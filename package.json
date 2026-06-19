@@ -8,7 +8,7 @@
   "description": "ICAI VERA - Professional Audit Tool",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gellavenugopal/audit-assistant-pro-electron"
+    "url": "https://github.com/ICAI-Audit/audit-assistant-pro-electron"
   },
   "scripts": {
     "dev": "vite",

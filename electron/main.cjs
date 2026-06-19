@@ -1695,7 +1695,7 @@ app.whenReady().then(() => {
     version: app.getVersion(),
     copyright: 'Copyright © 2026 ICAI VERA',
     authors: ['ICAI VERA'],
-    website: 'https://github.com/gellavenugopal/audit-assistant-pro-electron',
+    website: 'https://github.com/ICAI-Audit/audit-assistant-pro-electron',
     iconPath: path.join(__dirname, '../build/icon.png'),
   });
 

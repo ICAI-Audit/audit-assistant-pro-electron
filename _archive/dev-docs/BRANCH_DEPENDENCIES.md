@@ -318,7 +318,7 @@ node_modules/       - Installed dependencies (git-ignored)
 ## Git Information
 
 - **Current Branch**: trial-balance-new-fixes
-- **Remote**: origin (https://github.com/gellavenugopal/audit-assistant-pro-electron)
+- **Remote**: origin (https://github.com/ICAI-Audit/audit-assistant-pro-electron)
 - **Related Branches**:
   - main - Production ready code
   - tally - Tally-specific features
