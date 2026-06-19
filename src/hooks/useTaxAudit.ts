@@ -3,6 +3,7 @@ import { getSQLiteClient } from '@/integrations/sqlite/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FORM_3CD_CLAUSES, TAX_AUDIT_STATUTORY_VERSION } from '@/data/taxAudit3CDClauses';
 import {
+  TaxAuditAcceptanceCheck,
   TaxAuditClauseDefinition,
   TaxAuditClauseEvidence,
   TaxAuditClauseResponse,
@@ -15,8 +16,8 @@ import {
 import {
   deriveAssessmentYear,
   derivePreviousYearRange,
-  evaluateTaxAuditApplicability,
 } from '@/utils/tax-audit/applicability';
+import { calculateApplicability, TaxAuditApplicabilityInputs } from '@/lib/taxAuditApplicability';
 
 const db = getSQLiteClient();
 
@@ -34,6 +35,30 @@ const parseJson = <T,>(value: string | null | undefined, fallback: T): T => {
 const stringify = (value: unknown) => JSON.stringify(value ?? null);
 
 const sourceHash = (value: unknown) => JSON.stringify(value ?? {});
+
+const buildApplicabilityPatch = (setup: Partial<TaxAuditSetup>) => {
+  const setupJson = parseJson<Record<string, unknown>>(setup.setup_json, {});
+  const applicabilityInputs =
+    setupJson.applicabilityInputs && typeof setupJson.applicabilityInputs === 'object'
+      ? (setupJson.applicabilityInputs as TaxAuditApplicabilityInputs)
+      : {};
+  const calculation = calculateApplicability({ ...setup, ...applicabilityInputs });
+
+  return {
+    applicability_result: calculation.overall.result,
+    applicability_reason: calculation.overall.reason,
+    setup_json: stringify({
+      ...setupJson,
+      applicability: {
+        business: calculation.business,
+        profession: calculation.profession,
+        suggestedFormType: calculation.suggestedFormType,
+        warnings: calculation.warnings,
+        calculatedAt: new Date().toISOString(),
+      },
+    }),
+  };
+};
 
 const isCompanyConstitution = (value?: string | null) => {
   const normalized = (value || '').toLowerCase();
@@ -242,6 +267,7 @@ const createClausePrefill = (
 export function useTaxAudit(engagement: EngagementLike | null | undefined) {
   const { user } = useAuth();
   const [setup, setSetup] = useState<TaxAuditSetup | null>(null);
+  const [acceptanceCheck, setAcceptanceCheck] = useState<TaxAuditAcceptanceCheck | null>(null);
   const [clauses, setClauses] = useState<TaxAuditClauseResponse[]>([]);
   const [evidenceLinks, setEvidenceLinks] = useState<TaxAuditClauseEvidence[]>([]);
   const [client, setClient] = useState<ClientLike | null>(null);
@@ -315,21 +341,9 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
           sourceChip('Engagement', 'engagement', '/select-engagement'),
         ]),
       };
-      const applicability = evaluateTaxAuditApplicability({
-        businessOrProfession: baseSetup.business_or_profession || 'business',
-        turnover: baseSetup.turnover || 0,
-        grossReceipts: baseSetup.gross_receipts || 0,
-        cashReceiptsPercent: baseSetup.cash_receipts_percent || 0,
-        cashPaymentsPercent: baseSetup.cash_payments_percent || 0,
-        presumptiveTaxation: baseSetup.presumptive_taxation,
-        lowerThanPresumptive: baseSetup.lower_than_presumptive,
-        booksAuditedUnderOtherLaw: baseSetup.books_audited_under_other_law,
-      });
       return {
         ...baseSetup,
-        form_type: applicability.formType,
-        applicability_result: applicability.relevantClause,
-        applicability_reason: applicability.reason,
+        ...buildApplicabilityPatch(baseSetup),
       };
     },
     [engagement, user?.id]
@@ -373,6 +387,7 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
   const refresh = useCallback(async () => {
     if (!engagement?.id) {
       setSetup(null);
+      setAcceptanceCheck(null);
       setClauses([]);
       setEvidenceLinks([]);
       setClient(null);
@@ -414,7 +429,6 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
         const companyAuditPatch = {
           books_audited_under_other_law: 1,
           other_law_name: nextSetup.other_law_name || 'Companies Act, 2013',
-          form_type: '3CA',
         };
         const { error: companyPatchError } = await db
           .from('tax_audit_engagements')
@@ -426,6 +440,14 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
       }
 
       setSetup(nextSetup);
+
+      const { data: acceptanceData, error: acceptanceError } = await db
+        .from('tax_audit_acceptance_checks')
+        .select('*')
+        .eq('tax_audit_id', nextSetup.id)
+        .maybeSingle();
+      if (acceptanceError) throw acceptanceError;
+      setAcceptanceCheck((acceptanceData || null) as TaxAuditAcceptanceCheck | null);
 
       const { data: existingClauses, error: clausesError } = await db
         .from('tax_audit_clause_responses')
@@ -460,6 +482,7 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
     } catch (error) {
       console.error('Error loading tax audit:', error);
       setSetup(null);
+      setAcceptanceCheck(null);
       setClauses([]);
       setEvidenceLinks([]);
     } finally {
@@ -477,25 +500,16 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
       setSaving(true);
       try {
         const next = { ...setup, ...updates };
-        const applicability = evaluateTaxAuditApplicability({
-          businessOrProfession: next.business_or_profession || 'business',
-          turnover: next.turnover || 0,
-          grossReceipts: next.gross_receipts || 0,
-          cashReceiptsPercent: next.cash_receipts_percent || 0,
-          cashPaymentsPercent: next.cash_payments_percent || 0,
-          presumptiveTaxation: next.presumptive_taxation,
-          lowerThanPresumptive: next.lower_than_presumptive,
-          booksAuditedUnderOtherLaw: next.books_audited_under_other_law,
-        });
+        const applicabilityPatch = buildApplicabilityPatch(next);
 
         const payload = {
           ...updates,
           books_audited_under_other_law: updates.books_audited_under_other_law !== undefined ? toBoolNumber(updates.books_audited_under_other_law) : undefined,
           presumptive_taxation: updates.presumptive_taxation !== undefined ? toBoolNumber(updates.presumptive_taxation) : undefined,
           lower_than_presumptive: updates.lower_than_presumptive !== undefined ? toBoolNumber(updates.lower_than_presumptive) : undefined,
-          form_type: applicability.formType,
-          applicability_result: applicability.relevantClause,
-          applicability_reason: applicability.reason,
+          applicability_result: applicabilityPatch.applicability_result,
+          applicability_reason: applicabilityPatch.applicability_reason,
+          setup_json: applicabilityPatch.setup_json,
         };
 
         Object.keys(payload).forEach((key) => {
@@ -517,6 +531,52 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
       }
     },
     [refresh, setup]
+  );
+
+  const saveAcceptanceCheck = useCallback(
+    async (updates: Omit<TaxAuditAcceptanceCheck, 'tax_audit_id'>) => {
+      if (!setup?.id) return null;
+      setSaving(true);
+      try {
+        const payload = {
+          checklist_json: updates.checklist_json || '{}',
+          overall_status: updates.overall_status || 'not_started',
+          remarks_html: updates.remarks_html || '',
+          reviewed_by: updates.reviewed_by || null,
+          reviewed_at: updates.reviewed_at || null,
+          approved_by: updates.approved_by || null,
+          approved_at: updates.approved_at || null,
+        };
+
+        if (acceptanceCheck?.id) {
+          const { error } = await db
+            .from('tax_audit_acceptance_checks')
+            .update(payload)
+            .eq('id', acceptanceCheck.id)
+            .execute();
+          if (error) throw error;
+          const next = { ...acceptanceCheck, ...payload } as TaxAuditAcceptanceCheck;
+          setAcceptanceCheck(next);
+          return next;
+        }
+
+        const { data, error } = await db
+          .from('tax_audit_acceptance_checks')
+          .insert({
+            tax_audit_id: setup.id,
+            ...payload,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        const next = data as TaxAuditAcceptanceCheck;
+        setAcceptanceCheck(next);
+        return next;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [acceptanceCheck, setup?.id]
   );
 
   const refreshPrefill = useCallback(async () => {
@@ -644,6 +704,7 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
 
   return {
     setup,
+    acceptanceCheck,
     clauses,
     evidenceLinks,
     client,
@@ -652,6 +713,7 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
     summary,
     refresh,
     updateSetup,
+    saveAcceptanceCheck,
     refreshPrefill,
     updateClause,
     updateClauseStatus,

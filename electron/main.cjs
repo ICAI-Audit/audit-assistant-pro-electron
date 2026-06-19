@@ -71,6 +71,7 @@ function getSqliteDb() {
         // DO NOT wrap in try-catch - we want this to fail loudly if there's a problem
         initializeDatabaseSchema(sqliteDb);
         safeLog('✅ All database tables initialized successfully!');
+        runTaxAuditAy2025Backfill(sqliteDb);
 
       } catch (dbError) {
         safeLog('❌ Failed to create SQLite database:', dbError.message);
@@ -305,6 +306,126 @@ function initializeDatabaseSchema(db) {
   }
 
   safeLog(`✅ Verified all ${importantTables.length} critical tables exist`);
+}
+
+function runTaxAuditAy2025Backfill(db) {
+  const oldVersion = 'ITA_1961_RULE_6G_3CA_3CB_3CD';
+  const newVersion = 'ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025';
+  const targetAssessmentYear = 'AY 2025-26';
+  const targetFinancialYear = 'FY 2024-25';
+
+  const hasTable = (tableName) => Boolean(
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?").get(tableName)
+  );
+
+  if (
+    !hasTable('tax_audit_statutory_versions') ||
+    !hasTable('tax_audit_engagements') ||
+    !hasTable('tax_audit_clause_responses')
+  ) {
+    safeLog('   Tax Audit AY 2025-26 backfill skipped: Tax Audit tables are not available.');
+    return;
+  }
+
+  const insertVersion = db.prepare(`
+    INSERT OR IGNORE INTO tax_audit_statutory_versions (
+      version_key,
+      display_name,
+      act_name,
+      rule_reference,
+      form_set,
+      effective_from,
+      is_active
+    ) VALUES (?, ?, ?, ?, ?, ?, 1)
+  `);
+
+  const eligibleEngagements = db.prepare(`
+    SELECT id, engagement_id, assessment_year, financial_year
+    FROM tax_audit_engagements
+    WHERE statutory_version = ?
+      AND (assessment_year IS NULL OR TRIM(assessment_year) = '' OR TRIM(assessment_year) = ?)
+      AND (financial_year IS NULL OR TRIM(financial_year) = '' OR TRIM(financial_year) = ?)
+  `);
+
+  const findDuplicate = db.prepare(`
+    SELECT id
+    FROM tax_audit_engagements
+    WHERE engagement_id = ?
+      AND statutory_version = ?
+      AND id != ?
+    LIMIT 1
+  `);
+
+  const updateEngagement = db.prepare(`
+    UPDATE tax_audit_engagements
+    SET statutory_version = ?
+    WHERE id = ?
+      AND statutory_version = ?
+  `);
+
+  const updateClauseResponses = db.prepare(`
+    UPDATE tax_audit_clause_responses
+    SET statutory_version = ?
+    WHERE tax_audit_id = ?
+      AND statutory_version = ?
+  `);
+
+  try {
+    insertVersion.run(
+      newVersion,
+      'Income-tax Act, 1961 - Rule 6G - Forms 3CA/3CB/3CD - AY 2025-26',
+      'Income-tax Act, 1961',
+      'Rule 6G, Income-tax Rules, 1962; Notification No. 23/2025',
+      '3CA/3CB/3CD',
+      '2025-04-01'
+    );
+
+    const rows = eligibleEngagements.all(oldVersion, targetAssessmentYear, targetFinancialYear);
+    let migrated = 0;
+    let clauseResponsesUpdated = 0;
+    const conflicts = [];
+
+    const migrateRows = db.transaction(() => {
+      for (const row of rows) {
+        const duplicate = findDuplicate.get(row.engagement_id, newVersion, row.id);
+        if (duplicate) {
+          conflicts.push({
+            oldTaxAuditId: row.id,
+            existingTaxAuditId: duplicate.id,
+            engagementId: row.engagement_id,
+          });
+          continue;
+        }
+
+        const engagementResult = updateEngagement.run(newVersion, row.id, oldVersion);
+        if (engagementResult.changes === 0) {
+          continue;
+        }
+
+        migrated += engagementResult.changes;
+        const clauseResult = updateClauseResponses.run(newVersion, row.id, oldVersion);
+        clauseResponsesUpdated += clauseResult.changes;
+      }
+    });
+
+    migrateRows();
+
+    if (conflicts.length > 0) {
+      safeLog(`   Tax Audit AY 2025-26 backfill conflicts: ${conflicts.length} engagement(s) left unchanged.`);
+      conflicts.forEach((conflict) => {
+        safeLog(
+          `      engagement_id=${conflict.engagementId}, old_tax_audit_id=${conflict.oldTaxAuditId}, existing_ay_2025_26_tax_audit_id=${conflict.existingTaxAuditId}`
+        );
+      });
+    }
+
+    safeLog(
+      `   Tax Audit AY 2025-26 backfill complete: ${migrated} engagement(s) migrated, ${clauseResponsesUpdated} clause response(s) updated.`
+    );
+  } catch (error) {
+    safeLog('   Tax Audit AY 2025-26 backfill failed:', error.message);
+    throw error;
+  }
 }
 
 let currentUserId = null;

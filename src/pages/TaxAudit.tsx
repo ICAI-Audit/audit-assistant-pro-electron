@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -44,7 +45,13 @@ import { useEngagement } from '@/contexts/EngagementContext';
 import { useTaxAudit } from '@/hooks/useTaxAudit';
 import { useEvidenceFiles } from '@/hooks/useEvidenceFiles';
 import { FORM_3CD_CLAUSES, FORM_3CD_GROUPS } from '@/data/taxAudit3CDClauses';
+import { calculateApplicability, TaxAuditApplicabilityResult } from '@/lib/taxAuditApplicability';
 import {
+  TaxAuditAcceptanceCheck,
+  TaxAuditAcceptanceChecklist,
+  TaxAuditAcceptanceChecklistItem,
+  TaxAuditAcceptanceStatus,
+  TaxAuditChecklistResponse,
   TaxAuditClauseResponse,
   TaxAuditPrefillStatus,
   TaxAuditReviewStatus,
@@ -101,6 +108,140 @@ const numberValue = (value: unknown) => {
 
 type ClauseFilter = 'all' | 'attention' | 'evidence' | 'qualified' | 'reviewed';
 
+type SetupClient = {
+  pan?: string | null;
+  address?: string | null;
+};
+
+const ACCEPTANCE_CHECKLIST_VERSION = 1 as const;
+
+const acceptanceStatusLabel: Record<TaxAuditAcceptanceStatus, string> = {
+  not_started: 'Acceptance pending',
+  in_progress: 'In progress',
+  completed: 'Completed',
+  issue_noted: 'Issues noted',
+  not_accepted: 'Not accepted',
+};
+
+const acceptanceStatusBadgeVariant: Record<TaxAuditAcceptanceStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  not_started: 'secondary',
+  in_progress: 'outline',
+  completed: 'default',
+  issue_noted: 'outline',
+  not_accepted: 'destructive',
+};
+
+const responseLabel: Record<Exclude<TaxAuditChecklistResponse, ''>, string> = {
+  yes: 'Yes',
+  no: 'No',
+  na: 'NA',
+};
+
+const applicabilityBadgeVariant: Record<TaxAuditApplicabilityResult, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  Applicable: 'default',
+  'Not applicable': 'secondary',
+  'Review required': 'outline',
+  'Not assessed': 'outline',
+};
+
+const TAX_AUDIT_ACCEPTANCE_SECTIONS: TaxAuditAcceptanceChecklist['sections'] = [
+  {
+    id: 'auditor_eligibility_288_2',
+    title: 'A. Auditor eligibility under section 288(2)',
+    items: [
+      { id: 'valid_cop', label: 'Whether the signing auditor is a Chartered Accountant holding valid COP.', response: '', remarks: '' },
+      { id: 'eligible_accountant_288_2', label: 'Whether the auditor is eligible to act as accountant under section 288(2).', response: '', remarks: '' },
+      { id: 'relationship_disqualification', label: 'Whether the auditor is disqualified due to relationship with assessee.', response: '', remarks: '' },
+      { id: 'officer_or_employee', label: 'Whether the auditor is an officer or employee of the assessee.', response: '', remarks: '' },
+      { id: 'prohibited_interest', label: 'Whether the auditor or relative or partner has prohibited security, interest, indebtedness, guarantee, or business relationship.', response: '', remarks: '' },
+      { id: 'fraud_conviction', label: 'Whether the auditor has been convicted by a court for an offence involving fraud and 10 years have not elapsed.', response: '', remarks: '' },
+    ],
+  },
+  {
+    id: 'company_audit_eligibility',
+    title: 'B. Company audit eligibility where assessee is a company',
+    items: [
+      { id: 'companies_act_141_3', label: 'Whether the tax auditor is eligible under section 141(3) of the Companies Act, 2013, wherever applicable.', response: '', remarks: '' },
+    ],
+  },
+  {
+    id: 'books_internal_audit_restrictions',
+    title: 'C. Books and internal audit restrictions',
+    items: [
+      { id: 'maintains_books', label: 'Whether the auditor or firm is responsible for writing or maintaining books of account of the assessee.', response: '', remarks: '' },
+      { id: 'internal_auditor', label: 'Whether the auditor or firm is acting as internal auditor of the assessee.', response: '', remarks: '' },
+    ],
+  },
+  {
+    id: 'tax_audit_assignment_limit',
+    title: 'D. Tax audit assignment limit',
+    items: [
+      { id: 'within_prescribed_limit', label: 'Whether the signing member is within the prescribed tax audit limit.', response: '', remarks: '' },
+      { id: 'current_count', label: 'Capture current count.', response: '', remarks: '' },
+      { id: 'proposed_count', label: 'Capture proposed count after accepting this engagement.', response: '', remarks: '' },
+      { id: 'limit_conclusion', label: 'Record whether the audit falls within or outside the limit.', response: '', remarks: '' },
+    ],
+  },
+  {
+    id: 'previous_auditor_communication',
+    title: 'E. Previous auditor communication',
+    items: [
+      { id: 'previous_tax_auditor_exists', label: 'Whether previous year tax auditor exists.', response: '', remarks: '' },
+      { id: 'previous_auditor_name', label: 'Name of previous auditor.', response: '', remarks: '' },
+      { id: 'communication_required', label: 'Whether communication with previous auditor is required.', response: '', remarks: '' },
+      { id: 'communication_sent', label: 'Whether communication has been sent.', response: '', remarks: '' },
+      { id: 'communication_date', label: 'Date of communication.', response: '', remarks: '' },
+      { id: 'non_acceptance_reason_reported', label: 'Whether any professional reason for non-acceptance was reported.', response: '', remarks: '' },
+    ],
+  },
+  {
+    id: 'appointment_formalities',
+    title: 'F. Appointment and engagement formalities',
+    items: [
+      { id: 'appointment_letter_obtained', label: 'Whether appointment letter is obtained.', response: '', remarks: '' },
+      { id: 'engagement_letter_issued', label: 'Whether engagement letter is issued.', response: '', remarks: '' },
+      { id: 'acceptance_letter_issued', label: 'Whether acceptance letter is issued.', response: '', remarks: '' },
+      { id: 'tax_audit_register_updated', label: 'Whether tax audit register is updated.', response: '', remarks: '' },
+    ],
+  },
+];
+
+const buildDefaultAcceptanceChecklist = (): TaxAuditAcceptanceChecklist => ({
+  version: ACCEPTANCE_CHECKLIST_VERSION,
+  sections: TAX_AUDIT_ACCEPTANCE_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.map((item) => ({ ...item })),
+  })),
+});
+
+const normalizeAcceptanceChecklist = (value: string | null | undefined): TaxAuditAcceptanceChecklist => {
+  const fallback = buildDefaultAcceptanceChecklist();
+  const parsed = parseJson<Partial<TaxAuditAcceptanceChecklist>>(value, fallback);
+  const savedSections = Array.isArray(parsed.sections) ? parsed.sections : [];
+
+  return {
+    version: ACCEPTANCE_CHECKLIST_VERSION,
+    sections: fallback.sections.map((section) => {
+      const savedSection = savedSections.find((item) => item.id === section.id);
+      const savedItems = Array.isArray(savedSection?.items) ? savedSection.items : [];
+      return {
+        ...section,
+        items: section.items.map((item) => {
+          const savedItem = savedItems.find((candidate) => candidate.id === item.id);
+          return {
+            ...item,
+            response: savedItem?.response === 'yes' || savedItem?.response === 'no' || savedItem?.response === 'na' ? savedItem.response : '',
+            remarks: typeof savedItem?.remarks === 'string' ? savedItem.remarks : '',
+          };
+        }),
+      };
+    }),
+  };
+};
+
+const allChecklistItemsReviewed = (checklist: TaxAuditAcceptanceChecklist) =>
+  checklist.sections.every((section) => section.items.every((item) => item.response === 'yes' || item.response === 'no' || item.response === 'na'));
+
 const needsAttention = (clause?: TaxAuditClauseResponse) =>
   Boolean(
     clause &&
@@ -108,7 +249,7 @@ const needsAttention = (clause?: TaxAuditClauseResponse) =>
         clause.prefill_status === 'source_conflict' ||
         clause.validation_status === 'warning' ||
         clause.validation_status === 'error' ||
-        Boolean(clause.qualification_required))
+        toBool(clause.qualification_required))
   );
 
 const reviewSteps: TaxAuditReviewStatus[] = ['draft', 'prepared', 'reviewed', 'approved'];
@@ -162,7 +303,7 @@ function SetupPanel({
   setup: TaxAuditSetup;
   saving: boolean;
   onSave: (updates: Partial<TaxAuditSetup>) => Promise<unknown>;
-  client: any | null;
+  client: SetupClient | null;
 }) {
   const [draft, setDraft] = useState<TaxAuditSetup>(setup);
 
@@ -184,12 +325,63 @@ function SetupPanel({
   const setupSourceLinks = parseJson<TaxAuditSourceLink[]>(draft.source_links_json, []);
   const selectedReportForm = draft.form_type || (toBool(draft.books_audited_under_other_law) ? '3CA' : '3CB');
   const auditedUnderOtherLaw = selectedReportForm === '3CA' || toBool(draft.books_audited_under_other_law);
+  const setupJson = parseJson<Record<string, unknown>>(draft.setup_json, {});
+  const savedApplicabilityInputs =
+    setupJson.applicabilityInputs && typeof setupJson.applicabilityInputs === 'object'
+      ? (setupJson.applicabilityInputs as Record<string, unknown>)
+      : {};
+  const hasStoredActivityProfile =
+    savedApplicabilityInputs.has_business_activity !== undefined || savedApplicabilityInputs.has_professional_activity !== undefined;
+  const hasBusinessActivity = hasStoredActivityProfile
+    ? toBool(savedApplicabilityInputs.has_business_activity)
+    : (draft.business_or_profession || 'business') === 'business';
+  const hasProfessionalActivity = hasStoredActivityProfile
+    ? toBool(savedApplicabilityInputs.has_professional_activity)
+    : draft.business_or_profession === 'profession';
+  const businessTurnover = numberValue(savedApplicabilityInputs.business_turnover ?? draft.turnover);
+  const professionalGrossReceipts = numberValue(savedApplicabilityInputs.professional_gross_receipts ?? draft.gross_receipts);
+  const applicability = calculateApplicability({
+    ...draft,
+    has_business_activity: hasBusinessActivity,
+    has_professional_activity: hasProfessionalActivity,
+    business_turnover: businessTurnover,
+    professional_gross_receipts: professionalGrossReceipts,
+    form_type: selectedReportForm,
+    books_audited_under_other_law: auditedUnderOtherLaw ? 1 : 0,
+  });
 
   const updateDraft = (updates: Partial<TaxAuditSetup>) => {
     setDraft((prev) => ({ ...prev, ...updates }));
   };
 
+  const updateApplicabilityInputs = (updates: Record<string, unknown>) => {
+    setDraft((prev) => {
+      const prevJson = parseJson<Record<string, unknown>>(prev.setup_json, {});
+      const prevInputs =
+        prevJson.applicabilityInputs && typeof prevJson.applicabilityInputs === 'object'
+          ? (prevJson.applicabilityInputs as Record<string, unknown>)
+          : {};
+      const nextInputs = { ...prevInputs, ...updates };
+      return {
+        ...prev,
+        setup_json: JSON.stringify({
+          ...prevJson,
+          applicabilityInputs: nextInputs,
+        }),
+      };
+    });
+  };
+
   const save = async () => {
+    const nextSetupJson = JSON.stringify({
+      ...setupJson,
+      applicabilityInputs: {
+        has_business_activity: hasBusinessActivity,
+        has_professional_activity: hasProfessionalActivity,
+        business_turnover: businessTurnover,
+        professional_gross_receipts: professionalGrossReceipts,
+      },
+    });
     await onSave({
       assessee_name: draft.assessee_name,
       pan: draft.pan,
@@ -197,14 +389,16 @@ function SetupPanel({
       status: draft.status,
       business_or_profession: draft.business_or_profession,
       nature_of_business: draft.nature_of_business,
+      form_type: selectedReportForm,
       books_audited_under_other_law: auditedUnderOtherLaw ? 1 : 0,
       other_law_name: draft.other_law_name,
-      turnover: numberValue(draft.turnover),
-      gross_receipts: numberValue(draft.gross_receipts),
+      turnover: businessTurnover,
+      gross_receipts: professionalGrossReceipts,
       cash_receipts_percent: numberValue(draft.cash_receipts_percent),
       cash_payments_percent: numberValue(draft.cash_payments_percent),
       presumptive_taxation: draft.presumptive_taxation,
       lower_than_presumptive: draft.lower_than_presumptive,
+      setup_json: nextSetupJson,
     });
   };
 
@@ -225,10 +419,13 @@ function SetupPanel({
           </div>
         </div> */}
         <div className="flex items-center justify-end gap-2">
-          <Badge variant="outline">Form {draft.form_type} + 3CD</Badge>
-          <Badge variant={draft.applicability_result === 'Not applicable' ? 'secondary' : 'default'}>
-            {draft.applicability_result || 'Not assessed'}
+          <Badge variant="outline">Form {selectedReportForm} + 3CD</Badge>
+          <Badge variant={applicabilityBadgeVariant[applicability.overall.result]}>
+            {applicability.overall.result}
           </Badge>
+          <Button size="sm" variant="outline" onClick={save} disabled={saving}>
+            Recalculate Applicability
+          </Button>
           <Button size="sm" onClick={save} disabled={saving}>
             {saving ? 'Saving...' : 'Save Setup'}
           </Button>
@@ -243,6 +440,45 @@ function SetupPanel({
         )} */}
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-md border bg-muted/20 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Applicability Result</p>
+              <p className="mt-1 text-sm text-muted-foreground">{applicability.overall.reason}</p>
+            </div>
+            <Badge variant={applicabilityBadgeVariant[applicability.overall.result]}>{applicability.overall.result}</Badge>
+          </div>
+          <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Business</p>
+              <p className="font-medium">{applicability.business.result || '-'}</p>
+              <p className="text-xs text-muted-foreground">
+                {applicability.business.thresholdApplied || '-'} {applicability.business.sectionReference ? `| ${applicability.business.sectionReference}` : ''}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Profession</p>
+              <p className="font-medium">{applicability.profession.result || '-'}</p>
+              <p className="text-xs text-muted-foreground">
+                {applicability.profession.thresholdApplied || '-'} {applicability.profession.sectionReference ? `| ${applicability.profession.sectionReference}` : ''}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Recommended form</p>
+              <p className="font-medium">{applicability.suggestedFormType || '-'}</p>
+            </div>
+          </div>
+          {applicability.warnings.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {applicability.warnings.map((warning) => (
+                <p key={warning} className="text-xs text-amber-700">
+                  {warning}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="grid gap-3 md:grid-cols-4">
           <div className="space-y-1">
             <Label>Assessee</Label>
@@ -279,20 +515,28 @@ function SetupPanel({
             />
             <p className="text-xs text-muted-foreground">From Client Master</p>
           </div>
-          <div className="space-y-1">
-            <Label>Business / Profession</Label>
-            <Select
-              value={draft.business_or_profession || 'business'}
-              onValueChange={(value: 'business' | 'profession') => updateDraft({ business_or_profession: value })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="business">Business</SelectItem>
-                <SelectItem value="profession">Profession</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-2">
+            <Label>Activity Profile</Label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={hasBusinessActivity}
+                onCheckedChange={(checked) => {
+                  updateDraft({ business_or_profession: checked === true ? 'business' : hasProfessionalActivity ? 'profession' : draft.business_or_profession });
+                  updateApplicabilityInputs({ has_business_activity: checked === true });
+                }}
+              />
+              Business activity
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={hasProfessionalActivity}
+                onCheckedChange={(checked) => {
+                  updateDraft({ business_or_profession: checked === true && !hasBusinessActivity ? 'profession' : draft.business_or_profession });
+                  updateApplicabilityInputs({ has_professional_activity: checked === true });
+                }}
+              />
+              Professional activity
+            </label>
           </div>
           <div className="space-y-1">
             <Label>Nature</Label>
@@ -309,7 +553,6 @@ function SetupPanel({
                 updateDraft({
                   form_type: value,
                   books_audited_under_other_law: value === '3CA' ? 1 : 0,
-                  other_law_name: value === '3CA' && !draft.other_law_name ? 'Companies Act, 2013' : draft.other_law_name,
                 });
               }}
             >
@@ -322,14 +565,34 @@ function SetupPanel({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label>Turnover</Label>
-            <Input type="number" value={draft.turnover ?? 0} onChange={(e) => updateDraft({ turnover: Number(e.target.value) })} />
-          </div>
-          <div className="space-y-1">
-            <Label>Gross Receipts</Label>
-            <Input type="number" value={draft.gross_receipts ?? 0} onChange={(e) => updateDraft({ gross_receipts: Number(e.target.value) })} />
-          </div>
+          {hasBusinessActivity && (
+            <div className="space-y-1">
+              <Label>Business Turnover</Label>
+              <Input
+                type="number"
+                value={businessTurnover}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  updateDraft({ turnover: value });
+                  updateApplicabilityInputs({ business_turnover: value });
+                }}
+              />
+            </div>
+          )}
+          {hasProfessionalActivity && (
+            <div className="space-y-1">
+              <Label>Professional Gross Receipts</Label>
+              <Input
+                type="number"
+                value={professionalGrossReceipts}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  updateDraft({ gross_receipts: value });
+                  updateApplicabilityInputs({ professional_gross_receipts: value });
+                }}
+              />
+            </div>
+          )}
           <div className="space-y-1">
             <Label>Cash Receipts %</Label>
             <Input type="number" value={draft.cash_receipts_percent ?? 0} onChange={(e) => updateDraft({ cash_receipts_percent: Number(e.target.value) })} />
@@ -346,7 +609,6 @@ function SetupPanel({
                   updateDraft({
                     form_type: checked === true ? '3CA' : '3CB',
                     books_audited_under_other_law: checked === true ? 1 : 0,
-                    other_law_name: checked === true && !draft.other_law_name ? 'Companies Act, 2013' : draft.other_law_name,
                   })
                 }
               />
@@ -417,7 +679,7 @@ function ClauseNavigator({
     const clause = clausesByKey.get(definition.key);
     if (filter === 'attention') return needsAttention(clause);
     if (filter === 'evidence') return Boolean(clause && evidenceClauseIds.has(clause.id));
-    if (filter === 'qualified') return Boolean(clause?.qualification_required);
+    if (filter === 'qualified') return toBool(clause?.qualification_required);
     if (filter === 'reviewed') return clause?.review_status === 'reviewed' || clause?.review_status === 'approved';
     return true;
   };
@@ -450,7 +712,7 @@ function ClauseNavigator({
     {
       key: 'qualified',
       label: 'Remarks',
-      count: FORM_3CD_CLAUSES.filter((definition) => Boolean(clausesByKey.get(definition.key)?.qualification_required)).length,
+      count: FORM_3CD_CLAUSES.filter((definition) => toBool(clausesByKey.get(definition.key)?.qualification_required)).length,
     },
     {
       key: 'reviewed',
@@ -668,13 +930,13 @@ function ClauseEditor({
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
-              checked={Boolean(clause.qualification_required)}
+              checked={toBool(clause.qualification_required)}
               disabled={locked}
               onCheckedChange={(checked) => onUpdate({ qualification_required: checked === true ? 1 : 0 })}
             />
             Qualification / observation required in report
           </label>
-          {Boolean(clause.qualification_required) && (
+          {toBool(clause.qualification_required) && (
             <RichTextEditor
               value={clause.qualification_text_html || ''}
               onChange={(value) => onUpdate({ qualification_text_html: value })}
@@ -682,6 +944,216 @@ function ClauseEditor({
               disabled={locked}
             />
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AcceptanceChecklistPanel({
+  acceptanceCheck,
+  saving,
+  onSave,
+}: {
+  acceptanceCheck: TaxAuditAcceptanceCheck | null;
+  saving: boolean;
+  onSave: (updates: Omit<TaxAuditAcceptanceCheck, 'tax_audit_id'>) => Promise<unknown>;
+}) {
+  const { toast } = useToast();
+  const [checklist, setChecklist] = useState<TaxAuditAcceptanceChecklist>(() =>
+    normalizeAcceptanceChecklist(acceptanceCheck?.checklist_json)
+  );
+  const [overallStatus, setOverallStatus] = useState<TaxAuditAcceptanceStatus>(acceptanceCheck?.overall_status || 'not_started');
+  const [remarks, setRemarks] = useState(acceptanceCheck?.remarks_html || '');
+  const [reviewedBy, setReviewedBy] = useState(acceptanceCheck?.reviewed_by || '');
+  const [reviewedAt, setReviewedAt] = useState(acceptanceCheck?.reviewed_at || '');
+  const [approvedBy, setApprovedBy] = useState(acceptanceCheck?.approved_by || '');
+  const [approvedAt, setApprovedAt] = useState(acceptanceCheck?.approved_at || '');
+
+  useEffect(() => {
+    setChecklist(normalizeAcceptanceChecklist(acceptanceCheck?.checklist_json));
+    setOverallStatus(acceptanceCheck?.overall_status || 'not_started');
+    setRemarks(acceptanceCheck?.remarks_html || '');
+    setReviewedBy(acceptanceCheck?.reviewed_by || '');
+    setReviewedAt(acceptanceCheck?.reviewed_at || '');
+    setApprovedBy(acceptanceCheck?.approved_by || '');
+    setApprovedAt(acceptanceCheck?.approved_at || '');
+  }, [acceptanceCheck]);
+
+  const reviewedCount = checklist.sections.reduce(
+    (count, section) => count + section.items.filter((item) => item.response === 'yes' || item.response === 'no' || item.response === 'na').length,
+    0
+  );
+  const totalCount = checklist.sections.reduce((count, section) => count + section.items.length, 0);
+  const isComplete = totalCount > 0 && reviewedCount === totalCount;
+
+  const updateItem = (
+    sectionId: string,
+    itemId: string,
+    updates: Partial<Pick<TaxAuditAcceptanceChecklistItem, 'response' | 'remarks'>>
+  ) => {
+    setChecklist((prev) => ({
+      ...prev,
+      sections: prev.sections.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              items: section.items.map((item) => (item.id === itemId ? { ...item, ...updates } : item)),
+            }
+          : section
+      ),
+    }));
+    if (overallStatus === 'not_started') {
+      setOverallStatus('in_progress');
+    }
+  };
+
+  const save = async () => {
+    if (overallStatus === 'completed' && !allChecklistItemsReviewed(checklist)) {
+      toast({
+        title: 'Checklist incomplete',
+        description: 'Select Yes, No, or NA for every checklist item before marking it completed.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const nextReviewedAt =
+      (overallStatus === 'completed' || overallStatus === 'issue_noted' || overallStatus === 'not_accepted') && !reviewedAt
+        ? now
+        : reviewedAt || null;
+    const nextApprovedAt = approvedBy.trim() && !approvedAt ? now : approvedAt || null;
+
+    await onSave({
+      id: acceptanceCheck?.id,
+      checklist_json: JSON.stringify(checklist),
+      overall_status: overallStatus,
+      remarks_html: remarks,
+      reviewed_by: reviewedBy.trim() || null,
+      reviewed_at: nextReviewedAt,
+      approved_by: approvedBy.trim() || null,
+      approved_at: nextApprovedAt,
+    });
+
+    if (nextReviewedAt) setReviewedAt(nextReviewedAt);
+    if (nextApprovedAt) setApprovedAt(nextApprovedAt);
+    toast({ title: 'Acceptance checklist saved' });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border bg-background p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Acceptance and Eligibility</p>
+            <p className="text-xs text-muted-foreground">
+              {reviewedCount} of {totalCount} checklist items reviewed
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={acceptanceStatusBadgeVariant[overallStatus]}>
+              {acceptanceStatusLabel[overallStatus]}
+            </Badge>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Checklist'}
+            </Button>
+          </div>
+        </div>
+        <Progress value={totalCount ? Math.round((reviewedCount / totalCount) * 100) : 0} className="mt-3 h-2" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          {checklist.sections.map((section) => (
+            <div key={section.id} className="rounded-md border bg-background">
+              <div className="border-b bg-muted/40 px-4 py-3">
+                <p className="text-sm font-semibold">{section.title}</p>
+              </div>
+              <div className="divide-y">
+                {section.items.map((item) => (
+                  <div key={item.id} className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_120px_minmax(180px,260px)]">
+                    <p className="text-sm">{item.label}</p>
+                    <Select
+                      value={item.response || 'unanswered'}
+                      onValueChange={(value) =>
+                        updateItem(section.id, item.id, {
+                          response: value === 'unanswered' ? '' : (value as TaxAuditChecklistResponse),
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unanswered">Select</SelectItem>
+                        <SelectItem value="yes">{responseLabel.yes}</SelectItem>
+                        <SelectItem value="no">{responseLabel.no}</SelectItem>
+                        <SelectItem value="na">{responseLabel.na}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={item.remarks}
+                      onChange={(event) => updateItem(section.id, item.id, { remarks: event.target.value })}
+                      placeholder="Remarks"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Checklist Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1">
+                <Label>Overall status</Label>
+                <Select value={overallStatus} onValueChange={(value: TaxAuditAcceptanceStatus) => setOverallStatus(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Not started</SelectItem>
+                    <SelectItem value="in_progress">In progress</SelectItem>
+                    <SelectItem value="completed" disabled={!isComplete}>
+                      Completed
+                    </SelectItem>
+                    <SelectItem value="issue_noted">Issue noted</SelectItem>
+                    <SelectItem value="not_accepted">Not accepted</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!isComplete && (
+                  <p className="text-xs text-muted-foreground">Complete all checklist responses before selecting Completed.</p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <Label>Overall remarks</Label>
+                <Textarea
+                  value={remarks}
+                  onChange={(event) => setRemarks(event.target.value)}
+                  placeholder="Document acceptance conclusion, issues noted, or basis for non-acceptance"
+                  rows={5}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label>Reviewed by</Label>
+                <Input value={reviewedBy} onChange={(event) => setReviewedBy(event.target.value)} placeholder="Reviewer name" />
+                {reviewedAt && <p className="text-xs text-muted-foreground">Reviewed at {new Date(reviewedAt).toLocaleString()}</p>}
+              </div>
+
+              <div className="space-y-1">
+                <Label>Approved by</Label>
+                <Input value={approvedBy} onChange={(event) => setApprovedBy(event.target.value)} placeholder="Approver name" />
+                {approvedAt && <p className="text-xs text-muted-foreground">Approved at {new Date(approvedAt).toLocaleString()}</p>}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
@@ -826,6 +1298,7 @@ export default function TaxAudit() {
   const { toast } = useToast();
   const {
     setup,
+    acceptanceCheck,
     clauses,
     evidenceLinks,
     client,
@@ -833,6 +1306,7 @@ export default function TaxAudit() {
     saving,
     summary,
     updateSetup,
+    saveAcceptanceCheck,
     refreshPrefill,
     updateClause,
     updateClauseStatus,
@@ -883,7 +1357,7 @@ export default function TaxAudit() {
       clause.prefill_status === 'source_conflict' ||
       clause.validation_status === 'warning' ||
       clause.validation_status === 'error' ||
-      Boolean(clause.qualification_required)
+      toBool(clause.qualification_required)
   );
 
   return (
@@ -899,6 +1373,9 @@ export default function TaxAudit() {
           <Badge variant="outline">Income-tax Act, 1961</Badge>
           <Badge variant="outline">Rule 6G</Badge>
           <Badge>Form {setup.form_type} + 3CD</Badge>
+          {(setup.applicability_result === 'Review required' || setup.applicability_result === 'Not assessed') && (
+            <Badge variant="outline">{setup.applicability_result}</Badge>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -971,6 +1448,10 @@ export default function TaxAudit() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
+          <TabsTrigger value="acceptance">
+            <ClipboardCheck className="mr-2 h-4 w-4" />
+            Acceptance and Eligibility
+          </TabsTrigger>
           <TabsTrigger value="workspace">
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Clause Workspace
@@ -981,7 +1462,23 @@ export default function TaxAudit() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="acceptance">
+          <AcceptanceChecklistPanel
+            acceptanceCheck={acceptanceCheck}
+            saving={saving}
+            onSave={saveAcceptanceCheck}
+          />
+        </TabsContent>
+
         <TabsContent value="workspace">
+          {acceptanceCheck?.overall_status !== 'completed' && (
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Acceptance and eligibility checklist is not completed. Clause work remains available, but complete the checklist before finalizing the Tax Audit file.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] h-[800px]">
             <ClauseNavigator
               selectedKey={selectedClause?.clause_key || selectedClauseKey}

@@ -1,4 +1,4 @@
-export type TaxAuditStatutoryVersion = 'ITA_1961_RULE_6G_3CA_3CB_3CD';
+export type TaxAuditStatutoryVersion = 'ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025';
 
 export type TaxAuditFormType = '3CA' | '3CB';
 
@@ -16,6 +16,10 @@ export type TaxAuditPrefillStatus =
 export type TaxAuditApplicabilityStatus = 'applicable' | 'not_applicable' | 'not_assessed';
 
 export type TaxAuditValidationStatus = 'not_run' | 'valid' | 'warning' | 'error';
+
+export type TaxAuditAcceptanceStatus = 'not_started' | 'in_progress' | 'completed' | 'issue_noted' | 'not_accepted';
+
+export type TaxAuditChecklistResponse = 'yes' | 'no' | 'na' | '';
 
 export type TaxAuditSourceModule =
   | 'client_master'
@@ -115,6 +119,38 @@ export type TaxAuditClauseResponse = {
   locked_by?: string | null;
   locked_at?: string | null;
   unlock_reason?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TaxAuditAcceptanceChecklistItem = {
+  id: string;
+  label: string;
+  response: TaxAuditChecklistResponse;
+  remarks: string;
+};
+
+export type TaxAuditAcceptanceChecklistSection = {
+  id: string;
+  title: string;
+  items: TaxAuditAcceptanceChecklistItem[];
+};
+
+export type TaxAuditAcceptanceChecklist = {
+  version: 1;
+  sections: TaxAuditAcceptanceChecklistSection[];
+};
+
+export type TaxAuditAcceptanceCheck = {
+  id?: string;
+  tax_audit_id: string;
+  checklist_json: string;
+  overall_status: TaxAuditAcceptanceStatus;
+  remarks_html?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };

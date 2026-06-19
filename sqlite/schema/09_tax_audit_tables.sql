@@ -44,12 +44,12 @@ INSERT OR IGNORE INTO tax_audit_statutory_versions (
     effective_from,
     is_active
 ) VALUES (
-    'ITA_1961_RULE_6G_3CA_3CB_3CD',
-    'Income-tax Act, 1961 - Rule 6G - Forms 3CA/3CB/3CD',
+    'ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025',
+    'Income-tax Act, 1961 - Rule 6G - Forms 3CA/3CB/3CD - AY 2025-26',
     'Income-tax Act, 1961',
-    'Rule 6G, Income-tax Rules, 1962',
+    'Rule 6G, Income-tax Rules, 1962; Notification No. 23/2025',
     '3CA/3CB/3CD',
-    '1962-04-01',
+    '2025-04-01',
     1
 );
 
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS tax_audit_engagements (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     engagement_id TEXT NOT NULL,
     client_id TEXT,
-    statutory_version TEXT NOT NULL DEFAULT 'ITA_1961_RULE_6G_3CA_3CB_3CD',
+    statutory_version TEXT NOT NULL DEFAULT 'ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025',
     form_type TEXT NOT NULL DEFAULT '3CB' CHECK (form_type IN ('3CA', '3CB')),
     financial_year TEXT,
     assessment_year TEXT,
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS tax_audit_clause_responses (
     clause_key TEXT NOT NULL,
     clause_no TEXT NOT NULL,
     clause_title TEXT NOT NULL,
-    statutory_version TEXT NOT NULL DEFAULT 'ITA_1961_RULE_6G_3CA_3CB_3CD',
+    statutory_version TEXT NOT NULL DEFAULT 'ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025',
     applicability_status TEXT NOT NULL DEFAULT 'applicable' CHECK (applicability_status IN ('applicable', 'not_applicable', 'not_assessed')),
     response_json TEXT DEFAULT '{}',
     response_html TEXT,
@@ -165,6 +165,24 @@ CREATE TABLE IF NOT EXISTS tax_audit_clause_evidence (
 CREATE UNIQUE INDEX IF NOT EXISTS ux_tax_audit_clause_evidence ON tax_audit_clause_evidence(clause_response_id, evidence_file_id);
 CREATE INDEX IF NOT EXISTS idx_tax_audit_clause_evidence_tax_audit_id ON tax_audit_clause_evidence(tax_audit_id);
 CREATE INDEX IF NOT EXISTS idx_tax_audit_clause_evidence_file_id ON tax_audit_clause_evidence(evidence_file_id);
+
+CREATE TABLE IF NOT EXISTS tax_audit_acceptance_checks (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    tax_audit_id TEXT NOT NULL UNIQUE,
+    checklist_json TEXT NOT NULL DEFAULT '{}',
+    overall_status TEXT NOT NULL DEFAULT 'not_started' CHECK (overall_status IN ('not_started', 'in_progress', 'completed', 'issue_noted', 'not_accepted')),
+    remarks_html TEXT,
+    reviewed_by TEXT,
+    reviewed_at TEXT,
+    approved_by TEXT,
+    approved_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (tax_audit_id) REFERENCES tax_audit_engagements(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_tax_audit_acceptance_checks_tax_audit_id ON tax_audit_acceptance_checks(tax_audit_id);
+CREATE INDEX IF NOT EXISTS idx_tax_audit_acceptance_checks_overall_status ON tax_audit_acceptance_checks(overall_status);
 
 CREATE TABLE IF NOT EXISTS tax_audit_qualifications (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
@@ -235,6 +253,12 @@ CREATE TRIGGER IF NOT EXISTS update_tax_audit_clause_responses_timestamp
 AFTER UPDATE ON tax_audit_clause_responses
 BEGIN
     UPDATE tax_audit_clause_responses SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_tax_audit_acceptance_checks_timestamp
+AFTER UPDATE ON tax_audit_acceptance_checks
+BEGIN
+    UPDATE tax_audit_acceptance_checks SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
 CREATE TRIGGER IF NOT EXISTS update_tax_audit_qualifications_timestamp

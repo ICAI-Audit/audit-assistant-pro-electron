@@ -1,6 +1,6 @@
 import { TaxAuditClauseDefinition } from '@/types/taxAudit';
 
-export const TAX_AUDIT_STATUTORY_VERSION = 'ITA_1961_RULE_6G_3CA_3CB_3CD' as const;
+export const TAX_AUDIT_STATUTORY_VERSION = 'ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025' as const;
 
 export const FORM_3CD_GROUPS = [
   'Part A - Basic Particulars',
@@ -41,11 +41,10 @@ export const FORM_3CD_CLAUSES: TaxAuditClauseDefinition[] = [
   { key: 'clause_25', clauseNo: '25', title: 'Amounts chargeable under section 41', group: FORM_3CD_GROUPS[2], prefillStrategy: 'financial_review' },
   { key: 'clause_26', clauseNo: '26', title: 'Liabilities covered by section 43B', group: FORM_3CD_GROUPS[3], prefillStrategy: 'financial_review', requiresEvidence: true },
   { key: 'clause_27', clauseNo: '27', title: 'CENVAT/Input tax credit and prior period items', group: FORM_3CD_GROUPS[3], prefillStrategy: 'financial_review' },
-  { key: 'clause_28', clauseNo: '28', title: 'Shares received without/inadequate consideration', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual', requiresEvidence: true },
-  { key: 'clause_29', clauseNo: '29', title: 'Income referred to in section 56(2)(ix)', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
-  { key: 'clause_29a', clauseNo: '29A', title: 'Amount chargeable under section 56(2)(x)', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
-  { key: 'clause_30', clauseNo: '30', title: 'Primary adjustments to transfer price under section 92CE', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
-  { key: 'clause_30a', clauseNo: '30A', title: 'Secondary adjustment under section 92CE', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
+  { key: 'clause_29a', clauseNo: '29A', title: 'Amount includible in income under section 56(2)(ix)', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
+  { key: 'clause_29b', clauseNo: '29B', title: 'Amount includible in income under section 56(2)(x)', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
+  { key: 'clause_30', clauseNo: '30', title: 'Hundi loans and repayments otherwise than by account payee cheque under section 69D', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
+  { key: 'clause_30a', clauseNo: '30A', title: 'Primary adjustment to transfer price under section 92CE', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
   { key: 'clause_30b', clauseNo: '30B', title: 'Limitation on interest deduction under section 94B', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
   { key: 'clause_30c', clauseNo: '30C', title: 'Impermissible avoidance arrangement', group: FORM_3CD_GROUPS[4], prefillStrategy: 'manual' },
   { key: 'clause_31', clauseNo: '31', title: 'Loans, deposits and specified sums', group: FORM_3CD_GROUPS[4], prefillStrategy: 'financial_review', requiresEvidence: true },
@@ -55,6 +54,7 @@ export const FORM_3CD_CLAUSES: TaxAuditClauseDefinition[] = [
   { key: 'clause_35', clauseNo: '35', title: 'Trading and manufacturing quantitative details', group: FORM_3CD_GROUPS[6], prefillStrategy: 'financial_review', requiresEvidence: true },
   { key: 'clause_36', clauseNo: '36', title: 'Dividend distribution tax details', group: FORM_3CD_GROUPS[5], prefillStrategy: 'manual' },
   { key: 'clause_36a', clauseNo: '36A', title: 'Deemed dividend under section 2(22)(e)', group: FORM_3CD_GROUPS[5], prefillStrategy: 'manual' },
+  { key: 'clause_36b', clauseNo: '36B', title: 'Amount received for buyback of shares under section 2(22)(f)', group: FORM_3CD_GROUPS[5], prefillStrategy: 'manual' },
   { key: 'clause_37', clauseNo: '37', title: 'Cost audit details', group: FORM_3CD_GROUPS[6], prefillStrategy: 'manual' },
   { key: 'clause_38', clauseNo: '38', title: 'Central excise audit details', group: FORM_3CD_GROUPS[6], prefillStrategy: 'manual' },
   { key: 'clause_39', clauseNo: '39', title: 'Service tax audit details', group: FORM_3CD_GROUPS[6], prefillStrategy: 'manual' },
