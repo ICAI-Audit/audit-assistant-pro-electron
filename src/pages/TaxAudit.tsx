@@ -3,6 +3,8 @@ import type { ElementType } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  ChevronDown,
+  ChevronRight,
   CheckCircle2,
   ClipboardCheck,
   FileCheck,
@@ -109,6 +111,22 @@ const badgeClass = (status: TaxAuditPrefillStatus) =>
     status === 'outdated_source' && 'border-orange-300 bg-orange-50 text-orange-700',
     status === 'manual_override' && 'border-blue-300 bg-blue-50 text-blue-700'
   );
+
+const compactStatusClass = (clause?: TaxAuditClauseResponse) => {
+  if (!clause) return 'bg-slate-300';
+  if (clause.prefill_status === 'source_conflict' || clause.validation_status === 'error') return 'bg-red-500';
+  if (needsAttention(clause)) return 'bg-amber-500';
+  if (clause.prefill_status === 'auto_filled') return 'bg-emerald-500';
+  if (clause.prefill_status === 'manual_override') return 'bg-blue-500';
+  return 'bg-slate-400';
+};
+
+const compactStatusLabel = (clause?: TaxAuditClauseResponse) => {
+  if (!clause) return 'Open';
+  if (clause.prefill_status === 'source_conflict' || clause.validation_status === 'error') return 'Conflict';
+  if (needsAttention(clause)) return 'Needs input';
+  return statusLabel[clause.prefill_status];
+};
 
 const toBool = (value: unknown) => value === true || value === 1 || value === '1';
 
@@ -1006,6 +1024,7 @@ function ClauseNavigator({
 }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ClauseFilter>('all');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const evidenceClauseIds = useMemo(
     () => new Set(evidenceLinks.map((link) => link.clause_response_id)),
     [evidenceLinks]
@@ -1060,6 +1079,18 @@ function ClauseNavigator({
     },
   ];
 
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) {
+        next.delete(group);
+      } else {
+        next.add(group);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="h-full overflow-hidden rounded-md border bg-background">
       <div className="space-y-2 border-b bg-background p-2.5">
@@ -1098,52 +1129,67 @@ function ClauseNavigator({
       <div className="h-[calc(100%-116px)] overflow-y-auto divide-y">
         {FORM_3CD_GROUPS.map((group) => {
           const groupClauses = visibleClauses.filter((clause) => clause.group === group);
+          const allGroupClauses = FORM_3CD_CLAUSES.filter((clause) => clause.group === group);
+          const pendingCount = allGroupClauses.filter((definition) => needsAttention(clausesByKey.get(definition.key))).length;
+          const isCollapsed = collapsedGroups.has(group);
           if (groupClauses.length === 0) return null;
           return (
             <div key={group}>
-              <div className="bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase text-muted-foreground">
-                {group}
-              </div>
-              {groupClauses.map((definition) => {
-              const clause = clausesByKey.get(definition.key);
-              const selected = selectedKey === definition.key;
-              const hasEvidence = Boolean(clause && evidenceClauseIds.has(clause.id));
-              return (
-                <button
-                  key={definition.key}
-                  type="button"
-                  onClick={() => onSelect(definition.key)}
-                  className={cn(
-                    'flex w-full items-start gap-2 border-l-2 border-transparent px-3 py-1.5 text-left text-sm hover:bg-muted/50',
-                    selected && 'border-primary bg-primary/10'
-                  )}
-                >
-                  <span className={cn('w-8 shrink-0 font-mono text-xs text-muted-foreground', selected && 'font-semibold text-primary')}>
-                    {definition.clauseNo}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className={cn('line-clamp-1 text-xs', selected && 'font-medium')}>{definition.title}</span>
-                    {clause && (
-                      <span className="mt-1 flex flex-wrap items-center gap-1">
-                        <Badge variant="outline" className={badgeClass(clause.prefill_status)}>
-                          {statusLabel[clause.prefill_status]}
-                        </Badge>
-                        {clause.review_status !== 'draft' && (
-                          <Badge variant="secondary" className="text-[11px]">
-                            {reviewLabel[clause.review_status]}
-                          </Badge>
-                        )}
-                        {hasEvidence && (
-                          <Badge variant="outline" className="gap-1 px-1.5 text-[10px]">
-                            <Paperclip className="h-3 w-3" />
-                          </Badge>
-                        )}
+              <button
+                type="button"
+                onClick={() => toggleGroup(group)}
+                className="flex w-full items-center gap-1.5 bg-muted/30 px-2.5 py-1.5 text-left text-[10px] font-semibold uppercase text-muted-foreground hover:bg-muted/50"
+                title={isCollapsed ? `Expand ${group}` : `Collapse ${group}`}
+              >
+                {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                <span className="min-w-0 flex-1 truncate">{group}</span>
+                <span className="shrink-0 font-medium normal-case">
+                  {allGroupClauses.length} clauses{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}
+                </span>
+              </button>
+              {!isCollapsed &&
+                groupClauses.map((definition) => {
+                  const clause = clausesByKey.get(definition.key);
+                  const selected = selectedKey === definition.key;
+                  const hasEvidence = Boolean(clause && evidenceClauseIds.has(clause.id));
+                  const statusText = compactStatusLabel(clause);
+                  const title = `${definition.clauseNo} ${definition.title}${clause ? ` | ${statusText} | ${reviewLabel[clause.review_status]}` : ''}`;
+                  return (
+                    <button
+                      key={definition.key}
+                      type="button"
+                      onClick={() => onSelect(definition.key)}
+                      title={title}
+                      className={cn(
+                        'flex w-full items-center gap-2 border-l-2 border-transparent px-2.5 py-1 text-left text-sm hover:bg-muted/50',
+                        selected && 'border-primary bg-primary/10'
+                      )}
+                    >
+                      <span className={cn('w-8 shrink-0 font-mono text-[11px] text-muted-foreground', selected && 'font-semibold text-primary')}>
+                        {definition.clauseNo}
                       </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
+                      <span
+                        className={cn('h-2 w-2 shrink-0 rounded-full', compactStatusClass(clause))}
+                        title={statusText}
+                        aria-label={statusText}
+                      />
+                      <span className={cn('min-w-0 flex-1 truncate text-xs leading-6', selected && 'font-medium')}>
+                        {definition.title}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1">
+                        {selected && clause && (
+                          <span className="rounded-sm border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {statusText}
+                          </span>
+                        )}
+                        {hasEvidence && <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />}
+                        {clause?.review_status === 'reviewed' || clause?.review_status === 'approved' || clause?.review_status === 'locked' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        ) : null}
+                      </span>
+                    </button>
+                  );
+                })}
             </div>
           );
         })}
@@ -1171,28 +1217,38 @@ function ClauseEditor({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border bg-background">
-      <div className="shrink-0 border-b bg-background px-3 py-2">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="sticky top-0 z-10 shrink-0 border-b bg-background/95 px-3 py-2 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">Clause {clause.clause_no}</Badge>
-              <Badge variant="outline" className={badgeClass(clause.prefill_status)}>
-                {statusLabel[clause.prefill_status]}
-              </Badge>
-              <Badge variant="secondary">{reviewLabel[clause.review_status]}</Badge>
-              <Badge variant="outline">{clause.workpaper_ref || `TA-3CD-${clause.clause_no}`}</Badge>
-              {locked && <Lock className="h-4 w-4 text-muted-foreground" />}
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="truncate text-base font-semibold leading-snug">
+                Clause {clause.clause_no} <span className="font-normal text-muted-foreground">·</span> {clause.clause_title}
+              </h2>
+              {locked && <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />}
             </div>
-            <h2 className="mt-1 line-clamp-2 text-base font-semibold leading-snug">{clause.clause_title}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span
+                className={cn('h-2 w-2 rounded-full', compactStatusClass(clause))}
+                title={statusLabel[clause.prefill_status]}
+                aria-label={statusLabel[clause.prefill_status]}
+              />
+              <span className={cn(clause.prefill_status === 'auto_filled' && 'text-emerald-700')}>
+                {statusLabel[clause.prefill_status]}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>{reviewLabel[clause.review_status]}</span>
+              <span aria-hidden="true">·</span>
+              <span className="font-mono text-[11px]">{clause.workpaper_ref || `TA-3CD-${clause.clause_no}`}</span>
+            </div>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-1">
-            <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => onStatus('prepared')} disabled={locked}>
+          <div className="flex shrink-0 flex-wrap items-center gap-1">
+            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => onStatus('prepared')} disabled={locked}>
               Prepared
             </Button>
-            <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => onStatus('reviewed')} disabled={locked}>
+            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => onStatus('reviewed')} disabled={locked}>
               Reviewed
             </Button>
-            <Button size="sm" className="h-8 px-2" onClick={() => onStatus('approved')} disabled={locked}>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={() => onStatus('approved')} disabled={locked}>
               Approve
             </Button>
           </div>
