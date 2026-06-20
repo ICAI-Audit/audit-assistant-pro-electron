@@ -21,6 +21,31 @@ export type TaxAuditAcceptanceStatus = 'not_started' | 'in_progress' | 'complete
 
 export type TaxAuditChecklistResponse = 'yes' | 'no' | 'na' | '';
 
+export type TaxAuditComplianceWorkflowStatus = 'pending' | 'completed' | 'not_applicable';
+
+export type TaxAuditComplianceTracker = {
+  version: 1;
+  due_date_for_return: string;
+  specified_date_for_tax_audit_report: string;
+  is_transfer_pricing_applicable: boolean;
+  remarks: string;
+  assigned_by_client_on_portal: TaxAuditComplianceWorkflowStatus;
+  accepted_by_ca_on_portal: TaxAuditComplianceWorkflowStatus;
+  form_3ca_3cb_uploaded: TaxAuditComplianceWorkflowStatus;
+  form_3cd_uploaded: TaxAuditComplianceWorkflowStatus;
+  financial_statements_uploaded: TaxAuditComplianceWorkflowStatus;
+  client_accepted_uploaded_report: TaxAuditComplianceWorkflowStatus;
+  acknowledgement_reference: string;
+  acknowledgement_date: string;
+  udin_required: TaxAuditComplianceWorkflowStatus;
+  udin_generated: TaxAuditComplianceWorkflowStatus;
+  udin_number: string;
+  udin_generated_date: string;
+  udin_updated_on_income_tax_portal: TaxAuditComplianceWorkflowStatus;
+  udin_update_due_date: string;
+  udin_remarks: string;
+};
+
 export type TaxAuditSourceModule =
   | 'client_master'
   | 'engagement'

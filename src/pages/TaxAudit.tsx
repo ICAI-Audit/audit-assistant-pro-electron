@@ -9,6 +9,8 @@ import {
   FileSpreadsheet,
   Lock,
   Paperclip,
+  PanelRightClose,
+  PanelRightOpen,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -53,13 +55,22 @@ import {
   TaxAuditAcceptanceStatus,
   TaxAuditChecklistResponse,
   TaxAuditClauseResponse,
+  TaxAuditComplianceTracker,
+  TaxAuditComplianceWorkflowStatus,
   TaxAuditPrefillStatus,
   TaxAuditReviewStatus,
   TaxAuditSetup,
   TaxAuditSourceLink,
+  TaxAuditSummary,
 } from '@/types/taxAudit';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import {
+  calculateSpecifiedDateFromReturnDueDate,
+  calculateUdinUpdateDueDate,
+  normalizeTaxAuditComplianceTracker,
+  summarizeTaxAuditComplianceTracker,
+} from '@/lib/taxAuditComplianceTracker';
 
 const parseJson = <T,>(value: string | null | undefined, fallback: T): T => {
   if (!value) return fallback;
@@ -142,6 +153,18 @@ const applicabilityBadgeVariant: Record<TaxAuditApplicabilityResult, 'default' |
   'Not applicable': 'secondary',
   'Review required': 'outline',
   'Not assessed': 'outline',
+};
+
+const complianceStatusLabel: Record<TaxAuditComplianceWorkflowStatus, string> = {
+  pending: 'Pending',
+  completed: 'Completed',
+  not_applicable: 'Not applicable',
+};
+
+const complianceStatusBadgeVariant: Record<TaxAuditComplianceWorkflowStatus, 'default' | 'secondary' | 'outline'> = {
+  pending: 'outline',
+  completed: 'default',
+  not_applicable: 'secondary',
 };
 
 const TAX_AUDIT_ACCEPTANCE_SECTIONS: TaxAuditAcceptanceChecklist['sections'] = [
@@ -252,8 +275,6 @@ const needsAttention = (clause?: TaxAuditClauseResponse) =>
         toBool(clause.qualification_required))
   );
 
-const reviewSteps: TaxAuditReviewStatus[] = ['draft', 'prepared', 'reviewed', 'approved'];
-
 function MetricCard({
   label,
   value,
@@ -294,6 +315,266 @@ function MetricCard({
   );
 }
 
+function ComplianceStatusSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: TaxAuditComplianceWorkflowStatus;
+  onChange: (value: TaxAuditComplianceWorkflowStatus) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label>{label}</Label>
+      <Select value={value} onValueChange={(nextValue: TaxAuditComplianceWorkflowStatus) => onChange(nextValue)}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="completed">Completed</SelectItem>
+          <SelectItem value="not_applicable">Not applicable</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function ComplianceTrackerCard({
+  tracker,
+  saving,
+  onChange,
+  onSave,
+}: {
+  tracker: TaxAuditComplianceTracker;
+  saving: boolean;
+  onChange: (updates: Partial<TaxAuditComplianceTracker>) => void;
+  onSave: () => Promise<void>;
+}) {
+  const summary = summarizeTaxAuditComplianceTracker(tracker);
+  const badgeVariant = summary.completed ? 'default' : 'outline';
+
+  const updateReturnDueDate = (dueDate: string) => {
+    const previousAutoSpecifiedDate = calculateSpecifiedDateFromReturnDueDate(tracker.due_date_for_return);
+    const nextAutoSpecifiedDate = calculateSpecifiedDateFromReturnDueDate(dueDate);
+    const shouldApplyAutoSpecifiedDate =
+      !tracker.specified_date_for_tax_audit_report ||
+      tracker.specified_date_for_tax_audit_report === previousAutoSpecifiedDate;
+
+    onChange({
+      due_date_for_return: dueDate,
+      specified_date_for_tax_audit_report: shouldApplyAutoSpecifiedDate
+        ? nextAutoSpecifiedDate
+        : tracker.specified_date_for_tax_audit_report,
+    });
+  };
+
+  const updateUdinGeneratedDate = (generatedDate: string) => {
+    onChange({
+      udin_generated_date: generatedDate,
+      udin_update_due_date: generatedDate ? calculateUdinUpdateDueDate(generatedDate) : '',
+    });
+  };
+
+  return (
+    <div className="rounded-md border bg-background p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">Specified Date, Filing and UDIN Tracker</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Manual tracker for post-applicability compliance steps. Dates are editable for statutory extensions or engagement-specific facts.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={badgeVariant}>{summary.badge}</Badge>
+          <Button size="sm" variant="outline" onClick={onSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Tracker'}
+          </Button>
+        </div>
+      </div>
+
+      {summary.warnings.length > 0 && (
+        <Alert className="mt-3">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-1">
+              {summary.warnings.map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className="space-y-3 rounded-md border bg-muted/10 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Specified date</p>
+            <Badge variant={summary.specifiedDatePending ? 'outline' : 'secondary'}>
+              {summary.specifiedDatePending ? 'Pending' : 'Captured'}
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <Label>Due date for return</Label>
+            <Input
+              type="date"
+              value={tracker.due_date_for_return}
+              onChange={(event) => updateReturnDueDate(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Specified date for tax audit report</Label>
+            <Input
+              type="date"
+              value={tracker.specified_date_for_tax_audit_report}
+              onChange={(event) => onChange({ specified_date_for_tax_audit_report: event.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">Default helper calculates one month before the return due date.</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={tracker.is_transfer_pricing_applicable}
+              onCheckedChange={(checked) => onChange({ is_transfer_pricing_applicable: checked === true })}
+            />
+            Transfer pricing applicable
+          </label>
+          <div className="space-y-1">
+            <Label>Remarks</Label>
+            <Textarea
+              value={tracker.remarks}
+              onChange={(event) => onChange({ remarks: event.target.value })}
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-md border bg-muted/10 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Filing workflow</p>
+            <Badge variant={summary.filingPending ? 'outline' : 'secondary'}>
+              {summary.filingPending ? 'Pending' : 'Completed'}
+            </Badge>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <ComplianceStatusSelect
+              label="Assigned by client"
+              value={tracker.assigned_by_client_on_portal}
+              onChange={(value) => onChange({ assigned_by_client_on_portal: value })}
+            />
+            <ComplianceStatusSelect
+              label="Accepted by CA"
+              value={tracker.accepted_by_ca_on_portal}
+              onChange={(value) => onChange({ accepted_by_ca_on_portal: value })}
+            />
+            <ComplianceStatusSelect
+              label="Form 3CA/3CB uploaded"
+              value={tracker.form_3ca_3cb_uploaded}
+              onChange={(value) => onChange({ form_3ca_3cb_uploaded: value })}
+            />
+            <ComplianceStatusSelect
+              label="Form 3CD uploaded"
+              value={tracker.form_3cd_uploaded}
+              onChange={(value) => onChange({ form_3cd_uploaded: value })}
+            />
+            <ComplianceStatusSelect
+              label="Financial statements uploaded"
+              value={tracker.financial_statements_uploaded}
+              onChange={(value) => onChange({ financial_statements_uploaded: value })}
+            />
+            <ComplianceStatusSelect
+              label="Client accepted report"
+              value={tracker.client_accepted_uploaded_report}
+              onChange={(value) => onChange({ client_accepted_uploaded_report: value })}
+            />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label>Acknowledgement reference</Label>
+              <Input
+                value={tracker.acknowledgement_reference}
+                onChange={(event) => onChange({ acknowledgement_reference: event.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Acknowledgement date</Label>
+              <Input
+                type="date"
+                value={tracker.acknowledgement_date}
+                onChange={(event) => onChange({ acknowledgement_date: event.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-md border bg-muted/10 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">UDIN</p>
+            <Badge variant={summary.udinPending ? 'outline' : 'secondary'}>
+              {summary.udinPending ? 'Pending' : 'Completed'}
+            </Badge>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <ComplianceStatusSelect
+              label="UDIN required"
+              value={tracker.udin_required}
+              onChange={(value) => onChange({ udin_required: value })}
+            />
+            <ComplianceStatusSelect
+              label="UDIN generated"
+              value={tracker.udin_generated}
+              onChange={(value) => onChange({ udin_generated: value })}
+            />
+            <ComplianceStatusSelect
+              label="Updated on IT portal"
+              value={tracker.udin_updated_on_income_tax_portal}
+              onChange={(value) => onChange({ udin_updated_on_income_tax_portal: value })}
+            />
+            <div className="space-y-1">
+              <Label>UDIN number</Label>
+              <Input
+                value={tracker.udin_number}
+                onChange={(event) => onChange({ udin_number: event.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>UDIN generated date</Label>
+              <Input
+                type="date"
+                value={tracker.udin_generated_date}
+                onChange={(event) => updateUdinGeneratedDate(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>UDIN update due date</Label>
+              <Input
+                type="date"
+                value={tracker.udin_update_due_date}
+                onChange={(event) => onChange({ udin_update_due_date: event.target.value })}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label>UDIN remarks</Label>
+            <Textarea
+              value={tracker.udin_remarks}
+              onChange={(event) => onChange({ udin_remarks: event.target.value })}
+              rows={3}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(['udin_required', 'udin_generated', 'udin_updated_on_income_tax_portal'] as const).map((field) => (
+              <Badge key={field} variant={complianceStatusBadgeVariant[tracker[field]]}>
+                {complianceStatusLabel[tracker[field]]}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SetupPanel({
   setup,
   saving,
@@ -322,7 +603,6 @@ function SetupPanel({
     }
   }, [client]);
 
-  const setupSourceLinks = parseJson<TaxAuditSourceLink[]>(draft.source_links_json, []);
   const selectedReportForm = draft.form_type || (toBool(draft.books_audited_under_other_law) ? '3CA' : '3CB');
   const auditedUnderOtherLaw = selectedReportForm === '3CA' || toBool(draft.books_audited_under_other_law);
   const setupJson = parseJson<Record<string, unknown>>(draft.setup_json, {});
@@ -403,22 +683,13 @@ function SetupPanel({
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        {/* Tax Audit Setup heading and badges hidden as per user request */}
-        {/* <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-base">Tax Audit Setup</CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">Form {draft.form_type} + 3CD</Badge>
-            <Badge variant={draft.applicability_result === 'Not applicable' ? 'secondary' : 'default'}>
-              {draft.applicability_result || 'Not assessed'}
-            </Badge>
-            <Button size="sm" onClick={save} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Setup'}
-            </Button>
-          </div>
-        </div> */}
-        <div className="flex items-center justify-end gap-2">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
+        <div>
+          <p className="text-sm font-semibold">Setup and Applicability</p>
+          <p className="text-xs text-muted-foreground">Maintain assessee profile, activity thresholds, report form and applicability conclusion.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">Form {selectedReportForm} + 3CD</Badge>
           <Badge variant={applicabilityBadgeVariant[applicability.overall.result]}>
             {applicability.overall.result}
@@ -430,230 +701,295 @@ function SetupPanel({
             {saving ? 'Saving...' : 'Save Setup'}
           </Button>
         </div>
-        {/* Source links removed as per user request - Client and Engagement buttons hidden */}
-        {/* {setupSourceLinks.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1">
-            {setupSourceLinks.map((link, index) => (
-              <SourceLinkChip key={`${link.label}-${index}`} link={link} />
-            ))}
-          </div>
-        )} */}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-md border bg-muted/20 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">Applicability Result</p>
-              <p className="mt-1 text-sm text-muted-foreground">{applicability.overall.reason}</p>
-            </div>
-            <Badge variant={applicabilityBadgeVariant[applicability.overall.result]}>{applicability.overall.result}</Badge>
-          </div>
-          <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Business</p>
-              <p className="font-medium">{applicability.business.result || '-'}</p>
-              <p className="text-xs text-muted-foreground">
-                {applicability.business.thresholdApplied || '-'} {applicability.business.sectionReference ? `| ${applicability.business.sectionReference}` : ''}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Profession</p>
-              <p className="font-medium">{applicability.profession.result || '-'}</p>
-              <p className="text-xs text-muted-foreground">
-                {applicability.profession.thresholdApplied || '-'} {applicability.profession.sectionReference ? `| ${applicability.profession.sectionReference}` : ''}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Recommended form</p>
-              <p className="font-medium">{applicability.suggestedFormType || '-'}</p>
-            </div>
-          </div>
-          {applicability.warnings.length > 0 && (
-            <div className="mt-3 space-y-1">
-              {applicability.warnings.map((warning) => (
-                <p key={warning} className="text-xs text-amber-700">
-                  {warning}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Assessee Profile</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-4">
+              <div className="space-y-1">
+                <Label>Assessee</Label>
+                <Input value={draft.assessee_name || ''} onChange={(e) => updateDraft({ assessee_name: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label>PAN</Label>
+                <Input
+                  value={draft.pan || ''}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                  title="Auto-populated from Client Master"
+                />
+                <p className="text-xs text-muted-foreground">From Client Master</p>
+              </div>
+              <div className="space-y-1">
+                <Label>Assessment Year</Label>
+                <Input value={draft.assessment_year || ''} disabled />
+              </div>
+              <div className="space-y-1">
+                <Label>Status</Label>
+                <Input value={draft.status || ''} onChange={(e) => updateDraft({ status: e.target.value })} />
+              </div>
+              <div className="space-y-1 md:col-span-3">
+                <Label>Address</Label>
+                <Input
+                  value={draft.address || ''}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                  title="Auto-populated from Client Master"
+                />
+                <p className="text-xs text-muted-foreground">From Client Master</p>
+              </div>
+              <div className="space-y-1">
+                <Label>Nature</Label>
+                <Input value={draft.nature_of_business || ''} onChange={(e) => updateDraft({ nature_of_business: e.target.value })} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Activity and Thresholds</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Activity Profile</Label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={hasBusinessActivity}
+                      onCheckedChange={(checked) => {
+                        updateDraft({ business_or_profession: checked === true ? 'business' : hasProfessionalActivity ? 'profession' : draft.business_or_profession });
+                        updateApplicabilityInputs({ has_business_activity: checked === true });
+                      }}
+                    />
+                    Business activity
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={hasProfessionalActivity}
+                      onCheckedChange={(checked) => {
+                        updateDraft({ business_or_profession: checked === true && !hasBusinessActivity ? 'profession' : draft.business_or_profession });
+                        updateApplicabilityInputs({ has_professional_activity: checked === true });
+                      }}
+                    />
+                    Professional activity
+                  </label>
+                </div>
+                {hasBusinessActivity && (
+                  <div className="space-y-1">
+                    <Label>Business Turnover</Label>
+                    <Input
+                      type="number"
+                      value={businessTurnover}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        updateDraft({ turnover: value });
+                        updateApplicabilityInputs({ business_turnover: value });
+                      }}
+                    />
+                  </div>
+                )}
+                {hasProfessionalActivity && (
+                  <div className="space-y-1">
+                    <Label>Professional Gross Receipts</Label>
+                    <Input
+                      type="number"
+                      value={professionalGrossReceipts}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        updateDraft({ gross_receipts: value });
+                        updateApplicabilityInputs({ professional_gross_receipts: value });
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label>Cash Receipts %</Label>
+                  <Input type="number" value={draft.cash_receipts_percent ?? 0} onChange={(e) => updateDraft({ cash_receipts_percent: Number(e.target.value) })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cash Payments %</Label>
+                  <Input type="number" value={draft.cash_payments_percent ?? 0} onChange={(e) => updateDraft({ cash_payments_percent: Number(e.target.value) })} />
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={toBool(draft.presumptive_taxation)}
+                    onCheckedChange={(checked) => updateDraft({ presumptive_taxation: checked === true ? 1 : 0 })}
+                  />
+                  Presumptive taxation opted
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={toBool(draft.lower_than_presumptive)}
+                    onCheckedChange={(checked) => updateDraft({ lower_than_presumptive: checked === true ? 1 : 0 })}
+                  />
+                  Income lower than presumptive threshold
+                </label>
+                <div className="text-xs text-muted-foreground">
+                  {draft.applicability_reason || 'Save setup to evaluate applicability.'}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Audit Report Selection</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="space-y-1">
+                  <Label>Tax Audit Report</Label>
+                  <Select
+                    value={selectedReportForm}
+                    onValueChange={(value: '3CA' | '3CB') => {
+                      updateDraft({
+                        form_type: value,
+                        books_audited_under_other_law: value === '3CA' ? 1 : 0,
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3CA">Form 3CA - audited under other law</SelectItem>
+                      <SelectItem value="3CB">Form 3CB - tax audit only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 pt-6">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={auditedUnderOtherLaw}
+                      onCheckedChange={(checked) =>
+                        updateDraft({
+                          form_type: checked === true ? '3CA' : '3CB',
+                          books_audited_under_other_law: checked === true ? 1 : 0,
+                        })
+                      }
+                    />
+                    Audited under other law
+                  </label>
+                </div>
+                {auditedUnderOtherLaw && (
+                  <div className="space-y-1">
+                    <Label>Other law</Label>
+                    <Input
+                      value={draft.other_law_name || ''}
+                      onChange={(e) => updateDraft({ other_law_name: e.target.value })}
+                      placeholder="e.g. Companies Act, 2013"
+                    />
+                  </div>
+                )}
+              </div>
+              {auditedUnderOtherLaw && (
+                <p className="text-xs text-muted-foreground">
+                  Form 3CA is used where accounts are audited under another law. For companies, this is usually the Companies Act audit.
                 </p>
-              ))}
-            </div>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="space-y-1">
-            <Label>Assessee</Label>
-            <Input value={draft.assessee_name || ''} onChange={(e) => updateDraft({ assessee_name: e.target.value })} />
-          </div>
-          <div className="space-y-1">
-            <Label>PAN</Label>
-            <Input 
-              value={draft.pan || ''} 
-              readOnly 
-              className="bg-muted cursor-not-allowed"
-              title="Auto-populated from Client Master"
-            />
-            <p className="text-xs text-muted-foreground">From Client Master</p>
-          </div>
-          <div className="space-y-1">
-            <Label>Assessment Year</Label>
-            <Input value={draft.assessment_year || ''} disabled />
-          </div>
-          <div className="space-y-1">
-            <Label>Status</Label>
-            <Input value={draft.status || ''} onChange={(e) => updateDraft({ status: e.target.value })} />
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="space-y-1 md:col-span-2">
-            <Label>Address</Label>
-            <Input 
-              value={draft.address || ''} 
-              readOnly 
-              className="bg-muted cursor-not-allowed"
-              title="Auto-populated from Client Master"
-            />
-            <p className="text-xs text-muted-foreground">From Client Master</p>
-          </div>
-          <div className="space-y-2">
-            <Label>Activity Profile</Label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={hasBusinessActivity}
-                onCheckedChange={(checked) => {
-                  updateDraft({ business_or_profession: checked === true ? 'business' : hasProfessionalActivity ? 'profession' : draft.business_or_profession });
-                  updateApplicabilityInputs({ has_business_activity: checked === true });
-                }}
-              />
-              Business activity
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={hasProfessionalActivity}
-                onCheckedChange={(checked) => {
-                  updateDraft({ business_or_profession: checked === true && !hasBusinessActivity ? 'profession' : draft.business_or_profession });
-                  updateApplicabilityInputs({ has_professional_activity: checked === true });
-                }}
-              />
-              Professional activity
-            </label>
-          </div>
-          <div className="space-y-1">
-            <Label>Nature</Label>
-            <Input value={draft.nature_of_business || ''} onChange={(e) => updateDraft({ nature_of_business: e.target.value })} />
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-6">
-          <div className="space-y-1">
-            <Label>Tax Audit Report</Label>
-            <Select
-              value={selectedReportForm}
-              onValueChange={(value: '3CA' | '3CB') => {
-                updateDraft({
-                  form_type: value,
-                  books_audited_under_other_law: value === '3CA' ? 1 : 0,
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="3CA">Form 3CA - audited under other law</SelectItem>
-                <SelectItem value="3CB">Form 3CB - tax audit only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {hasBusinessActivity && (
-            <div className="space-y-1">
-              <Label>Business Turnover</Label>
-              <Input
-                type="number"
-                value={businessTurnover}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  updateDraft({ turnover: value });
-                  updateApplicabilityInputs({ business_turnover: value });
-                }}
-              />
+        <Card className="h-fit">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-3">
+              <CardTitle className="text-base">Applicability Result</CardTitle>
+              <Badge variant={applicabilityBadgeVariant[applicability.overall.result]}>{applicability.overall.result}</Badge>
             </div>
-          )}
-          {hasProfessionalActivity && (
-            <div className="space-y-1">
-              <Label>Professional Gross Receipts</Label>
-              <Input
-                type="number"
-                value={professionalGrossReceipts}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  updateDraft({ gross_receipts: value });
-                  updateApplicabilityInputs({ professional_gross_receipts: value });
-                }}
-              />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{applicability.overall.reason}</p>
+            <div className="grid gap-3 text-sm sm:grid-cols-3 xl:grid-cols-1">
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">Business</p>
+                <p className="font-medium">{applicability.business.result || '-'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {applicability.business.thresholdApplied || '-'} {applicability.business.sectionReference ? `| ${applicability.business.sectionReference}` : ''}
+                </p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">Profession</p>
+                <p className="font-medium">{applicability.profession.result || '-'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {applicability.profession.thresholdApplied || '-'} {applicability.profession.sectionReference ? `| ${applicability.profession.sectionReference}` : ''}
+                </p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">Recommended form</p>
+                <p className="font-medium">{applicability.suggestedFormType || '-'}</p>
+              </div>
             </div>
-          )}
-          <div className="space-y-1">
-            <Label>Cash Receipts %</Label>
-            <Input type="number" value={draft.cash_receipts_percent ?? 0} onChange={(e) => updateDraft({ cash_receipts_percent: Number(e.target.value) })} />
-          </div>
-          <div className="space-y-1">
-            <Label>Cash Payments %</Label>
-            <Input type="number" value={draft.cash_payments_percent ?? 0} onChange={(e) => updateDraft({ cash_payments_percent: Number(e.target.value) })} />
-          </div>
-          <div className="space-y-2 pt-6">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={auditedUnderOtherLaw}
-                onCheckedChange={(checked) =>
-                  updateDraft({
-                    form_type: checked === true ? '3CA' : '3CB',
-                    books_audited_under_other_law: checked === true ? 1 : 0,
-                  })
-                }
-              />
-              Audited under other law
-            </label>
-          </div>
-        </div>
+            {applicability.warnings.length > 0 && (
+              <div className="space-y-1 rounded-md border border-amber-200 bg-amber-50/60 p-3">
+                {applicability.warnings.map((warning) => (
+                  <p key={warning} className="text-xs text-amber-700">
+                    {warning}
+                  </p>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
 
-        {auditedUnderOtherLaw && (
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="space-y-1">
-              <Label>Other law</Label>
-              <Input
-                value={draft.other_law_name || ''}
-                onChange={(e) => updateDraft({ other_law_name: e.target.value })}
-                placeholder="e.g. Companies Act, 2013"
-              />
-            </div>
-            <div className="md:col-span-2 pt-7 text-xs text-muted-foreground">
-              Form 3CA is used where accounts are audited under another law. For companies, this is usually the Companies Act audit.
-            </div>
-          </div>
-        )}
+function ComplianceTrackerPanel({
+  setup,
+  saving,
+  onSave,
+}: {
+  setup: TaxAuditSetup;
+  saving: boolean;
+  onSave: (updates: Partial<TaxAuditSetup>) => Promise<unknown>;
+}) {
+  const [draftSetupJson, setDraftSetupJson] = useState(setup.setup_json || '{}');
 
-        <div className="grid gap-3 md:grid-cols-3">
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={toBool(draft.presumptive_taxation)}
-              onCheckedChange={(checked) => updateDraft({ presumptive_taxation: checked === true ? 1 : 0 })}
-            />
-            Presumptive taxation opted
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={toBool(draft.lower_than_presumptive)}
-              onCheckedChange={(checked) => updateDraft({ lower_than_presumptive: checked === true ? 1 : 0 })}
-            />
-            Income lower than presumptive threshold
-          </label>
-          <div className="text-xs text-muted-foreground">
-            {draft.applicability_reason || 'Save setup to evaluate applicability.'}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+  useEffect(() => {
+    setDraftSetupJson(setup.setup_json || '{}');
+  }, [setup.setup_json]);
+
+  const setupJson = parseJson<Record<string, unknown>>(draftSetupJson, {});
+  const complianceTracker = normalizeTaxAuditComplianceTracker(setupJson.complianceTracker);
+
+  const updateComplianceTracker = (updates: Partial<TaxAuditComplianceTracker>) => {
+    setDraftSetupJson((prev) => {
+      const prevJson = parseJson<Record<string, unknown>>(prev, {});
+      const prevTracker = normalizeTaxAuditComplianceTracker(prevJson.complianceTracker);
+      return JSON.stringify({
+        ...prevJson,
+        complianceTracker: {
+          ...prevTracker,
+          ...updates,
+        },
+      });
+    });
+  };
+
+  const saveComplianceTracker = async () => {
+    await onSave({
+      setup_json: JSON.stringify({
+        ...setupJson,
+        complianceTracker,
+      }),
+    });
+  };
+
+  return (
+    <ComplianceTrackerCard
+      tracker={complianceTracker}
+      saving={saving}
+      onChange={updateComplianceTracker}
+      onSave={saveComplianceTracker}
+    />
   );
 }
 
@@ -725,8 +1061,8 @@ function ClauseNavigator({
   ];
 
   return (
-    <div className="h-full overflow-y-auto rounded-md border bg-background">
-      <div className="sticky top-0 z-10 space-y-3 border-b bg-background p-3">
+    <div className="h-full overflow-hidden rounded-md border bg-background">
+      <div className="space-y-2 border-b bg-background p-2.5">
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="text-sm font-semibold">Form 3CD Clauses</p>
@@ -740,7 +1076,7 @@ function ClauseNavigator({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search clause"
-            className="h-9 pl-8"
+            className="h-8 pl-8"
           />
         </div>
         <div className="flex flex-wrap gap-1">
@@ -759,13 +1095,13 @@ function ClauseNavigator({
           ))}
         </div>
       </div>
-      <div className="divide-y">
+      <div className="h-[calc(100%-116px)] overflow-y-auto divide-y">
         {FORM_3CD_GROUPS.map((group) => {
           const groupClauses = visibleClauses.filter((clause) => clause.group === group);
           if (groupClauses.length === 0) return null;
           return (
             <div key={group}>
-              <div className="bg-muted/30 px-3 py-2 text-[11px] font-semibold uppercase text-muted-foreground">
+              <div className="bg-muted/30 px-3 py-1.5 text-[10px] font-semibold uppercase text-muted-foreground">
                 {group}
               </div>
               {groupClauses.map((definition) => {
@@ -778,15 +1114,17 @@ function ClauseNavigator({
                   type="button"
                   onClick={() => onSelect(definition.key)}
                   className={cn(
-                    'flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50',
-                    selected && 'bg-primary/10'
+                    'flex w-full items-start gap-2 border-l-2 border-transparent px-3 py-1.5 text-left text-sm hover:bg-muted/50',
+                    selected && 'border-primary bg-primary/10'
                   )}
                 >
-                  <span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">{definition.clauseNo}</span>
+                  <span className={cn('w-8 shrink-0 font-mono text-xs text-muted-foreground', selected && 'font-semibold text-primary')}>
+                    {definition.clauseNo}
+                  </span>
                   <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2">{definition.title}</span>
+                    <span className={cn('line-clamp-1 text-xs', selected && 'font-medium')}>{definition.title}</span>
                     {clause && (
-                      <span className="mt-1 flex flex-wrap gap-1">
+                      <span className="mt-1 flex flex-wrap items-center gap-1">
                         <Badge variant="outline" className={badgeClass(clause.prefill_status)}>
                           {statusLabel[clause.prefill_status]}
                         </Badge>
@@ -796,9 +1134,8 @@ function ClauseNavigator({
                           </Badge>
                         )}
                         {hasEvidence && (
-                          <Badge variant="outline" className="gap-1 text-[11px]">
+                          <Badge variant="outline" className="gap-1 px-1.5 text-[10px]">
                             <Paperclip className="h-3 w-3" />
-                            Evidence
                           </Badge>
                         )}
                       </span>
@@ -831,70 +1168,38 @@ function ClauseEditor({
   const sourceLinks = parseJson<TaxAuditSourceLink[]>(clause.source_links_json, []);
   const validationMessages = parseJson<string[]>(clause.validation_messages_json, []);
   const missingFields = parseJson<string[]>(clause.missing_fields_json, []);
-  const currentReviewIndex =
-    clause.review_status === 'locked'
-      ? reviewSteps.length - 1
-      : Math.max(0, reviewSteps.indexOf(clause.review_status));
 
   return (
-    <div className="h-full overflow-y-auto rounded-md border bg-background">
-      <div className="border-b bg-muted/30 px-4 py-3">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border bg-background">
+      <div className="shrink-0 border-b bg-background px-3 py-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">Clause {clause.clause_no}</Badge>
               <Badge variant="outline" className={badgeClass(clause.prefill_status)}>
                 {statusLabel[clause.prefill_status]}
               </Badge>
               <Badge variant="secondary">{reviewLabel[clause.review_status]}</Badge>
+              <Badge variant="outline">{clause.workpaper_ref || `TA-3CD-${clause.clause_no}`}</Badge>
               {locked && <Lock className="h-4 w-4 text-muted-foreground" />}
             </div>
-            <h2 className="mt-2 text-lg font-semibold">{clause.clause_title}</h2>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {sourceLinks.map((link, index) => (
-                <SourceLinkChip key={`${link.label}-${index}`} link={link} />
-              ))}
-            </div>
-            <div className="mt-3 grid max-w-xl grid-cols-4 gap-2">
-              {reviewSteps.map((step, index) => {
-                const reached = index <= currentReviewIndex;
-                return (
-                  <div
-                    key={step}
-                    className={cn(
-                      'flex items-center gap-2 rounded-md border px-2 py-1 text-xs',
-                      reached ? 'border-primary/30 bg-primary/10 text-primary' : 'bg-background text-muted-foreground'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px]',
-                        reached ? 'border-primary bg-primary text-primary-foreground' : 'bg-background'
-                      )}
-                    >
-                      {index + 1}
-                    </span>
-                    <span className="truncate">{reviewLabel[step]}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <h2 className="mt-1 line-clamp-2 text-base font-semibold leading-snug">{clause.clause_title}</h2>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => onStatus('prepared')} disabled={locked}>
-              Mark Prepared
+          <div className="flex shrink-0 flex-wrap gap-1">
+            <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => onStatus('prepared')} disabled={locked}>
+              Prepared
             </Button>
-            <Button size="sm" variant="outline" onClick={() => onStatus('reviewed')} disabled={locked}>
-              Mark Reviewed
+            <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => onStatus('reviewed')} disabled={locked}>
+              Reviewed
             </Button>
-            <Button size="sm" onClick={() => onStatus('approved')} disabled={locked}>
+            <Button size="sm" className="h-8 px-2" onClick={() => onStatus('approved')} disabled={locked}>
               Approve
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="space-y-5 p-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
         {(validationMessages.length > 0 || missingFields.length > 0) && (
           <Alert>
             <AlertCircle className="h-4 w-4" />
@@ -904,16 +1209,29 @@ function ClauseEditor({
           </Alert>
         )}
 
+        {sourceLinks.length > 0 && (
+          <details className="rounded-md border bg-muted/20">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground">
+              Clause guidance and source links
+            </summary>
+            <div className="flex flex-wrap gap-1 border-t px-3 py-2">
+              {sourceLinks.map((link, index) => (
+                <SourceLinkChip key={`${link.label}-${index}`} link={link} />
+              ))}
+            </div>
+          </details>
+        )}
+
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Clause Response / Particulars</Label>
-            <Badge variant="outline">{clause.workpaper_ref || `TA-3CD-${clause.clause_no}`}</Badge>
           </div>
           <RichTextEditor
             value={clause.response_html || ''}
             onChange={(value) => onUpdate({ response_html: value })}
             placeholder="Enter clause response or review the prefilled particulars"
             disabled={locked}
+            className="[&_[role=textbox]]:min-h-[260px]"
           />
         </div>
 
@@ -924,6 +1242,7 @@ function ClauseEditor({
             onChange={(value) => onUpdate({ auditor_remarks_html: value })}
             placeholder="Add observation, qualification basis, explanation, or NIL reporting basis"
             disabled={locked}
+            className="[&_[role=textbox]]:min-h-[180px]"
           />
         </div>
 
@@ -942,6 +1261,7 @@ function ClauseEditor({
               onChange={(value) => onUpdate({ qualification_text_html: value })}
               placeholder="Enter qualification or observation wording"
               disabled={locked}
+              className="[&_[role=textbox]]:min-h-[140px]"
             />
           )}
         </div>
@@ -1165,11 +1485,13 @@ function EvidenceRail({
   evidenceLinks,
   onLink,
   onUnlink,
+  onCollapse,
 }: {
   clause: TaxAuditClauseResponse;
   evidenceLinks: ReturnType<typeof useTaxAudit>['evidenceLinks'];
   onLink: (evidenceFileId: string) => Promise<void>;
   onUnlink: (linkId: string) => Promise<void>;
+  onCollapse?: () => void;
 }) {
   const { currentEngagement } = useEngagement();
   const { files, uploadFile, downloadFile } = useEvidenceFiles(currentEngagement?.id);
@@ -1206,7 +1528,17 @@ function EvidenceRail({
 
   return (
     <div className="h-full overflow-y-auto rounded-md border bg-background">
-      <div className="border-b bg-muted/30 px-3 py-2 text-sm font-semibold">Sources, Evidence and Review</div>
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2">
+        <div>
+          <p className="text-sm font-semibold">Sources, Evidence and Review</p>
+          <p className="text-xs text-muted-foreground">{linkedFiles.length} linked evidence file(s)</p>
+        </div>
+        {onCollapse && (
+          <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={onCollapse} title="Collapse evidence pane">
+            <PanelRightClose className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
       <div className="space-y-4 p-3">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -1293,6 +1625,304 @@ function EvidenceRail({
   );
 }
 
+function TaxAuditPageHeader({
+  clientName,
+  financialYear,
+  setup,
+  onRefreshPrefill,
+  onOpenReviewQueue,
+}: {
+  clientName: string;
+  financialYear: string;
+  setup: TaxAuditSetup;
+  onRefreshPrefill: () => Promise<void>;
+  onOpenReviewQueue: () => void;
+}) {
+  return (
+    <div className="sticky top-0 z-20 -mx-1 border-b bg-background/95 px-1 py-3 backdrop-blur">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-foreground">Tax Audit</h1>
+          <p className="truncate text-sm text-muted-foreground">
+            {clientName} - {financialYear}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Badge variant="outline">Income-tax Act, 1961</Badge>
+          <Badge variant="outline">Rule 6G</Badge>
+          <Badge>Form {setup.form_type} + 3CD</Badge>
+          <Badge variant={setup.applicability_result === 'Applicable' ? 'default' : 'outline'}>
+            {setup.applicability_result || 'Not assessed'}
+          </Badge>
+          <Button variant="outline" size="sm" onClick={onRefreshPrefill}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh Prefill
+          </Button>
+          <Button variant="outline" size="sm" onClick={onOpenReviewQueue}>
+            <ShieldCheck className="mr-2 h-4 w-4" />
+            Review Queue
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TaxAuditOverview({
+  setup,
+  acceptanceCheck,
+  complianceSummary,
+  summary,
+  progress,
+  onOpenReviewQueue,
+}: {
+  setup: TaxAuditSetup;
+  acceptanceCheck: TaxAuditAcceptanceCheck | null;
+  complianceSummary: ReturnType<typeof summarizeTaxAuditComplianceTracker>;
+  summary: TaxAuditSummary;
+  progress: number;
+  onOpenReviewQueue: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Applicability"
+          value={setup.applicability_result || 'Not assessed'}
+          detail={setup.form_type ? `Form ${setup.form_type} + 3CD` : 'Report form pending'}
+          icon={ShieldCheck}
+          tone={setup.applicability_result === 'Applicable' ? 'success' : 'warning'}
+        />
+        <MetricCard
+          label="Acceptance"
+          value={acceptanceStatusLabel[acceptanceCheck?.overall_status || 'not_started']}
+          detail="Eligibility checklist"
+          icon={ClipboardCheck}
+          tone={acceptanceCheck?.overall_status === 'completed' ? 'success' : 'warning'}
+        />
+        <MetricCard
+          label="Compliance Tracker"
+          value={complianceSummary.badge}
+          detail={complianceSummary.warnings.length > 0 ? `${complianceSummary.warnings.length} warning(s)` : 'Specified date, filing and UDIN'}
+          icon={FileCheck}
+          tone={complianceSummary.completed ? 'success' : 'warning'}
+        />
+        <MetricCard
+          label="Clause Progress"
+          value={`${progress}%`}
+          detail={`${summary.prepared + summary.reviewed + summary.approved} of ${summary.totalClauses} clauses moved from draft`}
+          icon={FileSpreadsheet}
+          tone={progress === 100 ? 'success' : 'info'}
+        />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Needs Input"
+          value={summary.needsInput}
+          detail="Missing or manual clauses"
+          icon={AlertCircle}
+          tone={summary.needsInput > 0 ? 'warning' : 'success'}
+          onClick={onOpenReviewQueue}
+        />
+        <MetricCard
+          label="Source Conflicts"
+          value={summary.conflicts}
+          detail="Requires source review"
+          icon={ShieldCheck}
+          tone={summary.conflicts > 0 ? 'warning' : 'success'}
+          onClick={onOpenReviewQueue}
+        />
+        <MetricCard
+          label="Evidence Linked"
+          value={summary.evidenceLinked}
+          detail="Clause workpapers attached"
+          icon={Paperclip}
+          tone="info"
+        />
+        <MetricCard
+          label="Auditor Remarks"
+          value={summary.qualifications}
+          detail="Qualification or observation flags"
+          icon={ClipboardCheck}
+          tone={summary.qualifications > 0 ? 'warning' : 'default'}
+          onClick={onOpenReviewQueue}
+        />
+      </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">3CD Review Progress</p>
+              <p className="text-xs text-muted-foreground">
+                {summary.prepared + summary.reviewed + summary.approved} of {summary.totalClauses} clauses moved from draft
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-semibold">{progress}%</p>
+              <p className="text-xs text-muted-foreground">prepared / reviewed / approved</p>
+            </div>
+          </div>
+          <Progress value={progress} className="mt-3 h-2" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ClauseWorkspacePanel({
+  selectedClause,
+  selectedClauseKey,
+  clausesByKey,
+  evidenceLinks,
+  acceptanceCheck,
+  onOpenClause,
+  onUpdateClause,
+  onUpdateClauseStatus,
+  onLinkEvidence,
+  onUnlinkEvidence,
+}: {
+  selectedClause: TaxAuditClauseResponse | undefined;
+  selectedClauseKey: string;
+  clausesByKey: Map<string, TaxAuditClauseResponse>;
+  evidenceLinks: ReturnType<typeof useTaxAudit>['evidenceLinks'];
+  acceptanceCheck: TaxAuditAcceptanceCheck | null;
+  onOpenClause: (clauseKey: string) => void;
+  onUpdateClause: (clauseId: string, updates: Partial<TaxAuditClauseResponse>) => Promise<void>;
+  onUpdateClauseStatus: (clauseId: string, status: TaxAuditReviewStatus) => Promise<void>;
+  onLinkEvidence: (clause: TaxAuditClauseResponse, evidenceFileId: string) => Promise<void>;
+  onUnlinkEvidence: (linkId: string) => Promise<void>;
+}) {
+  const [evidencePaneOpen, setEvidencePaneOpen] = useState(true);
+  const linkedEvidenceCount = selectedClause
+    ? evidenceLinks.filter((link) => link.clause_response_id === selectedClause.id).length
+    : 0;
+
+  return (
+    <div className="space-y-3">
+      {acceptanceCheck?.overall_status !== 'completed' && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Acceptance checklist is not completed. Clause work remains available.
+          </AlertDescription>
+        </Alert>
+      )}
+      <div
+        className={cn(
+          'grid min-h-[620px] gap-3 lg:h-[calc(100vh-245px)] lg:grid-cols-[280px_minmax(0,1fr)]',
+          evidencePaneOpen
+            ? 'xl:grid-cols-[280px_minmax(0,1fr)_300px] 2xl:grid-cols-[300px_minmax(0,1fr)_320px]'
+            : 'xl:grid-cols-[280px_minmax(0,1fr)_56px] 2xl:grid-cols-[300px_minmax(0,1fr)_56px]'
+        )}
+      >
+        <ClauseNavigator
+          selectedKey={selectedClause?.clause_key || selectedClauseKey}
+          clausesByKey={clausesByKey}
+          evidenceLinks={evidenceLinks}
+          onSelect={onOpenClause}
+        />
+        {selectedClause ? (
+          <>
+            <div className="min-h-0">
+              <ClauseEditor
+                clause={selectedClause}
+                onUpdate={(updates) => onUpdateClause(selectedClause.id, updates)}
+                onStatus={(status) => onUpdateClauseStatus(selectedClause.id, status)}
+              />
+            </div>
+            <div className="min-h-[320px] lg:col-start-2 xl:col-start-auto xl:min-h-0">
+              {evidencePaneOpen ? (
+                <EvidenceRail
+                  clause={selectedClause}
+                  evidenceLinks={evidenceLinks}
+                  onLink={(evidenceFileId) => onLinkEvidence(selectedClause, evidenceFileId)}
+                  onUnlink={onUnlinkEvidence}
+                  onCollapse={() => setEvidencePaneOpen(false)}
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center gap-3 rounded-md border bg-background p-2">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => setEvidencePaneOpen(true)}
+                    title="Expand evidence pane"
+                  >
+                    <PanelRightOpen className="h-4 w-4" />
+                  </Button>
+                  <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                    <Paperclip className="h-4 w-4" />
+                    <Badge variant={linkedEvidenceCount > 0 ? 'default' : 'outline'} className="px-1.5 text-[10px]">
+                      {linkedEvidenceCount}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-md border p-6 text-sm text-muted-foreground">No clause selected.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewSummaryPanel({
+  clausesByKey,
+  evidenceLinks,
+  onOpenClause,
+}: {
+  clausesByKey: Map<string, TaxAuditClauseResponse>;
+  evidenceLinks: ReturnType<typeof useTaxAudit>['evidenceLinks'];
+  onOpenClause: (clauseKey: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border bg-background">
+      <div className="grid min-w-[760px] grid-cols-[80px_minmax(0,1fr)_140px_140px_120px] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
+        <span>Clause</span>
+        <span>Particulars</span>
+        <span>Prefill</span>
+        <span>Review</span>
+        <span>Evidence</span>
+      </div>
+      {FORM_3CD_CLAUSES.map((definition) => {
+        const clause = clausesByKey.get(definition.key);
+        const linked = clause ? evidenceLinks.some((link) => link.clause_response_id === clause.id) : false;
+        return (
+          <button
+            key={definition.key}
+            type="button"
+            onClick={() => onOpenClause(definition.key)}
+            className="grid min-w-[760px] w-full grid-cols-[80px_minmax(0,1fr)_140px_140px_120px] items-center gap-2 border-b px-3 py-2 text-left text-sm hover:bg-muted/40"
+          >
+            <span className="font-mono text-xs">{definition.clauseNo}</span>
+            <span>{definition.title}</span>
+            <span>
+              <Badge variant="outline" className={clause ? badgeClass(clause.prefill_status) : 'text-[11px]'}>
+                {clause ? statusLabel[clause.prefill_status] : 'Open'}
+              </Badge>
+            </span>
+            <span className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-[11px]">
+                {clause ? reviewLabel[clause.review_status] : 'Draft'}
+              </Badge>
+              {needsAttention(clause) && <AlertCircle className="h-4 w-4 text-amber-600" />}
+            </span>
+            <span className="flex items-center gap-2">
+              {linked ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : '-'}
+              <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TaxAudit() {
   const { currentEngagement } = useEngagement();
   const { toast } = useToast();
@@ -1315,14 +1945,17 @@ export default function TaxAudit() {
   } = useTaxAudit(currentEngagement);
   const [selectedClauseKey, setSelectedClauseKey] = useState('clause_1');
   const [reviewQueueOpen, setReviewQueueOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('workspace');
+  const [activeTab, setActiveTab] = useState('clauses');
 
   const clausesByKey = useMemo(() => new Map(clauses.map((clause) => [clause.clause_key, clause])), [clauses]);
   const selectedClause = clausesByKey.get(selectedClauseKey) || clauses[0];
   const progress = summary.totalClauses ? Math.round(((summary.prepared + summary.reviewed + summary.approved) / summary.totalClauses) * 100) : 0;
+  const setupJson = parseJson<Record<string, unknown>>(setup?.setup_json, {});
+  const complianceTracker = normalizeTaxAuditComplianceTracker(setupJson.complianceTracker);
+  const complianceSummary = summarizeTaxAuditComplianceTracker(complianceTracker);
   const openClause = (clauseKey: string) => {
     setSelectedClauseKey(clauseKey);
-    setActiveTab('workspace');
+    setActiveTab('clauses');
   };
 
   if (!currentEngagement) {
@@ -1361,108 +1994,47 @@ export default function TaxAudit() {
   );
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Tax Audit</h1>
-          <p className="text-muted-foreground">
-            {currentEngagement.client_name} - {currentEngagement.financial_year}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">Income-tax Act, 1961</Badge>
-          <Badge variant="outline">Rule 6G</Badge>
-          <Badge>Form {setup.form_type} + 3CD</Badge>
-          {(setup.applicability_result === 'Review required' || setup.applicability_result === 'Not assessed') && (
-            <Badge variant="outline">{setup.applicability_result}</Badge>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              await refreshPrefill();
-              toast({ title: 'Prefill refreshed', description: 'Draft clauses were refreshed from available source data.' });
-            }}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh Prefill
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setReviewQueueOpen(true)}>
-            <ShieldCheck className="mr-2 h-4 w-4" />
-            Review Queue
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <TaxAuditPageHeader
+        clientName={currentEngagement.client_name}
+        financialYear={currentEngagement.financial_year}
+        setup={setup}
+        onRefreshPrefill={async () => {
+          await refreshPrefill();
+          toast({ title: 'Prefill refreshed', description: 'Draft clauses were refreshed from available source data.' });
+        }}
+        onOpenReviewQueue={() => setReviewQueueOpen(true)}
+      />
 
-      <SetupPanel setup={setup} saving={saving} onSave={updateSetup} client={client} />
-
-      <div className="rounded-md border bg-background p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold">Review Progress</p>
-            <p className="text-xs text-muted-foreground">
-              {summary.prepared + summary.reviewed + summary.approved} of {summary.totalClauses} clauses moved from draft
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-semibold">{progress}%</p>
-            <p className="text-xs text-muted-foreground">prepared / reviewed / approved</p>
-          </div>
-        </div>
-        <Progress value={progress} className="mt-3 h-2" />
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Needs Input"
-          value={summary.needsInput}
-          detail="Missing or manual clauses"
-          icon={AlertCircle}
-          tone={summary.needsInput > 0 ? 'warning' : 'success'}
-          onClick={() => setReviewQueueOpen(true)}
-        />
-        <MetricCard
-          label="Source Conflicts"
-          value={summary.conflicts}
-          detail="Requires source review"
-          icon={ShieldCheck}
-          tone={summary.conflicts > 0 ? 'warning' : 'success'}
-          onClick={() => setReviewQueueOpen(true)}
-        />
-        <MetricCard
-          label="Evidence Linked"
-          value={summary.evidenceLinked}
-          detail="Clause workpapers attached"
-          icon={Paperclip}
-          tone="info"
-        />
-        <MetricCard
-          label="Auditor Remarks"
-          value={summary.qualifications}
-          detail="Qualification or observation flags"
-          icon={ClipboardCheck}
-          tone={summary.qualifications > 0 ? 'warning' : 'default'}
-          onClick={() => setReviewQueueOpen(true)}
-        />
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="acceptance">
-            <ClipboardCheck className="mr-2 h-4 w-4" />
-            Acceptance and Eligibility
-          </TabsTrigger>
-          <TabsTrigger value="workspace">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3">
+        <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="setup">Setup and Applicability</TabsTrigger>
+          <TabsTrigger value="acceptance">Acceptance and Eligibility</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance Tracker</TabsTrigger>
+          <TabsTrigger value="clauses">
             <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Clause Workspace
+            3CD Clause Workspace
           </TabsTrigger>
-          <TabsTrigger value="summary">
-            <FileCheck className="mr-2 h-4 w-4" />
-            Review Summary
-          </TabsTrigger>
+          <TabsTrigger value="summary">Review Summary</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="acceptance">
+        <TabsContent value="overview" className="mt-0">
+          <TaxAuditOverview
+            setup={setup}
+            acceptanceCheck={acceptanceCheck}
+            complianceSummary={complianceSummary}
+            summary={summary}
+            progress={progress}
+            onOpenReviewQueue={() => setReviewQueueOpen(true)}
+          />
+        </TabsContent>
+
+        <TabsContent value="setup" className="mt-0">
+          <SetupPanel setup={setup} saving={saving} onSave={updateSetup} client={client} />
+        </TabsContent>
+
+        <TabsContent value="acceptance" className="mt-0 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
           <AcceptanceChecklistPanel
             acceptanceCheck={acceptanceCheck}
             saving={saving}
@@ -1470,86 +2042,31 @@ export default function TaxAudit() {
           />
         </TabsContent>
 
-        <TabsContent value="workspace">
-          {acceptanceCheck?.overall_status !== 'completed' && (
-            <Alert className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Acceptance and eligibility checklist is not completed. Clause work remains available, but complete the checklist before finalizing the Tax Audit file.
-              </AlertDescription>
-            </Alert>
-          )}
-          <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] h-[800px]">
-            <ClauseNavigator
-              selectedKey={selectedClause?.clause_key || selectedClauseKey}
-              clausesByKey={clausesByKey}
-              evidenceLinks={evidenceLinks}
-              onSelect={openClause}
-            />
-            {selectedClause ? (
-              <div className="flex flex-col gap-4 min-h-0">
-                <div className="flex-1 min-h-0">
-                  <ClauseEditor
-                    clause={selectedClause}
-                    onUpdate={(updates) => updateClause(selectedClause.id, updates)}
-                    onStatus={(status) => updateClauseStatus(selectedClause.id, status)}
-                  />
-                </div>
-                <div className="h-[300px] shrink-0">
-                  <EvidenceRail
-                    clause={selectedClause}
-                    evidenceLinks={evidenceLinks}
-                    onLink={(evidenceFileId) => linkEvidence(selectedClause, evidenceFileId)}
-                    onUnlink={unlinkEvidence}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-md border p-6 text-sm text-muted-foreground">No clause selected.</div>
-            )}
-          </div>
+        <TabsContent value="compliance" className="mt-0">
+          <ComplianceTrackerPanel setup={setup} saving={saving} onSave={updateSetup} />
         </TabsContent>
 
-        <TabsContent value="summary">
-          <div className="rounded-md border bg-background">
-            <div className="grid grid-cols-[80px_minmax(0,1fr)_140px_140px_120px] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
-              <span>Clause</span>
-              <span>Particulars</span>
-              <span>Prefill</span>
-              <span>Review</span>
-              <span>Evidence</span>
-            </div>
-            {FORM_3CD_CLAUSES.map((definition) => {
-              const clause = clausesByKey.get(definition.key);
-              const linked = clause ? evidenceLinks.some((link) => link.clause_response_id === clause.id) : false;
-              return (
-                <button
-                  key={definition.key}
-                  type="button"
-                  onClick={() => openClause(definition.key)}
-                  className="grid w-full grid-cols-[80px_minmax(0,1fr)_140px_140px_120px] items-center gap-2 border-b px-3 py-2 text-left text-sm hover:bg-muted/40"
-                >
-                  <span className="font-mono text-xs">{definition.clauseNo}</span>
-                  <span>{definition.title}</span>
-                  <span>
-                    <Badge variant="outline" className={clause ? badgeClass(clause.prefill_status) : 'text-[11px]'}>
-                      {clause ? statusLabel[clause.prefill_status] : 'Open'}
-                    </Badge>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-[11px]">
-                      {clause ? reviewLabel[clause.review_status] : 'Draft'}
-                    </Badge>
-                    {needsAttention(clause) && <AlertCircle className="h-4 w-4 text-amber-600" />}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    {linked ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : '-'}
-                    <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        <TabsContent value="clauses" className="mt-0">
+          <ClauseWorkspacePanel
+            selectedClause={selectedClause}
+            selectedClauseKey={selectedClauseKey}
+            clausesByKey={clausesByKey}
+            evidenceLinks={evidenceLinks}
+            acceptanceCheck={acceptanceCheck}
+            onOpenClause={openClause}
+            onUpdateClause={updateClause}
+            onUpdateClauseStatus={updateClauseStatus}
+            onLinkEvidence={linkEvidence}
+            onUnlinkEvidence={unlinkEvidence}
+          />
+        </TabsContent>
+
+        <TabsContent value="summary" className="mt-0">
+          <ReviewSummaryPanel
+            clausesByKey={clausesByKey}
+            evidenceLinks={evidenceLinks}
+            onOpenClause={openClause}
+          />
         </TabsContent>
       </Tabs>
 
