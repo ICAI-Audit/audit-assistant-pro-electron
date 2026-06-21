@@ -595,11 +595,60 @@ const createClausePrefill = (
           structured: {
             clause_31a_loan_deposit_rows: [],
             clause_31b_specified_sum_rows: [],
+            clause_31ba_receipt_other_than_permitted_mode_rows: [],
+            clause_31bb_receipt_non_account_payee_rows: [],
+            clause_31bc_payment_other_than_permitted_mode_rows: [],
+            clause_31bd_payment_non_account_payee_rows: [],
+            clause_31c_repayment_made_rows: [],
+            clause_31d_repayment_received_other_than_permitted_mode_rows: [],
+            clause_31e_repayment_received_non_account_payee_rows: [],
           },
         },
         status: 'needs_input',
         links: [setupLink],
         missingFields: ['Clause 31(a) and 31(b) receipt particulars'],
+      };
+    case 'clause_32':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_32a_loss_depreciation_rows: [],
+            clause_32b_shareholding_change_rows: [],
+            clause_32c_speculation_loss_rows: [],
+            clause_32d_specified_business_loss_rows: [],
+            clause_32e_deemed_speculation_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 32 loss and carry forward particulars'],
+      };
+    case 'clause_33':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_33_deduction_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 33 deduction particulars'],
+      };
+    case 'clause_34':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_34a_tds_tcs_summary_rows: [],
+            clause_34b_statement_rows: [],
+            clause_34c_interest_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 34(a), 34(b) and 34(c) TDS/TCS particulars'],
       };
     default:
       if (definition.prefillStrategy === 'financial_review') {

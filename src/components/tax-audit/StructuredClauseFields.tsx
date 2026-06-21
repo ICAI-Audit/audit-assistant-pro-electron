@@ -81,11 +81,18 @@ const isNumericValue = (value: unknown) => {
   return Number.isFinite(Number(value));
 };
 
+const toFiniteNumber = (value: unknown) => {
+  if (isBlank(value)) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 // These acceptance modes warrant a manual 269SS review once the monetary threshold is met.
 const THRESHOLD_REVIEW_MODES = new Set([
   'Cash',
   'Bearer cheque',
   'Non-account payee cheque',
+  'Non-account payee bank draft',
   'Journal entry',
   'Transfer of asset',
   'Conversion of liability',
@@ -94,6 +101,8 @@ const THRESHOLD_REVIEW_MODES = new Set([
 
 const getRows = (structured: StructuredValues, key: string): StructuredRow[] =>
   Array.isArray(structured[key]) ? (structured[key] as StructuredRow[]) : [];
+
+const hasReportingDetails = (row: StructuredRow, keys: string[]) => keys.some((key) => !isBlank(row[key]));
 
 const hasUsefulTableRow = (rows: StructuredRow[], columns: TaxAuditStructuredTableColumn[]) =>
   rows.some((row) => columns.some((column) => !isBlank(row[column.key])));
@@ -212,6 +221,9 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
   const { parsed, structured } = getStructuredValues(clause);
   const validationMessages = parseJson<string[]>(clause.validation_messages_json, []);
   const tables = schema.tables || (schema.table ? [schema.table] : []);
+  // Clauses such as 34(a)/(b)/(c) intentionally use the table workbench even when only one
+  // sub-clause exists so the navigator and editor stay on the same interaction pattern.
+  const usesTableWorkbench = Boolean(schema.tables?.length);
   const [rowEditor, setRowEditor] = useState<RowEditorState | null>(null);
   const activeTable = tables.find((table) => table.key === activeTableKey) || tables[0];
 
@@ -826,6 +838,396 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
           warnings.push(`31(b) row ${index + 1}: PAN or Aadhaar should be entered when payer name is captured.`);
         }
       });
+
+      getRows(nextStructured, 'clause_31ba_receipt_other_than_permitted_mode_rows').forEach((row, index) => {
+        const amount = Number(row.amount_received);
+        const amountAtThreshold = !isBlank(row.amount_received) && Number.isFinite(amount) && amount >= 200000;
+
+        if (amountAtThreshold && row.whether_permitted_mode === 'Yes') {
+          warnings.push(`31(ba) row ${index + 1}: Amount is 2 lakh or more but receipt is marked as permitted mode. Review manually.`);
+        }
+        if (amountAtThreshold && isBlank(row.payer_pan_or_aadhaar)) {
+          warnings.push(`31(ba) row ${index + 1}: PAN or Aadhaar should be entered when amount received is 2 lakh or more.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_31bb_receipt_non_account_payee_rows').forEach((row, index) => {
+        const amount = Number(row.amount_received);
+        const amountAtThreshold = !isBlank(row.amount_received) && Number.isFinite(amount) && amount >= 200000;
+
+        if (amountAtThreshold && row.whether_account_payee === 'Yes') {
+          warnings.push(`31(bb) row ${index + 1}: Amount is 2 lakh or more but instrument is marked account payee. Review manually.`);
+        }
+        if (row.whether_account_payee === 'Cannot verify') {
+          warnings.push(`31(bb) row ${index + 1}: Account payee status cannot be verified. Consider whether an auditor comment is required.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_31bc_payment_other_than_permitted_mode_rows').forEach((row, index) => {
+        const amount = Number(row.amount_paid);
+        const amountAtThreshold = !isBlank(row.amount_paid) && Number.isFinite(amount) && amount >= 200000;
+
+        if (amountAtThreshold && row.whether_permitted_mode === 'Yes') {
+          warnings.push(`31(bc) row ${index + 1}: Amount is 2 lakh or more but payment is marked as permitted mode. Review manually.`);
+        }
+        if (amountAtThreshold && isBlank(row.payee_pan_or_aadhaar)) {
+          warnings.push(`31(bc) row ${index + 1}: PAN or Aadhaar should be entered when amount paid is 2 lakh or more.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_31bd_payment_non_account_payee_rows').forEach((row, index) => {
+        const amount = Number(row.amount_paid);
+        const amountAtThreshold = !isBlank(row.amount_paid) && Number.isFinite(amount) && amount >= 200000;
+
+        if (amountAtThreshold && row.whether_account_payee === 'Yes') {
+          warnings.push(`31(bd) row ${index + 1}: Amount is 2 lakh or more but instrument is marked account payee. Review manually.`);
+        }
+        if (row.whether_account_payee === 'Cannot verify') {
+          warnings.push(`31(bd) row ${index + 1}: Account payee status cannot be verified. Consider whether an auditor comment is required.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_31c_repayment_made_rows').forEach((row, index) => {
+        const maximumOutstanding = Number(row.maximum_amount_outstanding_during_year);
+        const thresholdReached =
+          !isBlank(row.maximum_amount_outstanding_during_year) &&
+          Number.isFinite(maximumOutstanding) &&
+          maximumOutstanding >= 20000;
+
+        if (thresholdReached && THRESHOLD_REVIEW_MODES.has(String(row.mode_of_repayment))) {
+          warnings.push(`31(c) row ${index + 1}: Maximum amount outstanding is 20,000 or more and mode of repayment requires manual review under section 269T.`);
+        }
+        if (thresholdReached && row.whether_account_payee_if_cheque_or_draft === 'No') {
+          warnings.push(`31(c) row ${index + 1}: Maximum amount outstanding is 20,000 or more and cheque or draft is marked non-account payee.`);
+        }
+        if (!isBlank(row.payee_name) && isBlank(row.payee_pan_or_aadhaar)) {
+          warnings.push(`31(c) row ${index + 1}: PAN or Aadhaar should be entered when payee name is captured.`);
+        }
+        if (
+          !isBlank(row.exception_or_excluded_counterparty_status) &&
+          row.exception_or_excluded_counterparty_status !== 'No exception claimed' &&
+          hasReportingDetails(row, [
+            'payee_name',
+            'amount_of_repayment',
+            'date_of_repayment',
+            'mode_of_repayment',
+            'maximum_amount_outstanding_during_year',
+          ])
+        ) {
+          warnings.push(`31(c) row ${index + 1}: An exception is selected. Review whether reporting is required for this counterparty.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_31d_repayment_received_other_than_permitted_mode_rows').forEach((row, index) => {
+        const amountReceived = Number(row.amount_received);
+        const thresholdReached = !isBlank(row.amount_received) && Number.isFinite(amountReceived) && amountReceived >= 20000;
+
+        if (
+          thresholdReached &&
+          [
+            'Account payee cheque',
+            'Account payee bank draft',
+            'Electronic clearing system through bank account',
+            'Other prescribed electronic mode',
+          ].includes(String(row.mode_of_receipt))
+        ) {
+          warnings.push(`31(d) row ${index + 1}: Amount received is 20,000 or more but mode of receipt appears to be a permitted banking mode. Review manually.`);
+        }
+        if (thresholdReached && isBlank(row.payer_pan_or_aadhaar)) {
+          warnings.push(`31(d) row ${index + 1}: PAN or Aadhaar should be entered when amount received is 20,000 or more.`);
+        }
+        if (
+          !isBlank(row.exception_or_excluded_counterparty_status) &&
+          row.exception_or_excluded_counterparty_status !== 'No exception claimed' &&
+          hasReportingDetails(row, [
+            'payer_name',
+            'amount_received',
+            'date_of_receipt',
+            'mode_of_receipt',
+            'maximum_amount_outstanding_during_year',
+          ])
+        ) {
+          warnings.push(`31(d) row ${index + 1}: An exception is selected. Review whether reporting is required for this counterparty.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_31e_repayment_received_non_account_payee_rows').forEach((row, index) => {
+        const amountReceived = Number(row.amount_received);
+        const thresholdReached = !isBlank(row.amount_received) && Number.isFinite(amountReceived) && amountReceived >= 20000;
+
+        if (thresholdReached && row.whether_account_payee === 'Yes') {
+          warnings.push(`31(e) row ${index + 1}: Amount received is 20,000 or more but instrument is marked account payee. Review manually.`);
+        }
+        if (row.whether_account_payee === 'Cannot verify') {
+          warnings.push(`31(e) row ${index + 1}: Account payee status cannot be verified. Consider whether an auditor observation is required.`);
+        }
+        if (!isBlank(row.payer_name) && isBlank(row.payer_pan_or_aadhaar)) {
+          warnings.push(`31(e) row ${index + 1}: PAN or Aadhaar should be entered when payer name is captured.`);
+        }
+        if (
+          !isBlank(row.exception_or_excluded_counterparty_status) &&
+          row.exception_or_excluded_counterparty_status !== 'No exception claimed' &&
+          hasReportingDetails(row, [
+            'payer_name',
+            'amount_received',
+            'date_of_receipt',
+            'instrument_type',
+            'maximum_amount_outstanding_during_year',
+          ])
+        ) {
+          warnings.push(`31(e) row ${index + 1}: An exception is selected. Review whether reporting is required for this counterparty.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_32') {
+      getRows(nextStructured, 'clause_32a_loss_depreciation_rows').forEach((row, index) => {
+        const hasAmount =
+          !isBlank(row.amount_as_returned) ||
+          !isBlank(row.amount_not_allowed_under_115baa_115bac_115bad_115bae) ||
+          !isBlank(row.amount_adjusted_by_withdrawal_of_additional_depreciation) ||
+          !isBlank(row.amount_as_assessed) ||
+          !isBlank(row.amount_available_for_carry_forward_or_setoff);
+
+        if (hasAmount && isBlank(row.assessment_year)) {
+          warnings.push(`32(a) row ${index + 1}: Assessment year should be entered when amount is captured.`);
+        }
+        if (!isBlank(row.amount_as_assessed) && isBlank(row.reference_to_relevant_order)) {
+          warnings.push(`32(a) row ${index + 1}: Reference to relevant order should be entered when amount as assessed is captured.`);
+        }
+        if (!isBlank(row.amount_available_for_carry_forward_or_setoff) && isBlank(row.remarks)) {
+          warnings.push(`32(a) row ${index + 1}: Remarks should be entered when amount available for carry forward or set-off is captured.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_32b_shareholding_change_rows').forEach((row, index) => {
+        if (
+          row.whether_change_in_shareholding_during_previous_year === 'Yes' &&
+          isBlank(row.section_79_view)
+        ) {
+          warnings.push(`32(b) row ${index + 1}: Section 79 view should be entered when change in shareholding is marked Yes.`);
+        }
+        if (row.section_79_view === 'Exception claimed' && isBlank(row.remarks)) {
+          warnings.push(`32(b) row ${index + 1}: Remarks should be entered when section 79 exception is claimed.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_32c_speculation_loss_rows').forEach((row, index) => {
+        if (!isBlank(row.amount_of_speculation_loss) && isBlank(row.nature_of_speculation_business)) {
+          warnings.push(`32(c) row ${index + 1}: Nature of speculation business should be entered when speculation loss is captured.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_32d_specified_business_loss_rows').forEach((row, index) => {
+        if (!isBlank(row.amount_of_specified_business_loss) && isBlank(row.specified_business_description)) {
+          warnings.push(`32(d) row ${index + 1}: Specified business description should be entered when specified business loss is captured.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_32e_deemed_speculation_rows').forEach((row, index) => {
+        if (row.whether_company === 'Yes' && isBlank(row.whether_deemed_speculation_business)) {
+          warnings.push(`32(e) row ${index + 1}: Deemed speculation business view should be entered when whether company is Yes.`);
+        }
+        if (
+          row.whether_deemed_speculation_business === 'Yes' &&
+          isBlank(row.basis_for_deemed_speculation_view)
+        ) {
+          warnings.push(`32(e) row ${index + 1}: Basis for deemed speculation view should be entered when deemed speculation business is marked Yes.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_33') {
+      getRows(nextStructured, 'clause_33_deduction_rows').forEach((row, index) => {
+        const claimedAmount = Number(row.amount_claimed_by_assessee);
+        const admissibleAmount = Number(row.amount_admissible_as_per_act);
+
+        if (!isBlank(row.section) && isBlank(row.amount_admissible_as_per_act)) {
+          warnings.push(`33 row ${index + 1}: Amount admissible as per Act should be entered when section is selected.`);
+        }
+        if (
+          !isBlank(row.amount_claimed_by_assessee) &&
+          !isBlank(row.amount_admissible_as_per_act) &&
+          Number.isFinite(claimedAmount) &&
+          Number.isFinite(admissibleAmount) &&
+          admissibleAmount > claimedAmount
+        ) {
+          warnings.push(`33 row ${index + 1}: Amount admissible as per Act exceeds amount claimed by assessee.`);
+        }
+        if (row.conditions_fulfilled === 'No' && !isBlank(row.amount_admissible_as_per_act)) {
+          warnings.push(`33 row ${index + 1}: Conditions are marked No but admissible amount is captured.`);
+        }
+        if (
+          row.whether_restricted_under_special_tax_regime === 'Yes' &&
+          !isBlank(row.amount_admissible_as_per_act)
+        ) {
+          warnings.push(`33 row ${index + 1}: Special tax regime restriction is marked Yes but admissible amount is captured.`);
+        }
+        if (row.section === 'Other' && isBlank(row.remarks)) {
+          warnings.push(`33 row ${index + 1}: Remarks should be entered when section is marked Other.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_34') {
+      // Clause 34 remains manual in this phase; warnings only flag obvious completeness issues
+      // without attempting any statutory computation or reconciliation across sub-clauses.
+      getRows(nextStructured, 'clause_34a_tds_tcs_summary_rows').forEach((row, index) => {
+        const totalAmount = toFiniteNumber(row.total_amount_of_payment_or_receipt);
+        const requiredAmount = toFiniteNumber(row.amount_on_which_tax_required_to_be_deducted_or_collected);
+        const specifiedRateAmount = toFiniteNumber(row.amount_on_which_tax_deducted_or_collected_at_specified_rate) ?? 0;
+        const lowerOrNilRateAmount = toFiniteNumber(row.amount_on_which_tax_deducted_or_collected_at_lower_or_nil_rate) ?? 0;
+        const notDeductedAmount = toFiniteNumber(row.amount_on_which_tax_not_deducted_or_collected) ?? 0;
+        const notDepositedAmount = toFiniteNumber(row.amount_on_which_tax_deducted_or_collected_but_not_deposited) ?? 0;
+        const hasAmounts = [
+          'total_amount_of_payment_or_receipt',
+          'amount_on_which_tax_required_to_be_deducted_or_collected',
+          'amount_on_which_tax_deducted_or_collected_at_specified_rate',
+          'tax_deducted_or_collected_at_specified_rate',
+          'amount_on_which_tax_deducted_or_collected_at_lower_or_nil_rate',
+          'tax_deducted_or_collected_at_lower_or_nil_rate',
+          'amount_on_which_tax_not_deducted_or_collected',
+          'tax_not_deducted_or_collected',
+          'amount_on_which_tax_deducted_or_collected_but_not_deposited',
+          'tax_deducted_or_collected_but_not_deposited',
+        ].some((key) => !isBlank(row[key]));
+
+        if (hasAmounts && isBlank(row.tan)) {
+          warnings.push(`34(a) row ${index + 1}: TAN should be entered when amounts are captured.`);
+        }
+        if (hasAmounts && isBlank(row.section)) {
+          warnings.push(`34(a) row ${index + 1}: Section should be entered when amounts are captured.`);
+        }
+        if (
+          totalAmount !== null &&
+          requiredAmount !== null &&
+          requiredAmount > totalAmount
+        ) {
+          warnings.push(`34(a) row ${index + 1}: Amount on which tax was required should not exceed total amount of payment or receipt.`);
+        }
+
+        const bucketAmountTotal =
+          specifiedRateAmount +
+          lowerOrNilRateAmount +
+          notDeductedAmount +
+          notDepositedAmount;
+
+        if (requiredAmount !== null && bucketAmountTotal > requiredAmount) {
+          warnings.push(`34(a) row ${index + 1}: Bucket amounts exceed the amount on which tax was required to be deducted or collected.`);
+        }
+        if (
+          !isBlank(row.amount_on_which_tax_deducted_or_collected_at_lower_or_nil_rate) &&
+          isBlank(row.lower_or_nil_rate_basis)
+        ) {
+          warnings.push(`34(a) row ${index + 1}: Lower or nil rate basis should be entered when lower or nil rate amount is captured.`);
+        }
+        if (
+          !isBlank(row.amount_on_which_tax_not_deducted_or_collected) &&
+          isBlank(row.reason_or_review_note)
+        ) {
+          warnings.push(`34(a) row ${index + 1}: Reason or review note should be entered when tax not deducted or collected is captured.`);
+        }
+        if (
+          !isBlank(row.tax_deducted_or_collected_but_not_deposited) &&
+          isBlank(row.reason_or_review_note)
+        ) {
+          warnings.push(`34(a) row ${index + 1}: Reason or review note should be entered when tax deducted or collected but not deposited is captured.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_34b_statement_rows').forEach((row, index) => {
+        const hasRowData = [
+          'tan',
+          'tds_or_tcs',
+          'type_of_form',
+          'quarter_or_period',
+          'due_date_for_furnishing',
+          'date_of_furnishing',
+          'acknowledgment_number_or_token',
+          'whether_statement_furnished',
+          'whether_statement_contains_all_required_transactions',
+          'details_of_transactions_not_reported',
+          'reason_for_delay_or_omission',
+          'evidence_or_working_reference',
+          'remarks',
+        ].some((key) => !isBlank(row[key]));
+        const dueDate = typeof row.due_date_for_furnishing === 'string' ? row.due_date_for_furnishing : '';
+        const furnishingDate = typeof row.date_of_furnishing === 'string' ? row.date_of_furnishing : '';
+
+        if (hasRowData && isBlank(row.tan)) {
+          warnings.push(`34(b) row ${index + 1}: TAN should be entered when a row is captured.`);
+        }
+        if (hasRowData && isBlank(row.type_of_form)) {
+          warnings.push(`34(b) row ${index + 1}: Type of form should be entered when a row is captured.`);
+        }
+        if (row.whether_statement_furnished === 'Yes' && isBlank(row.date_of_furnishing)) {
+          warnings.push(`34(b) row ${index + 1}: Date of furnishing should be entered when statement furnished is marked Yes.`);
+        }
+        if (
+          dueDate &&
+          furnishingDate &&
+          isValidDateInput(dueDate) &&
+          isValidDateInput(furnishingDate) &&
+          furnishingDate > dueDate
+        ) {
+          warnings.push(`34(b) row ${index + 1}: Date of furnishing is later than due date for furnishing. Review delay manually.`);
+        }
+        if (row.whether_statement_furnished === 'No' && isBlank(row.reason_for_delay_or_omission)) {
+          warnings.push(`34(b) row ${index + 1}: Reason for delay or omission should be entered when statement furnished is marked No.`);
+        }
+        if (
+          row.whether_statement_contains_all_required_transactions === 'No' &&
+          isBlank(row.details_of_transactions_not_reported)
+        ) {
+          warnings.push(`34(b) row ${index + 1}: Details of transactions not reported should be entered when completeness is marked No.`);
+        }
+        if (row.whether_statement_contains_all_required_transactions === 'Cannot verify') {
+          warnings.push(`34(b) row ${index + 1}: Statement completeness cannot be verified. Consider whether an auditor observation is required.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_34c_interest_rows').forEach((row, index) => {
+        const payableAmount = toFiniteNumber(row.amount_of_interest_payable);
+        const paidAmount = toFiniteNumber(row.amount_of_interest_paid);
+        const balanceAmount = toFiniteNumber(row.balance_interest_payable);
+        const hasAmounts =
+          !isBlank(row.amount_of_interest_payable) ||
+          !isBlank(row.amount_of_interest_paid) ||
+          !isBlank(row.balance_interest_payable);
+        const hasAnyChallanDetail =
+          !isBlank(row.challan_bsr_code) ||
+          !isBlank(row.challan_serial_number) ||
+          !isBlank(row.challan_date);
+        const hasIncompleteChallanDetail =
+          hasAnyChallanDetail &&
+          (isBlank(row.challan_bsr_code) || isBlank(row.challan_serial_number) || isBlank(row.challan_date));
+
+        if (hasAmounts && isBlank(row.tan)) {
+          warnings.push(`34(c) row ${index + 1}: TAN should be entered when amount details are captured.`);
+        }
+        if (hasAmounts && isBlank(row.interest_section)) {
+          warnings.push(`34(c) row ${index + 1}: Interest section should be entered when amount details are captured.`);
+        }
+        if (
+          payableAmount !== null &&
+          paidAmount !== null &&
+          paidAmount > payableAmount
+        ) {
+          warnings.push(`34(c) row ${index + 1}: Amount of interest paid should not exceed amount of interest payable.`);
+        }
+        if (!isBlank(row.amount_of_interest_paid) && isBlank(row.date_of_payment)) {
+          warnings.push(`34(c) row ${index + 1}: Date of payment should be entered when amount of interest paid is captured.`);
+        }
+        if (hasIncompleteChallanDetail) {
+          warnings.push(`34(c) row ${index + 1}: Challan details are partly entered. Review missing BSR code, serial number or challan date.`);
+        }
+        if (!isBlank(row.balance_interest_payable) && isBlank(row.remarks)) {
+          warnings.push(`34(c) row ${index + 1}: Remarks should be entered when balance interest payable is captured.`);
+        }
+        if (row.default_type === 'To be reviewed' && hasAmounts) {
+          warnings.push(`34(c) row ${index + 1}: Default type is marked To be reviewed while amount details are captured.`);
+        }
+      });
     }
 
     return warnings;
@@ -1029,7 +1431,7 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
             </Tooltip>
           </TooltipProvider>
         </div>
-        {tables.length === 1 && (
+        {!usesTableWorkbench && tables.length === 1 && (
           <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => addRow(tables[0])} disabled={disabled}>
             <Plus className="mr-1 h-3.5 w-3.5" />
             Add Row
@@ -1063,7 +1465,7 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
           </div>
         )}
 
-        {tables.length > 1 ? renderMultiTableWorkbench() : tables.map((table) => {
+        {usesTableWorkbench ? renderMultiTableWorkbench() : tables.map((table) => {
           const rows = getRows(structured, table.key);
           return (
             <div key={table.key} className="space-y-2">
@@ -1157,3 +1559,5 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
     </div>
   );
 }
+
+

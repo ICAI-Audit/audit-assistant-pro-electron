@@ -76,6 +76,11 @@ import {
   normalizeTaxAuditComplianceTracker,
   summarizeTaxAuditComplianceTracker,
 } from '@/lib/taxAuditComplianceTracker';
+import {
+  buildTaxAuditReviewSummaryCounts,
+  buildTaxAuditReviewSummaryRows,
+  TaxAuditReviewDataStatus,
+} from '@/lib/taxAuditReviewSummary';
 
 const parseJson = <T,>(value: string | null | undefined, fallback: T): T => {
   if (!value) return fallback;
@@ -139,6 +144,17 @@ const numberValue = (value: unknown) => {
 };
 
 type ClauseFilter = 'all' | 'attention' | 'evidence' | 'qualified' | 'reviewed';
+type ReviewSummaryFilter =
+  | 'all'
+  | 'not_started'
+  | 'needs_attention'
+  | 'in_progress'
+  | 'prepared'
+  | 'reviewed'
+  | 'approved'
+  | 'has_evidence'
+  | 'has_remarks'
+  | 'has_qualification';
 
 type SetupClient = {
   pan?: string | null;
@@ -1226,7 +1242,7 @@ function ClauseNavigator({
                           ) : null}
                         </span>
                       </button>
-                      {subClauseTables.length > 1 && (
+                      {subClauseTables.length > 0 && (
                         <div className="bg-muted/10 pb-1">
                           {subClauseTables.map((table) => {
                             const rowCount = getStructuredRows(clause, table.key).length;
@@ -2080,45 +2096,189 @@ function ReviewSummaryPanel({
   evidenceLinks: ReturnType<typeof useTaxAudit>['evidenceLinks'];
   onOpenClause: (clauseKey: string) => void;
 }) {
+  const [filter, setFilter] = useState<ReviewSummaryFilter>('all');
+  const [search, setSearch] = useState('');
+
+  const rows = useMemo(() => buildTaxAuditReviewSummaryRows(clausesByKey, evidenceLinks), [clausesByKey, evidenceLinks]);
+  const counts = useMemo(() => buildTaxAuditReviewSummaryCounts(rows), [rows]);
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredRows = useMemo(
+    () =>
+      rows.filter((row) => {
+        if (normalizedSearch) {
+          const haystack = `${row.clauseNo} ${row.clauseTitle}`.toLowerCase();
+          if (!haystack.includes(normalizedSearch)) return false;
+        }
+
+        if (filter === 'all') return true;
+        if (filter === 'not_started') return row.dataStatus === 'not_started';
+        if (filter === 'needs_attention') return row.dataStatus === 'needs_attention';
+        if (filter === 'in_progress') return row.dataStatus === 'in_progress';
+        if (filter === 'prepared') return row.reviewStatus === 'prepared';
+        if (filter === 'reviewed') return row.reviewStatus === 'reviewed';
+        if (filter === 'approved') return row.reviewStatus === 'approved' || row.reviewStatus === 'locked';
+        if (filter === 'has_evidence') return row.evidenceCount > 0;
+        if (filter === 'has_remarks') return row.hasAdditionalParticulars || row.hasInternalRemarks;
+        if (filter === 'has_qualification') return row.hasObservation;
+        return true;
+      }),
+    [filter, normalizedSearch, rows]
+  );
+
+  const dataStatusLabel: Record<TaxAuditReviewDataStatus, string> = {
+    not_started: 'Not started',
+    in_progress: 'In progress',
+    needs_attention: 'Needs attention',
+    prepared: 'Prepared',
+    reviewed: 'Reviewed',
+    approved: 'Approved',
+  };
+
+  const dataStatusBadgeClass = (status: TaxAuditReviewDataStatus) =>
+    cn(
+      'text-[11px]',
+      status === 'not_started' && 'border-slate-300 bg-slate-50 text-slate-700',
+      status === 'in_progress' && 'border-blue-300 bg-blue-50 text-blue-700',
+      status === 'needs_attention' && 'border-amber-300 bg-amber-50 text-amber-700',
+      status === 'prepared' && 'border-emerald-300 bg-emerald-50 text-emerald-700',
+      status === 'reviewed' && 'border-teal-300 bg-teal-50 text-teal-700',
+      status === 'approved' && 'border-violet-300 bg-violet-50 text-violet-700'
+    );
+
+  const filterButtons: Array<{ key: ReviewSummaryFilter; label: string; count: number }> = [
+    { key: 'all', label: 'All', count: counts.totalActiveClauses },
+    { key: 'not_started', label: 'Not started', count: counts.notStarted },
+    { key: 'needs_attention', label: 'Needs attention', count: counts.needsAttention },
+    { key: 'in_progress', label: 'In progress', count: counts.inProgress },
+    { key: 'prepared', label: 'Prepared', count: counts.prepared },
+    { key: 'reviewed', label: 'Reviewed', count: counts.reviewed },
+    { key: 'approved', label: 'Approved', count: counts.approved },
+    { key: 'has_evidence', label: 'Has evidence', count: counts.clausesWithEvidence },
+    { key: 'has_remarks', label: 'Has remarks', count: rows.filter((row) => row.hasAdditionalParticulars || row.hasInternalRemarks).length },
+    { key: 'has_qualification', label: 'Has qualification', count: counts.clausesWithQualification },
+  ];
+
   return (
-    <div className="overflow-x-auto rounded-md border bg-background">
-      <div className="grid min-w-[760px] grid-cols-[80px_minmax(0,1fr)_140px_140px_120px] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
-        <span>Clause</span>
-        <span>Particulars</span>
-        <span>Prefill</span>
-        <span>Review</span>
-        <span>Evidence</span>
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <MetricCard label="Total active clauses" value={counts.totalActiveClauses} detail="Active Form 3CD clauses only" icon={FileSpreadsheet} onClick={() => setFilter('all')} />
+        <MetricCard label="Not started" value={counts.notStarted} icon={ClipboardCheck} tone={counts.notStarted > 0 ? 'warning' : 'default'} onClick={() => setFilter('not_started')} />
+        <MetricCard label="In progress" value={counts.inProgress} icon={RefreshCw} tone={counts.inProgress > 0 ? 'info' : 'default'} onClick={() => setFilter('in_progress')} />
+        <MetricCard label="Needs attention" value={counts.needsAttention} icon={AlertCircle} tone={counts.needsAttention > 0 ? 'warning' : 'default'} onClick={() => setFilter('needs_attention')} />
+        <MetricCard label="Prepared" value={counts.prepared} icon={FileCheck} tone={counts.prepared > 0 ? 'success' : 'default'} onClick={() => setFilter('prepared')} />
+        <MetricCard label="Reviewed" value={counts.reviewed} icon={ClipboardCheck} tone={counts.reviewed > 0 ? 'success' : 'default'} onClick={() => setFilter('reviewed')} />
+        <MetricCard label="Approved" value={counts.approved} icon={ShieldCheck} tone={counts.approved > 0 ? 'success' : 'default'} onClick={() => setFilter('approved')} />
+        <MetricCard label="Clauses with evidence" value={counts.clausesWithEvidence} icon={Paperclip} onClick={() => setFilter('has_evidence')} />
+        <MetricCard label="Clauses with internal remarks" value={counts.clausesWithInternalRemarks} icon={FileSpreadsheet} onClick={() => setFilter('has_remarks')} />
+        <MetricCard label="Clauses with qualification / observation" value={counts.clausesWithQualification} icon={AlertCircle} tone={counts.clausesWithQualification > 0 ? 'warning' : 'default'} onClick={() => setFilter('has_qualification')} />
       </div>
-      {FORM_3CD_CLAUSES.map((definition) => {
-        const clause = clausesByKey.get(definition.key);
-        const linked = clause ? evidenceLinks.some((link) => link.clause_response_id === clause.id) : false;
-        return (
-          <button
-            key={definition.key}
-            type="button"
-            onClick={() => onOpenClause(definition.key)}
-            className="grid min-w-[760px] w-full grid-cols-[80px_minmax(0,1fr)_140px_140px_120px] items-center gap-2 border-b px-3 py-2 text-left text-sm hover:bg-muted/40"
-          >
-            <span className="font-mono text-xs">{definition.clauseNo}</span>
-            <span>{definition.title}</span>
-            <span>
-              <Badge variant="outline" className={clause ? badgeClass(clause.prefill_status) : 'text-[11px]'}>
-                {clause ? statusLabel[clause.prefill_status] : 'Open'}
-              </Badge>
-            </span>
-            <span className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-[11px]">
-                {clause ? reviewLabel[clause.review_status] : 'Draft'}
-              </Badge>
-              {needsAttention(clause) && <AlertCircle className="h-4 w-4 text-amber-600" />}
-            </span>
-            <span className="flex items-center gap-2">
-              {linked ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : '-'}
-              <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
-            </span>
-          </button>
-        );
-      })}
+
+      <div className="flex flex-col gap-3 rounded-md border bg-background p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {filterButtons.map((item) => (
+              <Button
+                key={item.key}
+                type="button"
+                size="sm"
+                variant={filter === item.key ? 'default' : 'outline'}
+                className="h-8 gap-2"
+                onClick={() => setFilter(item.key)}
+              >
+                {item.label}
+                <Badge variant={filter === item.key ? 'secondary' : 'outline'} className="px-1.5 text-[10px]">
+                  {item.count}
+                </Badge>
+              </Button>
+            ))}
+          </div>
+          <div className="relative w-full lg:w-72">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search clause number or title"
+              className="h-9 pl-8"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-md border">
+          <div className="grid min-w-[1180px] grid-cols-[88px_minmax(0,1.5fr)_128px_96px_96px_120px_150px_120px_92px] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
+            <span>Clause No.</span>
+            <span>Clause title</span>
+            <span>Data status</span>
+            <span>Warnings</span>
+            <span>Evidence</span>
+            <span>Review status</span>
+            <span>Remarks</span>
+            <span>Qualification</span>
+            <span>Action</span>
+          </div>
+          {filteredRows.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No clauses match the current filter.</div>
+          ) : (
+            filteredRows.map((row) => (
+              <button
+                key={row.clauseKey}
+                type="button"
+                onClick={() => onOpenClause(row.clauseKey)}
+                className="grid min-w-[1180px] w-full grid-cols-[88px_minmax(0,1.5fr)_128px_96px_96px_120px_150px_120px_92px] items-center gap-2 border-b px-3 py-2 text-left text-sm hover:bg-muted/40"
+              >
+                <span className="font-mono text-xs">{row.clauseNo}</span>
+                <span className="truncate">{row.clauseTitle}</span>
+                <span>
+                  <Badge variant="outline" className={dataStatusBadgeClass(row.dataStatus)}>
+                    {dataStatusLabel[row.dataStatus]}
+                  </Badge>
+                </span>
+                <span>
+                  {row.warningCount > 0 ? (
+                    <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[11px] text-amber-700">
+                      {row.warningCount}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">0</span>
+                  )}
+                </span>
+                <span>
+                  {row.evidenceCount > 0 ? (
+                    <Badge variant="outline" className="text-[11px]">
+                      {row.evidenceCount}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">0</span>
+                  )}
+                </span>
+                <span>
+                  <Badge variant="secondary" className="text-[11px]">
+                    {reviewLabel[row.reviewStatus]}
+                  </Badge>
+                </span>
+                <span className="flex flex-wrap gap-1">
+                  {row.hasAdditionalParticulars && <Badge variant="outline" className="text-[10px]">Report</Badge>}
+                  {row.hasInternalRemarks && <Badge variant="outline" className="text-[10px]">Internal</Badge>}
+                  {!row.hasAdditionalParticulars && !row.hasInternalRemarks && <span className="text-muted-foreground">-</span>}
+                </span>
+                <span>
+                  {row.hasObservation ? (
+                    <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[11px] text-amber-700">
+                      Present
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </span>
+                <span className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Open</span>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
