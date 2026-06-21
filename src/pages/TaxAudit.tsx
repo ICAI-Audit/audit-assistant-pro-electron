@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -44,11 +45,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { StructuredClauseFields } from '@/components/tax-audit/StructuredClauseFields';
 import { SourceLinkChip } from '@/components/tax-audit/SourceLinkChip';
 import { useEngagement } from '@/contexts/EngagementContext';
 import { useTaxAudit } from '@/hooks/useTaxAudit';
 import { useEvidenceFiles } from '@/hooks/useEvidenceFiles';
 import { FORM_3CD_CLAUSES, FORM_3CD_GROUPS } from '@/data/taxAudit3CDClauses';
+import { TAX_AUDIT_3CD_FIELD_SCHEMA_BY_CLAUSE, TaxAuditStructuredTable } from '@/data/taxAudit3CDFieldSchemas';
 import { calculateApplicability, TaxAuditApplicabilityResult } from '@/lib/taxAuditApplicability';
 import {
   TaxAuditAcceptanceCheck,
@@ -292,6 +295,35 @@ const needsAttention = (clause?: TaxAuditClauseResponse) =>
         clause.validation_status === 'error' ||
         toBool(clause.qualification_required))
   );
+
+const getStructuredRows = (clause: TaxAuditClauseResponse | undefined, tableKey: string) => {
+  if (!clause) return [];
+  const responseJson = parseJson<Record<string, unknown>>(clause.response_json, {});
+  const structured =
+    responseJson.structured && typeof responseJson.structured === 'object' && !Array.isArray(responseJson.structured)
+      ? (responseJson.structured as Record<string, unknown>)
+      : {};
+  return Array.isArray(structured[tableKey]) ? structured[tableKey] : [];
+};
+
+const getStructuredTableWarnings = (clause: TaxAuditClauseResponse | undefined, table: TaxAuditStructuredTable) => {
+  if (!clause) return [];
+  const messages = parseJson<string[]>(clause.validation_messages_json, []);
+  const markers = [table.shortLabel, table.label].filter(Boolean) as string[];
+  return markers.length > 0
+    ? messages.filter((message) => markers.some((marker) => message.includes(marker)))
+    : [];
+};
+
+const getDefaultStructuredTableKey = (clauseKey: string) => {
+  const fieldSchema = TAX_AUDIT_3CD_FIELD_SCHEMA_BY_CLAUSE.get(clauseKey);
+  return fieldSchema?.tables?.[0]?.key || '';
+};
+
+const hasRichTextContent = (value: string | null | undefined) => {
+  if (!value) return false;
+  return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length > 0;
+};
 
 function MetricCard({
   label,
@@ -1013,14 +1045,16 @@ function ComplianceTrackerPanel({
 
 function ClauseNavigator({
   selectedKey,
+  selectedStructuredTableKey,
   clausesByKey,
   evidenceLinks,
   onSelect,
 }: {
   selectedKey: string;
+  selectedStructuredTableKey?: string;
   clausesByKey: Map<string, TaxAuditClauseResponse>;
   evidenceLinks: ReturnType<typeof useTaxAudit>['evidenceLinks'];
-  onSelect: (key: string) => void;
+  onSelect: (key: string, tableKey?: string) => void;
 }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ClauseFilter>('all');
@@ -1041,11 +1075,13 @@ function ClauseNavigator({
 
   const searchTerm = search.trim().toLowerCase();
   const visibleClauses = FORM_3CD_CLAUSES.filter((definition) => {
+    const fieldSchema = TAX_AUDIT_3CD_FIELD_SCHEMA_BY_CLAUSE.get(definition.key);
     const matchesSearch =
       !searchTerm ||
       definition.clauseNo.toLowerCase().includes(searchTerm) ||
       definition.title.toLowerCase().includes(searchTerm) ||
-      definition.group.toLowerCase().includes(searchTerm);
+      definition.group.toLowerCase().includes(searchTerm) ||
+      Boolean(fieldSchema?.tables?.some((table) => table.label.toLowerCase().includes(searchTerm) || table.shortLabel?.toLowerCase().includes(searchTerm)));
     return matchesSearch && clauseMatchesFilter(definition);
   });
 
@@ -1150,44 +1186,79 @@ function ClauseNavigator({
               {!isCollapsed &&
                 groupClauses.map((definition) => {
                   const clause = clausesByKey.get(definition.key);
+                  const fieldSchema = TAX_AUDIT_3CD_FIELD_SCHEMA_BY_CLAUSE.get(definition.key);
+                  const subClauseTables = fieldSchema?.tables || [];
                   const selected = selectedKey === definition.key;
                   const hasEvidence = Boolean(clause && evidenceClauseIds.has(clause.id));
                   const statusText = compactStatusLabel(clause);
                   const title = `${definition.clauseNo} ${definition.title}${clause ? ` | ${statusText} | ${reviewLabel[clause.review_status]}` : ''}`;
                   return (
-                    <button
-                      key={definition.key}
-                      type="button"
-                      onClick={() => onSelect(definition.key)}
-                      title={title}
-                      className={cn(
-                        'flex w-full items-center gap-2 border-l-2 border-transparent px-2.5 py-1 text-left text-sm hover:bg-muted/50',
-                        selected && 'border-primary bg-primary/10'
-                      )}
-                    >
-                      <span className={cn('w-8 shrink-0 font-mono text-[11px] text-muted-foreground', selected && 'font-semibold text-primary')}>
-                        {definition.clauseNo}
-                      </span>
-                      <span
-                        className={cn('h-2 w-2 shrink-0 rounded-full', compactStatusClass(clause))}
-                        title={statusText}
-                        aria-label={statusText}
-                      />
-                      <span className={cn('min-w-0 flex-1 truncate text-xs leading-6', selected && 'font-medium')}>
-                        {definition.title}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1">
-                        {selected && clause && (
-                          <span className="rounded-sm border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                            {statusText}
-                          </span>
+                    <div key={definition.key}>
+                      <button
+                        type="button"
+                        onClick={() => onSelect(definition.key)}
+                        title={title}
+                        className={cn(
+                          'flex w-full items-center gap-2 border-l-2 border-transparent px-2.5 py-1 text-left text-sm hover:bg-muted/50',
+                          selected && 'border-primary bg-primary/10'
                         )}
-                        {hasEvidence && <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />}
-                        {clause?.review_status === 'reviewed' || clause?.review_status === 'approved' || clause?.review_status === 'locked' ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                        ) : null}
-                      </span>
-                    </button>
+                      >
+                        <span className={cn('w-8 shrink-0 font-mono text-[11px] text-muted-foreground', selected && 'font-semibold text-primary')}>
+                          {definition.clauseNo}
+                        </span>
+                        <span
+                          className={cn('h-2 w-2 shrink-0 rounded-full', compactStatusClass(clause))}
+                          title={statusText}
+                          aria-label={statusText}
+                        />
+                        <span className={cn('min-w-0 flex-1 truncate text-xs leading-6', selected && 'font-medium')}>
+                          {definition.title}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1">
+                          {selected && clause && (
+                            <span className="rounded-sm border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                              {statusText}
+                            </span>
+                          )}
+                          {hasEvidence && <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />}
+                          {clause?.review_status === 'reviewed' || clause?.review_status === 'approved' || clause?.review_status === 'locked' ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : null}
+                        </span>
+                      </button>
+                      {subClauseTables.length > 1 && (
+                        <div className="bg-muted/10 pb-1">
+                          {subClauseTables.map((table) => {
+                            const rowCount = getStructuredRows(clause, table.key).length;
+                            const warningCount = getStructuredTableWarnings(clause, table).length;
+                            const subClauseSelected = selected && selectedStructuredTableKey === table.key;
+                            return (
+                              <button
+                                key={table.key}
+                                type="button"
+                                onClick={() => onSelect(definition.key, table.key)}
+                                className={cn(
+                                  'flex w-full items-center gap-2 border-l-2 border-transparent py-1 pl-10 pr-2 text-left hover:bg-muted/50',
+                                  subClauseSelected && 'border-primary bg-primary/5'
+                                )}
+                                title={table.label}
+                              >
+                                <span className={cn('w-10 shrink-0 font-mono text-[10px] text-muted-foreground', subClauseSelected && 'font-semibold text-primary')}>
+                                  {table.shortLabel || definition.clauseNo}
+                                </span>
+                                <span className={cn('min-w-0 flex-1 truncate text-[11px]', subClauseSelected && 'font-medium')}>
+                                  {table.label.replace(`${table.shortLabel || ''} `, '')}
+                                </span>
+                                <span className="shrink-0 text-[10px] text-muted-foreground">
+                                  {rowCount} row{rowCount === 1 ? '' : 's'}
+                                  {warningCount > 0 ? ` · ${warningCount} warning${warningCount === 1 ? '' : 's'}` : ''}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
             </div>
@@ -1203,10 +1274,12 @@ function ClauseNavigator({
 
 function ClauseEditor({
   clause,
+  activeStructuredTableKey,
   onUpdate,
   onStatus,
 }: {
   clause: TaxAuditClauseResponse;
+  activeStructuredTableKey?: string;
   onUpdate: (updates: Partial<TaxAuditClauseResponse>) => Promise<void>;
   onStatus: (status: TaxAuditReviewStatus) => Promise<void>;
 }) {
@@ -1214,6 +1287,20 @@ function ClauseEditor({
   const sourceLinks = parseJson<TaxAuditSourceLink[]>(clause.source_links_json, []);
   const validationMessages = parseJson<string[]>(clause.validation_messages_json, []);
   const missingFields = parseJson<string[]>(clause.missing_fields_json, []);
+  const fieldSchema = TAX_AUDIT_3CD_FIELD_SCHEMA_BY_CLAUSE.get(clause.clause_key);
+  const activeStructuredTable = fieldSchema?.tables?.find((table) => table.key === activeStructuredTableKey);
+  const headerClauseNo = activeStructuredTable?.shortLabel || clause.clause_no;
+  const headerTitle = activeStructuredTable?.label.replace(`${activeStructuredTable.shortLabel || ''} `, '') || clause.clause_title;
+  const hasStructuredParticulars = Boolean(fieldSchema?.fields?.length || fieldSchema?.table || fieldSchema?.tables?.length);
+  const hasAdditionalParticulars = hasRichTextContent(clause.response_html);
+  const hasInternalRemarks = hasRichTextContent(clause.auditor_remarks_html);
+  const [additionalParticularsOpen, setAdditionalParticularsOpen] = useState(!hasStructuredParticulars);
+  const [internalRemarksOpen, setInternalRemarksOpen] = useState(false);
+
+  useEffect(() => {
+    setAdditionalParticularsOpen(!hasStructuredParticulars);
+    setInternalRemarksOpen(false);
+  }, [clause.id, hasStructuredParticulars]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border bg-background">
@@ -1222,10 +1309,13 @@ function ClauseEditor({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               <h2 className="truncate text-base font-semibold leading-snug">
-                Clause {clause.clause_no} <span className="font-normal text-muted-foreground">·</span> {clause.clause_title}
+                Clause {headerClauseNo} <span className="font-normal text-muted-foreground">·</span> {headerTitle}
               </h2>
               {locked && <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />}
             </div>
+            {activeStructuredTable?.description && (
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{activeStructuredTable.description}</p>
+            )}
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <span
                 className={cn('h-2 w-2 rounded-full', compactStatusClass(clause))}
@@ -1278,29 +1368,79 @@ function ClauseEditor({
           </details>
         )}
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Clause Response / Particulars</Label>
-          </div>
-          <RichTextEditor
-            value={clause.response_html || ''}
-            onChange={(value) => onUpdate({ response_html: value })}
-            placeholder="Enter clause response or review the prefilled particulars"
+        {fieldSchema && (
+          <StructuredClauseFields
+            clause={clause}
+            schema={fieldSchema}
+            activeTableKey={activeStructuredTableKey}
             disabled={locked}
-            className="[&_[role=textbox]]:min-h-[260px]"
+            onUpdate={onUpdate}
           />
-        </div>
+        )}
 
-        <div className="space-y-2">
-          <Label>Auditor's Remarks</Label>
-          <RichTextEditor
-            value={clause.auditor_remarks_html || ''}
-            onChange={(value) => onUpdate({ auditor_remarks_html: value })}
-            placeholder="Add observation, qualification basis, explanation, or NIL reporting basis"
-            disabled={locked}
-            className="[&_[role=textbox]]:min-h-[180px]"
-          />
-        </div>
+        <Collapsible open={additionalParticularsOpen} onOpenChange={setAdditionalParticularsOpen} className="rounded-md border bg-background">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/40"
+              title="Use this only for additional narrative, explanation, or particulars that may be considered for Form 3CD reporting where the structured fields are not sufficient."
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  {additionalParticularsOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  <span className="text-sm font-medium">Additional Report Particulars</span>
+                  {hasAdditionalParticulars && (
+                    <span className="rounded-sm border bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">Contains text</span>
+                  )}
+                </div>
+                <p className="mt-0.5 truncate pl-6 text-xs text-muted-foreground">
+                  Optional report-facing narrative when structured fields are not sufficient.
+                </p>
+              </div>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="border-t p-3">
+            <RichTextEditor
+              value={clause.response_html || ''}
+              onChange={(value) => onUpdate({ response_html: value })}
+              placeholder="Add any additional narrative or report-facing explanation, only if required."
+              disabled={locked}
+              className="[&_[role=textbox]]:min-h-[180px]"
+            />
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Collapsible open={internalRemarksOpen} onOpenChange={setInternalRemarksOpen} className="rounded-md border bg-background">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/40"
+              title="Use this for internal audit notes, review points, basis of conclusion, pending clarification, or working paper remarks. This is not intended to be part of Form 3CD unless specifically used later."
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  {internalRemarksOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  <span className="text-sm font-medium">Internal Audit Remarks</span>
+                  {hasInternalRemarks && (
+                    <span className="rounded-sm border bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">Has remarks</span>
+                  )}
+                </div>
+                <p className="mt-0.5 truncate pl-6 text-xs text-muted-foreground">
+                  Optional internal working paper notes and review observations.
+                </p>
+              </div>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="border-t p-3">
+            <RichTextEditor
+              value={clause.auditor_remarks_html || ''}
+              onChange={(value) => onUpdate({ auditor_remarks_html: value })}
+              placeholder="Add internal audit notes, review points, or pending clarifications."
+              disabled={locked}
+              className="[&_[role=textbox]]:min-h-[160px]"
+            />
+          </CollapsibleContent>
+        </Collapsible>
 
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm">
@@ -1830,6 +1970,7 @@ function TaxAuditOverview({
 function ClauseWorkspacePanel({
   selectedClause,
   selectedClauseKey,
+  selectedStructuredTableKey,
   clausesByKey,
   evidenceLinks,
   acceptanceCheck,
@@ -1841,10 +1982,11 @@ function ClauseWorkspacePanel({
 }: {
   selectedClause: TaxAuditClauseResponse | undefined;
   selectedClauseKey: string;
+  selectedStructuredTableKey?: string;
   clausesByKey: Map<string, TaxAuditClauseResponse>;
   evidenceLinks: ReturnType<typeof useTaxAudit>['evidenceLinks'];
   acceptanceCheck: TaxAuditAcceptanceCheck | null;
-  onOpenClause: (clauseKey: string) => void;
+  onOpenClause: (clauseKey: string, tableKey?: string) => void;
   onUpdateClause: (clauseId: string, updates: Partial<TaxAuditClauseResponse>) => Promise<void>;
   onUpdateClauseStatus: (clauseId: string, status: TaxAuditReviewStatus) => Promise<void>;
   onLinkEvidence: (clause: TaxAuditClauseResponse, evidenceFileId: string) => Promise<void>;
@@ -1875,6 +2017,7 @@ function ClauseWorkspacePanel({
       >
         <ClauseNavigator
           selectedKey={selectedClause?.clause_key || selectedClauseKey}
+          selectedStructuredTableKey={selectedStructuredTableKey}
           clausesByKey={clausesByKey}
           evidenceLinks={evidenceLinks}
           onSelect={onOpenClause}
@@ -1884,6 +2027,7 @@ function ClauseWorkspacePanel({
             <div className="min-h-0">
               <ClauseEditor
                 clause={selectedClause}
+                activeStructuredTableKey={selectedStructuredTableKey}
                 onUpdate={(updates) => onUpdateClause(selectedClause.id, updates)}
                 onStatus={(status) => onUpdateClauseStatus(selectedClause.id, status)}
               />
@@ -2000,16 +2144,26 @@ export default function TaxAudit() {
     unlinkEvidence,
   } = useTaxAudit(currentEngagement);
   const [selectedClauseKey, setSelectedClauseKey] = useState('clause_1');
+  const [selectedStructuredTableByClause, setSelectedStructuredTableByClause] = useState<Record<string, string>>({});
   const [reviewQueueOpen, setReviewQueueOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('clauses');
 
   const clausesByKey = useMemo(() => new Map(clauses.map((clause) => [clause.clause_key, clause])), [clauses]);
   const selectedClause = clausesByKey.get(selectedClauseKey) || clauses[0];
+  const selectedStructuredTableKey =
+    selectedStructuredTableByClause[selectedClauseKey] || getDefaultStructuredTableKey(selectedClauseKey);
   const progress = summary.totalClauses ? Math.round(((summary.prepared + summary.reviewed + summary.approved) / summary.totalClauses) * 100) : 0;
   const setupJson = parseJson<Record<string, unknown>>(setup?.setup_json, {});
   const complianceTracker = normalizeTaxAuditComplianceTracker(setupJson.complianceTracker);
   const complianceSummary = summarizeTaxAuditComplianceTracker(complianceTracker);
-  const openClause = (clauseKey: string) => {
+  const openClause = (clauseKey: string, tableKey?: string) => {
+    const defaultTableKey = getDefaultStructuredTableKey(clauseKey);
+    if (tableKey || defaultTableKey) {
+      setSelectedStructuredTableByClause((prev) => ({
+        ...prev,
+        [clauseKey]: tableKey || prev[clauseKey] || defaultTableKey,
+      }));
+    }
     setSelectedClauseKey(clauseKey);
     setActiveTab('clauses');
   };
@@ -2106,6 +2260,7 @@ export default function TaxAudit() {
           <ClauseWorkspacePanel
             selectedClause={selectedClause}
             selectedClauseKey={selectedClauseKey}
+            selectedStructuredTableKey={selectedStructuredTableKey}
             clausesByKey={clausesByKey}
             evidenceLinks={evidenceLinks}
             acceptanceCheck={acceptanceCheck}

@@ -105,6 +105,58 @@ type ClausePrefill = {
   missingFields?: string[];
 };
 
+const isBlankStructuredValue = (value: unknown) => {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
+};
+
+const mergeStructuredPrefill = (existingResponseJson: string | null | undefined, prefillResponseJson: Record<string, unknown>) => {
+  const existing = parseJson<Record<string, unknown>>(existingResponseJson, {});
+  const existingStructured =
+    existing.structured && typeof existing.structured === 'object' && !Array.isArray(existing.structured)
+      ? (existing.structured as Record<string, unknown>)
+      : {};
+  const prefillStructured =
+    prefillResponseJson.structured && typeof prefillResponseJson.structured === 'object' && !Array.isArray(prefillResponseJson.structured)
+      ? (prefillResponseJson.structured as Record<string, unknown>)
+      : {};
+
+  // Preserve any structured values already captured by the auditor while still backfilling new defaults.
+  const mergedStructured = { ...existingStructured };
+  Object.entries(prefillStructured).forEach(([key, value]) => {
+    if (isBlankStructuredValue(mergedStructured[key])) {
+      mergedStructured[key] = value;
+    }
+  });
+
+  return {
+    ...existing,
+    ...prefillResponseJson,
+    structured: mergedStructured,
+  };
+};
+
+const resolveSection44AB = (setup: TaxAuditSetup) => {
+  const setupJson = parseJson<Record<string, unknown>>(setup.setup_json, {});
+  const applicability =
+    setupJson.applicability && typeof setupJson.applicability === 'object'
+      ? (setupJson.applicability as Record<string, unknown>)
+      : {};
+  const business = applicability.business && typeof applicability.business === 'object'
+    ? (applicability.business as Record<string, unknown>)
+    : {};
+  const profession = applicability.profession && typeof applicability.profession === 'object'
+    ? (applicability.profession as Record<string, unknown>)
+    : {};
+
+  if (business.result === 'Applicable' && typeof business.sectionReference === 'string') return business.sectionReference;
+  if (profession.result === 'Applicable' && typeof profession.sectionReference === 'string') return profession.sectionReference;
+  if (setup.applicability_result === 'Review required') return 'Other / Review required';
+  return setup.applicability_result || '';
+};
+
 const sourceChip = (
   label: string,
   module: TaxAuditSourceLink['module'],
@@ -136,7 +188,10 @@ const createClausePrefill = (
       return client?.name || setup.assessee_name
         ? {
             responseHtml: client?.name || setup.assessee_name || '',
-            responseJson: { assessee_name: client?.name || setup.assessee_name },
+            responseJson: {
+              assessee_name: client?.name || setup.assessee_name,
+              structured: { assessee_name: client?.name || setup.assessee_name || '' },
+            },
             status: 'auto_filled',
             links: [clientLink],
           }
@@ -145,7 +200,10 @@ const createClausePrefill = (
       return client?.address || setup.address
         ? {
             responseHtml: client?.address || setup.address || '',
-            responseJson: { address: client?.address || setup.address },
+            responseJson: {
+              address: client?.address || setup.address,
+              structured: { address: client?.address || setup.address || '' },
+            },
             status: 'auto_filled',
             links: [clientLink],
           }
@@ -154,7 +212,10 @@ const createClausePrefill = (
       return client?.pan || setup.pan
         ? {
             responseHtml: client?.pan || setup.pan || '',
-            responseJson: { pan: client?.pan || setup.pan },
+            responseJson: {
+              pan: client?.pan || setup.pan,
+              structured: { pan_or_aadhaar: client?.pan || setup.pan || '' },
+            },
             status: 'auto_filled',
             links: [clientLink],
           }
@@ -164,14 +225,23 @@ const createClausePrefill = (
         const gstinList = gstins.map((item) => item.gstin).join(', ');
         return {
           responseHtml: `GST registration(s): ${gstinList}`,
-          responseJson: { gstins },
+          responseJson: {
+            gstins,
+            structured: {
+              registrations: gstins.map((item) => ({
+                law: 'GST',
+                registration_number: item.gstin,
+                description: '',
+              })),
+            },
+          },
           status: 'auto_filled',
           links: [gstLink],
         };
       }
       return {
         responseHtml: '',
-        responseJson: { gstins: [] },
+        responseJson: { gstins: [], structured: { registrations: [] } },
         status: 'needs_input',
         links: [gstLink],
         missingFields: ['Indirect tax registration details'],
@@ -180,7 +250,10 @@ const createClausePrefill = (
       return client?.constitution || setup.status
         ? {
             responseHtml: client?.constitution || setup.status || '',
-            responseJson: { status: client?.constitution || setup.status },
+            responseJson: {
+              status: client?.constitution || setup.status,
+              structured: { assessee_status: client?.constitution || setup.status || '' },
+            },
             status: 'auto_filled',
             links: [clientLink],
           }
@@ -189,7 +262,14 @@ const createClausePrefill = (
       return setup.previous_year_from && setup.previous_year_to
         ? {
             responseHtml: `${setup.previous_year_from} to ${setup.previous_year_to}`,
-            responseJson: { from: setup.previous_year_from, to: setup.previous_year_to },
+            responseJson: {
+              from: setup.previous_year_from,
+              to: setup.previous_year_to,
+              structured: {
+                previous_year_from: setup.previous_year_from,
+                previous_year_to: setup.previous_year_to,
+              },
+            },
             status: 'auto_filled',
             links: [engagementLink],
           }
@@ -198,7 +278,10 @@ const createClausePrefill = (
       return setup.assessment_year
         ? {
             responseHtml: setup.assessment_year,
-            responseJson: { assessment_year: setup.assessment_year },
+            responseJson: {
+              assessment_year: setup.assessment_year,
+              structured: { assessment_year: setup.assessment_year },
+            },
             status: 'auto_filled',
             links: [engagementLink],
           }
@@ -210,6 +293,10 @@ const createClausePrefill = (
           relevant_clause: setup.applicability_result,
           reason: setup.applicability_reason,
           form_type: setup.form_type,
+          structured: {
+            relevant_clause_44ab: resolveSection44AB(setup),
+            applicability_reason: setup.applicability_reason || '',
+          },
         },
         status: setup.applicability_result ? 'auto_filled' : 'needs_input',
         links: [setupLink],
@@ -221,6 +308,10 @@ const createClausePrefill = (
         responseJson: {
           presumptive_taxation: Boolean(toBoolNumber(setup.presumptive_taxation)),
           lower_than_presumptive: Boolean(toBoolNumber(setup.lower_than_presumptive)),
+          structured: {
+            presumptive_taxation_opted: Boolean(toBoolNumber(setup.presumptive_taxation)),
+            income_lower_than_presumptive: Boolean(toBoolNumber(setup.lower_than_presumptive)),
+          },
         },
         status: 'auto_filled',
         links: [setupLink],
@@ -229,20 +320,286 @@ const createClausePrefill = (
       return client?.industry || setup.nature_of_business
         ? {
             responseHtml: client?.industry || setup.nature_of_business || '',
-            responseJson: { nature_of_business: client?.industry || setup.nature_of_business },
+            responseJson: {
+              nature_of_business: client?.industry || setup.nature_of_business,
+              structured: {
+                whether_change_during_year: '',
+                change_details: '',
+                business_or_profession_rows: [
+                  {
+                    nature_of_business_or_profession: client?.industry || setup.nature_of_business || '',
+                    business_or_profession_code: '',
+                    remarks: '',
+                  },
+                ],
+              },
+            },
             status: 'auto_filled',
             links: [clientLink],
           }
         : { responseHtml: '', responseJson: {}, status: 'needs_input', links: [clientLink], missingFields: ['Nature of business or profession'] };
     case 'clause_11':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            whether_books_prescribed_under_44aa: '',
+            books_prescribed: '',
+            books_maintained: '',
+            books_examined: '',
+            whether_books_kept_at_multiple_locations: '',
+            book_locations: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Books of account particulars'],
+      };
     case 'clause_12':
+      return {
+        responseHtml: toBoolNumber(setup.presumptive_taxation) ? 'Yes' : '',
+        responseJson: {
+          structured: {
+            whether_profit_loss_includes_presumptive_income: toBoolNumber(setup.presumptive_taxation) ? 'yes' : '',
+            applicable_presumptive_section: '',
+            amount: '',
+            basis_or_remarks: toBoolNumber(setup.lower_than_presumptive)
+              ? 'Lower than presumptive threshold selected in setup. Review applicable presumptive provisions.'
+              : '',
+          },
+        },
+        status: toBoolNumber(setup.presumptive_taxation) ? 'auto_filled' : 'needs_input',
+        links: [setupLink],
+        missingFields: toBoolNumber(setup.presumptive_taxation) ? [] : ['Presumptive income particulars'],
+      };
     case 'clause_13':
       return {
         responseHtml: '',
-        responseJson: {},
+        responseJson: {
+          structured: {
+            method_of_accounting: '',
+            whether_change_in_method: '',
+            change_details: '',
+            effect_on_profit: '',
+            whether_icds_applicable: '',
+            icds_adjustments: '',
+            disclosure_or_remarks: '',
+          },
+        },
         status: 'needs_input',
         links: [setupLink],
         missingFields: ['Clause particulars'],
+      };
+    case 'clause_14':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            method_of_valuation_opening_stock: '',
+            method_of_valuation_closing_stock: '',
+            whether_deviation_from_section_145A: '',
+            deviation_details: '',
+            effect_on_profit: '',
+            remarks: '',
+          },
+        },
+        status: 'needs_input',
+        links: [financialReviewLink],
+        missingFields: ['Stock valuation particulars'],
+      };
+    case 'clause_19':
+      return {
+        responseHtml: '',
+        responseJson: { structured: { deduction_rows: [] } },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Section-wise admissible amount particulars'],
+      };
+    case 'clause_20':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            bonus_commission_rows: [],
+            employee_contribution_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Bonus, commission and employee contribution particulars'],
+      };
+    case 'clause_21':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_21a_rows: [],
+            clause_21b_rows: [],
+            clause_21c_rows: [],
+            clause_21d_rows: [],
+            clause_21e_rows: [],
+            clause_21f_rows: [],
+            clause_21g_rows: [],
+            clause_21h_rows: [],
+            clause_21i_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 21(a) to 21(i) particulars'],
+      };
+    case 'clause_22':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_22i_interest_rows: [],
+            clause_22ii_mse_payable_rows: [],
+            clause_22iii_payment_status_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 22 MSMED payment and interest particulars'],
+      };
+    case 'clause_23':
+      return {
+        responseHtml: '',
+        responseJson: { structured: { clause_23_rows: [] } },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Payments to specified persons under section 40A(2)(b)'],
+      };
+    case 'clause_24':
+      return {
+        responseHtml: '',
+        responseJson: { structured: { clause_24_rows: [] } },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Amounts deemed to be profits and gains particulars'],
+      };
+    case 'clause_25':
+      return {
+        responseHtml: '',
+        responseJson: { structured: { clause_25_rows: [] } },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Section 41 profit chargeable particulars'],
+      };
+    case 'clause_26':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_26ia_opening_liability_rows: [],
+            clause_26ib_current_year_liability_rows: [],
+            clause_26ii_indirect_tax_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 26 section 43B liability particulars'],
+      };
+    case 'clause_27':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_27a_credit_rows: [],
+            clause_27b_prior_period_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 27 credit treatment and prior period particulars'],
+      };
+    case 'clause_29a':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_29a_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 29A advance forfeiture particulars'],
+      };
+    case 'clause_29b':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_29b_money_rows: [],
+            clause_29b_immovable_property_rows: [],
+            clause_29b_other_property_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 29B property receipt particulars'],
+      };
+    case 'clause_30':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_30_hundi_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 30 hundi borrowing and repayment particulars'],
+      };
+    case 'clause_30a':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_30a_primary_adjustment_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 30A primary adjustment particulars'],
+      };
+    case 'clause_30b':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_30b_interest_rows: [],
+            clause_30b_summary_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 30B interest limitation particulars'],
+      };
+    case 'clause_30c':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_30c_arrangement_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 30C arrangement particulars'],
+      };
+    case 'clause_31':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_31a_loan_deposit_rows: [],
+            clause_31b_specified_sum_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 31(a) and 31(b) receipt particulars'],
       };
     default:
       if (definition.prefillStrategy === 'financial_review') {
@@ -587,15 +944,16 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
       const clause = clauses.find((item) => item.clause_key === definition.key);
       if (!clause || clause.review_status !== 'draft') continue;
       const prefill = createClausePrefill(definition, setup, clientRow, gstins);
+      const responseJson = mergeStructuredPrefill(clause.response_json, prefill.responseJson);
       const { error } = await db
         .from('tax_audit_clause_responses')
         .update({
-          response_json: stringify(prefill.responseJson),
-          response_html: prefill.responseHtml,
+          response_json: stringify(responseJson),
+          response_html: clause.response_html || prefill.responseHtml,
           prefill_status: prefill.status,
           source_links_json: stringify(prefill.links),
           missing_fields_json: stringify(prefill.missingFields || []),
-          last_source_hash: sourceHash(prefill.responseJson),
+          last_source_hash: sourceHash(responseJson),
           validation_status: prefill.status === 'needs_input' ? 'warning' : 'valid',
           validation_messages_json: stringify(prefill.missingFields || []),
         })
