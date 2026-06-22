@@ -128,7 +128,7 @@ const getComputedDataStatus = ({
 
 export const buildTaxAuditReviewSummaryRows = (
   clausesByKey: Map<string, TaxAuditClauseResponse>,
-  evidenceLinks: TaxAuditClauseEvidence[]
+  evidenceLinks: TaxAuditClauseEvidence[] = []
 ) => {
   const evidenceCountByClauseId = evidenceLinks.reduce<Map<string, number>>((result, link) => {
     result.set(link.clause_response_id, (result.get(link.clause_response_id) || 0) + 1);

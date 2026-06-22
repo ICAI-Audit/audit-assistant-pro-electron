@@ -7,6 +7,8 @@ import {
   ChevronRight,
   CheckCircle2,
   ClipboardCheck,
+  Copy,
+  Download,
   FileCheck,
   FileSpreadsheet,
   Lock,
@@ -45,12 +47,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { AuditProgrammePanel } from '@/components/tax-audit/AuditProgrammePanel';
+import { ProfessionalResponsibilityPanel } from '@/components/tax-audit/ProfessionalResponsibilityPanel';
 import { StructuredClauseFields } from '@/components/tax-audit/StructuredClauseFields';
 import { SourceLinkChip } from '@/components/tax-audit/SourceLinkChip';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEngagement } from '@/contexts/EngagementContext';
 import { useTaxAudit } from '@/hooks/useTaxAudit';
 import { useEvidenceFiles } from '@/hooks/useEvidenceFiles';
 import { FORM_3CD_CLAUSES, FORM_3CD_GROUPS } from '@/data/taxAudit3CDClauses';
+import { TaxAuditProgrammeLinkedTab } from '@/data/taxAuditProgrammeChecklist';
 import { TAX_AUDIT_3CD_FIELD_SCHEMA_BY_CLAUSE, TaxAuditStructuredTable } from '@/data/taxAudit3CDFieldSchemas';
 import { calculateApplicability, TaxAuditApplicabilityResult } from '@/lib/taxAuditApplicability';
 import {
@@ -81,6 +87,13 @@ import {
   buildTaxAuditReviewSummaryRows,
   TaxAuditReviewDataStatus,
 } from '@/lib/taxAuditReviewSummary';
+import {
+  buildTaxAuditReportReadiness,
+  TaxAuditReadinessAttentionItem,
+  TaxAuditReadinessCheckStatus,
+  TaxAuditReadinessSeverity,
+} from '@/lib/taxAuditReportReadiness';
+import { buildTaxAuditReportPack, renderTaxAuditReportPackMarkdown } from '@/lib/taxAuditReportPack';
 
 const parseJson = <T,>(value: string | null | undefined, fallback: T): T => {
   if (!value) return fallback;
@@ -155,6 +168,18 @@ type ReviewSummaryFilter =
   | 'has_evidence'
   | 'has_remarks'
   | 'has_qualification';
+
+const TAX_AUDIT_BETA_LABEL = 'Tax Audit Beta v0.1 RC1';
+const TAX_AUDIT_PHASE_LABEL = 'Phase 1: Structured Tax Audit Workflow';
+const TAX_AUDIT_STATUTORY_SCOPE_LABEL = 'AY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD';
+const TAX_AUDIT_KNOWN_LIMITATIONS = [
+  'Final statutory Form 3CD generation is not part of this beta.',
+  'Portal filing is not part of this beta.',
+  'PDF, Word and Excel export are not part of this beta.',
+  'GST, TDS and purchase register imports are not part of this beta.',
+  'Structured clause capture is manual and requires professional review.',
+  'The Working Paper Report Pack is an internal working paper summary, not a signed report.',
+];
 
 type SetupClient = {
   pan?: string | null;
@@ -1860,6 +1885,7 @@ function TaxAuditPageHeader({
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <Badge variant="secondary">{TAX_AUDIT_BETA_LABEL}</Badge>
           <Badge variant="outline">Income-tax Act, 1961</Badge>
           <Badge variant="outline">Rule 6G</Badge>
           <Badge>Form {setup.form_type} + 3CD</Badge>
@@ -1886,6 +1912,9 @@ function TaxAuditOverview({
   complianceSummary,
   summary,
   progress,
+  saving,
+  currentUserName,
+  onSaveAcknowledgement,
   onOpenReviewQueue,
 }: {
   setup: TaxAuditSetup;
@@ -1893,10 +1922,32 @@ function TaxAuditOverview({
   complianceSummary: ReturnType<typeof summarizeTaxAuditComplianceTracker>;
   summary: TaxAuditSummary;
   progress: number;
+  saving: boolean;
+  currentUserName?: string | null;
+  onSaveAcknowledgement: (updates: Partial<TaxAuditSetup>) => Promise<unknown>;
   onOpenReviewQueue: () => void;
 }) {
+  const diagnostics = [
+    { label: 'Tax Audit module', value: TAX_AUDIT_BETA_LABEL },
+    { label: 'Statutory scope', value: TAX_AUDIT_STATUTORY_SCOPE_LABEL },
+    { label: 'Workflow phase', value: TAX_AUDIT_PHASE_LABEL },
+    { label: 'Build mode', value: import.meta.env.MODE || 'production' },
+  ];
+
   return (
     <div className="space-y-4">
+      <Alert className="border-blue-200 bg-blue-50/70">
+        <AlertCircle className="h-4 w-4 text-blue-700" />
+        <AlertDescription className="text-blue-900">
+          <div className="flex flex-col gap-1">
+            <span className="font-medium">{TAX_AUDIT_BETA_LABEL} - {TAX_AUDIT_PHASE_LABEL}</span>
+            <span>
+              Beta version for pilot testing. This tool assists in tax audit documentation and review. It does not replace the auditor&apos;s professional judgment or responsibility.
+            </span>
+          </div>
+        </AlertDescription>
+      </Alert>
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Applicability"
@@ -1960,6 +2011,49 @@ function TaxAuditOverview({
           tone={summary.qualifications > 0 ? 'warning' : 'default'}
           onClick={onOpenReviewQueue}
         />
+      </div>
+
+      <ProfessionalResponsibilityPanel
+        setup={setup}
+        saving={saving}
+        currentUserName={currentUserName}
+        onSave={onSaveAcknowledgement}
+      />
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Known Limitations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            {TAX_AUDIT_KNOWN_LIMITATIONS.map((item) => (
+              <div key={item} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
+                <span>{item}</span>
+              </div>
+            ))}
+            <div className="mt-3 rounded-md border bg-amber-50/70 p-3 text-amber-900">
+              Pilot users should avoid using confidential client data unless specifically permitted by ICAI or their firm. For pilot testing, use dummy data or anonymised data where possible.
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Pilot Diagnostics</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {diagnostics.map((item) => (
+              <div key={item.label} className="flex items-start justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
+                <span className="text-muted-foreground">{item.label}</span>
+                <span className="text-right font-medium">{item.value}</span>
+              </div>
+            ))}
+            <p className="text-xs text-muted-foreground">
+              Local data location and Electron runtime details are available in the packaged application diagnostics where exposed by the desktop shell.
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -2087,21 +2181,254 @@ function ClauseWorkspacePanel({
   );
 }
 
+const readinessSeverityLabel: Record<TaxAuditReadinessSeverity, string> = {
+  critical: 'Critical',
+  review_required: 'Review Required',
+  advisory: 'Advisory',
+};
+
+const readinessCheckStatusLabel: Record<TaxAuditReadinessCheckStatus, string> = {
+  complete: 'Complete',
+  needs_review: 'Needs Review',
+  missing: 'Pending',
+};
+
+const readinessSeverityClass = (severity: TaxAuditReadinessSeverity) =>
+  cn(
+    'text-[11px]',
+    severity === 'critical' && 'border-red-300 bg-red-50 text-red-700',
+    severity === 'review_required' && 'border-amber-300 bg-amber-50 text-amber-700',
+    severity === 'advisory' && 'border-blue-300 bg-blue-50 text-blue-700'
+  );
+
+const readinessStatusClass = (status: TaxAuditReadinessCheckStatus) =>
+  cn(
+    'text-[11px]',
+    status === 'complete' && 'border-emerald-300 bg-emerald-50 text-emerald-700',
+    status === 'needs_review' && 'border-amber-300 bg-amber-50 text-amber-700',
+    status === 'missing' && 'border-red-300 bg-red-50 text-red-700'
+  );
+
+function ReportReadinessPanel({
+  readiness,
+  onOpenAction,
+}: {
+  readiness: ReturnType<typeof buildTaxAuditReportReadiness>;
+  onOpenAction: (action?: TaxAuditReadinessAttentionItem['action']) => void;
+}) {
+  const levelClass = cn(
+    'rounded-md border p-4',
+    readiness.level === 'ready' && 'border-emerald-200 bg-emerald-50/60',
+    readiness.level === 'needs_review' && 'border-amber-200 bg-amber-50/60',
+    readiness.level === 'not_ready' && 'border-red-200 bg-red-50/60'
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className={levelClass}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase text-muted-foreground">Report Readiness</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-2xl font-semibold">{readiness.label}</p>
+              <Badge variant="outline" className={readinessSeverityClass(readiness.level === 'not_ready' ? 'critical' : readiness.level === 'needs_review' ? 'review_required' : 'advisory')}>
+                Readiness status
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{readiness.reason}</p>
+          </div>
+          <div className="grid min-w-[280px] grid-cols-3 gap-2 text-center">
+            <div className="rounded-md border bg-background/70 p-2">
+              <p className="text-xl font-semibold">{readiness.criticalCount}</p>
+              <p className="text-[11px] uppercase text-muted-foreground">Critical Items</p>
+            </div>
+            <div className="rounded-md border bg-background/70 p-2">
+              <p className="text-xl font-semibold">{readiness.reviewRequiredCount}</p>
+              <p className="text-[11px] uppercase text-muted-foreground">Review Required</p>
+            </div>
+            <div className="rounded-md border bg-background/70 p-2">
+              <p className="text-xl font-semibold">{readiness.advisoryCount}</p>
+              <p className="text-[11px] uppercase text-muted-foreground">Advisory</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        {readiness.sections.map((section) => (
+          <div key={section.title} className="rounded-md border bg-background p-3">
+            <p className="text-sm font-semibold">{section.title}</p>
+            <div className="mt-3 space-y-2">
+              {section.checks.map((check) => (
+                <button
+                  key={`${section.title}-${check.label}`}
+                  type="button"
+                  className={cn(
+                    'flex w-full items-start justify-between gap-3 rounded-md border p-2 text-left text-sm',
+                    check.action && 'hover:bg-muted/40'
+                  )}
+                  onClick={() => check.action && onOpenAction(check.action)}
+                  disabled={!check.action}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium">{check.label}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{check.detail}</p>
+                  </div>
+                  <Badge variant="outline" className={readinessStatusClass(check.status)}>
+                    {readinessCheckStatusLabel[check.status]}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-md border bg-background p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Report-Level Attention Items</p>
+            <p className="text-xs text-muted-foreground">Open items that should be resolved or documented before report preparation.</p>
+          </div>
+          <Badge variant="outline">{readiness.attentionItems.length} item(s)</Badge>
+        </div>
+        <div className="mt-3 overflow-x-auto rounded-md border">
+          <div className="grid min-w-[1120px] grid-cols-[160px_minmax(0,1.2fr)_140px_170px_minmax(0,1.4fr)_100px] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
+            <span>Area</span>
+            <span>Item</span>
+            <span>Severity</span>
+            <span>Status</span>
+            <span>Suggested Action</span>
+            <span>Open</span>
+          </div>
+          {readiness.attentionItems.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No report-level attention items.</div>
+          ) : (
+            readiness.attentionItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={cn(
+                  'grid min-w-[1120px] w-full grid-cols-[160px_minmax(0,1.2fr)_140px_170px_minmax(0,1.4fr)_100px] items-center gap-2 border-b px-3 py-2 text-left text-sm',
+                  item.action && 'hover:bg-muted/40'
+                )}
+                onClick={() => item.action && onOpenAction(item.action)}
+                disabled={!item.action}
+              >
+                <span className="truncate">{item.area}</span>
+                <span className="truncate">{item.item}</span>
+                <span>
+                  <Badge variant="outline" className={readinessSeverityClass(item.severity)}>
+                    {readinessSeverityLabel[item.severity]}
+                  </Badge>
+                </span>
+                <span className="truncate text-xs text-muted-foreground">{item.status}</span>
+                <span className="truncate text-xs">{item.suggestedAction}</span>
+                <span className="flex items-center justify-between text-xs text-muted-foreground">
+                  {item.action ? 'Open' : '-'}
+                  {item.action && <ArrowRight className="h-4 w-4" />}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReviewSummaryPanel({
+  setup,
+  clientName,
+  acceptanceCheck,
+  complianceTracker,
   clausesByKey,
   evidenceLinks,
   onOpenClause,
+  onOpenReadinessAction,
 }: {
+  setup: TaxAuditSetup;
+  clientName?: string | null;
+  acceptanceCheck: TaxAuditAcceptanceCheck | null;
+  complianceTracker: TaxAuditComplianceTracker;
   clausesByKey: Map<string, TaxAuditClauseResponse>;
   evidenceLinks: ReturnType<typeof useTaxAudit>['evidenceLinks'];
   onOpenClause: (clauseKey: string) => void;
+  onOpenReadinessAction: (action?: TaxAuditReadinessAttentionItem['action']) => void;
 }) {
+  const { toast } = useToast();
   const [filter, setFilter] = useState<ReviewSummaryFilter>('all');
   const [search, setSearch] = useState('');
+  const [reportPackPreviewOpen, setReportPackPreviewOpen] = useState(false);
+  const [reportPackMarkdown, setReportPackMarkdown] = useState('');
+  const [reportPackGeneratedAt, setReportPackGeneratedAt] = useState('');
 
   const rows = useMemo(() => buildTaxAuditReviewSummaryRows(clausesByKey, evidenceLinks), [clausesByKey, evidenceLinks]);
   const counts = useMemo(() => buildTaxAuditReviewSummaryCounts(rows), [rows]);
+  const readiness = useMemo(
+    () =>
+      buildTaxAuditReportReadiness({
+        setup,
+        clientName,
+        acceptanceCheck,
+        complianceTracker,
+        reviewRows: rows,
+        reviewCounts: counts,
+      }),
+    [acceptanceCheck, clientName, complianceTracker, counts, rows, setup]
+  );
   const normalizedSearch = search.trim().toLowerCase();
+
+  const generateReportPackMarkdown = () => {
+    const generatedAt = new Date().toISOString();
+    const pack = buildTaxAuditReportPack({
+      setup,
+      clientName,
+      acceptanceCheck,
+      complianceTracker,
+      clausesByKey,
+      evidenceLinks,
+      reviewRows: rows,
+      reviewCounts: counts,
+      readiness,
+      generatedAt,
+    });
+    const markdown = renderTaxAuditReportPackMarkdown(pack);
+    setReportPackMarkdown(markdown);
+    setReportPackGeneratedAt(generatedAt);
+    return { markdown, generatedAt };
+  };
+
+  const previewReportPack = () => {
+    generateReportPackMarkdown();
+    setReportPackPreviewOpen(true);
+  };
+
+  const copyReportPack = async () => {
+    const { markdown } = generateReportPackMarkdown();
+    try {
+      await navigator.clipboard.writeText(markdown);
+      toast({ title: 'Working Paper Report Pack copied', description: 'The report pack summary was copied to the clipboard.' });
+    } catch {
+      setReportPackPreviewOpen(true);
+      toast({ title: 'Copy unavailable', description: 'The report pack preview is open so the text can be selected manually.' });
+    }
+  };
+
+  const downloadReportPack = () => {
+    const { markdown, generatedAt } = generateReportPackMarkdown();
+    const fileNameDate = generatedAt.slice(0, 19).replace(/[:T]/g, '-');
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `tax-audit-working-paper-report-pack-${fileNameDate}.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Working Paper Report Pack downloaded', description: 'Markdown report pack was generated for review.' });
+  };
 
   const filteredRows = useMemo(
     () =>
@@ -2161,6 +2488,73 @@ function ReviewSummaryPanel({
 
   return (
     <div className="space-y-3">
+      <ReportReadinessPanel readiness={readiness} onOpenAction={onOpenReadinessAction} />
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle className="text-base">Working Paper Report Pack</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Generated for review from the current engagement setup, checklist, readiness, clause and evidence status.
+              </p>
+              {reportPackGeneratedAt && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Last generated: {new Date(reportPackGeneratedAt).toLocaleString('en-IN')}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={previewReportPack}>
+                Preview
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={copyReportPack}>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy Summary
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={downloadReportPack}>
+                <Download className="mr-2 h-4 w-4" />
+                Download Markdown
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 pt-0 md:grid-cols-4">
+          <div className="rounded-md border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Readiness</p>
+            <p className="mt-1 text-sm font-semibold">{readiness.label}</p>
+          </div>
+          <div className="rounded-md border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Active clauses</p>
+            <p className="mt-1 text-sm font-semibold">{counts.totalActiveClauses}</p>
+          </div>
+          <div className="rounded-md border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Review Required</p>
+            <p className="mt-1 text-sm font-semibold">{readiness.reviewRequiredCount}</p>
+          </div>
+          <div className="rounded-md border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Evidence / Working Reference</p>
+            <p className="mt-1 text-sm font-semibold">{counts.clausesWithEvidence} clause(s)</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={reportPackPreviewOpen} onOpenChange={setReportPackPreviewOpen}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Working Paper Report Pack Preview</DialogTitle>
+            <DialogDescription>
+              Markdown preview generated for internal review. This is not final statutory Form 3CD generation.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={reportPackMarkdown}
+            readOnly
+            className="h-[60vh] resize-none font-mono text-xs"
+          />
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Total active clauses" value={counts.totalActiveClauses} detail="Active Form 3CD clauses only" icon={FileSpreadsheet} onClick={() => setFilter('all')} />
         <MetricCard label="Not started" value={counts.notStarted} icon={ClipboardCheck} tone={counts.notStarted > 0 ? 'warning' : 'default'} onClick={() => setFilter('not_started')} />
@@ -2285,6 +2679,7 @@ function ReviewSummaryPanel({
 
 export default function TaxAudit() {
   const { currentEngagement } = useEngagement();
+  const { profile } = useAuth();
   const { toast } = useToast();
   const {
     setup,
@@ -2326,6 +2721,29 @@ export default function TaxAudit() {
     }
     setSelectedClauseKey(clauseKey);
     setActiveTab('clauses');
+  };
+  const openReadinessAction = (action?: TaxAuditReadinessAttentionItem['action']) => {
+    if (!action) return;
+    if (action.target === 'clause') {
+      if (action.clauseKey) {
+        openClause(action.clauseKey);
+      } else {
+        setActiveTab('clauses');
+      }
+      return;
+    }
+    setActiveTab(action.target);
+  };
+  const openProgrammeTarget = (tab: TaxAuditProgrammeLinkedTab, clauseKey?: string) => {
+    if (tab === 'clauses') {
+      if (clauseKey) {
+        openClause(clauseKey);
+      } else {
+        setActiveTab('clauses');
+      }
+      return;
+    }
+    setActiveTab(tab);
   };
 
   if (!currentEngagement) {
@@ -2382,6 +2800,7 @@ export default function TaxAudit() {
           <TabsTrigger value="setup">Setup and Applicability</TabsTrigger>
           <TabsTrigger value="acceptance">Acceptance and Eligibility</TabsTrigger>
           <TabsTrigger value="compliance">Compliance Tracker</TabsTrigger>
+          <TabsTrigger value="programme">Audit Programme</TabsTrigger>
           <TabsTrigger value="clauses">
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             3CD Clause Workspace
@@ -2396,6 +2815,9 @@ export default function TaxAudit() {
             complianceSummary={complianceSummary}
             summary={summary}
             progress={progress}
+            saving={saving}
+            currentUserName={profile?.full_name}
+            onSaveAcknowledgement={updateSetup}
             onOpenReviewQueue={() => setReviewQueueOpen(true)}
           />
         </TabsContent>
@@ -2416,6 +2838,15 @@ export default function TaxAudit() {
           <ComplianceTrackerPanel setup={setup} saving={saving} onSave={updateSetup} />
         </TabsContent>
 
+        <TabsContent value="programme" className="mt-0">
+          <AuditProgrammePanel
+            setup={setup}
+            saving={saving}
+            onSave={updateSetup}
+            onNavigate={openProgrammeTarget}
+          />
+        </TabsContent>
+
         <TabsContent value="clauses" className="mt-0">
           <ClauseWorkspacePanel
             selectedClause={selectedClause}
@@ -2434,9 +2865,14 @@ export default function TaxAudit() {
 
         <TabsContent value="summary" className="mt-0">
           <ReviewSummaryPanel
+            setup={setup}
+            clientName={currentEngagement.client_name}
+            acceptanceCheck={acceptanceCheck}
+            complianceTracker={complianceTracker}
             clausesByKey={clausesByKey}
             evidenceLinks={evidenceLinks}
             onOpenClause={openClause}
+            onOpenReadinessAction={openReadinessAction}
           />
         </TabsContent>
       </Tabs>

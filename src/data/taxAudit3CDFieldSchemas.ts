@@ -923,6 +923,249 @@ const CLAUSE_34_DEFAULT_TYPE_OPTIONS: TaxAuditStructuredFieldOption[] = [
   { label: 'Other', value: 'Other' },
 ];
 
+const CLAUSE_35_PRINCIPAL_ITEM_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_35_TRADING_BASIS_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'More than 10 percent of purchases', value: 'More than 10 percent of purchases' },
+  { label: 'More than 10 percent of turnover', value: 'More than 10 percent of turnover' },
+  { label: 'Management identified principal item', value: 'Management identified principal item' },
+  { label: 'Auditor review', value: 'Auditor review' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+  { label: 'Other', value: 'Other' },
+];
+
+const CLAUSE_35_RAW_MATERIAL_BASIS_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'More than 10 percent of purchases', value: 'More than 10 percent of purchases' },
+  { label: 'More than 10 percent of consumption', value: 'More than 10 percent of consumption' },
+  { label: 'Management identified principal item', value: 'Management identified principal item' },
+  { label: 'Auditor review', value: 'Auditor review' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+  { label: 'Other', value: 'Other' },
+];
+
+const CLAUSE_35_PRODUCT_TYPE_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Finished product', value: 'Finished product' },
+  { label: 'By-product', value: 'By-product' },
+  { label: 'Scrap', value: 'Scrap' },
+  { label: 'Other', value: 'Other' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_35_FINISHED_PRODUCT_BASIS_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'More than 10 percent of turnover', value: 'More than 10 percent of turnover' },
+  { label: 'More than 10 percent of production', value: 'More than 10 percent of production' },
+  { label: 'Management identified principal item', value: 'Management identified principal item' },
+  { label: 'Auditor review', value: 'Auditor review' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+  { label: 'Other', value: 'Other' },
+];
+
+const CLAUSE_36A_CLOSELY_HELD_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_36A_NATURE_OF_PAYMENT_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Loan', value: 'Loan' },
+  { label: 'Advance', value: 'Advance' },
+  { label: 'Payment on behalf of shareholder', value: 'Payment on behalf of shareholder' },
+  { label: 'Payment for benefit of shareholder', value: 'Payment for benefit of shareholder' },
+  { label: 'Current account transaction', value: 'Current account transaction' },
+  { label: 'Other', value: 'Other' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_36A_COMMERCIAL_TRANSACTION_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_36B_SHARE_CLASS_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Equity shares', value: 'Equity shares' },
+  { label: 'Preference shares', value: 'Preference shares' },
+  { label: 'Other', value: 'Other' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_37_TO_39_WHETHER_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_37_TO_39_DISQUALIFICATION_NATURE_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Disqualification', value: 'Disqualification' },
+  { label: 'Disagreement', value: 'Disagreement' },
+  { label: 'Adverse observation', value: 'Adverse observation' },
+  { label: 'Qualification', value: 'Qualification' },
+  { label: 'Other matter', value: 'Other matter' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_40_ACTIVITY_TYPE_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Trading', value: 'Trading' },
+  { label: 'Manufacturing', value: 'Manufacturing' },
+  { label: 'Service', value: 'Service' },
+  { label: 'Mixed', value: 'Mixed' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_40_DEVIATION_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_41_TAX_LAW_CATEGORY_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'GST', value: 'GST' },
+  { label: 'Central Excise', value: 'Central Excise' },
+  { label: 'Service Tax', value: 'Service Tax' },
+  { label: 'Customs', value: 'Customs' },
+  { label: 'VAT', value: 'VAT' },
+  { label: 'Central Sales Tax', value: 'Central Sales Tax' },
+  { label: 'Professional Tax', value: 'Professional Tax' },
+  { label: 'Entry Tax', value: 'Entry Tax' },
+  { label: 'Local Body Tax', value: 'Local Body Tax' },
+  { label: 'Stamp Duty', value: 'Stamp Duty' },
+  { label: 'Other tax law', value: 'Other tax law' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_41_DEMAND_OR_REFUND_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Demand', value: 'Demand' },
+  { label: 'Refund', value: 'Refund' },
+  { label: 'Refund adjusted against demand', value: 'Refund adjusted against demand' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_41_CURRENT_STATUS_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Paid', value: 'Paid' },
+  { label: 'Received', value: 'Received' },
+  { label: 'Adjusted', value: 'Adjusted' },
+  { label: 'Pending', value: 'Pending' },
+  { label: 'Under appeal', value: 'Under appeal' },
+  { label: 'Stayed', value: 'Stayed' },
+  { label: 'Partly paid', value: 'Partly paid' },
+  { label: 'Partly received', value: 'Partly received' },
+  { label: 'Dropped', value: 'Dropped' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_41_WHETHER_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_42_FORM_NO_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Form 61', value: 'Form 61' },
+  { label: 'Form 61A', value: 'Form 61A' },
+  { label: 'Form 61B', value: 'Form 61B' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_42_REQUIRED_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_42_WHETHER_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_42_INFORMATION_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'Cannot verify', value: 'Cannot verify' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_42_REPORTING_PERIOD_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: '1 April to 30 September', value: '1 April to 30 September' },
+  { label: '1 October to 31 March', value: '1 October to 31 March' },
+  { label: 'Full financial year', value: 'Full financial year' },
+  { label: 'Calendar year', value: 'Calendar year' },
+  { label: 'Other', value: 'Other' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_43_WHETHER_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_43_ASSESSEE_ROLE_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Parent entity resident in India', value: 'Parent entity resident in India' },
+  { label: 'Alternate reporting entity resident in India', value: 'Alternate reporting entity resident in India' },
+  { label: 'Constituent entity resident in India', value: 'Constituent entity resident in India' },
+  { label: 'Constituent entity with non-resident parent', value: 'Constituent entity with non-resident parent' },
+  { label: 'Not part of international group', value: 'Not part of international group' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_43_REPORT_FURNISHED_BY_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Assessee', value: 'Assessee' },
+  { label: 'Parent entity', value: 'Parent entity' },
+  { label: 'Alternate reporting entity', value: 'Alternate reporting entity' },
+  { label: 'Other constituent entity resident in India', value: 'Other constituent entity resident in India' },
+  { label: 'Not furnished', value: 'Not furnished' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_43_FORM_OR_REPORT_REFERENCE_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Form 3CEAC', value: 'Form 3CEAC' },
+  { label: 'Form 3CEAD', value: 'Form 3CEAD' },
+  { label: 'Form 3CEAE', value: 'Form 3CEAE' },
+  { label: 'Other', value: 'Other' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_44_EXPENDITURE_TYPE_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Revenue expenditure', value: 'Revenue expenditure' },
+  { label: 'Capital expenditure', value: 'Capital expenditure' },
+  { label: 'Mixed', value: 'Mixed' },
+  { label: 'Other', value: 'Other' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_44_BASIS_OF_CLASSIFICATION_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Supplier GST registration status at time of supply', value: 'Supplier GST registration status at time of supply' },
+  { label: 'Purchase register classification', value: 'Purchase register classification' },
+  { label: 'Management working', value: 'Management working' },
+  { label: 'GST portal verification', value: 'GST portal verification' },
+  { label: 'Test-check basis', value: 'Test-check basis' },
+  { label: 'Other', value: 'Other' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
+const CLAUSE_44_WHETHER_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'Yes' },
+  { label: 'No', value: 'No' },
+  { label: 'Not applicable', value: 'Not applicable' },
+  { label: 'To be reviewed', value: 'To be reviewed' },
+];
+
 export const TAX_AUDIT_3CD_FIELD_SCHEMAS: TaxAudit3CDFieldSchema[] = [
   {
     clauseKey: 'clause_1',
@@ -3601,6 +3844,732 @@ export const TAX_AUDIT_3CD_FIELD_SCHEMAS: TaxAudit3CDFieldSchema[] = [
             type: 'date',
             width: '160px',
           },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_35',
+    tables: [
+      {
+        key: 'clause_35a_trading_goods_rows',
+        label: '35(a) Trading goods',
+        shortLabel: '35(a)',
+        description: 'Quantitative details of principal items of goods traded, captured manually for tax audit reporting.',
+        summaryFields: ['item_name', 'unit_of_measurement', 'sales_quantity'],
+        columns: [
+          { key: 'item_name', label: 'Item name', type: 'text', width: '220px' },
+          { key: 'item_description', label: 'Item description', type: 'text', width: '240px' },
+          { key: 'unit_of_measurement', label: 'Unit of measurement', type: 'text', width: '170px' },
+          {
+            key: 'whether_principal_item',
+            label: 'Principal item',
+            type: 'select',
+            options: CLAUSE_35_PRINCIPAL_ITEM_OPTIONS,
+            width: '150px',
+          },
+          { key: 'opening_stock_quantity', label: 'Opening stock quantity', type: 'number', width: '190px' },
+          { key: 'purchases_quantity', label: 'Purchases quantity', type: 'number', width: '180px' },
+          { key: 'sales_quantity', label: 'Sales quantity', type: 'number', width: '160px' },
+          { key: 'closing_stock_quantity', label: 'Closing stock quantity', type: 'number', width: '190px' },
+          { key: 'shortage_or_excess_quantity', label: 'Shortage / excess quantity', type: 'number', width: '210px' },
+          { key: 'reason_for_shortage_or_excess', label: 'Reason for shortage / excess', type: 'text', width: '230px' },
+          {
+            key: 'basis_of_identification_as_principal_item',
+            label: 'Basis of identification as principal item',
+            type: 'select',
+            options: CLAUSE_35_TRADING_BASIS_OPTIONS,
+            width: '280px',
+          },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+      {
+        key: 'clause_35b_raw_material_rows',
+        label: '35(b)(A) Raw materials',
+        shortLabel: '35(b)(A)',
+        description: 'Quantitative details of principal items of raw materials for manufacturing concerns.',
+        summaryFields: ['raw_material_name', 'unit_of_measurement', 'consumption_quantity'],
+        columns: [
+          { key: 'raw_material_name', label: 'Raw material name', type: 'text', width: '220px' },
+          { key: 'raw_material_description', label: 'Raw material description', type: 'text', width: '240px' },
+          { key: 'unit_of_measurement', label: 'Unit of measurement', type: 'text', width: '170px' },
+          {
+            key: 'whether_principal_item',
+            label: 'Principal item',
+            type: 'select',
+            options: CLAUSE_35_PRINCIPAL_ITEM_OPTIONS,
+            width: '150px',
+          },
+          { key: 'opening_stock_quantity', label: 'Opening stock quantity', type: 'number', width: '190px' },
+          { key: 'purchases_quantity', label: 'Purchases quantity', type: 'number', width: '180px' },
+          { key: 'consumption_quantity', label: 'Consumption quantity', type: 'number', width: '190px' },
+          { key: 'sales_quantity', label: 'Sales quantity', type: 'number', width: '160px' },
+          { key: 'closing_stock_quantity', label: 'Closing stock quantity', type: 'number', width: '190px' },
+          {
+            key: 'yield_or_related_finished_product_reference',
+            label: 'Yield / related finished product ref',
+            type: 'text',
+            width: '260px',
+          },
+          { key: 'shortage_or_excess_quantity', label: 'Shortage / excess quantity', type: 'number', width: '210px' },
+          { key: 'reason_for_shortage_or_excess', label: 'Reason for shortage / excess', type: 'text', width: '230px' },
+          {
+            key: 'basis_of_identification_as_principal_item',
+            label: 'Basis of identification as principal item',
+            type: 'select',
+            options: CLAUSE_35_RAW_MATERIAL_BASIS_OPTIONS,
+            width: '290px',
+          },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+      {
+        key: 'clause_35b_finished_product_rows',
+        label: '35(b)(B) Finished products / by-products',
+        shortLabel: '35(b)(B)',
+        description: 'Quantitative details of principal finished products and by-products for manufacturing concerns.',
+        summaryFields: ['product_name', 'product_type', 'quantity_manufactured'],
+        columns: [
+          { key: 'product_name', label: 'Product name', type: 'text', width: '220px' },
+          { key: 'product_description', label: 'Product description', type: 'text', width: '240px' },
+          {
+            key: 'product_type',
+            label: 'Product type',
+            type: 'select',
+            options: CLAUSE_35_PRODUCT_TYPE_OPTIONS,
+            width: '170px',
+          },
+          { key: 'unit_of_measurement', label: 'Unit of measurement', type: 'text', width: '170px' },
+          {
+            key: 'whether_principal_item',
+            label: 'Principal item',
+            type: 'select',
+            options: CLAUSE_35_PRINCIPAL_ITEM_OPTIONS,
+            width: '150px',
+          },
+          { key: 'opening_stock_quantity', label: 'Opening stock quantity', type: 'number', width: '190px' },
+          { key: 'purchases_quantity', label: 'Purchases quantity', type: 'number', width: '180px' },
+          { key: 'quantity_manufactured', label: 'Quantity manufactured', type: 'number', width: '190px' },
+          { key: 'sales_quantity', label: 'Sales quantity', type: 'number', width: '160px' },
+          { key: 'closing_stock_quantity', label: 'Closing stock quantity', type: 'number', width: '190px' },
+          { key: 'shortage_or_excess_quantity', label: 'Shortage / excess quantity', type: 'number', width: '210px' },
+          { key: 'reason_for_shortage_or_excess', label: 'Reason for shortage / excess', type: 'text', width: '230px' },
+          { key: 'yield_percentage_if_available', label: 'Yield %, if available', type: 'number', width: '170px' },
+          {
+            key: 'basis_of_identification_as_principal_item',
+            label: 'Basis of identification as principal item',
+            type: 'select',
+            options: CLAUSE_35_FINISHED_PRODUCT_BASIS_OPTIONS,
+            width: '290px',
+          },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_36a',
+    tables: [
+      {
+        key: 'clause_36a_deemed_dividend_rows',
+        label: '36A Deemed dividend under section 2(22)(e)',
+        shortLabel: '36A',
+        description: 'Manual capture of receipts that may be treated as deemed dividend under section 2(22)(e).',
+        summaryFields: ['payer_company_name', 'nature_of_payment', 'amount_treated_as_deemed_dividend'],
+        columns: [
+          { key: 'payer_company_name', label: 'Payer company name', type: 'text', width: '230px' },
+          { key: 'payer_company_pan', label: 'Payer company PAN', type: 'text', width: '170px' },
+          {
+            key: 'whether_company_is_closely_held',
+            label: 'Closely held company',
+            type: 'select',
+            options: CLAUSE_36A_CLOSELY_HELD_OPTIONS,
+            width: '180px',
+          },
+          {
+            key: 'nature_of_payment',
+            label: 'Nature of payment',
+            type: 'select',
+            options: CLAUSE_36A_NATURE_OF_PAYMENT_OPTIONS,
+            width: '240px',
+          },
+          { key: 'date_of_receipt', label: 'Date of receipt', type: 'date', width: '170px' },
+          { key: 'amount_received', label: 'Amount received', type: 'number', width: '180px' },
+          { key: 'accumulated_profits_available', label: 'Accumulated profits available', type: 'number', width: '220px' },
+          { key: 'assessee_shareholding_or_interest', label: 'Assessee shareholding / interest', type: 'text', width: '230px' },
+          {
+            key: 'concern_in_which_substantial_interest_exists',
+            label: 'Concern in which substantial interest exists',
+            type: 'text',
+            width: '280px',
+          },
+          {
+            key: 'whether_trade_advance_or_commercial_transaction',
+            label: 'Trade advance / commercial transaction',
+            type: 'select',
+            options: CLAUSE_36A_COMMERCIAL_TRANSACTION_OPTIONS,
+            width: '250px',
+          },
+          { key: 'amount_treated_as_deemed_dividend', label: 'Amount treated as deemed dividend', type: 'number', width: '240px' },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_36b',
+    tables: [
+      {
+        key: 'clause_36b_buyback_rows',
+        label: '36B Amount received for buyback of shares under section 2(22)(f)',
+        shortLabel: '36B',
+        description: 'Manual capture of buyback receipts that may be treated as dividend under section 2(22)(f).',
+        summaryFields: ['company_name', 'class_or_type_of_shares', 'amount_treated_as_dividend'],
+        columns: [
+          { key: 'company_name', label: 'Company name', type: 'text', width: '230px' },
+          { key: 'company_pan', label: 'Company PAN', type: 'text', width: '170px' },
+          {
+            key: 'class_or_type_of_shares',
+            label: 'Class / type of shares',
+            type: 'select',
+            options: CLAUSE_36B_SHARE_CLASS_OPTIONS,
+            width: '190px',
+          },
+          { key: 'date_of_buyback', label: 'Date of buyback', type: 'date', width: '170px' },
+          { key: 'number_of_shares_bought_back', label: 'No. of shares bought back', type: 'number', width: '210px' },
+          { key: 'amount_received', label: 'Amount received', type: 'number', width: '180px' },
+          {
+            key: 'cost_of_acquisition_of_shares_bought_back',
+            label: 'Cost of acquisition of shares bought back',
+            type: 'number',
+            width: '280px',
+          },
+          { key: 'amount_treated_as_dividend', label: 'Amount treated as dividend', type: 'number', width: '220px' },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_37',
+    tables: [
+      {
+        key: 'clause_37_cost_audit_rows',
+        label: '37 Cost audit report',
+        shortLabel: '37',
+        description: 'Manual capture of cost audit applicability, report details, and reported disqualifications or disagreements.',
+        summaryFields: ['period_covered', 'cost_auditor_name', 'cost_audit_report_date'],
+        columns: [
+          {
+            key: 'whether_cost_audit_applicable',
+            label: 'Cost audit applicable',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '190px',
+          },
+          {
+            key: 'whether_cost_audit_carried_out',
+            label: 'Cost audit carried out',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '190px',
+          },
+          { key: 'law_or_section_reference', label: 'Law / section reference', type: 'text', width: '220px' },
+          { key: 'period_covered', label: 'Period covered', type: 'text', width: '180px' },
+          { key: 'cost_auditor_name', label: 'Cost auditor name', type: 'text', width: '220px' },
+          { key: 'cost_auditor_registration_or_membership_no', label: 'Registration / membership no.', type: 'text', width: '240px' },
+          { key: 'cost_audit_report_date', label: 'Report date', type: 'date', width: '160px' },
+          { key: 'cost_audit_report_reference', label: 'Report reference', type: 'text', width: '210px' },
+          {
+            key: 'whether_disqualification_or_disagreement_reported',
+            label: 'Disqualification / disagreement reported',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '280px',
+          },
+          { key: 'matter_or_item_reported', label: 'Matter / item reported', type: 'text', width: '240px' },
+          {
+            key: 'nature_of_disqualification_or_disagreement',
+            label: 'Nature of matter',
+            type: 'select',
+            options: CLAUSE_37_TO_39_DISQUALIFICATION_NATURE_OPTIONS,
+            width: '220px',
+          },
+          { key: 'amount_value_or_quantity_involved', label: 'Amount / value / quantity involved', type: 'number', width: '250px' },
+          { key: 'management_response', label: 'Management response', type: 'text', width: '240px' },
+          { key: 'auditor_review_note', label: 'Auditor review note', type: 'text', width: '240px' },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_38',
+    tables: [
+      {
+        key: 'clause_38_excise_audit_rows',
+        label: '38 Central excise audit report',
+        shortLabel: '38',
+        description: 'Manual capture of central excise audit applicability, report details, and reported disqualifications or disagreements.',
+        summaryFields: ['period_covered', 'auditor_or_authority_name', 'excise_audit_report_date'],
+        columns: [
+          {
+            key: 'whether_excise_audit_applicable',
+            label: 'Excise audit applicable',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '190px',
+          },
+          {
+            key: 'whether_excise_audit_carried_out',
+            label: 'Excise audit carried out',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '190px',
+          },
+          { key: 'period_covered', label: 'Period covered', type: 'text', width: '180px' },
+          { key: 'excise_registration_or_reference_no', label: 'Registration / reference no.', type: 'text', width: '230px' },
+          { key: 'auditor_or_authority_name', label: 'Auditor / authority name', type: 'text', width: '230px' },
+          { key: 'excise_audit_report_date', label: 'Report date', type: 'date', width: '160px' },
+          { key: 'excise_audit_report_reference', label: 'Report reference', type: 'text', width: '210px' },
+          {
+            key: 'whether_disqualification_or_disagreement_reported',
+            label: 'Disqualification / disagreement reported',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '280px',
+          },
+          { key: 'matter_or_item_reported', label: 'Matter / item reported', type: 'text', width: '240px' },
+          {
+            key: 'nature_of_disqualification_or_disagreement',
+            label: 'Nature of matter',
+            type: 'select',
+            options: CLAUSE_37_TO_39_DISQUALIFICATION_NATURE_OPTIONS,
+            width: '220px',
+          },
+          { key: 'amount_value_or_quantity_involved', label: 'Amount / value / quantity involved', type: 'number', width: '250px' },
+          { key: 'management_response', label: 'Management response', type: 'text', width: '240px' },
+          { key: 'auditor_review_note', label: 'Auditor review note', type: 'text', width: '240px' },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_39',
+    tables: [
+      {
+        key: 'clause_39_service_tax_audit_rows',
+        label: '39 Service tax audit report',
+        shortLabel: '39',
+        description: 'Manual capture of service tax audit applicability, report details, and reported disqualifications or disagreements.',
+        summaryFields: ['period_covered', 'auditor_or_authority_name', 'service_tax_audit_report_date'],
+        columns: [
+          {
+            key: 'whether_service_tax_audit_applicable',
+            label: 'Service tax audit applicable',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '210px',
+          },
+          {
+            key: 'whether_service_tax_audit_carried_out',
+            label: 'Service tax audit carried out',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '220px',
+          },
+          { key: 'period_covered', label: 'Period covered', type: 'text', width: '180px' },
+          { key: 'service_tax_registration_or_reference_no', label: 'Registration / reference no.', type: 'text', width: '230px' },
+          { key: 'auditor_or_authority_name', label: 'Auditor / authority name', type: 'text', width: '230px' },
+          { key: 'service_tax_audit_report_date', label: 'Report date', type: 'date', width: '160px' },
+          { key: 'service_tax_audit_report_reference', label: 'Report reference', type: 'text', width: '210px' },
+          {
+            key: 'whether_disqualification_or_disagreement_reported',
+            label: 'Disqualification / disagreement reported',
+            type: 'select',
+            options: CLAUSE_37_TO_39_WHETHER_OPTIONS,
+            width: '280px',
+          },
+          { key: 'matter_or_item_reported', label: 'Matter / item reported', type: 'text', width: '240px' },
+          {
+            key: 'nature_of_disqualification_or_disagreement',
+            label: 'Nature of matter',
+            type: 'select',
+            options: CLAUSE_37_TO_39_DISQUALIFICATION_NATURE_OPTIONS,
+            width: '220px',
+          },
+          { key: 'amount_value_or_quantity_involved', label: 'Amount / value / quantity involved', type: 'number', width: '250px' },
+          { key: 'management_response', label: 'Management response', type: 'text', width: '240px' },
+          { key: 'auditor_review_note', label: 'Auditor review note', type: 'text', width: '240px' },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_40',
+    tables: [
+      {
+        key: 'clause_40_ratio_rows',
+        label: '40 Accounting ratios',
+        shortLabel: '40',
+        description: 'Manual capture of current year and preceding previous year ratios for goods traded, goods manufactured or services rendered.',
+        summaryFields: ['activity_or_segment_name', 'activity_type', 'principal_item_or_service'],
+        columns: [
+          { key: 'activity_or_segment_name', label: 'Activity / segment name', type: 'text', width: '230px' },
+          {
+            key: 'activity_type',
+            label: 'Activity type',
+            type: 'select',
+            options: CLAUSE_40_ACTIVITY_TYPE_OPTIONS,
+            width: '170px',
+          },
+          { key: 'principal_item_or_service', label: 'Principal item / service', type: 'text', width: '230px' },
+          { key: 'current_year_total_turnover', label: 'Current year total turnover', type: 'number', width: '220px' },
+          { key: 'preceding_year_total_turnover', label: 'Preceding year total turnover', type: 'number', width: '230px' },
+          { key: 'current_year_gross_profit_to_turnover_ratio', label: 'Current year gross profit / turnover ratio', type: 'number', width: '300px' },
+          { key: 'preceding_year_gross_profit_to_turnover_ratio', label: 'Preceding year gross profit / turnover ratio', type: 'number', width: '310px' },
+          { key: 'current_year_net_profit_to_turnover_ratio', label: 'Current year net profit / turnover ratio', type: 'number', width: '290px' },
+          { key: 'preceding_year_net_profit_to_turnover_ratio', label: 'Preceding year net profit / turnover ratio', type: 'number', width: '300px' },
+          { key: 'current_year_stock_in_trade_to_turnover_ratio', label: 'Current year stock-in-trade / turnover ratio', type: 'number', width: '310px' },
+          { key: 'preceding_year_stock_in_trade_to_turnover_ratio', label: 'Preceding year stock-in-trade / turnover ratio', type: 'number', width: '320px' },
+          {
+            key: 'current_year_material_consumed_to_finished_goods_ratio',
+            label: 'Current year material consumed / finished goods ratio',
+            type: 'number',
+            width: '350px',
+          },
+          {
+            key: 'preceding_year_material_consumed_to_finished_goods_ratio',
+            label: 'Preceding year material consumed / finished goods ratio',
+            type: 'number',
+            width: '360px',
+          },
+          { key: 'basis_of_computation', label: 'Basis of computation', type: 'text', width: '240px' },
+          {
+            key: 'whether_significant_deviation_observed',
+            label: 'Significant deviation observed',
+            type: 'select',
+            options: CLAUSE_40_DEVIATION_OPTIONS,
+            width: '240px',
+          },
+          { key: 'reason_for_significant_deviation', label: 'Reason for significant deviation', type: 'text', width: '270px' },
+          { key: 'financial_statement_or_working_reference', label: 'Financial statement / working ref', type: 'text', width: '270px' },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_41',
+    tables: [
+      {
+        key: 'clause_41_demand_refund_rows',
+        label: '41 Demand or refund under other tax laws',
+        shortLabel: '41',
+        description: 'Manual capture of demand raised or refund issued during the previous year under tax laws other than Income-tax Act and Wealth-tax Act.',
+        summaryFields: ['name_of_applicable_act', 'demand_or_refund', 'amount_of_demand_or_refund'],
+        columns: [
+          { key: 'financial_year_to_which_demand_or_refund_relates', label: 'Financial year to which demand / refund relates', type: 'text', width: '320px' },
+          { key: 'name_of_applicable_act', label: 'Name of applicable Act', type: 'text', width: '240px' },
+          {
+            key: 'tax_law_category',
+            label: 'Tax law category',
+            type: 'select',
+            options: CLAUSE_41_TAX_LAW_CATEGORY_OPTIONS,
+            width: '190px',
+          },
+          {
+            key: 'demand_or_refund',
+            label: 'Demand / refund',
+            type: 'select',
+            options: CLAUSE_41_DEMAND_OR_REFUND_OPTIONS,
+            width: '240px',
+          },
+          { key: 'order_number', label: 'Order number', type: 'text', width: '190px' },
+          { key: 'date_of_demand_or_refund_order', label: 'Order date', type: 'date', width: '160px' },
+          { key: 'amount_of_demand_or_refund', label: 'Demand / refund amount', type: 'number', width: '210px' },
+          { key: 'authority_issuing_order', label: 'Authority issuing order', type: 'text', width: '230px' },
+          { key: 'relevant_proceeding_details', label: 'Relevant proceeding details', type: 'text', width: '260px' },
+          { key: 'authority_before_which_matter_is_pending', label: 'Pending before authority', type: 'text', width: '250px' },
+          {
+            key: 'current_status',
+            label: 'Current status',
+            type: 'select',
+            options: CLAUSE_41_CURRENT_STATUS_OPTIONS,
+            width: '180px',
+          },
+          {
+            key: 'whether_paid_received_or_adjusted',
+            label: 'Paid / received / adjusted',
+            type: 'select',
+            options: CLAUSE_41_WHETHER_OPTIONS,
+            width: '230px',
+          },
+          { key: 'amount_paid_received_or_adjusted', label: 'Amount paid / received / adjusted', type: 'number', width: '260px' },
+          { key: 'date_of_payment_receipt_or_adjustment', label: 'Payment / receipt / adjustment date', type: 'date', width: '270px' },
+          { key: 'mode_or_reference_of_payment_receipt_or_adjustment', label: 'Payment / receipt / adjustment ref', type: 'text', width: '280px' },
+          {
+            key: 'whether_verified_with_portal',
+            label: 'Verified with portal',
+            type: 'select',
+            options: CLAUSE_41_WHETHER_OPTIONS,
+            width: '190px',
+          },
+          {
+            key: 'whether_management_representation_obtained',
+            label: 'Management representation obtained',
+            type: 'select',
+            options: CLAUSE_41_WHETHER_OPTIONS,
+            width: '270px',
+          },
+          { key: 'financial_statement_or_caro_reference', label: 'Financial statement / CARO ref', type: 'text', width: '260px' },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_42',
+    tables: [
+      {
+        key: 'clause_42_reporting_rows',
+        label: '42 Form 61, Form 61A and Form 61B reporting',
+        shortLabel: '42',
+        description: 'Manual capture of Form 61, Form 61A and Form 61B reporting requirements and furnishing status.',
+        summaryFields: ['form_no', 'reporting_period', 'date_of_actual_furnishing'],
+        columns: [
+          {
+            key: 'form_no',
+            label: 'Form no.',
+            type: 'select',
+            options: CLAUSE_42_FORM_NO_OPTIONS,
+            width: '170px',
+          },
+          {
+            key: 'whether_required_to_furnish',
+            label: 'Required to furnish',
+            type: 'select',
+            options: CLAUSE_42_REQUIRED_OPTIONS,
+            width: '190px',
+          },
+          { key: 'section_and_rule_reference', label: 'Section / rule reference', type: 'text', width: '230px' },
+          {
+            key: 'reporting_period',
+            label: 'Reporting period',
+            type: 'select',
+            options: CLAUSE_42_REPORTING_PERIOD_OPTIONS,
+            width: '230px',
+          },
+          { key: 'registration_number_or_itdrein', label: 'Registration no. / ITDREIN', type: 'text', width: '230px' },
+          {
+            key: 'designated_director_or_principal_officer_details',
+            label: 'Designated director / principal officer details',
+            type: 'text',
+            width: '320px',
+          },
+          {
+            key: 'due_date_for_furnishing',
+            label: 'Due date for furnishing',
+            type: 'date',
+            placeholder: 'Form 61: 31 Oct / 30 Apr; Form 61A/61B: 31 May',
+            width: '210px',
+          },
+          { key: 'date_of_actual_furnishing', label: 'Date of actual furnishing', type: 'date', width: '220px' },
+          { key: 'acknowledgment_number', label: 'Acknowledgment number', type: 'text', width: '220px' },
+          {
+            key: 'whether_form_furnished',
+            label: 'Form furnished',
+            type: 'select',
+            options: CLAUSE_42_WHETHER_OPTIONS,
+            width: '180px',
+          },
+          {
+            key: 'whether_furnished_within_due_date',
+            label: 'Furnished within due date',
+            type: 'select',
+            options: CLAUSE_42_WHETHER_OPTIONS,
+            width: '230px',
+          },
+          {
+            key: 'whether_form_contains_all_required_information',
+            label: 'Contains all required information',
+            type: 'select',
+            options: CLAUSE_42_INFORMATION_OPTIONS,
+            width: '260px',
+          },
+          {
+            key: 'details_of_information_or_transactions_not_reported',
+            label: 'Information / transactions not reported',
+            type: 'text',
+            width: '300px',
+          },
+          { key: 'reason_for_delay_or_omission', label: 'Reason for delay / omission', type: 'text', width: '250px' },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_43',
+    tables: [
+      {
+        key: 'clause_43_cbcr_rows',
+        label: '43 Country-by-country reporting under section 286',
+        shortLabel: '43',
+        description: 'Manual capture of country-by-country reporting applicability and report furnishing under section 286.',
+        summaryFields: ['international_group_name', 'assessee_role_in_international_group', 'report_furnished_by'],
+        columns: [
+          {
+            key: 'whether_liable_to_furnish_report_under_section_286_2',
+            label: 'Liable to furnish report under section 286(2)',
+            type: 'select',
+            options: CLAUSE_43_WHETHER_OPTIONS,
+            width: '300px',
+          },
+          {
+            key: 'assessee_role_in_international_group',
+            label: 'Assessee role in international group',
+            type: 'select',
+            options: CLAUSE_43_ASSESSEE_ROLE_OPTIONS,
+            width: '300px',
+          },
+          { key: 'international_group_name', label: 'International group name', type: 'text', width: '240px' },
+          { key: 'reporting_accounting_year', label: 'Reporting accounting year', type: 'text', width: '220px' },
+          { key: 'parent_entity_name', label: 'Parent entity name', type: 'text', width: '230px' },
+          { key: 'parent_entity_country_or_territory', label: 'Parent entity country / territory', type: 'text', width: '260px' },
+          { key: 'parent_entity_pan_or_tax_identification_number', label: 'Parent PAN / tax identification no.', type: 'text', width: '280px' },
+          { key: 'alternate_reporting_entity_name', label: 'Alternate reporting entity name', type: 'text', width: '270px' },
+          {
+            key: 'alternate_reporting_entity_country_or_territory',
+            label: 'Alternate reporting entity country / territory',
+            type: 'text',
+            width: '330px',
+          },
+          {
+            key: 'alternate_reporting_entity_pan_or_tax_identification_number',
+            label: 'Alternate reporting PAN / tax identification no.',
+            type: 'text',
+            width: '330px',
+          },
+          {
+            key: 'whether_form_3ceac_furnished',
+            label: 'Form 3CEAC furnished',
+            type: 'select',
+            options: CLAUSE_43_WHETHER_OPTIONS,
+            width: '200px',
+          },
+          { key: 'form_3ceac_date_of_furnishing', label: 'Form 3CEAC furnishing date', type: 'date', width: '230px' },
+          { key: 'form_3ceac_acknowledgment_number', label: 'Form 3CEAC acknowledgment no.', type: 'text', width: '250px' },
+          {
+            key: 'whether_report_under_section_286_2_furnished',
+            label: 'Report under section 286(2) furnished',
+            type: 'select',
+            options: CLAUSE_43_WHETHER_OPTIONS,
+            width: '280px',
+          },
+          {
+            key: 'report_furnished_by',
+            label: 'Report furnished by',
+            type: 'select',
+            options: CLAUSE_43_REPORT_FURNISHED_BY_OPTIONS,
+            width: '260px',
+          },
+          {
+            key: 'form_or_report_reference',
+            label: 'Form / report reference',
+            type: 'select',
+            options: CLAUSE_43_FORM_OR_REPORT_REFERENCE_OPTIONS,
+            width: '210px',
+          },
+          { key: 'date_of_furnishing_of_report', label: 'Report furnishing date', type: 'date', width: '210px' },
+          { key: 'acknowledgment_number', label: 'Acknowledgment number', type: 'text', width: '220px' },
+          {
+            key: 'whether_copy_of_report_or_acknowledgment_verified',
+            label: 'Copy / acknowledgment verified',
+            type: 'select',
+            options: CLAUSE_43_WHETHER_OPTIONS,
+            width: '250px',
+          },
+          { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
+          { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
+        ],
+      },
+    ],
+  },
+  {
+    clauseKey: 'clause_44',
+    tables: [
+      {
+        key: 'clause_44_gst_expenditure_rows',
+        label: '44 GST expenditure break-up',
+        shortLabel: '44',
+        description: 'Manual capture of expenditure head-wise GST registration status break-up.',
+        summaryFields: ['expenditure_head', 'total_amount_of_expenditure', 'total_expenditure_relating_to_registered_entities'],
+        columns: [
+          { key: 'expenditure_head', label: 'Expenditure head', type: 'text', width: '230px' },
+          {
+            key: 'expenditure_type',
+            label: 'Expenditure type',
+            type: 'select',
+            options: CLAUSE_44_EXPENDITURE_TYPE_OPTIONS,
+            width: '190px',
+          },
+          { key: 'total_amount_of_expenditure', label: 'Total amount of expenditure', type: 'number', width: '230px' },
+          {
+            key: 'expenditure_relating_to_exempt_goods_or_services_from_registered_entities',
+            label: 'Exempt goods / services from registered entities',
+            type: 'number',
+            width: '340px',
+          },
+          { key: 'expenditure_relating_to_composition_entities', label: 'Composition entities', type: 'number', width: '210px' },
+          { key: 'expenditure_relating_to_other_registered_entities', label: 'Other registered entities', type: 'number', width: '240px' },
+          {
+            key: 'total_expenditure_relating_to_registered_entities',
+            label: 'Total expenditure relating to registered entities',
+            type: 'number',
+            width: '330px',
+          },
+          { key: 'expenditure_relating_to_unregistered_entities', label: 'Unregistered entities', type: 'number', width: '230px' },
+          { key: 'reconciliation_difference', label: 'Reconciliation difference', type: 'number', width: '230px' },
+          { key: 'reason_for_reconciliation_difference', label: 'Reason for reconciliation difference', type: 'text', width: '300px' },
+          {
+            key: 'basis_of_classification',
+            label: 'Basis of classification',
+            type: 'select',
+            options: CLAUSE_44_BASIS_OF_CLASSIFICATION_OPTIONS,
+            width: '310px',
+          },
+          {
+            key: 'whether_capital_expenditure_included',
+            label: 'Capital expenditure included',
+            type: 'select',
+            options: CLAUSE_44_WHETHER_OPTIONS,
+            width: '230px',
+          },
+          {
+            key: 'whether_multiple_gstin_consolidation_involved',
+            label: 'Multiple GSTIN consolidation involved',
+            type: 'select',
+            options: CLAUSE_44_WHETHER_OPTIONS,
+            width: '280px',
+          },
+          { key: 'gstin_or_branch_reference', label: 'GSTIN / branch reference', type: 'text', width: '230px' },
           { key: 'evidence_or_working_reference', label: 'Evidence / working ref', type: 'text', width: '220px' },
           { key: 'remarks', label: 'Remarks', type: 'text', width: '220px' },
         ],

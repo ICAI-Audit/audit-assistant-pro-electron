@@ -316,6 +316,20 @@ const createClausePrefill = (
         status: 'auto_filled',
         links: [setupLink],
       };
+    case 'clause_9':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            whether_there_was_change_during_year: '',
+            change_remarks: '',
+            partners_or_members: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Partners or members particulars'],
+      };
     case 'clause_10':
       return client?.industry || setup.nature_of_business
         ? {
@@ -406,6 +420,49 @@ const createClausePrefill = (
         status: 'needs_input',
         links: [financialReviewLink],
         missingFields: ['Stock valuation particulars'],
+      };
+    case 'clause_15':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            whether_any_capital_asset_converted_into_stock_in_trade: '',
+            rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [financialReviewLink],
+        missingFields: ['Capital asset conversion particulars'],
+      };
+    case 'clause_16':
+      return {
+        responseHtml: '',
+        responseJson: { structured: { rows: [] } },
+        status: 'needs_input',
+        links: [financialReviewLink],
+        missingFields: ['Amounts not credited to profit and loss account'],
+      };
+    case 'clause_17':
+      return {
+        responseHtml: '',
+        responseJson: { structured: { rows: [] } },
+        status: 'needs_input',
+        links: [financialReviewLink],
+        missingFields: ['Land or building transfer particulars'],
+      };
+    case 'clause_18':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            depreciation_working_available: '',
+            remarks: '',
+            rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [financialReviewLink],
+        missingFields: ['Depreciation particulars'],
       };
     case 'clause_19':
       return {
@@ -649,6 +706,140 @@ const createClausePrefill = (
         status: 'needs_input',
         links: [setupLink],
         missingFields: ['Clause 34(a), 34(b) and 34(c) TDS/TCS particulars'],
+      };
+    case 'clause_35':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_35a_trading_goods_rows: [],
+            clause_35b_raw_material_rows: [],
+            clause_35b_finished_product_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [financialReviewLink],
+        missingFields: ['Clause 35 quantitative details'],
+      };
+    case 'clause_36a':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_36a_deemed_dividend_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 36A deemed dividend particulars'],
+      };
+    case 'clause_36b':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_36b_buyback_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 36B buyback particulars'],
+      };
+    case 'clause_37':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_37_cost_audit_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 37 cost audit report particulars'],
+      };
+    case 'clause_38':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_38_excise_audit_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 38 central excise audit report particulars'],
+      };
+    case 'clause_39':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_39_service_tax_audit_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 39 service tax audit report particulars'],
+      };
+    case 'clause_40':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_40_ratio_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 40 accounting ratio particulars'],
+      };
+    case 'clause_41':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_41_demand_refund_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 41 demand or refund particulars'],
+      };
+    case 'clause_42':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_42_reporting_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 42 Form 61, Form 61A and Form 61B particulars'],
+      };
+    case 'clause_43':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_43_cbcr_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 43 country-by-country reporting particulars'],
+      };
+    case 'clause_44':
+      return {
+        responseHtml: '',
+        responseJson: {
+          structured: {
+            clause_44_gst_expenditure_rows: [],
+          },
+        },
+        status: 'needs_input',
+        links: [setupLink],
+        missingFields: ['Clause 44 GST expenditure break-up particulars'],
       };
     default:
       if (definition.prefillStrategy === 'financial_review') {

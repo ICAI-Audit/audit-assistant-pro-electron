@@ -221,9 +221,9 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
   const { parsed, structured } = getStructuredValues(clause);
   const validationMessages = parseJson<string[]>(clause.validation_messages_json, []);
   const tables = schema.tables || (schema.table ? [schema.table] : []);
-  // Clauses such as 34(a)/(b)/(c) intentionally use the table workbench even when only one
-  // sub-clause exists so the navigator and editor stay on the same interaction pattern.
-  const usesTableWorkbench = Boolean(schema.tables?.length);
+  // Repeatable details use the row workbench so add/edit/delete behavior stays
+  // consistent across both older single-table clauses and newer sub-clause sets.
+  const usesTableWorkbench = tables.length > 0;
   const [rowEditor, setRowEditor] = useState<RowEditorState | null>(null);
   const activeTable = tables.find((table) => table.key === activeTableKey) || tables[0];
 
@@ -1230,6 +1230,451 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
       });
     }
 
+    if (schema.clauseKey === 'clause_35') {
+      getRows(nextStructured, 'clause_35a_trading_goods_rows').forEach((row, index) => {
+        const hasQuantities =
+          !isBlank(row.opening_stock_quantity) ||
+          !isBlank(row.purchases_quantity) ||
+          !isBlank(row.sales_quantity) ||
+          !isBlank(row.closing_stock_quantity) ||
+          !isBlank(row.shortage_or_excess_quantity);
+
+        if (hasQuantities && isBlank(row.unit_of_measurement)) {
+          warnings.push(`35(a) row ${index + 1}: Unit of measurement should be entered when quantities are captured.`);
+        }
+        if (!isBlank(row.shortage_or_excess_quantity) && isBlank(row.reason_for_shortage_or_excess)) {
+          warnings.push(`35(a) row ${index + 1}: Reason for shortage or excess should be entered when shortage or excess quantity is captured.`);
+        }
+        if (row.whether_principal_item === 'No' && hasQuantities) {
+          warnings.push(`35(a) row ${index + 1}: Principal item is marked No while quantities are captured. Review whether reporting is required.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_35b_raw_material_rows').forEach((row, index) => {
+        const hasQuantities =
+          !isBlank(row.opening_stock_quantity) ||
+          !isBlank(row.purchases_quantity) ||
+          !isBlank(row.consumption_quantity) ||
+          !isBlank(row.sales_quantity) ||
+          !isBlank(row.closing_stock_quantity) ||
+          !isBlank(row.shortage_or_excess_quantity);
+
+        if (hasQuantities && isBlank(row.unit_of_measurement)) {
+          warnings.push(`35(b)(A) row ${index + 1}: Unit of measurement should be entered when quantities are captured.`);
+        }
+        if (!isBlank(row.consumption_quantity) && isBlank(row.raw_material_name)) {
+          warnings.push(`35(b)(A) row ${index + 1}: Raw material name should be entered when consumption quantity is captured.`);
+        }
+        if (!isBlank(row.shortage_or_excess_quantity) && isBlank(row.reason_for_shortage_or_excess)) {
+          warnings.push(`35(b)(A) row ${index + 1}: Reason for shortage or excess should be entered when shortage or excess quantity is captured.`);
+        }
+      });
+
+      getRows(nextStructured, 'clause_35b_finished_product_rows').forEach((row, index) => {
+        const hasQuantities =
+          !isBlank(row.opening_stock_quantity) ||
+          !isBlank(row.purchases_quantity) ||
+          !isBlank(row.quantity_manufactured) ||
+          !isBlank(row.sales_quantity) ||
+          !isBlank(row.closing_stock_quantity) ||
+          !isBlank(row.shortage_or_excess_quantity);
+
+        if (hasQuantities && isBlank(row.unit_of_measurement)) {
+          warnings.push(`35(b)(B) row ${index + 1}: Unit of measurement should be entered when quantities are captured.`);
+        }
+        if (!isBlank(row.quantity_manufactured) && isBlank(row.product_name)) {
+          warnings.push(`35(b)(B) row ${index + 1}: Product name should be entered when quantity manufactured is captured.`);
+        }
+        if (!isBlank(row.shortage_or_excess_quantity) && isBlank(row.reason_for_shortage_or_excess)) {
+          warnings.push(`35(b)(B) row ${index + 1}: Reason for shortage or excess should be entered when shortage or excess quantity is captured.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_36a') {
+      getRows(nextStructured, 'clause_36a_deemed_dividend_rows').forEach((row, index) => {
+        const amountReceived = toFiniteNumber(row.amount_received);
+        const deemedDividendAmount = toFiniteNumber(row.amount_treated_as_deemed_dividend);
+
+        if (!isBlank(row.amount_received) && isBlank(row.payer_company_name)) {
+          warnings.push(`36A row ${index + 1}: Payer company name should be entered when amount received is captured.`);
+        }
+        if (
+          row.whether_company_is_closely_held === 'No' &&
+          !isBlank(row.amount_treated_as_deemed_dividend)
+        ) {
+          warnings.push(`36A row ${index + 1}: Company is marked not closely held while deemed dividend amount is captured.`);
+        }
+        if (
+          row.whether_trade_advance_or_commercial_transaction === 'Yes' &&
+          !isBlank(row.amount_treated_as_deemed_dividend)
+        ) {
+          warnings.push(`36A row ${index + 1}: Trade advance or commercial transaction is marked Yes while deemed dividend amount is captured.`);
+        }
+        if (
+          amountReceived !== null &&
+          deemedDividendAmount !== null &&
+          deemedDividendAmount > amountReceived
+        ) {
+          warnings.push(`36A row ${index + 1}: Amount treated as deemed dividend should not exceed amount received.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_36b') {
+      getRows(nextStructured, 'clause_36b_buyback_rows').forEach((row, index) => {
+        if (!isBlank(row.amount_received) && isBlank(row.company_name)) {
+          warnings.push(`36B row ${index + 1}: Company name should be entered when amount received is captured.`);
+        }
+        if (
+          !isBlank(row.amount_received) &&
+          isBlank(row.cost_of_acquisition_of_shares_bought_back)
+        ) {
+          warnings.push(`36B row ${index + 1}: Cost of acquisition should be entered when amount received is captured.`);
+        }
+        if (
+          !isBlank(row.amount_treated_as_dividend) &&
+          isBlank(row.amount_received)
+        ) {
+          warnings.push(`36B row ${index + 1}: Amount received should be entered when amount treated as dividend is captured.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_37') {
+      getRows(nextStructured, 'clause_37_cost_audit_rows').forEach((row, index) => {
+        if (row.whether_cost_audit_carried_out === 'Yes' && isBlank(row.cost_audit_report_date)) {
+          warnings.push(`37 row ${index + 1}: Report date should be entered when cost audit is marked carried out.`);
+        }
+        if (row.whether_cost_audit_carried_out === 'Yes' && isBlank(row.cost_audit_report_reference)) {
+          warnings.push(`37 row ${index + 1}: Report reference should be entered when cost audit is marked carried out.`);
+        }
+        if (row.whether_disqualification_or_disagreement_reported === 'Yes' && isBlank(row.matter_or_item_reported)) {
+          warnings.push(`37 row ${index + 1}: Matter or item reported should be entered when disqualification or disagreement is marked Yes.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_38') {
+      getRows(nextStructured, 'clause_38_excise_audit_rows').forEach((row, index) => {
+        if (row.whether_excise_audit_carried_out === 'Yes' && isBlank(row.excise_audit_report_date)) {
+          warnings.push(`38 row ${index + 1}: Report date should be entered when central excise audit is marked carried out.`);
+        }
+        if (row.whether_excise_audit_carried_out === 'Yes' && isBlank(row.excise_audit_report_reference)) {
+          warnings.push(`38 row ${index + 1}: Report reference should be entered when central excise audit is marked carried out.`);
+        }
+        if (row.whether_disqualification_or_disagreement_reported === 'Yes' && isBlank(row.matter_or_item_reported)) {
+          warnings.push(`38 row ${index + 1}: Matter or item reported should be entered when disqualification or disagreement is marked Yes.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_39') {
+      getRows(nextStructured, 'clause_39_service_tax_audit_rows').forEach((row, index) => {
+        if (row.whether_service_tax_audit_carried_out === 'Yes' && isBlank(row.service_tax_audit_report_date)) {
+          warnings.push(`39 row ${index + 1}: Report date should be entered when service tax audit is marked carried out.`);
+        }
+        if (row.whether_service_tax_audit_carried_out === 'Yes' && isBlank(row.service_tax_audit_report_reference)) {
+          warnings.push(`39 row ${index + 1}: Report reference should be entered when service tax audit is marked carried out.`);
+        }
+        if (row.whether_disqualification_or_disagreement_reported === 'Yes' && isBlank(row.matter_or_item_reported)) {
+          warnings.push(`39 row ${index + 1}: Matter or item reported should be entered when disqualification or disagreement is marked Yes.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_40') {
+      getRows(nextStructured, 'clause_40_ratio_rows').forEach((row, index) => {
+        const ratioFields = [
+          'current_year_gross_profit_to_turnover_ratio',
+          'preceding_year_gross_profit_to_turnover_ratio',
+          'current_year_net_profit_to_turnover_ratio',
+          'preceding_year_net_profit_to_turnover_ratio',
+          'current_year_stock_in_trade_to_turnover_ratio',
+          'preceding_year_stock_in_trade_to_turnover_ratio',
+          'current_year_material_consumed_to_finished_goods_ratio',
+          'preceding_year_material_consumed_to_finished_goods_ratio',
+        ];
+        const serviceSpecificReviewFields = [
+          'current_year_gross_profit_to_turnover_ratio',
+          'preceding_year_gross_profit_to_turnover_ratio',
+          'current_year_stock_in_trade_to_turnover_ratio',
+          'preceding_year_stock_in_trade_to_turnover_ratio',
+          'current_year_material_consumed_to_finished_goods_ratio',
+          'preceding_year_material_consumed_to_finished_goods_ratio',
+        ];
+        const tradingSpecificReviewFields = [
+          'current_year_material_consumed_to_finished_goods_ratio',
+          'preceding_year_material_consumed_to_finished_goods_ratio',
+        ];
+        const hasRatioDetails = ratioFields.some((field) => !isBlank(row[field]));
+
+        if (hasRatioDetails && isBlank(row.basis_of_computation)) {
+          warnings.push(`40 row ${index + 1}: Basis of computation should be entered when ratio details are captured.`);
+        }
+        if (row.whether_significant_deviation_observed === 'Yes' && isBlank(row.reason_for_significant_deviation)) {
+          warnings.push(`40 row ${index + 1}: Reason for significant deviation should be entered when significant deviation is marked Yes.`);
+        }
+        if (hasRatioDetails && isBlank(row.principal_item_or_service)) {
+          warnings.push(`40 row ${index + 1}: Review whether ratio details are linked to principal items or services.`);
+        }
+        if (row.activity_type === 'Service' && serviceSpecificReviewFields.some((field) => !isBlank(row[field]))) {
+          warnings.push(`40 row ${index + 1}: Service providers generally require turnover and net profit ratio only. Review other ratios entered.`);
+        }
+        if (row.activity_type === 'Trading' && tradingSpecificReviewFields.some((field) => !isBlank(row[field]))) {
+          warnings.push(`40 row ${index + 1}: Material consumed to finished goods ratio generally need not be furnished for trading concerns.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_41') {
+      getRows(nextStructured, 'clause_41_demand_refund_rows').forEach((row, index) => {
+        const rowHasData = hasReportingDetails(row, [
+          'financial_year_to_which_demand_or_refund_relates',
+          'name_of_applicable_act',
+          'tax_law_category',
+          'demand_or_refund',
+          'order_number',
+          'date_of_demand_or_refund_order',
+          'amount_of_demand_or_refund',
+          'authority_issuing_order',
+          'relevant_proceeding_details',
+          'authority_before_which_matter_is_pending',
+          'current_status',
+          'whether_paid_received_or_adjusted',
+          'amount_paid_received_or_adjusted',
+          'date_of_payment_receipt_or_adjustment',
+          'mode_or_reference_of_payment_receipt_or_adjustment',
+          'whether_verified_with_portal',
+          'whether_management_representation_obtained',
+          'financial_statement_or_caro_reference',
+          'evidence_or_working_reference',
+          'remarks',
+        ]);
+        const hasAmount = !isBlank(row.amount_of_demand_or_refund);
+
+        if (rowHasData && isBlank(row.name_of_applicable_act)) {
+          warnings.push(`41 row ${index + 1}: Name of applicable Act should be entered.`);
+        }
+        if (rowHasData && isBlank(row.demand_or_refund)) {
+          warnings.push(`41 row ${index + 1}: Demand or refund should be selected.`);
+        }
+        if (hasAmount && isBlank(row.order_number)) {
+          warnings.push(`41 row ${index + 1}: Order number should be entered when demand or refund amount is captured.`);
+        }
+        if (
+          (row.current_status === 'Under appeal' || row.current_status === 'Stayed') &&
+          isBlank(row.authority_before_which_matter_is_pending)
+        ) {
+          warnings.push(`41 row ${index + 1}: Pending authority should be entered when status is Under appeal or Stayed.`);
+        }
+        if (
+          row.demand_or_refund === 'Refund adjusted against demand' &&
+          isBlank(row.amount_paid_received_or_adjusted)
+        ) {
+          warnings.push(`41 row ${index + 1}: Amount adjusted should be entered when refund is adjusted against demand.`);
+        }
+        if (
+          row.whether_paid_received_or_adjusted === 'Yes' &&
+          isBlank(row.date_of_payment_receipt_or_adjustment)
+        ) {
+          warnings.push(`41 row ${index + 1}: Payment, receipt or adjustment date should be entered.`);
+        }
+        if (
+          hasAmount &&
+          (row.whether_verified_with_portal === 'No' || row.whether_verified_with_portal === 'To be reviewed')
+        ) {
+          warnings.push(`41 row ${index + 1}: Amount is captured while portal verification is not confirmed.`);
+        }
+        if (hasAmount && row.whether_management_representation_obtained === 'No') {
+          warnings.push(`41 row ${index + 1}: Amount is captured while management representation is marked No.`);
+        }
+        if (row.tax_law_category === 'Other tax law' && isBlank(row.remarks)) {
+          warnings.push(`41 row ${index + 1}: Remarks should be entered when tax law category is Other tax law.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_42') {
+      getRows(nextStructured, 'clause_42_reporting_rows').forEach((row, index) => {
+        const rowHasData = hasReportingDetails(row, [
+          'form_no',
+          'whether_required_to_furnish',
+          'section_and_rule_reference',
+          'reporting_period',
+          'registration_number_or_itdrein',
+          'designated_director_or_principal_officer_details',
+          'due_date_for_furnishing',
+          'date_of_actual_furnishing',
+          'acknowledgment_number',
+          'whether_form_furnished',
+          'whether_furnished_within_due_date',
+          'whether_form_contains_all_required_information',
+          'details_of_information_or_transactions_not_reported',
+          'reason_for_delay_or_omission',
+          'evidence_or_working_reference',
+          'remarks',
+        ]);
+        const dueDate = typeof row.due_date_for_furnishing === 'string' ? row.due_date_for_furnishing : '';
+        const furnishingDate = typeof row.date_of_actual_furnishing === 'string' ? row.date_of_actual_furnishing : '';
+
+        if (rowHasData && isBlank(row.form_no)) {
+          warnings.push(`42 row ${index + 1}: Form number should be selected.`);
+        }
+        if (
+          row.whether_required_to_furnish === 'Yes' &&
+          (isBlank(row.whether_form_furnished) || row.whether_form_furnished === 'To be reviewed')
+        ) {
+          warnings.push(`42 row ${index + 1}: Furnishing status should be confirmed when the form is required.`);
+        }
+        if (row.whether_form_furnished === 'Yes' && isBlank(row.date_of_actual_furnishing)) {
+          warnings.push(`42 row ${index + 1}: Date of actual furnishing should be entered when form furnished is marked Yes.`);
+        }
+        if (
+          dueDate &&
+          furnishingDate &&
+          isValidDateInput(dueDate) &&
+          isValidDateInput(furnishingDate) &&
+          furnishingDate > dueDate
+        ) {
+          warnings.push(`42 row ${index + 1}: Date of actual furnishing is later than due date. Review delay manually.`);
+        }
+        if (
+          row.whether_form_contains_all_required_information === 'No' &&
+          isBlank(row.details_of_information_or_transactions_not_reported)
+        ) {
+          warnings.push(`42 row ${index + 1}: Details of information or transactions not reported should be entered.`);
+        }
+        if (row.whether_form_contains_all_required_information === 'Cannot verify') {
+          warnings.push(`42 row ${index + 1}: Auditor may need a suitable observation where completeness cannot be verified.`);
+        }
+        if (row.form_no === 'Form 61B' && isBlank(row.registration_number_or_itdrein)) {
+          warnings.push(`42 row ${index + 1}: Registration number or ITDREIN should be entered for Form 61B.`);
+        }
+        if (row.whether_required_to_furnish === 'No' && !isBlank(row.date_of_actual_furnishing)) {
+          warnings.push(`42 row ${index + 1}: Review consistency because actual furnishing date is entered while requirement is marked No.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_43') {
+      getRows(nextStructured, 'clause_43_cbcr_rows').forEach((row, index) => {
+        const reportDetailsFilled = hasReportingDetails(row, [
+          'report_furnished_by',
+          'form_or_report_reference',
+          'date_of_furnishing_of_report',
+          'acknowledgment_number',
+          'whether_copy_of_report_or_acknowledgment_verified',
+        ]);
+        const reportStatedFurnished =
+          row.whether_report_under_section_286_2_furnished === 'Yes' ||
+          (
+            !isBlank(row.report_furnished_by) &&
+            row.report_furnished_by !== 'Not furnished' &&
+            row.report_furnished_by !== 'Not applicable' &&
+            row.report_furnished_by !== 'To be reviewed'
+          );
+
+        if (
+          row.whether_liable_to_furnish_report_under_section_286_2 === 'Yes' &&
+          (isBlank(row.report_furnished_by) || row.report_furnished_by === 'To be reviewed')
+        ) {
+          warnings.push(`43 row ${index + 1}: Report furnished by should be confirmed when section 286(2) liability is marked Yes.`);
+        }
+        if (
+          row.whether_liable_to_furnish_report_under_section_286_2 === 'Yes' &&
+          isBlank(row.date_of_furnishing_of_report)
+        ) {
+          warnings.push(`43 row ${index + 1}: Report furnishing date should be entered when section 286(2) liability is marked Yes.`);
+        }
+        if (row.report_furnished_by === 'Parent entity' && isBlank(row.parent_entity_name)) {
+          warnings.push(`43 row ${index + 1}: Parent entity name should be entered when report is furnished by parent entity.`);
+        }
+        if (row.report_furnished_by === 'Alternate reporting entity' && isBlank(row.alternate_reporting_entity_name)) {
+          warnings.push(`43 row ${index + 1}: Alternate reporting entity name should be entered when report is furnished by alternate reporting entity.`);
+        }
+        if (
+          row.assessee_role_in_international_group === 'Constituent entity with non-resident parent' &&
+          (isBlank(row.whether_form_3ceac_furnished) || row.whether_form_3ceac_furnished === 'To be reviewed')
+        ) {
+          warnings.push(`43 row ${index + 1}: Form 3CEAC furnishing status should be confirmed for constituent entity with non-resident parent.`);
+        }
+        if (row.whether_form_3ceac_furnished === 'Yes' && isBlank(row.form_3ceac_date_of_furnishing)) {
+          warnings.push(`43 row ${index + 1}: Form 3CEAC furnishing date should be entered when Form 3CEAC is marked furnished.`);
+        }
+        if (
+          reportStatedFurnished &&
+          (row.whether_copy_of_report_or_acknowledgment_verified === 'No' ||
+            row.whether_copy_of_report_or_acknowledgment_verified === 'To be reviewed')
+        ) {
+          warnings.push(`43 row ${index + 1}: Report or acknowledgment is stated as furnished but verification is not confirmed.`);
+        }
+        if (row.whether_liable_to_furnish_report_under_section_286_2 === 'No' && reportDetailsFilled) {
+          warnings.push(`43 row ${index + 1}: Review consistency because report details are entered while section 286(2) liability is marked No.`);
+        }
+      });
+    }
+
+    if (schema.clauseKey === 'clause_44') {
+      getRows(nextStructured, 'clause_44_gst_expenditure_rows').forEach((row, index) => {
+        const amountFields = [
+          'total_amount_of_expenditure',
+          'expenditure_relating_to_exempt_goods_or_services_from_registered_entities',
+          'expenditure_relating_to_composition_entities',
+          'expenditure_relating_to_other_registered_entities',
+          'total_expenditure_relating_to_registered_entities',
+          'expenditure_relating_to_unregistered_entities',
+          'reconciliation_difference',
+        ];
+        const hasAmounts = amountFields.some((field) => !isBlank(row[field]));
+        const exemptRegistered = toFiniteNumber(row.expenditure_relating_to_exempt_goods_or_services_from_registered_entities);
+        const composition = toFiniteNumber(row.expenditure_relating_to_composition_entities);
+        const otherRegistered = toFiniteNumber(row.expenditure_relating_to_other_registered_entities);
+        const totalRegistered = toFiniteNumber(row.total_expenditure_relating_to_registered_entities);
+        const totalExpenditure = toFiniteNumber(row.total_amount_of_expenditure);
+        const unregistered = toFiniteNumber(row.expenditure_relating_to_unregistered_entities);
+
+        if (hasAmounts && isBlank(row.expenditure_head)) {
+          warnings.push(`44 row ${index + 1}: Expenditure head should be entered when amounts are captured.`);
+        }
+        if (
+          exemptRegistered !== null &&
+          composition !== null &&
+          otherRegistered !== null &&
+          totalRegistered !== null &&
+          Math.abs(totalRegistered - (exemptRegistered + composition + otherRegistered)) > 0.01
+        ) {
+          warnings.push(`44 row ${index + 1}: Total registered expenditure does not match the registered category break-up.`);
+        }
+        if (
+          totalExpenditure !== null &&
+          totalRegistered !== null &&
+          unregistered !== null &&
+          Math.abs(totalExpenditure - (totalRegistered + unregistered)) > 0.01
+        ) {
+          warnings.push(`44 row ${index + 1}: Total expenditure does not match registered plus unregistered expenditure.`);
+        }
+        if (!isBlank(row.reconciliation_difference) && isBlank(row.reason_for_reconciliation_difference)) {
+          warnings.push(`44 row ${index + 1}: Reason for reconciliation difference should be entered when reconciliation difference is captured.`);
+        }
+        if (!isBlank(row.expenditure_relating_to_composition_entities) && isBlank(row.remarks)) {
+          warnings.push(`44 row ${index + 1}: Document the basis for identifying composition suppliers in remarks.`);
+        }
+        if (
+          row.whether_capital_expenditure_included === 'No' ||
+          row.whether_capital_expenditure_included === 'To be reviewed'
+        ) {
+          warnings.push(`44 row ${index + 1}: Review whether capital expenditure also requires reporting.`);
+        }
+        if (
+          row.whether_multiple_gstin_consolidation_involved === 'Yes' &&
+          isBlank(row.gstin_or_branch_reference)
+        ) {
+          warnings.push(`44 row ${index + 1}: GSTIN or branch reference should be entered when multiple GSTIN consolidation is involved.`);
+        }
+      });
+    }
+
     return warnings;
   };
 
@@ -1440,7 +1885,7 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
       </div>
 
       <div className="space-y-3 p-3">
-        {tables.length <= 1 && localWarnings.length > 0 && (
+        {!usesTableWorkbench && tables.length <= 1 && localWarnings.length > 0 && (
           <CompactWarnings warnings={localWarnings} />
         )}
 
