@@ -51,6 +51,7 @@ import { AuditProgrammePanel } from '@/components/tax-audit/AuditProgrammePanel'
 import { ProfessionalResponsibilityPanel } from '@/components/tax-audit/ProfessionalResponsibilityPanel';
 import { StructuredClauseFields } from '@/components/tax-audit/StructuredClauseFields';
 import { SourceLinkChip } from '@/components/tax-audit/SourceLinkChip';
+import { Form3CA } from '@/components/appointment/Form3CA';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEngagement } from '@/contexts/EngagementContext';
 import { useTaxAudit } from '@/hooks/useTaxAudit';
@@ -2698,6 +2699,9 @@ export default function TaxAudit() {
     linkEvidence,
     unlinkEvidence,
   } = useTaxAudit(currentEngagement);
+
+  const governingActName = setup?.other_law_name || '';
+
   const [selectedClauseKey, setSelectedClauseKey] = useState('clause_1');
   const [selectedStructuredTableByClause, setSelectedStructuredTableByClause] = useState<Record<string, string>>({});
   const [reviewQueueOpen, setReviewQueueOpen] = useState(false);
@@ -2801,6 +2805,7 @@ export default function TaxAudit() {
           <TabsTrigger value="acceptance">Acceptance and Eligibility</TabsTrigger>
           <TabsTrigger value="compliance">Compliance Tracker</TabsTrigger>
           <TabsTrigger value="programme">Audit Programme</TabsTrigger>
+          <TabsTrigger value="3ca3cb">3CA/3CB</TabsTrigger>
           <TabsTrigger value="clauses">
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             3CD Clause Workspace
@@ -2845,6 +2850,26 @@ export default function TaxAudit() {
             onSave={updateSetup}
             onNavigate={openProgrammeTarget}
           />
+        </TabsContent>
+
+        <TabsContent value="3ca3cb" className="mt-0">
+          <Tabs defaultValue="3ca" className="space-y-3">
+            <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+              <TabsTrigger value="3ca">3CA</TabsTrigger>
+              <TabsTrigger value="3cb">3CB</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="3ca" className="mt-0">
+              <Form3CA governingActName={governingActName} />
+            </TabsContent>
+
+            <TabsContent value="3cb" className="mt-0">
+              <div className="space-y-3">
+                <h3 className="text-lg font-medium">3CB</h3>
+                <p className="text-sm text-muted-foreground">3CB will be implemented next.</p>
+              </div>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="clauses" className="mt-0">
