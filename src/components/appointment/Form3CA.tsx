@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { toast } from 'sonner';
-import { Eye, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
+import { Eye, Plus, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import { AlignmentType, BorderStyle, Document, Paragraph, Packer, Table, TableCell, TableRow, TextRun, UnderlineType, WidthType } from 'docx';
 import { useEngagement } from '@/contexts/EngagementContext';
 import { useClient } from '@/hooks/useClient';
@@ -21,7 +21,9 @@ import { FORM_3CA_TEMPLATE_VERSION, form3caTemplate } from '@/data/form3caTempla
 
 const FIELD_PLACEHOLDERS = {
   i_or_we: 'I/We',
-  assessee_name_and_address: '(Name and address of the assessee)',
+  assessee_name: '(Name of the assessee)',
+  assessee_address: '(Address of the assessee)',
+  assessee_pan: '(PAN)',
   me_or_us: 'me/us',
   statutory_auditor_name: '(Auditor/Firm name)',
   governing_act_name: '(Act name)',
@@ -32,9 +34,6 @@ const FIELD_PLACEHOLDERS = {
   period_end_date: '31 March YYYY',
   balance_sheet_date: '31 March YYYY',
   my_or_our: 'my/our',
-  observation_or_qualification_1: '(Observation or qualification 1)',
-  observation_or_qualification_2: '(Observation or qualification 2)',
-  additional_observations_or_qualifications: '(Additional observations or qualifications)',
   firm_name: '(Firm name)',
   firm_registration_number: '(Firm registration number)',
   partner_or_proprietor_name: '(Partner / Proprietor name)',
@@ -42,6 +41,7 @@ const FIELD_PLACEHOLDERS = {
   report_date: 'DD MMMM YYYY',
   membership_number: '(Membership number)',
   udin: '(UDIN)',
+  place_of_signing: '(Place of signing)',
   firm_full_address: '(Firm full address)',
 };
 
@@ -66,6 +66,28 @@ const formatDateForTemplate = (value: string) => {
   return new Intl.DateTimeFormat('en-GB').format(date);
 };
 
+const includesText = (source: string | null | undefined, value: string | null | undefined) => {
+  if (!source || !value) return false;
+  return source.toLowerCase().includes(value.toLowerCase());
+};
+
+const buildClientAddress = (client: {
+  address?: string | null;
+  state?: string | null;
+  pin?: string | null;
+}) => {
+  const address = client.address?.trim() || '';
+  const state = client.state?.trim() || '';
+  const pin = client.pin?.trim() || '';
+  const parts = [
+    address,
+    state && !includesText(address, state) ? state : '',
+    pin && !includesText(address, pin) ? `PIN - ${pin}` : '',
+  ].filter(Boolean);
+
+  return parts.join(', ');
+};
+
 const populateTemplate = (values: Record<string, string>) => {
   return Object.entries(values).reduce((content, [key, value]) => {
     return content.replace(new RegExp(`{{${key}}}`, 'g'), value);
@@ -81,11 +103,11 @@ const editorStyles = `
   height: 520px;
   overflow: auto;
   background: #fff;
-  padding: 72px 88px;
+  padding: 64px 72px;
   white-space: normal;
   overflow-wrap: break-word;
   box-sizing: border-box;
-  max-width: 720px;
+  max-width: 860px;
   width: 100%;
   margin: 0 auto;
 }
@@ -110,7 +132,7 @@ const editorStyles = `
 
 .form-3ca-editor .preview-letter p {
   margin: 0 0 6pt 0;
-  text-align: justify;
+  text-align: left;
 }
 
 .form-3ca-editor .preview-letter .center { text-align: center; }
@@ -122,16 +144,16 @@ const editorStyles = `
 .form-3ca-editor .preview-letter .subclause { margin-left: 18px; text-indent: -18px; }
 .form-3ca-editor .preview-letter .responsibility { margin-left: 18px; text-indent: -18px; }
 .form-3ca-editor .preview-letter .placeholder {
-  display: inline-block;
-  min-width: 70px;
+  display: inline;
   padding: 0 3px;
   border-bottom: 1px dotted #555;
   background: #fff7cc;
   color: #000;
-  font-family: Consolas, "Courier New", monospace;
-  font-size: 10.5pt;
-  line-height: 1.1;
-  white-space: nowrap;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .form-3ca-editor .preview-letter .signature-block { margin-top: 34px; width: 100%; }
 .form-3ca-editor .preview-letter .firm-block { text-align: left; margin-left: auto; width: 48%; }
@@ -154,7 +176,7 @@ const editorStyles = `
 }
 `;
 
-const convertHtmlToDocxElements = (html: string) => {
+export const convertHtmlToDocxElements = (html: string) => {
   if (typeof document === 'undefined') {
     return [new Paragraph('')];
   }
@@ -378,6 +400,108 @@ const parseFinancialYearRange = (financialYear?: string) => {
   };
 };
 
+export const buildSafeDocxFilename = (value: string) =>
+  `${value.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').replace(/\s+/g, '_')}.docx`;
+
+type PronounSelection = 'i' | 'we';
+type SameOtherLawAuditorSelection = 'yes' | 'no';
+
+type ObservationRow = {
+  id: string;
+  text: string;
+};
+
+const TAX_AUDITOR_PRONOUNS: Record<
+  PronounSelection,
+  {
+    iOrWe: string;
+    iOrWeBe: string;
+    meOrUs: string;
+    myOrOur: string;
+  }
+> = {
+  i: {
+    iOrWe: 'I',
+    iOrWeBe: 'am',
+    meOrUs: 'me',
+    myOrOur: 'my',
+  },
+  we: {
+    iOrWe: 'We',
+    iOrWeBe: 'are',
+    meOrUs: 'us',
+    myOrOur: 'our',
+  },
+};
+
+const createObservationId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `observation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const escapeHtml = (value: string) => {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
+const formatObservationTextForTemplate = (value: string) => {
+  return escapeHtml(value.trim()).replace(/\n/g, '<br />');
+};
+
+const toRomanNumeral = (value: number) => {
+  const numerals: Array<[number, string]> = [
+    [10, 'x'],
+    [9, 'ix'],
+    [5, 'v'],
+    [4, 'iv'],
+    [1, 'i'],
+  ];
+  let remainingValue = value;
+  let result = '';
+
+  numerals.forEach(([amount, numeral]) => {
+    while (remainingValue >= amount) {
+      result += numeral;
+      remainingValue -= amount;
+    }
+  });
+
+  return result;
+};
+
+const buildObservationsHtml = (observations: ObservationRow[]) => {
+  const populatedObservations = observations
+    .map((observation) => observation.text.trim())
+    .filter(Boolean);
+
+  return populatedObservations
+    .map((text, index) => {
+      const itemNumber = toRomanNumeral(index + 3);
+      return `<p class="responsibility">(${itemNumber}) ${formatObservationTextForTemplate(text)}</p>`;
+    })
+    .join('');
+};
+
+const buildConductedByPrefix = ({
+  sameOtherLawAuditor,
+  meOrUs,
+}: {
+  sameOtherLawAuditor: boolean;
+  meOrUs: string;
+}) => {
+  if (sameOtherLawAuditor) {
+    return `${meOrUs}, M/s.`;
+  }
+
+  return 'M/s.';
+};
+
 export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps) {
   const { currentEngagement } = useEngagement();
   const { client } = useClient(currentEngagement?.client_id || null);
@@ -388,18 +512,19 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
 
   const [editorHtml, setEditorHtml] = useState('');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
-  const [assesseeNameAndAddress, setAssesseeNameAndAddress] = useState('');
-  const [statutoryAuditorName, setStatutoryAuditorName] = useState('');
+  const [assesseeName, setAssesseeName] = useState('');
+  const [assesseeAddress, setAssesseeAddress] = useState('');
+  const [assesseePan, setAssesseePan] = useState('');
+  const [sameOtherLawAuditor, setSameOtherLawAuditor] = useState<SameOtherLawAuditorSelection>('yes');
+  const [otherLawAuditorName, setOtherLawAuditorName] = useState('');
   const [governingActName, setGoverningActName] = useState(governingActNameProp || '');
   const [statutoryAuditReportDate, setStatutoryAuditReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [profitLossAccountLabel, setProfitLossAccountLabel] = useState('Profit & Loss Account');
-  const [myOrOur, setMyOrOur] = useState('my/our');
-  const [iOrWe, setIOrWe] = useState('I/We');
-  const [meOrUs, setMeOrUs] = useState('me/us');
-  const [observation1, setObservation1] = useState('');
-  const [observation2, setObservation2] = useState('');
-  const [additionalObservations, setAdditionalObservations] = useState('');
+  const [pronounSelection, setPronounSelection] = useState<PronounSelection>('we');
+  const [observations, setObservations] = useState<ObservationRow[]>([]);
   const [partnerDesignation, setPartnerDesignation] = useState('Partner');
+  const [signingPartnerId, setSigningPartnerId] = useState('');
+  const [placeOfSigning, setPlaceOfSigning] = useState('');
   const [udin, setUdin] = useState('');
   const [showEditor, setShowEditor] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -411,14 +536,14 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
 
   useEffect(() => {
     if (client) {
-      const formattedAddress = [client.name, client.address].filter(Boolean).join(', ');
-      setAssesseeNameAndAddress(formattedAddress);
+      setAssesseeName(client.name || currentEngagement?.client_name || '');
+      setAssesseeAddress(buildClientAddress(client));
+      setAssesseePan(client.pan || '');
     }
-  }, [client]);
+  }, [client, currentEngagement?.client_name]);
 
   useEffect(() => {
     if (firmSettings) {
-      setStatutoryAuditorName(firmSettings.firm_name || '');
       setPartnerDesignation('Partner');
     }
   }, [firmSettings]);
@@ -432,54 +557,85 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
   useEffect(() => {
     if (!currentEngagement || partners.length === 0) return;
     const matched = currentEngagement.partner_id ? partners.find((partner) => partner.id === currentEngagement.partner_id) : null;
-    if (matched) {
-      setPartnerDesignation(matched.name);
-      setUdin(matched.membership_number || '');
-    }
+    setSigningPartnerId(matched?.id || partners[0]?.id || '');
   }, [currentEngagement?.partner_id, partners]);
 
+  const pronouns = TAX_AUDITOR_PRONOUNS[pronounSelection];
+  const observationsHtml = useMemo(() => buildObservationsHtml(observations), [observations]);
+  const firmMasterSignatureFields = useMemo(
+    () => [
+      {
+        fallback: FIELD_PLACEHOLDERS.firm_name,
+        value: firmSettings?.firm_name || '',
+      },
+      {
+        fallback: FIELD_PLACEHOLDERS.firm_registration_number,
+        value: firmSettings?.firm_registration_no || '',
+      },
+    ],
+    [firmSettings?.firm_name, firmSettings?.firm_registration_no]
+  );
+  const signingPartner = useMemo(
+    () => partners.find((partner) => partner.id === signingPartnerId) || null,
+    [partners, signingPartnerId]
+  );
+  const isSameOtherLawAuditor = sameOtherLawAuditor === 'yes';
+  const statutoryAuditorDisplayName = isSameOtherLawAuditor
+    ? firmSettings?.firm_name || ''
+    : otherLawAuditorName;
+  const conductedByPrefix = buildConductedByPrefix({
+    sameOtherLawAuditor: isSameOtherLawAuditor,
+    meOrUs: pronouns.meOrUs,
+  });
+  const statutoryAuditReportPronoun = isSameOtherLawAuditor ? pronouns.myOrOur : 'their';
+
   const templateValues = useMemo(() => ({
-    I_OR_WE: formatFieldForTemplate(iOrWe, FIELD_PLACEHOLDERS.i_or_we),
-    ASSESSEE_NAME_AND_ADDRESS: formatFieldForTemplate(assesseeNameAndAddress, FIELD_PLACEHOLDERS.assessee_name_and_address),
-    ME_OR_US: formatFieldForTemplate(meOrUs, FIELD_PLACEHOLDERS.me_or_us),
-    STATUTORY_AUDITOR_NAME: formatFieldForTemplate(statutoryAuditorName, FIELD_PLACEHOLDERS.statutory_auditor_name),
+    I_OR_WE: formatFieldForTemplate(pronouns.iOrWe, FIELD_PLACEHOLDERS.i_or_we),
+    I_OR_WE_BE: formatFieldForTemplate(pronouns.iOrWeBe, 'am/are'),
+    ASSESSEE_NAME: formatFieldForTemplate(assesseeName, FIELD_PLACEHOLDERS.assessee_name),
+    ASSESSEE_ADDRESS: formatFieldForTemplate(assesseeAddress, FIELD_PLACEHOLDERS.assessee_address),
+    ASSESSEE_PAN: formatFieldForTemplate(assesseePan, FIELD_PLACEHOLDERS.assessee_pan),
+    ME_OR_US: formatFieldForTemplate(pronouns.meOrUs, FIELD_PLACEHOLDERS.me_or_us),
+    STATUTORY_AUDIT_CONDUCTED_BY_PREFIX: formatFieldForTemplate(conductedByPrefix, 'M/s.'),
+    STATUTORY_AUDITOR_NAME: formatFieldForTemplate(statutoryAuditorDisplayName, FIELD_PLACEHOLDERS.statutory_auditor_name),
     GOVERNING_ACT_NAME: formatFieldForTemplate(governingActName, FIELD_PLACEHOLDERS.governing_act_name),
-    MY_OUR_OR_THEIR: formatFieldForTemplate(myOrOur, FIELD_PLACEHOLDERS.my_our_or_their),
+    MY_OUR_OR_THEIR: formatFieldForTemplate(statutoryAuditReportPronoun, FIELD_PLACEHOLDERS.my_our_or_their),
     STATUTORY_AUDIT_REPORT_DATE: formatFieldForTemplate(formatDateForTemplate(statutoryAuditReportDate), FIELD_PLACEHOLDERS.statutory_audit_report_date),
     PROFIT_LOSS_OR_INCOME_EXPENDITURE_ACCOUNT: formatFieldForTemplate(profitLossAccountLabel, FIELD_PLACEHOLDERS.profit_loss_or_income_expenditure_account),
     PERIOD_START_DATE: formatFieldForTemplate(period.start, FIELD_PLACEHOLDERS.period_start_date),
     PERIOD_END_DATE: formatFieldForTemplate(period.end, FIELD_PLACEHOLDERS.period_end_date),
     BALANCE_SHEET_DATE: formatFieldForTemplate(period.bsDate, FIELD_PLACEHOLDERS.balance_sheet_date),
-    MY_OR_OUR: formatFieldForTemplate(myOrOur, FIELD_PLACEHOLDERS.my_or_our),
-    OBSERVATION_OR_QUALIFICATION_1: formatFieldForTemplate(observation1, FIELD_PLACEHOLDERS.observation_or_qualification_1),
-    OBSERVATION_OR_QUALIFICATION_2: formatFieldForTemplate(observation2, FIELD_PLACEHOLDERS.observation_or_qualification_2),
-    ADDITIONAL_OBSERVATIONS_OR_QUALIFICATIONS: formatFieldForTemplate(additionalObservations, FIELD_PLACEHOLDERS.additional_observations_or_qualifications),
+    MY_OR_OUR: formatFieldForTemplate(pronouns.myOrOur, FIELD_PLACEHOLDERS.my_or_our),
+    OBSERVATIONS_OR_QUALIFICATIONS: observationsHtml,
     FIRM_NAME: formatFieldForTemplate(firmSettings?.firm_name || '', FIELD_PLACEHOLDERS.firm_name),
     FIRM_REGISTRATION_NUMBER: formatFieldForTemplate(firmSettings?.firm_registration_no || '', FIELD_PLACEHOLDERS.firm_registration_number),
-    PARTNER_OR_PROPRIETOR_NAME: formatFieldForTemplate(partnerDesignation, FIELD_PLACEHOLDERS.partner_or_proprietor_name),
+    PARTNER_OR_PROPRIETOR_NAME: formatFieldForTemplate(signingPartner?.name || '', FIELD_PLACEHOLDERS.partner_or_proprietor_name),
     PARTNER_OR_PROPRIETOR_DESIGNATION: formatFieldForTemplate(partnerDesignation, FIELD_PLACEHOLDERS.partner_or_proprietor_designation),
     REPORT_DATE: formatFieldForTemplate(formatDateForTemplate(reportDate), FIELD_PLACEHOLDERS.report_date),
-    MEMBERSHIP_NUMBER: formatFieldForTemplate(udin, FIELD_PLACEHOLDERS.membership_number),
+    MEMBERSHIP_NUMBER: formatFieldForTemplate(signingPartner?.membership_number || '', FIELD_PLACEHOLDERS.membership_number),
     UDIN: formatFieldForTemplate(udin, FIELD_PLACEHOLDERS.udin),
+    PLACE_OF_SIGNING: formatFieldForTemplate(placeOfSigning, FIELD_PLACEHOLDERS.place_of_signing),
     FIRM_FULL_ADDRESS: formatFieldForTemplate(firmSettings?.address || '', FIELD_PLACEHOLDERS.firm_full_address),
   }), [
-    iOrWe,
-    assesseeNameAndAddress,
-    meOrUs,
-    statutoryAuditorName,
+    pronouns,
+    assesseeName,
+    assesseeAddress,
+    assesseePan,
+    conductedByPrefix,
+    statutoryAuditorDisplayName,
+    statutoryAuditReportPronoun,
     governingActName,
-    myOrOur,
     statutoryAuditReportDate,
     profitLossAccountLabel,
     period.end,
     period.start,
     period.bsDate,
-    observation1,
-    observation2,
-    additionalObservations,
+    observationsHtml,
     firmSettings,
+    signingPartner,
     partnerDesignation,
     reportDate,
+    placeOfSigning,
     udin,
   ]);
 
@@ -515,6 +671,71 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
 
   const normalizeHtml = useCallback((value: string) => value.replace(/\s+/g, ' ').trim(), []);
 
+  const replaceObservationSectionHtml = useCallback((content: string) => {
+    if (!content || typeof document === 'undefined') {
+      return content;
+    }
+
+    const container = document.createElement('div');
+    container.innerHTML = content;
+    const observationSection = container.querySelector('[data-form3ca-observations="true"]');
+
+    if (!observationSection || observationSection.innerHTML === observationsHtml) {
+      return content;
+    }
+
+    observationSection.innerHTML = observationsHtml;
+    return container.innerHTML;
+  }, [observationsHtml]);
+
+  const replaceFirmMasterSignatureHtml = useCallback((content: string) => {
+    if (!content || typeof document === 'undefined') {
+      return content;
+    }
+
+    const populatedFields = firmMasterSignatureFields.filter((field) => field.value.trim());
+    if (populatedFields.length === 0) {
+      return content;
+    }
+
+    const container = document.createElement('div');
+    container.innerHTML = content;
+    let didReplace = false;
+    const fieldNodes = container.querySelectorAll('span.placeholder, span.missing');
+
+    fieldNodes.forEach((node) => {
+      const field = populatedFields.find((item) => node.textContent?.trim() === item.fallback);
+      if (!field) return;
+
+      node.textContent = field.value.trim();
+      node.classList.remove('missing');
+      didReplace = true;
+    });
+
+    return didReplace ? container.innerHTML : content;
+  }, [firmMasterSignatureFields]);
+
+  const handleAddObservation = () => {
+    setObservations((currentObservations) => [
+      ...currentObservations,
+      { id: createObservationId(), text: '' },
+    ]);
+  };
+
+  const handleObservationChange = (id: string, text: string) => {
+    setObservations((currentObservations) =>
+      currentObservations.map((observation) =>
+        observation.id === id ? { ...observation, text } : observation
+      )
+    );
+  };
+
+  const handleRemoveObservation = (id: string) => {
+    setObservations((currentObservations) =>
+      currentObservations.filter((observation) => observation.id !== id)
+    );
+  };
+
   useEffect(() => {
     if (!currentEngagement) return;
     initializedRef.current = null;
@@ -523,6 +744,7 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
     setEditorHtml('');
     setPrefillOpen(true);
     setReportDate(new Date().toISOString().split('T')[0]);
+    setObservations([]);
   }, [currentEngagement?.id]);
 
   useEffect(() => {
@@ -549,6 +771,11 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
     }
   }, [templateHtml, showEditor, isDirty]);
 
+  useEffect(() => {
+    if (!showEditor || !isDirty) return;
+    setEditorHtml((currentHtml) => replaceFirmMasterSignatureHtml(replaceObservationSectionHtml(currentHtml)));
+  }, [showEditor, isDirty, replaceObservationSectionHtml, replaceFirmMasterSignatureHtml]);
+
   const handleSaveDraft = async () => {
     if (!currentEngagement) {
       toast.error('Select an engagement before saving');
@@ -568,6 +795,17 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
   const handleApplyPrefill = () => {
     setEditorHtml(templateHtml);
     setIsDirty(false);
+  };
+
+  const downloadWordBlob = (blob: Blob, filename: string) => {
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
   };
 
   const handleExportWord = async () => {
@@ -595,19 +833,47 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
       ],
     });
 
+    const safeName = currentEngagement?.client_name ? `Form_3CA_${currentEngagement.client_name}` : 'Form_3CA';
+    const filename = buildSafeDocxFilename(safeName);
+
     try {
       const blob = await Packer.toBlob(doc);
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      const safeName = currentEngagement?.client_name ? `Form_3CA_${currentEngagement.client_name}` : 'Form_3CA';
-      link.download = `${safeName.replace(/\s+/g, '_')}.docx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success('Word document generated');
+
+      if (!window.electronAPI?.app?.exportFile) {
+        downloadWordBlob(blob, filename);
+        toast.success('Word document downloaded');
+        return;
+      }
+
+      const exportedPath = await window.electronAPI?.app?.exportFile?.({
+        defaultFilename: filename,
+        buffer: await blob.arrayBuffer(),
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        showSaveDialog: false,
+      });
+
+      if (exportedPath) {
+        toast.success(`Word document exported to ${exportedPath}`);
+        return;
+      }
+
+      if (exportedPath === null) {
+        toast.info('Word export cancelled');
+        return;
+      }
+
+      downloadWordBlob(blob, filename);
+      toast.success('Word document downloaded');
     } catch (err: any) {
       console.error('Failed to export Word document', err);
-      toast.error(err?.message || 'Failed to export Word document');
+      try {
+        const blob = await Packer.toBlob(doc);
+        downloadWordBlob(blob, filename);
+        toast.warning(`Electron export failed; downloaded instead. ${err?.message || ''}`.trim());
+      } catch (fallbackError: any) {
+        console.error('Failed to download Word fallback', fallbackError);
+        toast.error(fallbackError?.message || err?.message || 'Failed to export Word document');
+      }
     }
   };
 
@@ -697,7 +963,7 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
         </div>
         {showEditor && (
           <Button variant="outline" size="sm" onClick={() => setShowEditor(false)}>
-            Back to 3CA
+            Back
           </Button>
         )}
       </CardHeader>
@@ -733,46 +999,17 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
               </CollapsibleTrigger>
             </div>
             <CollapsibleContent className="mt-3">
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2 lg:grid-cols-3">
                 <div>
-                  <Label>Tax audit Report date</Label>
-                  <Input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} />
-                </div>
-                <div>
-                  <Label>Assessee name and address</Label>
-                  <Textarea
-                    rows={2}
-                    placeholder="Name and address"
-                    value={assesseeNameAndAddress}
-                    onChange={(event) => setAssesseeNameAndAddress(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Statutory auditor / firm name</Label>
+                  <Label>Client name</Label>
                   <Input
-                    placeholder="Statutory auditor name"
-                    value={statutoryAuditorName}
-                    onChange={(event) => setStatutoryAuditorName(event.target.value)}
+                    placeholder="Client name"
+                    value={assesseeName}
+                    onChange={(event) => setAssesseeName(event.target.value)}
                   />
                 </div>
                 <div>
-                  <Label>Governing Act name</Label>
-                  <Input
-                    placeholder="Income-tax"
-                    value={governingActName}
-                    onChange={(event) => setGoverningActName(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Date of audit report for audit under other law/act</Label>
-                  <Input
-                    type="date"
-                    value={statutoryAuditReportDate}
-                    onChange={(event) => setStatutoryAuditReportDate(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Profit / loss account label</Label>
+                  <Label>Profit &amp; Loss or Income &amp; Expenditure A/c (select)</Label>
                   <Select value={profitLossAccountLabel} onValueChange={(value) => setProfitLossAccountLabel(value)}>
                     <SelectTrigger>
                       <SelectValue />
@@ -784,43 +1021,108 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
                   </Select>
                 </div>
                 <div>
-                  <Label>I/We label</Label>
-                  <Input value={iOrWe} onChange={(event) => setIOrWe(event.target.value)} />
+                  <Label>Tax auditor salutation (I/We)- select</Label>
+                  <Select value={pronounSelection} onValueChange={(value) => setPronounSelection(value as PronounSelection)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="i">I</SelectItem>
+                      <SelectItem value="we">We</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <Label>Me/Us label</Label>
-                  <Input value={meOrUs} onChange={(event) => setMeOrUs(event.target.value)} />
+                <div className="lg:col-span-3 rounded-md border bg-muted/20 p-3">
+                  <p className="mb-2 text-sm font-semibold text-foreground">Audit under other law/act</p>
+                  <div className="grid items-end gap-2 md:grid-cols-2 xl:grid-cols-12">
+                    <div className="xl:col-span-3">
+                      <Label>Is tax auditor and other law auditor same?</Label>
+                      <Select
+                        value={sameOtherLawAuditor}
+                        onValueChange={(value) => setSameOtherLawAuditor(value as SameOtherLawAuditorSelection)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="xl:col-span-3">
+                      <Label>Name of other law/act under which audited</Label>
+                      <Input
+                        placeholder="Income-tax"
+                        value={governingActName}
+                        onChange={(event) => setGoverningActName(event.target.value)}
+                      />
+                    </div>
+                    <div className="xl:col-span-4">
+                      <Label>Name of Audit Firm Who Conducted Audit under Other Act/Law</Label>
+                      <Input
+                        placeholder="Auditor / firm name"
+                        value={statutoryAuditorDisplayName}
+                        readOnly={isSameOtherLawAuditor}
+                        className={isSameOtherLawAuditor ? 'bg-muted cursor-not-allowed' : undefined}
+                        title={isSameOtherLawAuditor ? 'Auto-populated from Firm Master' : undefined}
+                        onChange={(event) => setOtherLawAuditorName(event.target.value)}
+                      />
+                    </div>
+                    <div className="xl:col-span-2">
+                      <Label>Other law audit report date</Label>
+                      <Input
+                        type="date"
+                        value={statutoryAuditReportDate}
+                        onChange={(event) => setStatutoryAuditReportDate(event.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label>My/Our label</Label>
-                  <Input value={myOrOur} onChange={(event) => setMyOrOur(event.target.value)} />
-                </div>
-                <div>
-                  <Label>Observation / Qualification 1</Label>
-                  <Textarea
-                    rows={2}
-                    placeholder="Observation or qualification"
-                    value={observation1}
-                    onChange={(event) => setObservation1(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Observation / Qualification 2</Label>
-                  <Textarea
-                    rows={2}
-                    placeholder="Observation or qualification"
-                    value={observation2}
-                    onChange={(event) => setObservation2(event.target.value)}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label>Additional observations/qualifications</Label>
-                  <Textarea
-                    rows={2}
-                    placeholder="Additional observations or qualifications"
-                    value={additionalObservations}
-                    onChange={(event) => setAdditionalObservations(event.target.value)}
-                  />
+                <div className="lg:col-span-3 rounded-md border bg-muted/20 p-3">
+                  <div className="mb-2 space-y-0.5">
+                    <p className="text-sm font-semibold text-foreground">Report Signing Details</p>
+                    <p className="text-xs text-muted-foreground">These details will appear on the audit report signature block.</p>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <Label>Signing Partner</Label>
+                      <Select value={signingPartnerId} onValueChange={setSigningPartnerId} disabled={partners.length === 0}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select signing partner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {partners.map((partner) => (
+                            <SelectItem key={partner.id} value={partner.id}>
+                              {partner.name} {partner.membership_number ? `(M.No. ${partner.membership_number})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Tax audit Report date</Label>
+                      <Input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Place of Signing</Label>
+                      <Input
+                        placeholder="Place of signing"
+                        value={placeOfSigning}
+                        onChange={(event) => setPlaceOfSigning(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Tax audit UDIN</Label>
+                      <Input
+                        placeholder="18 character UDIN"
+                        inputMode="text"
+                        maxLength={18}
+                        value={udin}
+                        onChange={(event) => setUdin(event.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 18))}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </CollapsibleContent>
@@ -848,6 +1150,49 @@ export function Form3CA({ governingActName: governingActNameProp }: Form3CAProps
               placeholder="Edit the Form 3CA here. All fields are editable."
               className={prefillOpen ? 'form-3ca-editor' : 'form-3ca-editor prefill-collapsed'}
             />
+
+            <div className="space-y-3 rounded-md border bg-muted/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Observations / qualifications / comments</p>
+                  <p className="text-xs text-muted-foreground">Rows entered here are inserted into Para 3 of Form 3CA.</p>
+                </div>
+                <Button variant="secondary" size="sm" onClick={handleAddObservation}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add observation / qualification
+                </Button>
+              </div>
+
+              {observations.length === 0 ? (
+                <p className="rounded-md border border-dashed bg-background p-3 text-sm text-muted-foreground">
+                  No observations added.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {observations.map((observation, index) => (
+                    <div key={observation.id} className="grid gap-2 rounded-md border bg-background p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label>Observation / Qualification / Comment {index + 1}</Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveObservation(observation.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Remove
+                        </Button>
+                      </div>
+                      <Textarea
+                        rows={2}
+                        placeholder="Enter observation / qualification / comment"
+                        value={observation.text}
+                        onChange={(event) => handleObservationChange(observation.id, event.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-wrap gap-2">
               <Button onClick={handleSaveDraft} disabled={saving}>Save draft</Button>

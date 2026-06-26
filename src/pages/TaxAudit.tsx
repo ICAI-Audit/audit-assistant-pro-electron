@@ -52,6 +52,7 @@ import { ProfessionalResponsibilityPanel } from '@/components/tax-audit/Professi
 import { StructuredClauseFields } from '@/components/tax-audit/StructuredClauseFields';
 import { SourceLinkChip } from '@/components/tax-audit/SourceLinkChip';
 import { Form3CA } from '@/components/appointment/Form3CA';
+import { Form3CB } from '@/components/appointment/Form3CB';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEngagement } from '@/contexts/EngagementContext';
 import { useTaxAudit } from '@/hooks/useTaxAudit';
@@ -185,6 +186,26 @@ const TAX_AUDIT_KNOWN_LIMITATIONS = [
 type SetupClient = {
   pan?: string | null;
   address?: string | null;
+  state?: string | null;
+  pin?: string | null;
+};
+
+const includesText = (source: string | null | undefined, value: string | null | undefined) => {
+  if (!source || !value) return false;
+  return source.toLowerCase().includes(value.toLowerCase());
+};
+
+const buildSetupClientAddress = (client: SetupClient | null) => {
+  if (!client) return '';
+  const address = client.address?.trim() || '';
+  const state = client.state?.trim() || '';
+  const pin = client.pin?.trim() || '';
+
+  return [
+    address,
+    state && !includesText(address, state) ? state : '',
+    pin && !includesText(address, pin) ? `PIN - ${pin}` : '',
+  ].filter(Boolean).join(', ');
 };
 
 const ACCEPTANCE_CHECKLIST_VERSION = 1 as const;
@@ -687,10 +708,11 @@ function SetupPanel({
   // Auto-populate PAN and Address from client master
   useEffect(() => {
     if (client) {
+      const clientAddress = buildSetupClientAddress(client);
       setDraft((prev) => ({
         ...prev,
         pan: client.pan || prev.pan,
-        address: client.address || prev.address,
+        address: clientAddress || prev.address,
       }));
     }
   }, [client]);
@@ -1876,6 +1898,8 @@ function TaxAuditPageHeader({
   onRefreshPrefill: () => Promise<void>;
   onOpenReviewQueue: () => void;
 }) {
+  const selectedReportForm = setup.form_type || (toBool(setup.books_audited_under_other_law) ? '3CA' : '3CB');
+
   return (
     <div className="sticky top-0 z-20 -mx-1 border-b bg-background/95 px-1 py-3 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1889,7 +1913,7 @@ function TaxAuditPageHeader({
           <Badge variant="secondary">{TAX_AUDIT_BETA_LABEL}</Badge>
           <Badge variant="outline">Income-tax Act, 1961</Badge>
           <Badge variant="outline">Rule 6G</Badge>
-          <Badge>Form {setup.form_type} + 3CD</Badge>
+          <Badge>Form {selectedReportForm} + 3CD</Badge>
           <Badge variant={setup.applicability_result === 'Applicable' ? 'default' : 'outline'}>
             {setup.applicability_result || 'Not assessed'}
           </Badge>
@@ -2715,6 +2739,8 @@ export default function TaxAudit() {
   const setupJson = parseJson<Record<string, unknown>>(setup?.setup_json, {});
   const complianceTracker = normalizeTaxAuditComplianceTracker(setupJson.complianceTracker);
   const complianceSummary = summarizeTaxAuditComplianceTracker(complianceTracker);
+  const selectedReportForm = setup.form_type || (toBool(setup.books_audited_under_other_law) ? '3CA' : '3CB');
+  const activeReportFormTab = selectedReportForm === '3CB' ? '3cb' : '3ca';
   const openClause = (clauseKey: string, tableKey?: string) => {
     const defaultTableKey = getDefaultStructuredTableKey(clauseKey);
     if (tableKey || defaultTableKey) {
@@ -2853,21 +2879,25 @@ export default function TaxAudit() {
         </TabsContent>
 
         <TabsContent value="3ca3cb" className="mt-0">
-          <Tabs defaultValue="3ca" className="space-y-3">
+          <Tabs value={activeReportFormTab} className="space-y-3">
             <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-              <TabsTrigger value="3ca">3CA</TabsTrigger>
-              <TabsTrigger value="3cb">3CB</TabsTrigger>
+              <TabsTrigger value="3ca" disabled={selectedReportForm !== '3CA'}>
+                3CA
+              </TabsTrigger>
+              <TabsTrigger value="3cb" disabled={selectedReportForm !== '3CB'}>
+                3CB
+              </TabsTrigger>
             </TabsList>
+            <p className="text-xs text-muted-foreground">
+              Enabled report form is based on the saved Audit Report Selection: Form {selectedReportForm} + 3CD.
+            </p>
 
             <TabsContent value="3ca" className="mt-0">
               <Form3CA governingActName={governingActName} />
             </TabsContent>
 
             <TabsContent value="3cb" className="mt-0">
-              <div className="space-y-3">
-                <h3 className="text-lg font-medium">3CB</h3>
-                <p className="text-sm text-muted-foreground">3CB will be implemented next.</p>
-              </div>
+              <Form3CB />
             </TabsContent>
           </Tabs>
         </TabsContent>

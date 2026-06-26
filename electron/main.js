@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { initializeAutoUpdater } = require('./auto-updater.cjs');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -234,6 +235,49 @@ function setupAppHandlers() {
 
     ipcMain.handle('app:openPath', async (event, targetPath) => {
         return await shell.openPath(targetPath);
+    });
+
+    ipcMain.handle('app:exportFile', async (event, payload) => {
+        try {
+            const { defaultFilename, buffer, showSaveDialog = true } = payload || {};
+            const safeFilename = String(defaultFilename || 'export.docx')
+                .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+                .replace(/\s+/g, '_');
+            const filename = safeFilename.toLowerCase().endsWith('.docx') ? safeFilename : `${safeFilename}.docx`;
+            const downloadsPath = app.getPath('downloads');
+            let filePath = path.join(downloadsPath, filename);
+
+            if (showSaveDialog) {
+                const result = await dialog.showSaveDialog({
+                    title: 'Export Word Document',
+                    defaultPath: filePath,
+                    filters: [{ name: 'Word Document', extensions: ['docx'] }],
+                });
+
+                if (result.canceled || !result.filePath) {
+                    return { success: false, canceled: true };
+                }
+
+                filePath = result.filePath;
+            } else {
+                const parsedPath = path.parse(filePath);
+                let counter = 1;
+                while (fs.existsSync(filePath)) {
+                    filePath = path.join(parsedPath.dir, `${parsedPath.name}_${counter}${parsedPath.ext}`);
+                    counter += 1;
+                }
+            }
+
+            if (!buffer) {
+                throw new Error('No file data received for export');
+            }
+
+            fs.writeFileSync(filePath, Buffer.from(buffer));
+            return { success: true, path: filePath };
+        } catch (error) {
+            console.error('File export error:', error);
+            return { success: false, error: error.message || 'File export failed' };
+        }
     });
 }
 

@@ -101,6 +101,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     return true;
   },
+  app: {
+    getDownloadsPath: () => ipcRenderer.invoke('app:getDownloadsPath'),
+    openPath: (targetPath) => ipcRenderer.invoke('app:openPath', targetPath),
+    exportFile: async ({ defaultFilename, buffer, mimeType, showSaveDialog }) => {
+      const result = await ipcRenderer.invoke('app:exportFile', { defaultFilename, buffer, mimeType, showSaveDialog });
+      if (!result?.success) {
+        if (result?.canceled) return null;
+        throw new Error(result?.error || 'File export failed');
+      }
+      return result.path;
+    },
+  },
   gstzen: {
     login: (credentials) => ipcRenderer.invoke('gstzen-login', credentials),
     generateOtp: (data, token) => ipcRenderer.invoke('gstzen-generate-otp', { data, token }),

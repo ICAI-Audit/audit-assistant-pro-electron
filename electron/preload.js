@@ -37,6 +37,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   app: {
     getDownloadsPath: () => ipcRenderer.invoke('app:getDownloadsPath'),
     openPath: (targetPath) => ipcRenderer.invoke('app:openPath', targetPath),
+    exportFile: async ({ defaultFilename, buffer, mimeType, showSaveDialog }) => {
+      const result = await ipcRenderer.invoke('app:exportFile', { defaultFilename, buffer, mimeType, showSaveDialog });
+      if (!result?.success) {
+        if (result?.canceled) return null;
+        throw new Error(result?.error || 'File export failed');
+      }
+      return result.path;
+    },
   },
 
   // Auto-updater methods

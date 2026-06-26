@@ -87,6 +87,8 @@ type ClientLike = {
   name: string;
   pan?: string | null;
   address?: string | null;
+  state?: string | null;
+  pin?: string | null;
   constitution?: string | null;
   industry?: string | null;
 };
@@ -110,6 +112,24 @@ const isBlankStructuredValue = (value: unknown) => {
   if (typeof value === 'string') return value.trim() === '';
   if (Array.isArray(value)) return value.length === 0;
   return false;
+};
+
+const includesText = (source: string | null | undefined, value: string | null | undefined) => {
+  if (!source || !value) return false;
+  return source.toLowerCase().includes(value.toLowerCase());
+};
+
+const buildClientAddress = (client: Pick<ClientLike, 'address' | 'state' | 'pin'> | null | undefined) => {
+  if (!client) return '';
+  const address = client.address?.trim() || '';
+  const state = client.state?.trim() || '';
+  const pin = client.pin?.trim() || '';
+
+  return [
+    address,
+    state && !includesText(address, state) ? state : '',
+    pin && !includesText(address, pin) ? `PIN - ${pin}` : '',
+  ].filter(Boolean).join(', ');
 };
 
 const mergeStructuredPrefill = (existingResponseJson: string | null | undefined, prefillResponseJson: Record<string, unknown>) => {
@@ -182,6 +202,7 @@ const createClausePrefill = (
   const engagementLink = sourceChip('Engagement', 'engagement', '/select-engagement');
   const gstLink = sourceChip('GST', 'gst', '/audit-tools?tab=gst', 'client_gstins');
   const financialReviewLink = sourceChip('FR', 'financial_review', '/financial-review');
+  const clientAddress = buildClientAddress(client);
 
   switch (definition.key) {
     case 'clause_1':
@@ -197,12 +218,12 @@ const createClausePrefill = (
           }
         : { responseHtml: '', responseJson: {}, status: 'needs_input', links: [clientLink], missingFields: ['Name of assessee'] };
     case 'clause_2':
-      return client?.address || setup.address
+      return clientAddress || setup.address
         ? {
-            responseHtml: client?.address || setup.address || '',
+            responseHtml: clientAddress || setup.address || '',
             responseJson: {
-              address: client?.address || setup.address,
-              structured: { address: client?.address || setup.address || '' },
+              address: clientAddress || setup.address,
+              structured: { address: clientAddress || setup.address || '' },
             },
             status: 'auto_filled',
             links: [clientLink],
@@ -917,7 +938,7 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
         previous_year_to: period.to,
         assessee_name: clientRow?.name || engagement.client_name,
         pan: clientRow?.pan || '',
-        address: clientRow?.address || '',
+        address: buildClientAddress(clientRow),
         status: clientRow?.constitution || '',
         business_or_profession: 'business',
         nature_of_business: clientRow?.industry || '',

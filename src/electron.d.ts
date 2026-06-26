@@ -2,6 +2,16 @@ declare global {
   interface Window {
     electronAPI: {
       platform: string;
+      app?: {
+        getDownloadsPath: () => Promise<string>;
+        openPath: (targetPath: string) => Promise<string>;
+        exportFile: (payload: {
+          defaultFilename: string;
+          buffer: ArrayBuffer;
+          mimeType?: string;
+          showSaveDialog?: boolean;
+        }) => Promise<string | null>;
+      };
       gstzen: {
         login: (credentials: { username: string; password: string }) => Promise<any>;
         // Generic request handles most APIs now
