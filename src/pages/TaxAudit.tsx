@@ -30,6 +30,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -76,6 +77,7 @@ import {
   TaxAuditSourceLink,
   TaxAuditSummary,
 } from '@/types/taxAudit';
+import type { TaxAuditReportObservation } from '@/types/taxAuditReportObservation';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -348,6 +350,48 @@ const normalizeAcceptanceChecklist = (value: string | null | undefined): TaxAudi
 
 const allChecklistItemsReviewed = (checklist: TaxAuditAcceptanceChecklist) =>
   checklist.sections.every((section) => section.items.every((item) => item.response === 'yes' || item.response === 'no' || item.response === 'na'));
+
+const decodeHtmlEntities = (value: string) => {
+  if (typeof document === 'undefined') return value;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+};
+
+const richTextHtmlToPlainText = (value: string | null | undefined) => {
+  if (!value) return '';
+  const withLineBreaks = value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+
+  return decodeHtmlEntities(withLineBreaks)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n');
+};
+
+const buildReportClauseObservations = (clauses: TaxAuditClauseResponse[]): TaxAuditReportObservation[] => {
+  const clauseOrder = new Map(FORM_3CD_CLAUSES.map((definition, index) => [definition.key, index]));
+
+  return clauses
+    .filter((clause) => toBool(clause.qualification_required))
+    .map((clause) => ({
+      clause,
+      text: richTextHtmlToPlainText(clause.qualification_text_html),
+      order: clauseOrder.get(clause.clause_key) ?? Number.MAX_SAFE_INTEGER,
+    }))
+    .filter((item) => item.text)
+    .sort((a, b) => a.order - b.order || a.clause.clause_no.localeCompare(b.clause.clause_no, undefined, { numeric: true }))
+    .map(({ clause, text }) => ({
+      id: clause.id,
+      clauseKey: clause.clause_key,
+      clauseNo: clause.clause_no,
+      clauseTitle: clause.clause_title,
+      text,
+    }));
+};
 
 const needsAttention = (clause?: TaxAuditClauseResponse) =>
   Boolean(
@@ -1345,9 +1389,10 @@ function ClauseEditor({
   clause: TaxAuditClauseResponse;
   activeStructuredTableKey?: string;
   onUpdate: (updates: Partial<TaxAuditClauseResponse>) => Promise<void>;
-  onStatus: (status: TaxAuditReviewStatus) => Promise<void>;
+  onStatus: (status: TaxAuditReviewStatus, options?: { unlockReason?: string }) => Promise<void>;
 }) {
   const locked = toBool(clause.locked) || clause.review_status === 'approved' || clause.review_status === 'locked';
+  const { toast } = useToast();
   const sourceLinks = parseJson<TaxAuditSourceLink[]>(clause.source_links_json, []);
   const validationMessages = parseJson<string[]>(clause.validation_messages_json, []);
   const missingFields = parseJson<string[]>(clause.missing_fields_json, []);
@@ -1360,11 +1405,41 @@ function ClauseEditor({
   const hasInternalRemarks = hasRichTextContent(clause.auditor_remarks_html);
   const [additionalParticularsOpen, setAdditionalParticularsOpen] = useState(!hasStructuredParticulars);
   const [internalRemarksOpen, setInternalRemarksOpen] = useState(false);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
+  const [unlockReason, setUnlockReason] = useState('');
+  const [unlocking, setUnlocking] = useState(false);
 
   useEffect(() => {
     setAdditionalParticularsOpen(!hasStructuredParticulars);
     setInternalRemarksOpen(false);
+    setUnlockDialogOpen(false);
+    setUnlockReason('');
   }, [clause.id, hasStructuredParticulars]);
+
+  const handleUnlockForEdit = async () => {
+    const reason = unlockReason.trim();
+    if (!reason) {
+      toast({
+        title: 'Remarks required',
+        description: 'Enter a reason before editing an approved clause.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUnlocking(true);
+    try {
+      await onStatus('reviewed', { unlockReason: reason });
+      setUnlockDialogOpen(false);
+      setUnlockReason('');
+      toast({
+        title: 'Clause reopened for editing',
+        description: 'The clause is now editable. Approval history is retained.',
+      });
+    } finally {
+      setUnlocking(false);
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border bg-background">
@@ -1396,15 +1471,23 @@ function ClauseEditor({
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-1">
-            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => onStatus('prepared')} disabled={locked}>
-              Prepared
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => onStatus('reviewed')} disabled={locked}>
-              Reviewed
-            </Button>
-            <Button size="sm" className="h-7 px-2 text-xs" onClick={() => onStatus('approved')} disabled={locked}>
-              Approve
-            </Button>
+            {locked ? (
+              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setUnlockDialogOpen(true)}>
+                Edit
+              </Button>
+            ) : (
+              <>
+                <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => onStatus('prepared')}>
+                  Prepared
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => onStatus('reviewed')}>
+                  Reviewed
+                </Button>
+                <Button size="sm" className="h-7 px-2 text-xs" onClick={() => onStatus('approved')}>
+                  Approve
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1479,18 +1562,18 @@ function ClauseEditor({
             <button
               type="button"
               className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/40"
-              title="Use this for internal audit notes, review points, basis of conclusion, pending clarification, or working paper remarks. This is not intended to be part of Form 3CD unless specifically used later."
+              title="Use this for auditor review remarks, working paper notes, basis of conclusion, pending clarification, or review observations. This is for internal working papers only and is not intended to be part of Form 3CD unless specifically used later."
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   {internalRemarksOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  <span className="text-sm font-medium">Internal Audit Remarks</span>
+                  <span className="text-sm font-medium">Review Remarks/Notes of Auditor- (For Internal Working paper only)</span>
                   {hasInternalRemarks && (
                     <span className="rounded-sm border bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">Has remarks</span>
                   )}
                 </div>
                 <p className="mt-0.5 truncate pl-6 text-xs text-muted-foreground">
-                  Optional internal working paper notes and review observations.
+                  Optional auditor review notes and working paper observations.
                 </p>
               </div>
             </button>
@@ -1499,7 +1582,7 @@ function ClauseEditor({
             <RichTextEditor
               value={clause.auditor_remarks_html || ''}
               onChange={(value) => onUpdate({ auditor_remarks_html: value })}
-              placeholder="Add internal audit notes, review points, or pending clarifications."
+              placeholder="Add auditor review notes, review points, or pending clarifications."
               disabled={locked}
               className="[&_[role=textbox]]:min-h-[160px]"
             />
@@ -1526,6 +1609,38 @@ function ClauseEditor({
           )}
         </div>
       </div>
+
+      <Dialog open={unlockDialogOpen} onOpenChange={setUnlockDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit approved clause</DialogTitle>
+            <DialogDescription>
+              Enter remarks explaining why this approved clause is being reopened. The reason will be stored with the clause.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor={`unlock-reason-${clause.id}`}>Remarks for editing</Label>
+            <Textarea
+              id={`unlock-reason-${clause.id}`}
+              value={unlockReason}
+              onChange={(event) => setUnlockReason(event.target.value)}
+              placeholder="Example: Approved by mistake; correcting client master value."
+              rows={4}
+            />
+            {clause.unlock_reason && (
+              <p className="text-xs text-muted-foreground">Previous edit reason: {clause.unlock_reason}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setUnlockDialogOpen(false)} disabled={unlocking}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleUnlockForEdit} disabled={unlocking || !unlockReason.trim()}>
+              {unlocking ? 'Enabling...' : 'Enable Edit'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1898,7 +2013,7 @@ function TaxAuditPageHeader({
   onRefreshPrefill: () => Promise<void>;
   onOpenReviewQueue: () => void;
 }) {
-  const selectedReportForm = setup.form_type || (toBool(setup.books_audited_under_other_law) ? '3CA' : '3CB');
+  const selectedReportForm = setup?.form_type || (toBool(setup?.books_audited_under_other_law) ? '3CA' : '3CB');
 
   return (
     <div className="sticky top-0 z-20 -mx-1 border-b bg-background/95 px-1 py-3 backdrop-blur">
@@ -2123,7 +2238,7 @@ function ClauseWorkspacePanel({
   acceptanceCheck: TaxAuditAcceptanceCheck | null;
   onOpenClause: (clauseKey: string, tableKey?: string) => void;
   onUpdateClause: (clauseId: string, updates: Partial<TaxAuditClauseResponse>) => Promise<void>;
-  onUpdateClauseStatus: (clauseId: string, status: TaxAuditReviewStatus) => Promise<void>;
+  onUpdateClauseStatus: (clauseId: string, status: TaxAuditReviewStatus, options?: { unlockReason?: string }) => Promise<void>;
   onLinkEvidence: (clause: TaxAuditClauseResponse, evidenceFileId: string) => Promise<void>;
   onUnlinkEvidence: (linkId: string) => Promise<void>;
 }) {
@@ -2161,11 +2276,11 @@ function ClauseWorkspacePanel({
           <>
             <div className="min-h-0">
               <ClauseEditor
-                clause={selectedClause}
-                activeStructuredTableKey={selectedStructuredTableKey}
-                onUpdate={(updates) => onUpdateClause(selectedClause.id, updates)}
-                onStatus={(status) => onUpdateClauseStatus(selectedClause.id, status)}
-              />
+                  clause={selectedClause}
+                  activeStructuredTableKey={selectedStructuredTableKey}
+                  onUpdate={(updates) => onUpdateClause(selectedClause.id, updates)}
+                  onStatus={(status, options) => onUpdateClauseStatus(selectedClause.id, status, options)}
+                />
             </div>
             <div className="min-h-[320px] lg:col-start-2 xl:col-start-auto xl:min-h-0">
               {evidencePaneOpen ? (
@@ -2739,8 +2854,9 @@ export default function TaxAudit() {
   const setupJson = parseJson<Record<string, unknown>>(setup?.setup_json, {});
   const complianceTracker = normalizeTaxAuditComplianceTracker(setupJson.complianceTracker);
   const complianceSummary = summarizeTaxAuditComplianceTracker(complianceTracker);
-  const selectedReportForm = setup.form_type || (toBool(setup.books_audited_under_other_law) ? '3CA' : '3CB');
+  const selectedReportForm = setup?.form_type || (toBool(setup?.books_audited_under_other_law) ? '3CA' : '3CB');
   const activeReportFormTab = selectedReportForm === '3CB' ? '3cb' : '3ca';
+  const reportClauseObservations = useMemo(() => buildReportClauseObservations(clauses), [clauses]);
   const openClause = (clauseKey: string, tableKey?: string) => {
     const defaultTableKey = getDefaultStructuredTableKey(clauseKey);
     if (tableKey || defaultTableKey) {
@@ -2893,11 +3009,15 @@ export default function TaxAudit() {
             </p>
 
             <TabsContent value="3ca" className="mt-0">
-              <Form3CA governingActName={governingActName} />
+              <Form3CA
+                governingActName={governingActName}
+                clauseObservations={reportClauseObservations}
+                onEditClauseObservation={openClause}
+              />
             </TabsContent>
 
             <TabsContent value="3cb" className="mt-0">
-              <Form3CB />
+              <Form3CB clauseObservations={reportClauseObservations} onEditClauseObservation={openClause} />
             </TabsContent>
           </Tabs>
         </TabsContent>

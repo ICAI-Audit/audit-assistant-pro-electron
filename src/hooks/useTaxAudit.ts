@@ -223,7 +223,13 @@ const createClausePrefill = (
             responseHtml: clientAddress || setup.address || '',
             responseJson: {
               address: clientAddress || setup.address,
-              structured: { address: clientAddress || setup.address || '' },
+              state: client?.state || '',
+              pin: client?.pin || '',
+              structured: {
+                address: client?.address || setup.address || '',
+                state: client?.state || '',
+                pin_code: client?.pin || '',
+              },
             },
             status: 'auto_filled',
             links: [clientLink],
@@ -325,17 +331,16 @@ const createClausePrefill = (
       };
     case 'clause_8a':
       return {
-        responseHtml: toBoolNumber(setup.presumptive_taxation) ? 'Yes' : 'No',
+        responseHtml: '',
         responseJson: {
-          presumptive_taxation: Boolean(toBoolNumber(setup.presumptive_taxation)),
-          lower_than_presumptive: Boolean(toBoolNumber(setup.lower_than_presumptive)),
           structured: {
-            presumptive_taxation_opted: Boolean(toBoolNumber(setup.presumptive_taxation)),
-            income_lower_than_presumptive: Boolean(toBoolNumber(setup.lower_than_presumptive)),
+            opted_for_section_115_taxation: '',
+            selected_section_115_taxation: '',
           },
         },
-        status: 'auto_filled',
+        status: 'needs_input',
         links: [setupLink],
+        missingFields: ['Whether the assessee has opted for taxation under section 115BA/115BAA/115BAB/115BAC/115BAD/115BAE'],
       };
     case 'clause_9':
       return {
@@ -1248,11 +1253,12 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
   );
 
   const updateClauseStatus = useCallback(
-    async (clauseId: string, status: TaxAuditReviewStatus) => {
+    async (clauseId: string, status: TaxAuditReviewStatus, options?: { unlockReason?: string }) => {
       const timestamp = new Date().toISOString();
+      const isUnlockForEdit = Boolean(options?.unlockReason);
       const payload: Partial<TaxAuditClauseResponse> & Record<string, unknown> = {
         review_status: status,
-        locked: status === 'approved' || status === 'locked' ? 1 : 0,
+        locked: isUnlockForEdit ? 0 : status === 'approved' || status === 'locked' ? 1 : 0,
       };
       if (status === 'prepared') {
         payload.prepared_by = user?.id || null;
@@ -1267,6 +1273,11 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
         payload.approved_at = timestamp;
         payload.locked_by = user?.id || null;
         payload.locked_at = timestamp;
+      }
+      if (isUnlockForEdit) {
+        payload.unlock_reason = options?.unlockReason || null;
+        payload.locked_by = null;
+        payload.locked_at = null;
       }
       await updateClause(clauseId, payload as Partial<TaxAuditClauseResponse>);
     },

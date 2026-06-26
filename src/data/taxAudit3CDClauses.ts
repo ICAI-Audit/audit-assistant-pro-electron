@@ -21,7 +21,7 @@ export const FORM_3CD_CLAUSES: TaxAuditClauseDefinition[] = [
   { key: 'clause_6', clauseNo: '6', title: 'Previous year', group: FORM_3CD_GROUPS[0], prefillStrategy: 'setup' },
   { key: 'clause_7', clauseNo: '7', title: 'Assessment year', group: FORM_3CD_GROUPS[0], prefillStrategy: 'setup' },
   { key: 'clause_8', clauseNo: '8', title: 'Relevant clause of section 44AB', group: FORM_3CD_GROUPS[0], prefillStrategy: 'setup' },
-  { key: 'clause_8a', clauseNo: '8a', title: 'Whether the assessee has opted for taxation under presumptive provisions', group: FORM_3CD_GROUPS[0], prefillStrategy: 'setup' },
+  { key: 'clause_8a', clauseNo: '8a', title: 'Whether the assessee has opted for taxation under section 115BA/115BAA/115BAB/115BAC/115BAD/115BAE', group: FORM_3CD_GROUPS[0], prefillStrategy: 'manual' },
   { key: 'clause_9', clauseNo: '9', title: 'Firm or AOP/BOI partner or member details', group: FORM_3CD_GROUPS[0], prefillStrategy: 'manual' },
   { key: 'clause_10', clauseNo: '10', title: 'Nature of business or profession', group: FORM_3CD_GROUPS[0], prefillStrategy: 'master' },
   { key: 'clause_11', clauseNo: '11', title: 'Books of account and locations where books are kept', group: FORM_3CD_GROUPS[1], prefillStrategy: 'setup', requiresEvidence: true },

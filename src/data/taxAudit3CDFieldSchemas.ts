@@ -13,7 +13,14 @@ export type TaxAuditStructuredField = {
   placeholder?: string;
   options?: TaxAuditStructuredFieldOption[];
   sourceHint?: string;
+  visibleWhen?: {
+    fieldKey: string;
+    value?: StructuredValueForVisibility;
+    values?: StructuredValueForVisibility[];
+  };
 };
+
+type StructuredValueForVisibility = string | number | boolean | null;
 
 export type TaxAuditStructuredTableColumn = TaxAuditStructuredField & {
   width?: string;
@@ -53,6 +60,14 @@ const SECTION_44AB_OPTIONS: TaxAuditStructuredFieldOption[] = [
   { label: '44AB(c) - Presumptive taxation review', value: '44AB(c)' },
   { label: '44AB(d) - Presumptive taxation review', value: '44AB(d)' },
   { label: '44AB(e) - Presumptive taxation review', value: '44AB(e)' },
+  {
+    label: 'Third proviso to 44AB: audited under any other law',
+    value: 'Third proviso to 44AB: audited under any other law',
+  },
+  {
+    label: 'Clause 44AB(a)- proviso where cash receipt and cash payments do not exceed the specified percentage of total transactions, but the turnover exceeds the specified limit',
+    value: 'Clause 44AB(a)- proviso where cash receipt and cash payments do not exceed the specified percentage of total transactions, but the turnover exceeds the specified limit',
+  },
   { label: 'Other / Review required', value: 'Other / Review required' },
 ];
 
@@ -60,6 +75,20 @@ const YES_NO_OPTIONS: TaxAuditStructuredFieldOption[] = [
   { label: 'Yes', value: 'yes' },
   { label: 'No', value: 'no' },
   { label: 'Not applicable', value: 'not_applicable' },
+];
+
+const YES_NO_ONLY_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: 'Yes', value: 'yes' },
+  { label: 'No', value: 'no' },
+];
+
+const SECTION_115_TAX_REGIME_OPTIONS: TaxAuditStructuredFieldOption[] = [
+  { label: '115BA', value: '115BA' },
+  { label: '115BAA', value: '115BAA' },
+  { label: '115BAB', value: '115BAB' },
+  { label: '115BAC', value: '115BAC' },
+  { label: '115BAD', value: '115BAD' },
+  { label: '115BAE', value: '115BAE' },
 ];
 
 const PRESUMPTIVE_SECTION_OPTIONS: TaxAuditStructuredFieldOption[] = [
@@ -1191,6 +1220,20 @@ export const TAX_AUDIT_3CD_FIELD_SCHEMAS: TaxAudit3CDFieldSchema[] = [
         placeholder: 'Enter address',
         sourceHint: 'Client master / Tax Audit setup',
       },
+      {
+        key: 'state',
+        label: 'State',
+        type: 'text',
+        placeholder: 'State',
+        sourceHint: 'Client master',
+      },
+      {
+        key: 'pin_code',
+        label: 'PIN code',
+        type: 'text',
+        placeholder: 'PIN code',
+        sourceHint: 'Client master',
+      },
     ],
   },
   {
@@ -1313,16 +1356,22 @@ export const TAX_AUDIT_3CD_FIELD_SCHEMAS: TaxAudit3CDFieldSchema[] = [
     clauseKey: 'clause_8a',
     fields: [
       {
-        key: 'presumptive_taxation_opted',
-        label: 'Opted for presumptive taxation',
-        type: 'checkbox',
-        sourceHint: 'Tax Audit setup',
+        key: 'opted_for_section_115_taxation',
+        label: 'Whether the assessee has opted for taxation under section 115BA/115BAA/115BAB/115BAC/115BAD/115BAE?',
+        type: 'select',
+        required: true,
+        options: YES_NO_ONLY_OPTIONS,
       },
       {
-        key: 'income_lower_than_presumptive',
-        label: 'Income lower than presumptive threshold',
-        type: 'checkbox',
-        sourceHint: 'Tax Audit setup',
+        key: 'selected_section_115_taxation',
+        label: 'Selected section',
+        type: 'select',
+        required: true,
+        options: SECTION_115_TAX_REGIME_OPTIONS,
+        visibleWhen: {
+          fieldKey: 'opted_for_section_115_taxation',
+          value: 'yes',
+        },
       },
     ],
   },

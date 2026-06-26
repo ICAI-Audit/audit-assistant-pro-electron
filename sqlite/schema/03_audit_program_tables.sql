@@ -93,7 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_program_attachments_box_id ON audit_program
 -- Engagement Letter Templates
 CREATE TABLE IF NOT EXISTS engagement_letter_templates (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-    template_type TEXT NOT NULL CHECK (template_type IN ('statutory_audit', 'tax_audit', 'internal_audit', 'limited_review')),
+    template_type TEXT NOT NULL CHECK (template_type IN ('statutory_audit_company_without_ifc', 'statutory_audit_company_with_ifc', 'tax_audit_partnership_3ca', 'tax_audit_partnership_3cb')),
     template_name TEXT NOT NULL,
     template_description TEXT,
     file_content TEXT NOT NULL, -- Base64 encoded

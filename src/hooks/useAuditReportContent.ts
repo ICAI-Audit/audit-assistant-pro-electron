@@ -138,17 +138,46 @@ const DEFAULT_INSERT: Partial<AuditReportMainContent> = {
 const OPINION_TYPES: readonly OpinionType[] = ['unqualified', 'qualified', 'adverse', 'disclaimer'];
 const isOpinionType = (v: any): v is OpinionType => OPINION_TYPES.includes(v);
 
+const BOOLEAN_FIELDS = [
+  'is_finalized',
+  'basis_for_opinion_is_example',
+  'has_emphasis_of_matter',
+  'has_other_matter',
+  'has_going_concern_uncertainty',
+  'include_kam',
+  'clause_143_3_b_server_outside_india',
+  'clause_143_3_f_directors_disqualified',
+  'rule_11_e_interim_dividend_paid',
+  'rule_11_e_interim_dividend_declared_not_paid',
+  'rule_11_e_final_dividend_previous_year',
+  'rule_11_e_final_dividend_proposed',
+] as const;
+
+const parseJsonArray = <T,>(value: unknown): T[] | null => {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value !== 'string') return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 const normalizeRow = (row: any): AuditReportMainContent => {
   const normalized: AuditReportMainContent = {
     ...(row as AuditReportMainContent),
     opinion_type: isOpinionType(row?.opinion_type) ? row.opinion_type : 'unqualified',
-    emphasis_of_matter_items: Array.isArray(row?.emphasis_of_matter_items)
-      ? row.emphasis_of_matter_items
-      : (row?.emphasis_of_matter_items ?? null),
-    other_matter_items: Array.isArray(row?.other_matter_items)
-      ? row.other_matter_items
-      : (row?.other_matter_items ?? null),
+    emphasis_of_matter_items: parseJsonArray<EmphasisOfMatterItem>(row?.emphasis_of_matter_items),
+    other_matter_items: parseJsonArray<OtherMatterItem>(row?.other_matter_items),
   };
+
+  for (const field of BOOLEAN_FIELDS) {
+    if (field in normalized && normalized[field] !== null && normalized[field] !== undefined) {
+      (normalized as any)[field] = Boolean((normalized as any)[field]);
+    }
+  }
 
   return normalized;
 };
@@ -240,12 +269,11 @@ export function useAuditReportContent(engagementId: string | undefined) {
       const { data, error } = await db
         .from('audit_report_main_content')
         .update(sanitizeUpdate(patch) as any)
-        .eq('id', content.id)
-        .select('*')
-        .single();
+        .eq('id', content.id);
 
       if (error) throw error;
-      const normalized = normalizeRow(data);
+      const row = Array.isArray(data) ? data[0] : data;
+      const normalized = normalizeRow(row || { ...content, ...patch });
       setContent(normalized);
       return normalized;
     } catch (err: any) {

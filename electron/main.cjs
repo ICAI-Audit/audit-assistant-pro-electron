@@ -70,6 +70,9 @@ function getSqliteDb() {
         // This is idempotent (uses CREATE TABLE IF NOT EXISTS)
         // DO NOT wrap in try-catch - we want this to fail loudly if there's a problem
         initializeDatabaseSchema(sqliteDb);
+        runAuditReportSetupSchemaMigration(sqliteDb);
+        runAuditReportMainContentSchemaMigration(sqliteDb);
+        runEngagementLetterTemplateTypeMigration(sqliteDb);
         safeLog('✅ All database tables initialized successfully!');
         runTaxAuditAy2025Backfill(sqliteDb);
 
@@ -306,6 +309,246 @@ function initializeDatabaseSchema(db) {
   }
 
   safeLog(`✅ Verified all ${importantTables.length} critical tables exist`);
+}
+
+function runAuditReportSetupSchemaMigration(db) {
+  const tableExists = db.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name = 'audit_report_setup'"
+  ).get();
+
+  if (!tableExists) {
+    return;
+  }
+
+  const existingColumns = new Set(
+    db.prepare('PRAGMA table_info(audit_report_setup)').all().map((column) => column.name)
+  );
+
+  const requiredColumns = [
+    ['is_standalone', 'INTEGER DEFAULT 1'],
+    ['is_public_unlisted_company', 'INTEGER DEFAULT 0'],
+    ['is_private_exceeding_threshold', 'INTEGER DEFAULT 0'],
+    ['is_private_non_exceeding_threshold', 'INTEGER DEFAULT 0'],
+    ['private_turnover_above_50cr', 'INTEGER DEFAULT 0'],
+    ['private_borrowing_above_25cr', 'INTEGER DEFAULT 0'],
+    ['caro_exclusion_reason', 'TEXT'],
+    ['caro_annexure_letter', "TEXT DEFAULT 'A'"],
+    ['ifc_annexure_letter', "TEXT DEFAULT 'B'"],
+    ['company_profit_or_loss', 'TEXT'],
+    ['branch_locations', 'TEXT'],
+    ['predecessor_auditor_name', 'TEXT'],
+    ['predecessor_report_date', 'TEXT'],
+    ['has_subsidiaries', 'INTEGER DEFAULT 0'],
+    ['paid_up_capital', 'REAL DEFAULT 0'],
+    ['reserves_surplus', 'REAL DEFAULT 0'],
+    ['borrowings_amount', 'REAL DEFAULT 0'],
+    ['report_status', "TEXT DEFAULT 'draft'"],
+    ['locked_at', 'TEXT'],
+    ['locked_by', 'TEXT'],
+    ['unlock_reason', 'TEXT'],
+    ['unlocked_at', 'TEXT'],
+    ['unlocked_by', 'TEXT'],
+  ];
+
+  const addedColumns = [];
+  for (const [columnName, definition] of requiredColumns) {
+    if (existingColumns.has(columnName)) {
+      continue;
+    }
+
+    db.exec(`ALTER TABLE audit_report_setup ADD COLUMN "${columnName}" ${definition}`);
+    addedColumns.push(columnName);
+  }
+
+  if (addedColumns.length > 0) {
+    safeLog(`   Audit report setup schema migration added: ${addedColumns.join(', ')}`);
+  }
+}
+
+function runAuditReportMainContentSchemaMigration(db) {
+  const tableExists = db.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name = 'audit_report_main_content'"
+  ).get();
+
+  if (!tableExists) {
+    return;
+  }
+
+  const existingColumns = new Set(
+    db.prepare('PRAGMA table_info(audit_report_main_content)').all().map((column) => column.name)
+  );
+
+  const requiredColumns = [
+    ['basis_for_opinion_is_example', 'INTEGER DEFAULT 0'],
+    ['going_concern_details', 'TEXT'],
+    ['going_concern_note_ref', 'TEXT'],
+    ['finalized_at', 'TEXT'],
+    ['finalized_by', 'TEXT'],
+    ['board_report_status', 'TEXT'],
+    ['board_report_misstatement_details', 'TEXT'],
+    ['clause_143_3_a_status', 'TEXT'],
+    ['clause_143_3_a_details', 'TEXT'],
+    ['clause_143_3_b_audit_trail_status', 'TEXT'],
+    ['clause_143_3_b_audit_trail_details', 'TEXT'],
+    ['clause_143_3_b_server_outside_india', 'INTEGER'],
+    ['clause_143_3_c_branch_returns', 'TEXT'],
+    ['clause_143_3_e_going_concern_impact', 'TEXT'],
+    ['clause_143_3_f_directors_disqualified', 'INTEGER'],
+    ['clause_143_3_f_disqualified_details', 'TEXT'],
+    ['clause_143_3_g_qualification_impact', 'TEXT'],
+    ['clause_143_3_h_remuneration_status', 'TEXT'],
+    ['clause_143_3_h_details', 'TEXT'],
+    ['clause_143_3_i_ifc_qualification', 'TEXT'],
+    ['rule_11_a_pending_litigations', 'TEXT'],
+    ['rule_11_a_note_ref', 'TEXT'],
+    ['rule_11_b_long_term_contracts', 'TEXT'],
+    ['rule_11_b_note_ref', 'TEXT'],
+    ['rule_11_c_iepf_status', 'TEXT'],
+    ['rule_11_c_delay_amount', 'REAL'],
+    ['rule_11_c_delay_details', 'TEXT'],
+    ['rule_11_d_audit_procedures_status', 'TEXT'],
+    ['rule_11_d_loan_fund_representations', 'INTEGER'],
+    ['rule_11_d_modification_details', 'TEXT'],
+    ['rule_11_d_receiving_fund_representations', 'INTEGER'],
+    ['rule_11_e_dividend_status', 'TEXT'],
+    ['rule_11_e_dividend_note_ref', 'TEXT'],
+    ['rule_11_e_dividend_details', 'TEXT'],
+    ['rule_11_e_interim_dividend_paid', 'INTEGER'],
+    ['rule_11_e_interim_dividend_declared_not_paid', 'INTEGER'],
+    ['rule_11_e_final_dividend_previous_year', 'INTEGER'],
+    ['rule_11_e_final_dividend_proposed', 'INTEGER'],
+    ['rule_11_e_final_dividend_amount', 'REAL'],
+    ['rule_11_e_interim_dividend_amount', 'REAL'],
+    ['rule_11_f_audit_trail_status', 'TEXT'],
+    ['rule_11_f_audit_trail_details', 'TEXT'],
+    ['rule_11_g_funds_advanced_status', 'TEXT'],
+    ['rule_11_g_funds_advanced_details', 'TEXT'],
+  ];
+
+  const addedColumns = [];
+  for (const [columnName, definition] of requiredColumns) {
+    if (existingColumns.has(columnName)) {
+      continue;
+    }
+
+    db.exec(`ALTER TABLE audit_report_main_content ADD COLUMN "${columnName}" ${definition}`);
+    addedColumns.push(columnName);
+  }
+
+  if (addedColumns.length > 0) {
+    safeLog(`   Audit report main content schema migration added: ${addedColumns.join(', ')}`);
+  }
+}
+
+function runEngagementLetterTemplateTypeMigration(db) {
+  const table = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'engagement_letter_templates'").get();
+
+  if (!table?.sql) {
+    return;
+  }
+
+  const requiredTemplateTypes = [
+    'statutory_audit_company_without_ifc',
+    'statutory_audit_company_with_ifc',
+    'tax_audit_partnership_3ca',
+    'tax_audit_partnership_3cb',
+  ];
+
+  if (requiredTemplateTypes.every((type) => table.sql.includes(`'${type}'`))) {
+    return;
+  }
+
+  safeLog('   Migrating engagement letter template type constraint...');
+
+  const rebuild = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS engagement_letter_templates_new (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        template_type TEXT NOT NULL CHECK (template_type IN ('statutory_audit_company_without_ifc', 'statutory_audit_company_with_ifc', 'tax_audit_partnership_3ca', 'tax_audit_partnership_3cb')),
+        template_name TEXT NOT NULL,
+        template_description TEXT,
+        file_content TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        file_size_bytes INTEGER,
+        mime_type TEXT,
+        available_variables TEXT,
+        version_number INTEGER NOT NULL DEFAULT 1,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        uploaded_by TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_by TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        admin_notes TEXT,
+        FOREIGN KEY (uploaded_by) REFERENCES profiles(user_id) ON DELETE CASCADE
+      );
+    `);
+
+    const compatibleRows = db.prepare(`
+      SELECT *
+      FROM engagement_letter_templates
+      WHERE template_type IN ('statutory_audit_company_without_ifc', 'statutory_audit_company_with_ifc', 'tax_audit_partnership_3ca', 'tax_audit_partnership_3cb')
+    `).all();
+
+    const insert = db.prepare(`
+      INSERT OR REPLACE INTO engagement_letter_templates_new (
+        id,
+        template_type,
+        template_name,
+        template_description,
+        file_content,
+        file_name,
+        file_size_bytes,
+        mime_type,
+        available_variables,
+        version_number,
+        is_active,
+        uploaded_by,
+        uploaded_at,
+        updated_by,
+        updated_at,
+        admin_notes
+      ) VALUES (
+        @id,
+        @template_type,
+        @template_name,
+        @template_description,
+        @file_content,
+        @file_name,
+        @file_size_bytes,
+        @mime_type,
+        @available_variables,
+        @version_number,
+        @is_active,
+        @uploaded_by,
+        @uploaded_at,
+        @updated_by,
+        @updated_at,
+        @admin_notes
+      )
+    `);
+
+    compatibleRows.forEach((row) => insert.run(row));
+
+    db.exec(`
+      DROP TRIGGER IF EXISTS update_engagement_letter_templates_timestamp;
+      DROP INDEX IF EXISTS idx_engagement_letter_templates_type;
+      DROP INDEX IF EXISTS idx_engagement_letter_templates_active;
+      DROP INDEX IF EXISTS idx_engagement_letter_templates_uploaded_by;
+      DROP TABLE engagement_letter_templates;
+      ALTER TABLE engagement_letter_templates_new RENAME TO engagement_letter_templates;
+      CREATE INDEX IF NOT EXISTS idx_engagement_letter_templates_type ON engagement_letter_templates(template_type);
+      CREATE INDEX IF NOT EXISTS idx_engagement_letter_templates_active ON engagement_letter_templates(is_active);
+      CREATE INDEX IF NOT EXISTS idx_engagement_letter_templates_uploaded_by ON engagement_letter_templates(uploaded_by);
+      CREATE TRIGGER IF NOT EXISTS update_engagement_letter_templates_timestamp
+      AFTER UPDATE ON engagement_letter_templates
+      BEGIN
+          UPDATE engagement_letter_templates SET updated_at = datetime('now') WHERE id = NEW.id;
+      END;
+    `);
+  });
+
+  rebuild();
+  safeLog('   Engagement letter template type constraint migration complete.');
 }
 
 function runTaxAuditAy2025Backfill(db) {
@@ -613,6 +856,19 @@ function registerIpcHandlers() {
         return `"${identifier}"`;
       };
 
+      const toSqliteValue = (value) => {
+        if (typeof value === 'boolean') {
+          return value ? 1 : 0;
+        }
+        if (value === undefined) {
+          return null;
+        }
+        if (Array.isArray(value) || (value && typeof value === 'object' && !Buffer.isBuffer(value))) {
+          return JSON.stringify(value);
+        }
+        return value;
+      };
+
       const safeTable = safeIdentifier(table);
       const colList = columns && typeof columns === 'string' ? columns : '*';
       const whereClauses = [];
@@ -629,33 +885,33 @@ function registerIpcHandlers() {
                 whereClauses.push('1 = 0');
               } else {
                 whereClauses.push(`${column} IN (${values.map(() => '?').join(', ')})`);
-                params.push(...values);
+                params.push(...values.map(toSqliteValue));
               }
             } else if (operator === 'neq') {
               whereClauses.push(`${column} != ?`);
-              params.push(f.value);
+              params.push(toSqliteValue(f.value));
             } else if (operator === 'gte') {
               whereClauses.push(`${column} >= ?`);
-              params.push(f.value);
+              params.push(toSqliteValue(f.value));
             } else if (operator === 'lte') {
               whereClauses.push(`${column} <= ?`);
-              params.push(f.value);
+              params.push(toSqliteValue(f.value));
             } else if (operator === 'gt') {
               whereClauses.push(`${column} > ?`);
-              params.push(f.value);
+              params.push(toSqliteValue(f.value));
             } else if (operator === 'lt') {
               whereClauses.push(`${column} < ?`);
-              params.push(f.value);
+              params.push(toSqliteValue(f.value));
             } else if (operator === 'is') {
               if (f.value === null) {
                 whereClauses.push(`${column} IS NULL`);
               } else {
                 whereClauses.push(`${column} IS ?`);
-                params.push(f.value);
+                params.push(toSqliteValue(f.value));
               }
             } else {
               whereClauses.push(`${column} = ?`);
-              params.push(f.value);
+              params.push(toSqliteValue(f.value));
             }
           }
         }
@@ -703,7 +959,7 @@ function registerIpcHandlers() {
           const safeKeys = keys.map(safeIdentifier);
           const sql = `INSERT INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})`;
           const stmt = db.prepare(sql);
-          const result = stmt.run(...keys.map((k) => cleanRow[k]));
+          const result = stmt.run(...keys.map((k) => toSqliteValue(cleanRow[k])));
 
           // Fetch the inserted row to get the auto-generated ID
           const insertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE rowid = ?`).get(result.lastInsertRowid);
@@ -717,9 +973,10 @@ function registerIpcHandlers() {
           return { data: null, error: { message: 'No data to upsert.' } };
         }
         const rows = Array.isArray(data) ? data : [data];
-        const conflictColumns = typeof onConflict === 'string' && onConflict.trim()
-          ? onConflict.split(',').map((column) => safeIdentifier(column.trim())).filter(Boolean)
+        const conflictColumnNames = typeof onConflict === 'string' && onConflict.trim()
+          ? onConflict.split(',').map((column) => column.trim()).filter(Boolean)
           : [];
+        const conflictColumns = conflictColumnNames.map(safeIdentifier);
         const upserted = [];
 
         for (const row of rows) {
@@ -744,11 +1001,11 @@ function registerIpcHandlers() {
             ? `INSERT INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})${conflictSql}`
             : `INSERT${conflictSql} INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})`;
           const stmt = db.prepare(sql);
-          const result = stmt.run(...keys.map((k) => cleanRow[k]));
+          const result = stmt.run(...keys.map((k) => toSqliteValue(cleanRow[k])));
 
           if (conflictColumns.length > 0) {
             const lookupWhere = conflictColumns.map((column) => `${column} = ?`).join(' AND ');
-            const lookupParams = conflictColumns.map((column) => cleanRow[column]);
+            const lookupParams = conflictColumnNames.map((column) => toSqliteValue(cleanRow[column]));
             const upsertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE ${lookupWhere}`).get(...lookupParams);
             upserted.push(upsertedRow || cleanRow);
           } else {
@@ -768,8 +1025,9 @@ function registerIpcHandlers() {
         const setSql = keys.map((k) => `${safeIdentifier(k)} = ?`).join(', ');
         const sql = `UPDATE ${safeTable} SET ${setSql}${whereSql}`;
         const stmt = db.prepare(sql);
-        stmt.run(...keys.map((k) => data[k]), ...params);
-        return { data: null, error: null };
+        stmt.run(...keys.map((k) => toSqliteValue(data[k])), ...params);
+        const updatedRows = db.prepare(`SELECT * FROM ${safeTable}${whereSql}`).all(...params);
+        return { data: updatedRows, error: null };
       }
 
       if (action === 'delete') {

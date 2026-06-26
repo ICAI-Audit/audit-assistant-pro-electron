@@ -5,6 +5,41 @@ import { toast } from 'sonner';
 
 const db = getSQLiteClient();
 
+const BOOLEAN_FIELDS = [
+  'is_standalone',
+  'is_private_company',
+  'cash_flow_required',
+  'has_branch_auditors',
+  'has_predecessor_auditor',
+  'is_public_unlisted_company',
+  'private_turnover_above_50cr',
+  'private_borrowing_above_25cr',
+  'is_small_company',
+  'is_opc',
+  'is_public_company',
+  'is_private_exceeding_threshold',
+  'is_private_non_exceeding_threshold',
+  'ifc_applicable',
+  'is_listed_company',
+  'has_subsidiaries',
+  'setup_completed',
+  'locked',
+] as const;
+
+const normalizeSetup = (value: any): AuditReportSetup | null => {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!row) return null;
+
+  const normalized = { ...row };
+  for (const field of BOOLEAN_FIELDS) {
+    if (field in normalized && normalized[field] !== null && normalized[field] !== undefined) {
+      normalized[field] = Boolean(normalized[field]);
+    }
+  }
+
+  return normalized as AuditReportSetup;
+};
+
 export interface AuditReportSetup {
   id: string;
   engagement_id: string;
@@ -81,19 +116,22 @@ export function useAuditReportSetup(engagementId: string | undefined) {
 
   const fetchSetup = async () => {
     if (!engagementId) {
+      setSetup(null);
       setLoading(false);
       return;
     }
+
+    setLoading(true);
 
     try {
       const { data, error } = await db
         .from('audit_report_setup')
         .select('*')
         .eq('engagement_id', engagementId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      setSetup(data as AuditReportSetup | null);
+      setSetup(normalizeSetup(data));
     } catch (error) {
       console.error('Error fetching audit report setup:', error);
     } finally {
@@ -114,9 +152,10 @@ export function useAuditReportSetup(engagementId: string | undefined) {
         });
 
       if (error) throw error;
-      setSetup(newSetup as AuditReportSetup);
+      const normalized = normalizeSetup(newSetup);
+      setSetup(normalized);
       toast.success('Audit report setup created');
-      return newSetup as AuditReportSetup;
+      return normalized;
     } catch (error: any) {
       console.error('Error creating audit report setup:', error);
       toast.error(error.message || 'Failed to create setup');
@@ -134,9 +173,10 @@ export function useAuditReportSetup(engagementId: string | undefined) {
         .eq('id', setup.id);
 
       if (error) throw error;
-      setSetup(updatedSetup as AuditReportSetup);
+      const normalized = normalizeSetup(updatedSetup) || { ...setup, ...data } as AuditReportSetup;
+      setSetup(normalized);
       toast.success('Setup updated');
-      return updatedSetup as AuditReportSetup;
+      return normalized;
     } catch (error: any) {
       console.error('Error updating audit report setup:', error);
       toast.error(error.message || 'Failed to update setup');

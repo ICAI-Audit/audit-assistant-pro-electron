@@ -107,6 +107,13 @@ const hasReportingDetails = (row: StructuredRow, keys: string[]) => keys.some((k
 const hasUsefulTableRow = (rows: StructuredRow[], columns: TaxAuditStructuredTableColumn[]) =>
   rows.some((row) => columns.some((column) => !isBlank(row[column.key])));
 
+const isFieldVisible = (field: TaxAuditStructuredField, structured: StructuredValues) => {
+  if (!field.visibleWhen) return true;
+  const currentValue = structured[field.visibleWhen.fieldKey] as StructuredValue;
+  if (field.visibleWhen.values) return field.visibleWhen.values.includes(currentValue);
+  return currentValue === field.visibleWhen.value;
+};
+
 const createEmptyRow = (table: TaxAuditStructuredTable) =>
   table.columns.reduce<StructuredRow>((row, column) => {
     row[column.key] = column.type === 'checkbox' ? false : '';
@@ -230,7 +237,7 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
   const buildWarnings = (nextStructured: StructuredValues) => {
     const warnings: string[] = [];
 
-    (schema.fields || []).forEach((field) => {
+    (schema.fields || []).filter((field) => isFieldVisible(field, nextStructured)).forEach((field) => {
       if (field.required && isBlank(nextStructured[field.key])) {
         warnings.push(`${field.label} is required.`);
       }
@@ -284,6 +291,18 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
         });
       });
     });
+
+    if (schema.clauseKey === 'clause_9') {
+      const rows = getRows(nextStructured, 'partners_or_members');
+      const totalProfitSharingRatio = rows.reduce((total, row) => {
+        const ratio = toFiniteNumber(row.profit_sharing_ratio);
+        return ratio === null ? total : total + ratio;
+      }, 0);
+
+      if (totalProfitSharingRatio > 100.0001) {
+        warnings.push(`Total profit sharing ratio for all partners/members should not exceed 100%. Current total is ${totalProfitSharingRatio.toFixed(2)}%.`);
+      }
+    }
 
     if (schema.clauseKey === 'clause_15' && nextStructured.whether_any_capital_asset_converted_into_stock_in_trade === 'yes' && tables[0]) {
       const rows = getRows(nextStructured, tables[0].key);
@@ -1681,11 +1700,21 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
   const persistStructured = async (nextStructured: StructuredValues) => {
     const structuredWarnings = buildWarnings(nextStructured);
     const otherMessages = validationMessages.filter((message) => !message.startsWith(STRUCTURED_VALIDATION_PREFIX));
+    const responseHtml = (() => {
+      if (schema.clauseKey !== 'clause_8a') return undefined;
+      const opted = nextStructured.opted_for_section_115_taxation;
+      const selectedSection = nextStructured.selected_section_115_taxation;
+      if (opted === 'yes') return selectedSection ? `Yes - ${selectedSection}` : 'Yes';
+      if (opted === 'no') return 'No';
+      return '';
+    })();
+
     await onUpdate({
       response_json: JSON.stringify({
         ...parsed,
         structured: nextStructured,
       }),
+      ...(responseHtml !== undefined ? { response_html: responseHtml } : {}),
       validation_messages_json: JSON.stringify([
         ...otherMessages,
         ...structuredWarnings.map((message) => `${STRUCTURED_VALIDATION_PREFIX} ${message}`),
@@ -1695,10 +1724,16 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
   };
 
   const updateField = async (key: string, value: StructuredValue) => {
-    await persistStructured({
+    const nextStructured = {
       ...structured,
       [key]: value,
-    });
+    };
+
+    if (schema.clauseKey === 'clause_8a' && key === 'opted_for_section_115_taxation' && value !== 'yes') {
+      nextStructured.selected_section_115_taxation = '';
+    }
+
+    await persistStructured(nextStructured);
   };
 
   const localWarnings = buildWarnings(structured);
@@ -1891,7 +1926,7 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
 
         {schema.fields && (
           <div className="grid gap-3 md:grid-cols-2">
-            {schema.fields.map((field) => (
+            {schema.fields.filter((field) => isFieldVisible(field, structured)).map((field) => (
               <div key={field.key} className={field.type === 'textarea' ? 'space-y-1 md:col-span-2' : 'space-y-1'}>
                 {field.type !== 'checkbox' && (
                   <div className="flex items-center justify-between gap-2">

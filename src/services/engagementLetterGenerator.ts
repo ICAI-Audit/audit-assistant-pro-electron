@@ -4,13 +4,6 @@
 // Master service that coordinates master data → template selection → rendering → DOCX generation
 
 import type { EngagementLetterMasterData, GeneratedLetterResult } from '@/types/engagementLetter';
-import {
-  STATUTORY_AUDIT_COMPANY_TEMPLATE,
-  TAX_AUDIT_PARTNERSHIP_3CA_TEMPLATE,
-  TAX_AUDIT_PARTNERSHIP_3CB_TEMPLATE,
-} from '@/data/engagementLetterTemplates';
-import { EngagementLetterTemplateEngine } from './engagementLetterEngine';
-import { EngagementLetterDocxGenerator } from './engagementLetterDocxGenerator';
 
 /**
  * Main service for end-to-end engagement letter generation
@@ -23,22 +16,13 @@ export class EngagementLetterGenerator {
    */
   static async generateLetter(masterData: EngagementLetterMasterData): Promise<GeneratedLetterResult> {
     try {
-      // Step 1: Validate master data
       this.validateMasterData(masterData);
-
-      // Step 2: Select appropriate template
-      const template = this.selectTemplate(masterData.engagement_type);
-
-      // Step 3: Build context for rendering
-      const context = EngagementLetterTemplateEngine.buildContext(masterData);
-
-      // Step 4: Render template (merge tags + conditionals)
-      const renderedText = EngagementLetterTemplateEngine.render(template, context);
-
-      // Step 5: Generate DOCX
-      const result = await EngagementLetterDocxGenerator.generateDocx(renderedText, masterData);
-
-      return result;
+      return {
+        success: false,
+        error: 'Uploaded engagement letter template is required. Generate letters through the uploaded-template workflow.',
+        letter_type: masterData.engagement_type,
+        generated_at: new Date().toISOString(),
+      };
     } catch (error) {
       return {
         success: false,
@@ -46,26 +30,6 @@ export class EngagementLetterGenerator {
         letter_type: masterData.engagement_type,
         generated_at: new Date().toISOString(),
       };
-    }
-  }
-
-  /**
-   * Select template based on engagement type
-   */
-  private static selectTemplate(engagementType: string): string {
-    switch (engagementType) {
-      case 'statutory_audit_company_with_ifc':
-      case 'statutory_audit_company_without_ifc':
-        return STATUTORY_AUDIT_COMPANY_TEMPLATE;
-
-      case 'tax_audit_partnership_3ca':
-        return TAX_AUDIT_PARTNERSHIP_3CA_TEMPLATE;
-
-      case 'tax_audit_partnership_3cb':
-        return TAX_AUDIT_PARTNERSHIP_3CB_TEMPLATE;
-
-      default:
-        throw new Error(`Unknown engagement type: ${engagementType}`);
     }
   }
 

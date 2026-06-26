@@ -15,11 +15,6 @@ import { useEngagement } from '@/contexts/EngagementContext';
 import { useClient } from '@/hooks/useClient';
 import { usePartners } from '@/hooks/usePartners';
 import { useEngagementLetterTemplates } from '@/hooks/useEngagementLetterTemplates';
-import {
-  STATUTORY_AUDIT_COMPANY_TEMPLATE,
-  TAX_AUDIT_PARTNERSHIP_3CA_TEMPLATE,
-  TAX_AUDIT_PARTNERSHIP_3CB_TEMPLATE,
-} from '@/data/engagementLetterTemplates';
 import { EngagementLetterDocxTemplate } from '@/services/engagementLetterDocxTemplate';
 import {
   parseEngagementLetterTemplatePayload,
@@ -394,34 +389,24 @@ export function LettersPage({ engagementId }: LettersPageProps) {
     try {
       const masterData: EngagementLetterMasterData = buildMasterData();
 
-      // Get template from database instead of hardcoded imports
       const templateType = engagementTypeMap[letterType];
       const dbTemplate = getTemplateByType(templateType);
 
-      const fallbackTemplateMap: Record<string, string> = {
-        statutory_audit_company_without_ifc: STATUTORY_AUDIT_COMPANY_TEMPLATE,
-        statutory_audit_company_with_ifc: STATUTORY_AUDIT_COMPANY_TEMPLATE,
-        tax_audit_partnership_3ca: TAX_AUDIT_PARTNERSHIP_3CA_TEMPLATE,
-        tax_audit_partnership_3cb: TAX_AUDIT_PARTNERSHIP_3CB_TEMPLATE,
-      };
-
-      const template = dbTemplate?.file_content || fallbackTemplateMap[templateType];
-
-      if (!template) {
-        toast.error('Template not available. Upload one in Admin Settings > Letter Templates.', {
+      if (!dbTemplate?.file_content) {
+        toast.error('Template not uploaded. Please upload the template in Admin Settings > Letter Templates.', {
           duration: 5000,
         });
         setGenerating(false);
         return;
       }
 
-      const payload = parseEngagementLetterTemplatePayload(template);
+      const payload = parseEngagementLetterTemplatePayload(dbTemplate.file_content);
       setActiveTemplatePayload(payload);
-      if (!payload && dbTemplate) {
+      if (!payload) {
         toast.info('Template is stored as plain text. Re-upload to preserve Word formatting.');
       }
 
-      const templateText = payload?.text ?? (payload ? '' : template);
+      const templateText = payload?.text ?? dbTemplate.file_content;
 
       if (!templateText.trim()) {
         toast.info('Preview text not available for this template. You can still export to Word.');

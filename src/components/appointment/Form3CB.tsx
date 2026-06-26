@@ -18,12 +18,18 @@ import { usePartners } from '@/hooks/usePartners';
 import { useForm3CBDocument } from '@/hooks/useForm3CBDocument';
 import { FORM_3CB_TEMPLATE_VERSION, form3cbTemplate } from '@/data/form3cbTemplate';
 import { buildSafeDocxFilename, convertHtmlToDocxElements } from './Form3CA';
+import type { TaxAuditReportObservation } from '@/types/taxAuditReportObservation';
 
 type PronounSelection = 'i' | 'we';
 type AccountLabel = 'Profit & Loss Account' | 'Income and Expenditure Account';
 type ObservationRow = {
   id: string;
   text: string;
+};
+
+type Form3CBDraftJson = {
+  manualPara3Observations?: ObservationRow[];
+  manualPara5Observations?: ObservationRow[];
 };
 
 const FIELD_PLACEHOLDERS = {
@@ -212,6 +218,32 @@ const buildObservationsHtml = (observations: ObservationRow[], startAt: number) 
     .join('');
 };
 
+const parseDraftJson = (value: unknown): Form3CBDraftJson => {
+  if (!value) return {};
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return parsed && typeof parsed === 'object' ? (parsed as Form3CBDraftJson) : {};
+  } catch {
+    return {};
+  }
+};
+
+const sanitizeObservationRows = (value: unknown): ObservationRow[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      id: typeof item?.id === 'string' && item.id ? item.id : createObservationId(),
+      text: typeof item?.text === 'string' ? item.text : '',
+    }))
+    .filter((item) => item.text.trim());
+};
+
+const buildClauseObservationsHtml = (observations: TaxAuditReportObservation[]) => {
+  return observations
+    .filter((observation) => observation.text.trim())
+    .map((observation) => `Clause ${observation.clauseNo} - ${observation.clauseTitle}: ${observation.text.trim()}`);
+};
+
 const populateTemplate = (values: Record<string, string>) => {
   return Object.entries(values).reduce((content, [key, value]) => {
     return content.replace(new RegExp(`{{${key}}}`, 'g'), value);
@@ -233,7 +265,12 @@ const downloadWordBlob = (blob: Blob, filename: string) => {
   setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 };
 
-export function Form3CB() {
+type Form3CBProps = {
+  clauseObservations?: TaxAuditReportObservation[];
+  onEditClauseObservation?: (clauseKey: string) => void;
+};
+
+export function Form3CB({ clauseObservations = [], onEditClauseObservation }: Form3CBProps) {
   const { currentEngagement } = useEngagement();
   const { client } = useClient(currentEngagement?.client_id || null);
   const { firmSettings } = useFirmSettings();
@@ -290,7 +327,17 @@ export function Form3CB() {
   }, [currentEngagement?.partner_id, partners]);
 
   const para3ObservationsHtml = useMemo(() => buildObservationsHtml(para3Observations, 2), [para3Observations]);
-  const para5ObservationsHtml = useMemo(() => buildObservationsHtml(para5Observations, 3), [para5Observations]);
+  const combinedPara5Observations = useMemo(
+    () => [
+      ...buildClauseObservationsHtml(clauseObservations).map((text, index) => ({
+        id: `clause-observation-${clauseObservations[index]?.id || index}`,
+        text,
+      })),
+      ...para5Observations,
+    ],
+    [clauseObservations, para5Observations]
+  );
+  const para5ObservationsHtml = useMemo(() => buildObservationsHtml(combinedPara5Observations, 3), [combinedPara5Observations]);
 
   const templateValues = useMemo(() => ({
     I_OR_WE: formatFieldForTemplate(pronouns.iOrWe, FIELD_PLACEHOLDERS.i_or_we),
@@ -388,6 +435,15 @@ export function Form3CB() {
     initializedRef.current = currentEngagement.id;
 
     if (savedDocument?.content_html && isCurrentTemplate(savedDocument.content_html)) {
+      const savedDraft = parseDraftJson(savedDocument.content_json);
+      const savedManualPara3Observations = sanitizeObservationRows(savedDraft.manualPara3Observations);
+      const savedManualPara5Observations = sanitizeObservationRows(savedDraft.manualPara5Observations);
+      if (savedManualPara3Observations.length > 0) {
+        setPara3Observations(savedManualPara3Observations);
+      }
+      if (savedManualPara5Observations.length > 0) {
+        setPara5Observations(savedManualPara5Observations);
+      }
       const savedHtml = savedDocument.content_html;
       const isSameAsTemplate = normalizeHtml(savedHtml) === normalizeHtml(templateHtml);
       setEditorHtml(savedHtml);
@@ -397,7 +453,7 @@ export function Form3CB() {
 
     setEditorHtml(templateHtml);
     setIsDirty(false);
-  }, [showEditor, currentEngagement?.id, savedDocument?.content_html, templateHtml, isCurrentTemplate, normalizeHtml]);
+  }, [showEditor, currentEngagement?.id, savedDocument?.content_html, savedDocument?.content_json, templateHtml, isCurrentTemplate, normalizeHtml]);
 
   useEffect(() => {
     if (!showEditor) return;
@@ -442,13 +498,27 @@ export function Form3CB() {
     updater((currentObservations) => currentObservations.filter((observation) => observation.id !== id));
   };
 
+  const buildDraftJson = useCallback(
+    (): Form3CBDraftJson => ({
+      manualPara3Observations: para3Observations,
+      manualPara5Observations: para5Observations,
+    }),
+    [para3Observations, para5Observations]
+  );
+
+  const handleOpenPreview = async () => {
+    setShowEditor(true);
+    if (!currentEngagement) return;
+    await saveDocument(templateHtml, 'Form 3CB', buildDraftJson());
+  };
+
   const handleSaveDraft = async () => {
     if (!currentEngagement) {
       toast.error('Select an engagement before saving');
       return;
     }
     const draftHtml = editorHtml.trim() ? editorHtml : templateHtml;
-    const saved = await saveDocument(draftHtml, 'Form 3CB');
+    const saved = await saveDocument(draftHtml, 'Form 3CB', buildDraftJson());
     if (saved) toast.success('Draft saved');
   };
 
@@ -534,8 +604,39 @@ export function Form3CB() {
         </Button>
       </div>
 
+      {section === 'para5' && clauseObservations.length > 0 && (
+        <div className="space-y-2 rounded-md border bg-blue-50 p-3">
+          <p className="text-xs font-semibold text-blue-800">Auto-populated from 3CD clause observations</p>
+          <div className="space-y-2">
+            {clauseObservations.map((observation, index) => (
+              <div key={observation.id} className="rounded border bg-background p-2 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-medium">
+                    {index + 1}. Clause {observation.clauseNo} - {observation.clauseTitle}
+                  </p>
+                  {onEditClauseObservation && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => onEditClauseObservation(observation.clauseKey)}
+                    >
+                      Edit in 3CD
+                    </Button>
+                  )}
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{observation.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {observations.length === 0 ? (
-        <p className="rounded-md border border-dashed bg-background p-3 text-sm text-muted-foreground">No observations added.</p>
+        <p className="rounded-md border border-dashed bg-background p-3 text-sm text-muted-foreground">
+          No direct Form {section === 'para5' ? '3CB para 5' : '3CB para 3'} observations added.
+        </p>
       ) : (
         <div className="space-y-3">
           {observations.map((observation, index) => (
@@ -590,7 +691,7 @@ export function Form3CB() {
       {!showEditor ? (
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">Generate Form 3CB for the selected engagement and save the draft.</p>
-          <Button onClick={() => setShowEditor(true)}>Generate Form 3CB</Button>
+          <Button onClick={handleOpenPreview}>Generate Form 3CB</Button>
         </CardContent>
       ) : (
         <CardContent className="space-y-6">

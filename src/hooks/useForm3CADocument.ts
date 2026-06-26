@@ -6,6 +6,16 @@ const db = getSQLiteClient();
 
 const SECTION_NAME = 'form_3ca';
 
+const removeUndefinedValues = <T extends Record<string, unknown>>(value: T): T => {
+  const cleaned = { ...value };
+  Object.keys(cleaned).forEach((key) => {
+    if (cleaned[key] === undefined) {
+      delete cleaned[key];
+    }
+  });
+  return cleaned;
+};
+
 export function useForm3CADocument(engagementId?: string | null) {
   const { user } = useAuth();
   const [document, setDocument] = useState<any | null>(null);
@@ -27,7 +37,7 @@ export function useForm3CADocument(engagementId?: string | null) {
         .select('*')
         .eq('engagement_id', engagementId)
         .eq('section_name', SECTION_NAME)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       setDocument(data || null);
@@ -41,7 +51,7 @@ export function useForm3CADocument(engagementId?: string | null) {
   }, [engagementId]);
 
   const saveDocument = useCallback(
-    async (contentHtml: string, sectionTitle?: string) => {
+    async (contentHtml: string, sectionTitle?: string, contentJson: Record<string, unknown> = {}) => {
       if (!engagementId) {
         setError('Select an engagement before saving');
         return null;
@@ -49,22 +59,23 @@ export function useForm3CADocument(engagementId?: string | null) {
 
       setSaving(true);
       try {
-        const payload = {
+        const payload = removeUndefinedValues({
           engagement_id: engagementId,
           section_name: SECTION_NAME,
           section_title: sectionTitle || 'Form 3CA',
+          content_json: JSON.stringify(contentJson),
           content_html: contentHtml,
           changed_by: user?.id || null,
-        };
+        });
 
         const existing = await db
           .from('audit_report_documents')
           .select('*')
           .eq('engagement_id', engagementId)
           .eq('section_name', SECTION_NAME)
-          .single();
+          .maybeSingle();
 
-        let data, error;
+        let error;
         if (existing.data) {
           const result = await db
             .from('audit_report_documents')
@@ -72,21 +83,28 @@ export function useForm3CADocument(engagementId?: string | null) {
             .eq('engagement_id', engagementId)
             .eq('section_name', SECTION_NAME)
             .execute();
-          data = result.data;
           error = result.error;
         } else {
           const result = await db
             .from('audit_report_documents')
             .insert(payload)
             .execute();
-          data = result.data;
           error = result.error;
         }
 
         if (error) throw error;
-        setDocument(data);
+        const { data: savedData, error: fetchError } = await db
+          .from('audit_report_documents')
+          .select('*')
+          .eq('engagement_id', engagementId)
+          .eq('section_name', SECTION_NAME)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        const savedDocument = savedData || { ...payload };
+        setDocument(savedDocument);
         setError(null);
-        return data;
+        return savedDocument;
       } catch (err: any) {
         console.error('Failed to save 3CA document', err);
         setError(err.message || 'Failed to save document');

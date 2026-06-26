@@ -149,7 +149,10 @@ export class AuditReportGenerator {
     }
 
     // Other Information (SA 720)
-    blocks.push({ kind: 'subheading', text: 'Other Information' });
+    blocks.push({
+      kind: 'subheading',
+      text: 'Information Other than the Standalone Financial Statements and Auditor’s Report Thereon',
+    });
     {
       const status = content.board_report_status || 'received_no_misstatement';
       const details = content.board_report_misstatement_details;
