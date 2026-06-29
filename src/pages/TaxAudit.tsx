@@ -52,7 +52,6 @@ import { AuditProgrammePanel } from '@/components/tax-audit/AuditProgrammePanel'
 import { ProfessionalResponsibilityPanel } from '@/components/tax-audit/ProfessionalResponsibilityPanel';
 import { StructuredClauseFields } from '@/components/tax-audit/StructuredClauseFields';
 import { SourceLinkChip } from '@/components/tax-audit/SourceLinkChip';
-import { Form3CA } from '@/components/appointment/Form3CA';
 import { Form3CB } from '@/components/appointment/Form3CB';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEngagement } from '@/contexts/EngagementContext';
@@ -2838,9 +2837,6 @@ export default function TaxAudit() {
     linkEvidence,
     unlinkEvidence,
   } = useTaxAudit(currentEngagement);
-
-  const governingActName = setup?.other_law_name || '';
-
   const [selectedClauseKey, setSelectedClauseKey] = useState('clause_1');
   const [selectedStructuredTableByClause, setSelectedStructuredTableByClause] = useState<Record<string, string>>({});
   const [reviewQueueOpen, setReviewQueueOpen] = useState(false);
@@ -2855,7 +2851,6 @@ export default function TaxAudit() {
   const complianceTracker = normalizeTaxAuditComplianceTracker(setupJson.complianceTracker);
   const complianceSummary = summarizeTaxAuditComplianceTracker(complianceTracker);
   const selectedReportForm = setup?.form_type || (toBool(setup?.books_audited_under_other_law) ? '3CA' : '3CB');
-  const activeReportFormTab = selectedReportForm === '3CB' ? '3cb' : '3ca';
   const reportClauseObservations = useMemo(() => buildReportClauseObservations(clauses), [clauses]);
   const openClause = (clauseKey: string, tableKey?: string) => {
     const defaultTableKey = getDefaultStructuredTableKey(clauseKey);
@@ -2947,7 +2942,7 @@ export default function TaxAudit() {
           <TabsTrigger value="acceptance">Acceptance and Eligibility</TabsTrigger>
           <TabsTrigger value="compliance">Compliance Tracker</TabsTrigger>
           <TabsTrigger value="programme">Audit Programme</TabsTrigger>
-          <TabsTrigger value="3ca3cb">3CA/3CB</TabsTrigger>
+          <TabsTrigger value="3ca3cb">3CB</TabsTrigger>
           <TabsTrigger value="clauses">
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             3CD Clause Workspace
@@ -2995,31 +2990,16 @@ export default function TaxAudit() {
         </TabsContent>
 
         <TabsContent value="3ca3cb" className="mt-0">
-          <Tabs value={activeReportFormTab} className="space-y-3">
-            <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-              <TabsTrigger value="3ca" disabled={selectedReportForm !== '3CA'}>
-                3CA
-              </TabsTrigger>
-              <TabsTrigger value="3cb" disabled={selectedReportForm !== '3CB'}>
-                3CB
-              </TabsTrigger>
-            </TabsList>
-            <p className="text-xs text-muted-foreground">
-              Enabled report form is based on the saved Audit Report Selection: Form {selectedReportForm} + 3CD.
-            </p>
-
-            <TabsContent value="3ca" className="mt-0">
-              <Form3CA
-                governingActName={governingActName}
-                clauseObservations={reportClauseObservations}
-                onEditClauseObservation={openClause}
-              />
-            </TabsContent>
-
-            <TabsContent value="3cb" className="mt-0">
-              <Form3CB clauseObservations={reportClauseObservations} onEditClauseObservation={openClause} />
-            </TabsContent>
-          </Tabs>
+          {selectedReportForm === '3CB' ? (
+            <Form3CB clauseObservations={reportClauseObservations} onEditClauseObservation={openClause} />
+          ) : (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Form 3CA draft has been removed. Change Audit Report Selection to Form 3CB to use this report tab.
+              </AlertDescription>
+            </Alert>
+          )}
         </TabsContent>
 
         <TabsContent value="clauses" className="mt-0">
