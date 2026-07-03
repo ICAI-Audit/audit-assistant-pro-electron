@@ -319,7 +319,10 @@ export const buildTaxAuditReportPack = ({
     },
     applicabilityAndFormSelection: {
       result: compact(setup.applicability_result, 'Not assessed'),
-      thresholdApplied: applicability.overall.sectionReference || 'Review required',
+      thresholdApplied:
+        applicability.overall.thresholdApplied ||
+        applicability.overall.sectionReference ||
+        'Review required',
       reason: compact(setup.applicability_reason),
       suggestedFormType: applicability.suggestedFormType ? `Form ${applicability.suggestedFormType}` : 'Not available',
       selectedFormType: setup.form_type ? `Form ${setup.form_type}` : 'Not selected',

@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ElementType } from 'react';
+import ExcelJS from 'exceljs';
+import { AlignmentType, Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   AlertCircle,
   ArrowRight,
@@ -98,6 +102,14 @@ import {
   TaxAuditReadinessSeverity,
 } from '@/lib/taxAuditReportReadiness';
 import { buildTaxAuditReportPack, renderTaxAuditReportPackMarkdown } from '@/lib/taxAuditReportPack';
+import {
+  buildTaxAuditForm3CDExport,
+  formatTaxAuditForm3CDClauseDetails,
+  renderTaxAuditForm3CDHtml,
+  TaxAuditForm3CDExport,
+} from '@/lib/taxAuditForm3CDExport';
+import { getTaxAuditStatutoryVersionWarning, TAX_AUDIT_STATUTORY_SCOPE_LABEL } from '@/lib/taxAuditStatutoryVersion';
+import { resolveTaxAuditReportFormState } from '@/lib/taxAuditReportFormSelection';
 
 const parseJson = <T,>(value: string | null | undefined, fallback: T): T => {
   if (!value) return fallback;
@@ -160,7 +172,7 @@ const numberValue = (value: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-type ClauseFilter = 'all' | 'attention' | 'evidence' | 'qualified' | 'reviewed';
+type ClauseFilter = 'all' | 'attention' | 'evidence_needed' | 'evidence' | 'qualified' | 'reviewed';
 type ReviewSummaryFilter =
   | 'all'
   | 'not_started'
@@ -175,11 +187,10 @@ type ReviewSummaryFilter =
 
 const TAX_AUDIT_BETA_LABEL = 'Tax Audit Beta v0.1 RC1';
 const TAX_AUDIT_PHASE_LABEL = 'Phase 1: Structured Tax Audit Workflow';
-const TAX_AUDIT_STATUTORY_SCOPE_LABEL = 'AY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD';
 const TAX_AUDIT_KNOWN_LIMITATIONS = [
-  'Final statutory Form 3CD generation is not part of this beta.',
+  'Statutory Form 3CD exports are draft outputs and require professional review before signing or portal upload.',
   'Portal filing is not part of this beta.',
-  'PDF, Word and Excel export are not part of this beta.',
+  'Income Tax portal schema upload is not part of this beta.',
   'GST, TDS and purchase register imports are not part of this beta.',
   'Structured clause capture is manual and requires professional review.',
   'The Working Paper Report Pack is an internal working paper summary, not a signed report.',
@@ -761,8 +772,10 @@ function SetupPanel({
     }
   }, [client]);
 
-  const selectedReportForm = draft.form_type || (toBool(draft.books_audited_under_other_law) ? '3CA' : '3CB');
-  const auditedUnderOtherLaw = selectedReportForm === '3CA' || toBool(draft.books_audited_under_other_law);
+  const { selectedReportForm, auditedUnderOtherLaw } = resolveTaxAuditReportFormState({
+    formType: draft.form_type,
+    booksAuditedUnderOtherLaw: draft.books_audited_under_other_law,
+  });
   const setupJson = parseJson<Record<string, unknown>>(draft.setup_json, {});
   const savedApplicabilityInputs =
     setupJson.applicabilityInputs && typeof setupJson.applicabilityInputs === 'object'
@@ -1175,6 +1188,7 @@ function ClauseNavigator({
   const clauseMatchesFilter = (definition: (typeof FORM_3CD_CLAUSES)[number]) => {
     const clause = clausesByKey.get(definition.key);
     if (filter === 'attention') return needsAttention(clause);
+    if (filter === 'evidence_needed') return Boolean(definition.requiresEvidence && clause && !evidenceClauseIds.has(clause.id));
     if (filter === 'evidence') return Boolean(clause && evidenceClauseIds.has(clause.id));
     if (filter === 'qualified') return toBool(clause?.qualification_required);
     if (filter === 'reviewed') return clause?.review_status === 'reviewed' || clause?.review_status === 'approved';
@@ -1199,6 +1213,14 @@ function ClauseNavigator({
       key: 'attention',
       label: 'Attention',
       count: FORM_3CD_CLAUSES.filter((definition) => needsAttention(clausesByKey.get(definition.key))).length,
+    },
+    {
+      key: 'evidence_needed',
+      label: 'Need Evidence',
+      count: FORM_3CD_CLAUSES.filter((definition) => {
+        const clause = clausesByKey.get(definition.key);
+        return Boolean(definition.requiresEvidence && clause && !evidenceClauseIds.has(clause.id));
+      }).length,
     },
     {
       key: 'evidence',
@@ -1275,6 +1297,14 @@ function ClauseNavigator({
           const groupClauses = visibleClauses.filter((clause) => clause.group === group);
           const allGroupClauses = FORM_3CD_CLAUSES.filter((clause) => clause.group === group);
           const pendingCount = allGroupClauses.filter((definition) => needsAttention(clausesByKey.get(definition.key))).length;
+          const evidenceNeededCount = allGroupClauses.filter((definition) => {
+            const clause = clausesByKey.get(definition.key);
+            return Boolean(definition.requiresEvidence && clause && !evidenceClauseIds.has(clause.id));
+          }).length;
+          const reviewedCount = allGroupClauses.filter((definition) => {
+            const clause = clausesByKey.get(definition.key);
+            return clause?.review_status === 'reviewed' || clause?.review_status === 'approved' || clause?.review_status === 'locked';
+          }).length;
           const isCollapsed = collapsedGroups.has(group);
           if (groupClauses.length === 0) return null;
           return (
@@ -1290,6 +1320,16 @@ function ClauseNavigator({
                 <span className="shrink-0 font-medium normal-case">
                   {allGroupClauses.length} clauses{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}
                 </span>
+                {evidenceNeededCount > 0 && (
+                  <span className="shrink-0 rounded-sm border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] normal-case text-amber-700">
+                    {evidenceNeededCount} evidence
+                  </span>
+                )}
+                {reviewedCount > 0 && (
+                  <span className="shrink-0 rounded-sm border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] normal-case text-emerald-700">
+                    {reviewedCount} reviewed
+                  </span>
+                )}
               </button>
               {!isCollapsed &&
                 groupClauses.map((definition) => {
@@ -1298,6 +1338,7 @@ function ClauseNavigator({
                   const subClauseTables = fieldSchema?.tables || [];
                   const selected = selectedKey === definition.key;
                   const hasEvidence = Boolean(clause && evidenceClauseIds.has(clause.id));
+                  const evidenceNeeded = Boolean(definition.requiresEvidence && clause && !hasEvidence);
                   const statusText = compactStatusLabel(clause);
                   const title = `${definition.clauseNo} ${definition.title}${clause ? ` | ${statusText} | ${reviewLabel[clause.review_status]}` : ''}`;
                   return (
@@ -1326,6 +1367,11 @@ function ClauseNavigator({
                           {selected && clause && (
                             <span className="rounded-sm border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
                               {statusText}
+                            </span>
+                          )}
+                          {evidenceNeeded && (
+                            <span className="rounded-sm border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+                              Evidence
                             </span>
                           )}
                           {hasEvidence && <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -2014,6 +2060,7 @@ function TaxAuditPageHeader({
   onOpenReviewQueue: () => void;
 }) {
   const selectedReportForm = setup?.form_type || (toBool(setup?.books_audited_under_other_law) ? '3CA' : '3CB');
+  const statutoryVersionWarning = getTaxAuditStatutoryVersionWarning(setup?.assessment_year);
 
   return (
     <div className="sticky top-0 z-20 -mx-1 border-b bg-background/95 px-1 py-3 backdrop-blur">
@@ -2028,6 +2075,7 @@ function TaxAuditPageHeader({
           <Badge variant="secondary">{TAX_AUDIT_BETA_LABEL}</Badge>
           <Badge variant="outline">Income-tax Act, 1961</Badge>
           <Badge variant="outline">Rule 6G</Badge>
+          {statutoryVersionWarning && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">AY review required</Badge>}
           <Badge>Form {selectedReportForm} + 3CD</Badge>
           <Badge variant={setup.applicability_result === 'Applicable' ? 'default' : 'outline'}>
             {setup.applicability_result || 'Not assessed'}
@@ -2067,6 +2115,53 @@ function TaxAuditOverview({
   onSaveAcknowledgement: (updates: Partial<TaxAuditSetup>) => Promise<unknown>;
   onOpenReviewQueue: () => void;
 }) {
+  const statutoryVersionWarning = getTaxAuditStatutoryVersionWarning(setup.assessment_year);
+  const expectedEvidenceClauses = FORM_3CD_CLAUSES.filter((clause) => clause.requiresEvidence).length;
+  const movedClauses = summary.prepared + summary.reviewed + summary.approved;
+  const workflowItems = [
+    {
+      label: 'Setup',
+      value: setup.form_type && setup.assessment_year ? 'Ready' : 'Incomplete',
+      detail: `Form ${setup.form_type || '-'} + 3CD - AY ${setup.assessment_year || '-'}`,
+      tone: setup.form_type && setup.assessment_year ? 'success' : 'warning',
+    },
+    {
+      label: 'Applicability',
+      value: setup.applicability_result || 'Not assessed',
+      detail: setup.applicability_reason || 'Recalculate setup to confirm result',
+      tone: setup.applicability_result === 'Applicable' ? 'success' : 'warning',
+    },
+    {
+      label: 'Acceptance',
+      value: acceptanceStatusLabel[acceptanceCheck?.overall_status || 'not_started'],
+      detail: 'Eligibility and professional acceptance',
+      tone: acceptanceCheck?.overall_status === 'completed' ? 'success' : 'warning',
+    },
+    {
+      label: 'Clause Review',
+      value: `${movedClauses}/${summary.totalClauses}`,
+      detail: `${summary.needsInput} need input - ${summary.conflicts} conflicts`,
+      tone: progress === 100 ? 'success' : summary.needsInput > 0 || summary.conflicts > 0 ? 'warning' : 'info',
+    },
+    {
+      label: 'Evidence',
+      value: `${summary.evidenceLinked}/${expectedEvidenceClauses}`,
+      detail: 'Linked evidence against evidence-expected clauses',
+      tone: summary.evidenceLinked >= expectedEvidenceClauses ? 'success' : 'warning',
+    },
+    {
+      label: 'Export',
+      value: statutoryVersionWarning ? 'AY review' : 'Draft enabled',
+      detail: statutoryVersionWarning || 'Statutory draft export available with readiness warnings',
+      tone: statutoryVersionWarning ? 'warning' : 'info',
+    },
+  ] as const;
+  const workflowToneClass = (tone: (typeof workflowItems)[number]['tone']) =>
+    cn(
+      tone === 'success' && 'border-emerald-200 bg-emerald-50/60',
+      tone === 'warning' && 'border-amber-200 bg-amber-50/60',
+      tone === 'info' && 'border-blue-200 bg-blue-50/50'
+    );
   const diagnostics = [
     { label: 'Tax Audit module', value: TAX_AUDIT_BETA_LABEL },
     { label: 'Statutory scope', value: TAX_AUDIT_STATUTORY_SCOPE_LABEL },
@@ -2087,6 +2182,13 @@ function TaxAuditOverview({
           </div>
         </AlertDescription>
       </Alert>
+
+      {statutoryVersionWarning && (
+        <Alert className="border-amber-200 bg-amber-50/70">
+          <AlertCircle className="h-4 w-4 text-amber-700" />
+          <AlertDescription className="text-amber-900">{statutoryVersionWarning}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -2152,6 +2254,23 @@ function TaxAuditOverview({
           onClick={onOpenReviewQueue}
         />
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">CA Workflow Snapshot</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2 md:grid-cols-2 xl:grid-cols-6">
+          {workflowItems.map((item) => (
+            <div key={item.label} className={cn('rounded-md border p-3', workflowToneClass(item.tone))}>
+              <p className="text-[11px] font-medium uppercase text-muted-foreground">{item.label}</p>
+              <p className="mt-1 text-sm font-semibold">{item.value}</p>
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground" title={item.detail}>
+                {item.detail}
+              </p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <ProfessionalResponsibilityPanel
         setup={setup}
@@ -2477,6 +2596,218 @@ function ReportReadinessPanel({
   );
 }
 
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const paragraphLines = (text: string, options?: { bold?: boolean; size?: number }) => {
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const usefulLines = lines.length > 0 ? lines : [''];
+  return usefulLines.map(
+    (line) =>
+      new Paragraph({
+        spacing: { after: 80 },
+        children: [new TextRun({ text: line, bold: options?.bold, size: options?.size || 20 })],
+      })
+  );
+};
+
+const tableCell = (text: string, width: number, options?: { bold?: boolean }) =>
+  new TableCell({
+    width: { size: width, type: WidthType.PERCENTAGE },
+    children: paragraphLines(text, { bold: options?.bold }),
+  });
+
+const sectionHeading = (text: string) =>
+  new Paragraph({
+    spacing: { before: 160, after: 80 },
+    children: [new TextRun({ text, bold: true, size: 22 })],
+  });
+
+const buildForm3CDWordDocument = (form: TaxAuditForm3CDExport) =>
+  new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 80 },
+            children: [new TextRun({ text: form.heading, bold: true, size: 28 })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 120 },
+            children: [new TextRun({ text: form.statutoryReference, size: 20 })],
+          }),
+          ...paragraphLines(`Draft review note: ${form.draftNotice}`, { size: 18 }),
+          sectionHeading(form.assesseeDetailsHeading),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              ['Name of assessee', form.assessee.name],
+              ['PAN / Aadhaar', form.assessee.pan],
+              ['Address', form.assessee.address],
+              ['Status', form.assessee.status],
+              ['Previous year', form.assessee.previousYear],
+              ['Assessment year', form.assessee.assessmentYear],
+              ['Report form', form.assessee.formType],
+            ].map(
+              ([label, value]) =>
+                new TableRow({
+                  children: [tableCell(label, 28, { bold: true }), tableCell(value, 72)],
+                })
+            ),
+          }),
+          sectionHeading(form.particularsHeading),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                tableHeader: true,
+                children: [
+                  tableCell('Clause', 10, { bold: true }),
+                  tableCell('Particulars required', 30, { bold: true }),
+                  tableCell('Details furnished', 60, { bold: true }),
+                ],
+              }),
+              ...form.rows.map(
+                (row) =>
+                  new TableRow({
+                    children: [
+                      tableCell(row.clauseNo, 10),
+                      tableCell(row.title, 30),
+                      tableCell(formatTaxAuditForm3CDClauseDetails(row), 60),
+                    ],
+                  })
+              ),
+            ],
+          }),
+          new Paragraph({
+            spacing: { before: 180 },
+            children: [
+              new TextRun({
+                text: `Generated from AuditPro Tax Audit module on ${new Date(form.generatedAt).toLocaleString('en-IN')}. Draft for professional review only.`,
+                italics: true,
+                size: 18,
+              }),
+            ],
+          }),
+        ],
+      },
+    ],
+  });
+
+const buildForm3CDExcelWorkbook = (form: TaxAuditForm3CDExport) => {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'AuditPro';
+  workbook.created = new Date(form.generatedAt);
+
+  const summary = workbook.addWorksheet('Form 3CD Summary');
+  summary.addRows([
+    [form.heading],
+    [form.statutoryReference],
+    ['Draft review note', form.draftNotice],
+    [],
+    [form.assesseeDetailsHeading],
+    ['Name of assessee', form.assessee.name],
+    ['PAN / Aadhaar', form.assessee.pan],
+    ['Address', form.assessee.address],
+    ['Status', form.assessee.status],
+    ['Previous year', form.assessee.previousYear],
+    ['Assessment year', form.assessee.assessmentYear],
+    ['Report form', form.assessee.formType],
+    ['Generated at', new Date(form.generatedAt).toLocaleString('en-IN')],
+  ]);
+  summary.getColumn(1).width = 26;
+  summary.getColumn(2).width = 80;
+
+  const clauses = workbook.addWorksheet('Form 3CD Clauses');
+  clauses.columns = [
+    { header: 'Clause', key: 'clauseNo', width: 12 },
+    { header: 'Particulars required', key: 'title', width: 44 },
+    { header: 'Details furnished', key: 'particulars', width: 90 },
+    { header: 'Review status', key: 'reviewStatus', width: 18 },
+    { header: 'Qualification / Observation', key: 'qualificationOrObservation', width: 50 },
+    { header: 'Working reference', key: 'workpaperReference', width: 24 },
+  ];
+  clauses.getRow(1).font = { bold: true };
+  form.rows.forEach((row) =>
+    clauses.addRow({
+      ...row,
+      particulars: row.particulars,
+      qualificationOrObservation: row.qualificationOrObservation || '',
+    })
+  );
+  clauses.eachRow((row) => {
+    row.alignment = { vertical: 'top', wrapText: true };
+  });
+
+  return workbook;
+};
+
+const buildForm3CDPdf = (form: TaxAuditForm3CDExport) => {
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const margin = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const maxWidth = pageWidth - margin * 2;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(form.heading, pageWidth / 2, 42, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(doc.splitTextToSize(form.statutoryReference, maxWidth), margin, 62);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Draft review note', margin, 86);
+  doc.setFont('helvetica', 'normal');
+  doc.text(doc.splitTextToSize(form.draftNotice, maxWidth), margin, 100);
+
+  autoTable(doc, {
+    startY: 132,
+    body: [
+      [form.assesseeDetailsHeading, ''],
+      ['Name of assessee', form.assessee.name],
+      ['PAN / Aadhaar', form.assessee.pan],
+      ['Address', form.assessee.address],
+      ['Status', form.assessee.status],
+      ['Previous year', form.assessee.previousYear],
+      ['Assessment year', form.assessee.assessmentYear],
+      ['Report form', form.assessee.formType],
+    ],
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 4, valign: 'top' },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 140 }, 1: { cellWidth: maxWidth - 140 } },
+  });
+
+  autoTable(doc, {
+    startY: ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 132) + 16,
+    head: [['Clause', 'Particulars required', 'Details furnished']],
+    body: form.rows.map((row) => [row.clauseNo, row.title, formatTaxAuditForm3CDClauseDetails(row)]),
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 4, valign: 'top', overflow: 'linebreak' },
+    headStyles: { fillColor: [230, 230, 230], textColor: [20, 20, 20] },
+    columnStyles: {
+      0: { cellWidth: 44, halign: 'center' },
+      1: { cellWidth: 170 },
+      2: { cellWidth: maxWidth - 214 },
+    },
+    didDrawPage: () => {
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.setFontSize(7);
+      doc.text(`Generated ${new Date(form.generatedAt).toLocaleString('en-IN')} - Draft for professional review only`, margin, pageHeight - 18);
+    },
+  });
+
+  return doc;
+};
+
 function ReviewSummaryPanel({
   setup,
   clientName,
@@ -2502,6 +2833,7 @@ function ReviewSummaryPanel({
   const [reportPackPreviewOpen, setReportPackPreviewOpen] = useState(false);
   const [reportPackMarkdown, setReportPackMarkdown] = useState('');
   const [reportPackGeneratedAt, setReportPackGeneratedAt] = useState('');
+  const [form3CDGeneratedAt, setForm3CDGeneratedAt] = useState('');
 
   const rows = useMemo(() => buildTaxAuditReviewSummaryRows(clausesByKey, evidenceLinks), [clausesByKey, evidenceLinks]);
   const counts = useMemo(() => buildTaxAuditReviewSummaryCounts(rows), [rows]);
@@ -2518,6 +2850,21 @@ function ReviewSummaryPanel({
     [acceptanceCheck, clientName, complianceTracker, counts, rows, setup]
   );
   const normalizedSearch = search.trim().toLowerCase();
+  const statutoryVersionWarning = getTaxAuditStatutoryVersionWarning(setup.assessment_year);
+  const statutoryExportWarning =
+    readiness.level === 'ready'
+      ? ''
+      : `${readiness.label}: ${readiness.criticalCount} critical, ${readiness.reviewRequiredCount} review required and ${readiness.advisoryCount} advisory item(s) remain. Export is allowed, but the Form 3CD draft should not be treated as final until these are resolved or documented.`;
+
+  const warnBeforeStatutoryExport = () => {
+    const warning = [statutoryVersionWarning, statutoryExportWarning].filter(Boolean).join(' ');
+    if (!warning) return;
+    toast({
+      title: 'Form 3CD readiness warning',
+      description: warning,
+      variant: readiness.level === 'not_ready' || statutoryVersionWarning ? 'destructive' : 'default',
+    });
+  };
 
   const generateReportPackMarkdown = () => {
     const generatedAt = new Date().toISOString();
@@ -2568,6 +2915,51 @@ function ReviewSummaryPanel({
     link.remove();
     URL.revokeObjectURL(url);
     toast({ title: 'Working Paper Report Pack downloaded', description: 'Markdown report pack was generated for review.' });
+  };
+
+  const buildCurrentForm3CD = () => {
+    const generatedAt = new Date().toISOString();
+    const form = buildTaxAuditForm3CDExport({
+      setup,
+      clientName,
+      clausesByKey,
+      generatedAt,
+    });
+    setForm3CDGeneratedAt(generatedAt);
+    return form;
+  };
+
+  const downloadForm3CDWord = async () => {
+    warnBeforeStatutoryExport();
+    const form = buildCurrentForm3CD();
+    const blob = await Packer.toBlob(buildForm3CDWordDocument(form));
+    downloadBlob(blob, `${form.fileBaseName}.docx`);
+    toast({ title: 'Form 3CD Word downloaded', description: 'Statutory Form 3CD draft generated for review.' });
+  };
+
+  const downloadForm3CDExcel = async () => {
+    warnBeforeStatutoryExport();
+    const form = buildCurrentForm3CD();
+    const workbook = buildForm3CDExcelWorkbook(form);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    downloadBlob(blob, `${form.fileBaseName}.xlsx`);
+    toast({ title: 'Form 3CD Excel downloaded', description: 'Clause-wise Form 3CD workbook generated for review.' });
+  };
+
+  const downloadForm3CDPdf = () => {
+    warnBeforeStatutoryExport();
+    const form = buildCurrentForm3CD();
+    buildForm3CDPdf(form).save(`${form.fileBaseName}.pdf`);
+    toast({ title: 'Form 3CD PDF downloaded', description: 'Printable statutory Form 3CD draft generated for review.' });
+  };
+
+  const downloadForm3CDHtml = () => {
+    warnBeforeStatutoryExport();
+    const form = buildCurrentForm3CD();
+    const blob = new Blob([renderTaxAuditForm3CDHtml(form)], { type: 'text/html;charset=utf-8' });
+    downloadBlob(blob, `${form.fileBaseName}.html`);
+    toast({ title: 'Form 3CD HTML downloaded', description: 'Printable HTML draft generated for review.' });
   };
 
   const filteredRows = useMemo(
@@ -2675,6 +3067,73 @@ function ReviewSummaryPanel({
           <div className="rounded-md border bg-muted/20 p-3">
             <p className="text-xs font-medium uppercase text-muted-foreground">Evidence / Working Reference</p>
             <p className="mt-1 text-sm font-semibold">{counts.clausesWithEvidence} clause(s)</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle className="text-base">Statutory Form 3CD Export</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Generate Form 3CD statement of particulars from the current setup and clause responses. Review before signing or portal upload.
+              </p>
+              {form3CDGeneratedAt && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Last generated: {new Date(form3CDGeneratedAt).toLocaleString('en-IN')}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={downloadForm3CDWord}>
+                <Download className="mr-2 h-4 w-4" />
+                Word
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={downloadForm3CDExcel}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Excel
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={downloadForm3CDPdf}>
+                <Download className="mr-2 h-4 w-4" />
+                PDF
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={downloadForm3CDHtml}>
+                Printable HTML
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-0">
+          {statutoryVersionWarning && (
+            <Alert className="border-amber-200 bg-amber-50/70">
+              <AlertCircle className="h-4 w-4 text-amber-700" />
+              <AlertDescription className="text-amber-900">{statutoryVersionWarning}</AlertDescription>
+            </Alert>
+          )}
+          {statutoryExportWarning && (
+            <Alert variant={readiness.level === 'not_ready' ? 'destructive' : 'default'}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{statutoryExportWarning}</AlertDescription>
+            </Alert>
+          )}
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-md border bg-muted/20 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Clauses exported</p>
+              <p className="mt-1 text-sm font-semibold">{FORM_3CD_CLAUSES.length}</p>
+            </div>
+            <div className="rounded-md border bg-muted/20 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Report form</p>
+              <p className="mt-1 text-sm font-semibold">Form {setup.form_type} + 3CD</p>
+            </div>
+            <div className="rounded-md border bg-muted/20 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Assessment year</p>
+              <p className="mt-1 text-sm font-semibold">{setup.assessment_year || '-'}</p>
+            </div>
+            <div className="rounded-md border bg-muted/20 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Readiness</p>
+              <p className="mt-1 text-sm font-semibold">{readiness.label}</p>
+            </div>
           </div>
         </CardContent>
       </Card>

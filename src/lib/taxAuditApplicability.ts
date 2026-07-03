@@ -7,6 +7,15 @@ export type TaxAuditApplicabilityInputs = {
   has_professional_activity?: boolean | number | string | null;
   business_turnover?: number | string | null;
   professional_gross_receipts?: number | string | null;
+  presumptive_section?: string | null;
+};
+
+export type TaxAuditSection44AB = '44AB(a)' | '44AB(b)' | '44AB(c)' | '44AB(d)' | '44AB(e)';
+
+export type TaxAuditPresumptiveApplicability = {
+  result: TaxAuditApplicabilityResult | null;
+  presumptiveSection: string | null;
+  sectionReference: '44AB(c)' | '44AB(d)' | '44AB(e)' | null;
 };
 
 export type TaxAuditApplicabilitySetup = TaxAuditApplicabilityInputs & {
@@ -30,13 +39,15 @@ export type ActivityApplicability = {
   turnover?: number | null;
   grossReceipts?: number | null;
   thresholdApplied: 'Rs. 1 crore' | 'Rs. 10 crore' | 'Rs. 50 lakh' | null;
-  sectionReference: '44AB(a)' | '44AB(b)' | null;
+  sectionReference: TaxAuditSection44AB | null;
 };
 
 export type TaxAuditApplicabilityCalculation = {
   overall: {
     result: TaxAuditApplicabilityResult;
     reason: string;
+    sectionReference: TaxAuditSection44AB | null;
+    thresholdApplied: 'Rs. 1 crore' | 'Rs. 10 crore' | 'Rs. 50 lakh' | null;
   };
   business: {
     result: TaxAuditApplicabilityResult | null;
@@ -50,6 +61,7 @@ export type TaxAuditApplicabilityCalculation = {
     thresholdApplied: 'Rs. 50 lakh' | null;
     sectionReference: '44AB(b)' | null;
   };
+  presumptive: TaxAuditPresumptiveApplicability;
   suggestedFormType: TaxAuditFormType | null;
   warnings: string[];
 };
@@ -93,6 +105,51 @@ const buildDefaultProfessionResult = (): TaxAuditApplicabilityCalculation['profe
   sectionReference: null,
 });
 
+const buildDefaultPresumptiveResult = (): TaxAuditPresumptiveApplicability => ({
+  result: null,
+  presumptiveSection: null,
+  sectionReference: null,
+});
+
+const normalizePresumptiveSection = (value: unknown) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().toUpperCase();
+};
+
+const resolvePresumptiveApplicability = (
+  setupData: TaxAuditApplicabilitySetup,
+  resolved: ReturnType<typeof resolveInputs>,
+  warnings: string[]
+): TaxAuditPresumptiveApplicability => {
+  if (!toBool(setupData.presumptive_taxation) || !toBool(setupData.lower_than_presumptive)) {
+    return buildDefaultPresumptiveResult();
+  }
+
+  const explicitSection = normalizePresumptiveSection(setupData.presumptive_section);
+  if (['44AE', '44BB', '44BBB'].includes(explicitSection)) {
+    return { result: 'Applicable', presumptiveSection: explicitSection, sectionReference: '44AB(c)' };
+  }
+  if (explicitSection === '44ADA') {
+    return { result: 'Applicable', presumptiveSection: explicitSection, sectionReference: '44AB(d)' };
+  }
+  if (explicitSection === '44AD') {
+    return { result: 'Applicable', presumptiveSection: explicitSection, sectionReference: '44AB(e)' };
+  }
+
+  if (resolved.hasProfessionalActivity && !resolved.hasBusinessActivity) {
+    return { result: 'Applicable', presumptiveSection: '44ADA', sectionReference: '44AB(d)' };
+  }
+  if (resolved.hasBusinessActivity && !resolved.hasProfessionalActivity) {
+    return { result: 'Applicable', presumptiveSection: '44AD', sectionReference: '44AB(e)' };
+  }
+  if (!resolved.hasBusinessActivity && !resolved.hasProfessionalActivity) {
+    return { result: 'Applicable', presumptiveSection: '44AE/44BB/44BBB', sectionReference: '44AB(c)' };
+  }
+
+  warnings.push('Select the applicable presumptive section to resolve section 44AB(c), 44AB(d), or 44AB(e).');
+  return { result: 'Review required', presumptiveSection: null, sectionReference: null };
+};
+
 function resolveInputs(setupData: TaxAuditApplicabilitySetup) {
   const hasNewBusinessFlag = hasExplicitValue(setupData.has_business_activity);
   const hasNewProfessionFlag = hasExplicitValue(setupData.has_professional_activity);
@@ -130,12 +187,13 @@ export function calculateApplicability(setupData: TaxAuditApplicabilitySetup): T
     warnings.push('Activity profile is derived from legacy business/profession selection.');
   }
 
-  if (!resolved.hasBusinessActivity && !resolved.hasProfessionalActivity) {
+  if (!resolved.hasBusinessActivity && !resolved.hasProfessionalActivity && !(presumptiveTaxation && lowerThanPresumptive)) {
     warnings.push('Select at least one activity type to assess applicability.');
   }
 
   let business = buildDefaultBusinessResult();
   let profession = buildDefaultProfessionResult();
+  const presumptive = resolvePresumptiveApplicability(setupData, resolved, warnings);
   const reasons: string[] = [];
 
   if (resolved.hasBusinessActivity) {
@@ -211,23 +269,47 @@ export function calculateApplicability(setupData: TaxAuditApplicabilitySetup): T
     overallResult = 'Not assessed';
   }
 
-  if (presumptiveTaxation && lowerThanPresumptive && !hasApplicableActivity) {
-    overallResult = 'Review required';
-    reasons.push(
-      'Presumptive taxation is selected and income is reported lower than the presumptive threshold. Sections 44AD, 44ADA, 44AE, 44BB, and 44BBB require further auditor review before concluding applicability.'
-    );
+  if (presumptiveTaxation && lowerThanPresumptive) {
+    if (presumptive.result === 'Applicable') {
+      overallResult = 'Applicable';
+      reasons.push(
+        `Presumptive taxation is selected and income is reported lower than the presumptive threshold. Section ${presumptive.sectionReference} applies with reference to ${presumptive.presumptiveSection}.`
+      );
+    } else if (!hasApplicableActivity) {
+      overallResult = 'Review required';
+      reasons.push(
+        'Presumptive taxation is selected and income is reported lower than the presumptive threshold. Select the applicable presumptive section before concluding applicability.'
+      );
+    }
   }
 
   const suggestedFormType: TaxAuditFormType | null =
     overallResult === 'Applicable' ? (booksAuditedUnderOtherLaw ? '3CA' : '3CB') : null;
+  const overallSectionReference =
+    business.result === 'Applicable'
+      ? business.sectionReference
+      : profession.result === 'Applicable'
+        ? profession.sectionReference
+        : presumptive.result === 'Applicable'
+          ? presumptive.sectionReference
+          : null;
+  const overallThresholdApplied =
+    business.result === 'Applicable'
+      ? business.thresholdApplied
+      : profession.result === 'Applicable'
+        ? profession.thresholdApplied
+        : null;
 
   return {
     overall: {
       result: overallResult,
       reason: reasons.length > 0 ? reasons.join(' ') : 'No business or professional activity has been selected for applicability assessment.',
+      sectionReference: overallSectionReference,
+      thresholdApplied: overallThresholdApplied,
     },
     business,
     profession,
+    presumptive,
     suggestedFormType,
     warnings,
   };

@@ -18,6 +18,11 @@ import {
   derivePreviousYearRange,
 } from '@/utils/tax-audit/applicability';
 import { calculateApplicability, TaxAuditApplicabilityInputs } from '@/lib/taxAuditApplicability';
+import {
+  getDefaultTaxAuditReportSelection,
+  isCompanyConstitution,
+  shouldRepairTaxAuditDraftReportSelection,
+} from '@/lib/taxAuditReportFormSelection';
 
 const db = getSQLiteClient();
 
@@ -50,28 +55,16 @@ const buildApplicabilityPatch = (setup: Partial<TaxAuditSetup>) => {
     setup_json: stringify({
       ...setupJson,
       applicability: {
+        overall: calculation.overall,
         business: calculation.business,
         profession: calculation.profession,
+        presumptive: calculation.presumptive,
         suggestedFormType: calculation.suggestedFormType,
         warnings: calculation.warnings,
         calculatedAt: new Date().toISOString(),
       },
     }),
   };
-};
-
-const isCompanyConstitution = (value?: string | null) => {
-  const normalized = (value || '').toLowerCase();
-  if (!normalized) return false;
-  if (normalized.includes('llp') || normalized.includes('limited liability partnership')) return false;
-  return (
-    normalized.includes('company') ||
-    normalized.includes('private limited') ||
-    normalized.includes('public limited') ||
-    normalized.includes('one person company') ||
-    normalized.includes('opc') ||
-    normalized.includes('section 8')
-  );
 };
 
 type EngagementLike = {
@@ -170,9 +163,17 @@ const resolveSection44AB = (setup: TaxAuditSetup) => {
   const profession = applicability.profession && typeof applicability.profession === 'object'
     ? (applicability.profession as Record<string, unknown>)
     : {};
+  const presumptive = applicability.presumptive && typeof applicability.presumptive === 'object'
+    ? (applicability.presumptive as Record<string, unknown>)
+    : {};
+  const overall = applicability.overall && typeof applicability.overall === 'object'
+    ? (applicability.overall as Record<string, unknown>)
+    : {};
 
+  if (overall.result === 'Applicable' && typeof overall.sectionReference === 'string') return overall.sectionReference;
   if (business.result === 'Applicable' && typeof business.sectionReference === 'string') return business.sectionReference;
   if (profession.result === 'Applicable' && typeof profession.sectionReference === 'string') return profession.sectionReference;
+  if (presumptive.result === 'Applicable' && typeof presumptive.sectionReference === 'string') return presumptive.sectionReference;
   if (setup.applicability_result === 'Review required') return 'Other / Review required';
   return setup.applicability_result || '';
 };
@@ -395,16 +396,29 @@ const createClausePrefill = (
         links: [setupLink],
         missingFields: ['Books of account particulars'],
       };
-    case 'clause_12':
+    case 'clause_12': {
+      const setupJson = parseJson<Record<string, unknown>>(setup.setup_json, {});
+      const applicability =
+        setupJson.applicability && typeof setupJson.applicability === 'object'
+          ? (setupJson.applicability as Record<string, unknown>)
+          : {};
+      const presumptive =
+        applicability.presumptive && typeof applicability.presumptive === 'object'
+          ? (applicability.presumptive as Record<string, unknown>)
+          : {};
       return {
         responseHtml: toBoolNumber(setup.presumptive_taxation) ? 'Yes' : '',
         responseJson: {
           structured: {
             whether_profit_loss_includes_presumptive_income: toBoolNumber(setup.presumptive_taxation) ? 'yes' : '',
-            applicable_presumptive_section: '',
+            applicable_presumptive_section: typeof presumptive.presumptiveSection === 'string' ? presumptive.presumptiveSection : '',
             amount: '',
             basis_or_remarks: toBoolNumber(setup.lower_than_presumptive)
-              ? 'Lower than presumptive threshold selected in setup. Review applicable presumptive provisions.'
+              ? `Lower than presumptive threshold selected in setup.${
+                  typeof presumptive.sectionReference === 'string'
+                    ? ` ${presumptive.sectionReference} indicated by applicability setup.`
+                    : ' Review applicable presumptive provisions.'
+                }`
               : '',
           },
         },
@@ -412,6 +426,7 @@ const createClausePrefill = (
         links: [setupLink],
         missingFields: toBoolNumber(setup.presumptive_taxation) ? [] : ['Presumptive income particulars'],
       };
+    }
     case 'clause_13':
       return {
         responseHtml: '',
@@ -931,12 +946,15 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
       if (!engagement) return null;
       const assessmentYear = deriveAssessmentYear(engagement.financial_year);
       const period = derivePreviousYearRange(engagement.financial_year);
-      const companyAccountsAudited = isCompanyConstitution(clientRow?.constitution);
+      const defaultReportSelection = getDefaultTaxAuditReportSelection({
+        constitution: clientRow?.constitution,
+        engagementType: engagement.engagement_type,
+      });
       const baseSetup: TaxAuditSetup = {
         engagement_id: engagement.id,
         client_id: engagement.client_id,
         statutory_version: TAX_AUDIT_STATUTORY_VERSION,
-        form_type: '3CB',
+        form_type: defaultReportSelection.formType,
         financial_year: engagement.financial_year,
         assessment_year: assessmentYear,
         previous_year_from: period.from,
@@ -947,8 +965,8 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
         status: clientRow?.constitution || '',
         business_or_profession: 'business',
         nature_of_business: clientRow?.industry || '',
-        books_audited_under_other_law: companyAccountsAudited || engagement.engagement_type === 'statutory' ? 1 : 0,
-        other_law_name: companyAccountsAudited ? 'Companies Act, 2013' : '',
+        books_audited_under_other_law: defaultReportSelection.booksAuditedUnderOtherLaw ? 1 : 0,
+        other_law_name: defaultReportSelection.otherLawName,
         turnover: 0,
         gross_receipts: 0,
         cash_receipts_percent: 0,
@@ -1045,13 +1063,13 @@ export function useTaxAudit(engagement: EngagementLike | null | undefined) {
 
       if (
         nextSetup?.id &&
-        nextSetup.review_status === 'draft' &&
-        isCompanyConstitution(clientRow?.constitution) &&
-        !toBoolNumber(nextSetup.books_audited_under_other_law)
+        shouldRepairTaxAuditDraftReportSelection(nextSetup)
       ) {
         const companyAuditPatch = {
+          form_type: '3CA',
           books_audited_under_other_law: 1,
-          other_law_name: nextSetup.other_law_name || 'Companies Act, 2013',
+          other_law_name:
+            nextSetup.other_law_name || (isCompanyConstitution(clientRow?.constitution) ? 'Companies Act, 2013' : ''),
         };
         const { error: companyPatchError } = await db
           .from('tax_audit_engagements')
