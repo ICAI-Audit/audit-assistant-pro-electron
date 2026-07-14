@@ -164,18 +164,45 @@ function createWindow() {
     // Create the browser window.
     // Determine the correct icon path for the platform
     let iconPath;
-    const buildDir = path.join(__dirname, '../build');
+    // In development, __dirname points to electron/, in production it may differ
+    const buildDir = isDev 
+        ? path.join(__dirname, '../build')  // Development: electron/ is 1 level from root
+        : path.join(process.resourcesPath, '../build');  // Production: use app resources
+    
+    // Fallback to app path if needed
+    const fallbackBuildDir = path.join(app.getAppPath(), 'build');
     
     if (process.platform === 'win32') {
         // Windows: use .ico format for best taskbar appearance
         iconPath = path.join(buildDir, 'icon.ico');
+        // Check if file exists, fallback if not
+        if (!fs.existsSync(iconPath)) {
+            iconPath = path.join(fallbackBuildDir, 'icon.ico');
+        }
     } else if (process.platform === 'darwin') {
         // macOS: use .png
         iconPath = path.join(buildDir, 'icon.png');
+        // Check if file exists, fallback if not
+        if (!fs.existsSync(iconPath)) {
+            iconPath = path.join(fallbackBuildDir, 'icon.png');
+        }
     } else {
         // Linux: use .png
         iconPath = path.join(buildDir, 'icon.png');
+        // Check if file exists, fallback if not
+        if (!fs.existsSync(iconPath)) {
+            iconPath = path.join(fallbackBuildDir, 'icon.png');
+        }
     }
+    
+    // Log for debugging
+    console.log('[Icon] Platform:', process.platform);
+    console.log('[Icon] isDev:', isDev);
+    console.log('[Icon] Icon path:', iconPath);
+    console.log('[Icon] File exists:', fs.existsSync(iconPath));
+    
+    // Only set icon if file exists
+    const iconConfig = fs.existsSync(iconPath) ? { icon: iconPath } : {};
     
     const mainWindow = new BrowserWindow({
         width: 1400,
@@ -187,7 +214,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
         },
-        icon: iconPath,
+        ...iconConfig,
         title: 'ICAI VERA',
         show: false,
     });
