@@ -6,8 +6,44 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Loader2, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Building2, Loader2, AlertCircle, CheckCircle2, ArrowLeft, Trash2 } from 'lucide-react';
 import { z } from 'zod';
+
+// Storage keys for Remember Me functionality
+const REMEMBER_ME_EMAIL_KEY = 'icai_vera_remember_email';
+const REMEMBER_ME_FLAG_KEY = 'icai_vera_remember_me';
+
+// Helper functions for secure storage
+const saveRememberedEmail = (email: string) => {
+  try {
+    localStorage.setItem(REMEMBER_ME_EMAIL_KEY, email);
+    localStorage.setItem(REMEMBER_ME_FLAG_KEY, 'true');
+  } catch (err) {
+    console.error('Failed to save remembered email:', err);
+  }
+};
+
+const getRememberedEmail = (): string | null => {
+  try {
+    const isRemembered = localStorage.getItem(REMEMBER_ME_FLAG_KEY) === 'true';
+    if (isRemembered) {
+      return localStorage.getItem(REMEMBER_ME_EMAIL_KEY);
+    }
+  } catch (err) {
+    console.error('Failed to retrieve remembered email:', err);
+  }
+  return null;
+};
+
+const clearRememberedEmail = () => {
+  try {
+    localStorage.removeItem(REMEMBER_ME_EMAIL_KEY);
+    localStorage.removeItem(REMEMBER_ME_FLAG_KEY);
+  } catch (err) {
+    console.error('Failed to clear remembered email:', err);
+  }
+};
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -49,6 +85,7 @@ export default function Auth() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Signup form state
   const [signupFullName, setSignupFullName] = useState('');
@@ -62,6 +99,15 @@ export default function Auth() {
   // Update password state
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+
+  // Load remembered email on component mount
+  useEffect(() => {
+    const rememberedEmail = getRememberedEmail();
+    if (rememberedEmail) {
+      setLoginEmail(rememberedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   // Check for password reset flow - handle token exchange
   useEffect(() => {
@@ -126,6 +172,13 @@ export default function Auth() {
         setError('Invalid email or password. Please try again.');
       } else {
         setError(signInError.message);
+      }
+    } else {
+      // Save email if Remember Me is checked
+      if (rememberMe) {
+        saveRememberedEmail(loginEmail);
+      } else {
+        clearRememberedEmail();
       }
     }
   };
@@ -430,6 +483,33 @@ export default function Auth() {
                       required
                     />
                   </div>
+
+                  {/* Remember Me Checkbox */}
+                  <div className="flex items-center space-x-2 py-2">
+                    <Checkbox
+                      id="remember-me"
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    />
+                    <Label htmlFor="remember-me" className="font-normal cursor-pointer flex-1">
+                      Remember this email
+                    </Label>
+                    {rememberMe && loginEmail && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearRememberedEmail();
+                          setRememberMe(false);
+                          setLoginEmail('');
+                        }}
+                        className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                        title="Clear remembered email"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </button>
+                    )}
+                  </div>
+
                   <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? (
                       <>

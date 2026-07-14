@@ -162,6 +162,21 @@ function setupGstzenHandlers() {
 
 function createWindow() {
     // Create the browser window.
+    // Determine the correct icon path for the platform
+    let iconPath;
+    const buildDir = path.join(__dirname, '../build');
+    
+    if (process.platform === 'win32') {
+        // Windows: use .ico format for best taskbar appearance
+        iconPath = path.join(buildDir, 'icon.ico');
+    } else if (process.platform === 'darwin') {
+        // macOS: use .png
+        iconPath = path.join(buildDir, 'icon.png');
+    } else {
+        // Linux: use .png
+        iconPath = path.join(buildDir, 'icon.png');
+    }
+    
     const mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
@@ -172,7 +187,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
         },
-        icon: path.join(__dirname, '../build/icon.png'),
+        icon: iconPath,
         title: 'ICAI VERA',
         show: false,
     });
