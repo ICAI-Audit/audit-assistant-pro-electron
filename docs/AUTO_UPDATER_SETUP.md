@@ -371,7 +371,7 @@ jobs:
 npm run build
 
 # Build and run Electron app with auto-updater
-VITE_DEV_SERVER_URL="" npm run electron
+npm run electron
 ```
 
 ### 10.2 Test Beta Updates

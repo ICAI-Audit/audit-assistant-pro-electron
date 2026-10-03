@@ -42,6 +42,9 @@ npm run dev
 # Run Electron app in development mode (with hot reload)
 npm run electron:dev
 
+# Run the latest production build locally (run `npm run build` first)
+npm run electron
+
 # Build the production version of the app
 npm run build
 
