@@ -4,61 +4,68 @@
 
 - Date: 29 October 2026.
 - Agent: AI assistant using Copilot SDK in VS Code.
-- Requested task: T-002, reproducible installation and supported toolchain.
-- Branch: `docs/t002-reproducible-install-2026-10-29`, created separately from the published T-001 documentation branch.
-- Source/base application commit: `main` at `c0ea50820094952b3bad9c83b45cc00cbff0381c`.
-- Application package version: 0.9.1.
-- Verified local toolchain: Windows x64, Node.js 24.12.0, npm 11.6.2.
-- Current branch HEAD: use `git rev-parse HEAD`; compare with `git ls-remote origin refs/heads/docs/t002-reproducible-install-2026-10-29`. This handoff intentionally does not embed its own commit SHA.
+- Requested task: T-003, backend authorization and locking verification.
+- Branch: `docs/t003-auth-lock-verification-2026-10-29`, created from published T-002 branch commit `229a098f375050be1c5d4cd45236b5e0ec903325`.
+- Application source baseline: `main` at `c0ea50820094952b3bad9c83b45cc00cbff0381c`; T-002 install/toolchain fixes are preserved.
+- Local environment: Windows x64, Node.js 24.12.0, npm 11.6.2.
+- Current branch HEAD: use `git rev-parse HEAD`; compare with `git ls-remote origin refs/heads/docs/t003-auth-lock-verification-2026-10-29`. Do not embed this handoff's own future commit SHA.
 
-## T-001 status and client evidence
+## Scope and boundaries
 
-T-001 remains **partial**. Its remaining client checks are non-blocking for T-002.
+T-003 is complete as investigation, isolated regression evidence and remediation proposal only. No production authorization rule changed; no finalization behavior was implemented. The T-003 test profile contained only synthetic accounts, two engagements, records and files. No existing client database or evidence path was opened.
 
-- This assistant explicitly read AGENTS.md and the requested project records. That is manual reading, not evidence of automatic repository-instruction loading.
-- VS Code evidence recorded for T-001: version 1.143.1 (`e646868227c3e3a9e3f24277c8c7220be42c0be7`, x64). The installed extension list included `openai.chatgpt@26.1021.22027`, `openai.codex-audio@26.1021.22027`, and `anthropic.claude-code@2.1.312`; installed extensions do not identify which client hosted the assistant.
-- No standalone Codex executable or direct Codex client version/session evidence was available. Automatic instruction loading is unverified.
-- Claude was not exercised; its check remains pending.
+T-001 remains partial: automatic repository instruction loading is unverified; a fresh Codex client/version test and Claude client check remain pending. These were non-blocking for T-003. T-002 remains complete with its lock metadata repair, Node 24 workflow and installation evidence.
 
-## T-002 findings and changes
+## Active-path evidence
 
-Before editing, `npm ci --ignore-scripts --no-audit --no-fund` was run in a clean worktree and reproduced npm EUSAGE. The lockfile had `@emnapi/wasi-threads` 1.2.2 while 1.2.3 was required, and 26 Vitest optional platform `@esbuild/*` entries at 0.28.1 while 0.28.2 was required.
+- The real `electron/main.cjs` registers IPC handlers and creates the window with the real `electron/preload.cjs`.
+- The preload exposes SQLite authentication/query, evidence-file and export APIs through `ipcRenderer.invoke`.
+- `sqlite-auth` maintains a module-global `currentUserId`; `sqlite-query` does not consult the session, renderer sender, role or `AccessControl`.
+- File handlers resolve bucket/path beneath userData storage, but do not consult an authenticated principal or evidence metadata/engagement assignment. Export writes renderer-supplied bytes to the downloads folder.
+- `sqlite/access-control.ts` is not imported/called by active main or preload. Even if connected, its role enum omits database roles `admin`, `viewer`, and `user`; evidence-link lookup assumes an `engagement_id` field that the link table does not have; and the helper has no lock/approval-state check.
 
-The lock metadata was regenerated with `npm install --package-lock-only --ignore-scripts --no-audit --no-fund`. Review found stale platform entries, the emnapi mismatch, and an `iconv-lite` optional/dev flag change. Root dependency metadata and direct dependency versions did not change. The release workflow was updated from Node 18 to Node 24 because the locked `@electron/rebuild` requires Node >=22.12.0 and Node 18 is EOL. The locked `better-sqlite3` supports Node 20.x and 22.x–25.x. `package.json` adds only the `test:native` script; the script uses synthetic inputs and a temporary Electron profile.
+## Isolation and actual-handler harness
 
-The earlier installation fix is committed on this branch. This task's final documentation change is limited to project guidance, status, task tracking and handoff. No application source behavior or direct dependency version was changed.
+`npm run test:t003-authorization` runs the renderer build, then `node --test scripts/test-t003-authorization.cjs`. The test creates a fresh OS temp root and a temporary Electron app entry. `scripts/t003-electron-entry.cjs` sets and verifies Electron `userData` and downloads paths, checks the database and SQLite sidecars are absent, prints an isolation marker, and only then requires production `electron/main.cjs`. The test waits for the actual preload API and sends all probes through the actual Electron IPC handlers. The first database call initializes the synthetic test DB and startup schema only within the verified temp profile.
 
-## Validation results
+Final run evidence:
+
+- The isolation marker was emitted before loading main; the test later confirmed `audit_assistant.db` and WAL files existed only under the temporary userData path, with no application profile selected.
+- `npm run test:t003-authorization` built the Vite renderer successfully and exited 1 because expected-denial regression assertions failed. Nineteen behavioral subtests ran: 5 passed setup/observation checks and 14 failed security assertions. Node reports the failed parent suite as an additional failure (20 total, 5 pass, 15 fail).
+- The failing assertions demonstrate: an anonymous database read before signup; a staff client update forbidden by the helper policy; database reads after logout; unfiltered cross-engagement procedure reads; forged-ID procedure update and delete across assignments; staff escalation of its own role; indirect A-to-B evidence link access; anonymous `file-get-path`, save, download and delete; and unfiltered bulk update/delete affecting all three synthetic records.
+- Positive/observation checks demonstrated a permitted manager update, observed admin-role ambiguity, successful locked/approved evidence writes without a defined policy check, unauthenticated synthetic export limited to the temp downloads directory, and test-profile isolation.
+- These failures are intentionally preserved in `scripts/test-t003-authorization.cjs`; do not weaken assertions to make the suite green. The summary and policy classifications are in `docs/project/SECURITY_AND_AUDIT.md`.
+
+## Passed, failed and skipped checks
 
 **Passed**
 
-- `npm ci --no-audit --no-fund`, with normal postinstall, in two separate clean worktrees on Windows x64 with Node.js 24.12.0/npm 11.6.2. Electron rebuild completed in both.
-- `npm run test:native` after both installs. Electron loaded SQLite using `:memory:` and bcrypt processed a synthetic password; Electron used a unique temporary userData directory. Existing client databases and evidence files were not accessed.
-- `npx vitest run src/lib`: 8 files and 37 tests passed.
-- `npm run test:classification`: passed.
-- `npm run test:bulk-update`: passed.
-- `npm run build`: passed; existing stale Browserslist, dynamic-import/chunk, and large-chunk warnings remain.
-- `npm run docs:inventory`: passed; refreshed and reported 31 routes, 9 schema files, and 13 test files. Generated diff was reviewed.
-- `npm run docs:check`: passed.
-- `node --test scripts/check-project-docs.test.mjs`: 1 test passed, 0 failures.
-- `git diff --check`: passed. Run `git diff --cached --check` after staging and before commit.
+- `npm ci --no-audit --no-fund`: installed in the new isolated worktree on Node.js 24.12.0/npm 11.6.2; Electron native rebuild completed.
+- Vite production renderer build within `npm run test:t003-authorization`: passed. Existing Browserslist, dynamic import/chunk and large chunk warnings remain.
+- Five behavioral setup/observation subtests passed as described above; this does not mean authorization passed.
+- `npm run docs:inventory`: passed; 31 routes, 9 schema files, 13 test files. The regenerated screen map and JSON inventory matched committed content.
+- The first `npm run docs:check` and documentation regression-test attempts detected a stale screen map. After `npm run docs:inventory`, final `npm run docs:check` passed and `node --test scripts/check-project-docs.test.mjs` passed (1 test, 0 failures).
+- `npx eslint scripts/t003-electron-entry.cjs scripts/test-t003-authorization.cjs`: passed.
+- `node --check` passed for both harness files; package.json parsed as valid JSON.
+- `git diff --check`: passed after documentation edits; run `git diff --cached --check` after staging and before commit.
 
 **Failed**
 
-- `npx tsc -p tsconfig.app.json --noEmit`: 114 diagnostics across 28 files. Tracked as T-013; no application source was changed.
-- `npm run lint`: 515 errors and 101 warnings. Tracked as T-014; no application source was changed.
+- `npm run test:t003-authorization`: 14 of 19 authorization assertions failed by design; the node:test command exits 1 to preserve the evidence.
+- `npx tsc -p tsconfig.app.json --noEmit`: exit 2, 114 existing diagnostics across 28 source files; tracked by T-013.
+- `npm run lint`: exit 1, 515 existing errors and 101 warnings; tracked by T-014.
 
 **Skipped / not established**
 
-- Electron development and production launch, installer/package build, ODBC/Tally integration, cross-platform installation, restart persistence, and owner UAT were not tested.
-- npm reported existing transitive deprecations; unrelated package upgrades were out of scope.
+- No application permission fix, full role/assignment policy, lock-state policy, whole-file finalization, installer, cross-platform test, ODBC/Tally test, real-user profile test, restore test, multi-window identity test, external/untrusted renderer test, or owner UAT was performed.
+- Export authorization after logout remains unspecified. Evidence approval/reopen rules and bulk-operation limits remain product decisions.
 
-## Changed records and task state
+## Changed paths and task state
 
-The branch contains the install/toolchain fix and native smoke-test harness, plus updated records in AGENTS.md, README.md, START_HERE.md, DEVELOPMENT_GUIDE.md, CURRENT_STATUS.md, NEXT_TASKS.md, SESSION_HANDOFF.md, DECISIONS.md, DOCUMENTATION_AUDIT.md, FEATURE_REGISTER.md, TESTING.md, and the desktop-validation workflow.
+Scoped changes: `package.json` adds `test:t003-authorization`; `scripts/t003-electron-entry.cjs` provides pre-import profile isolation; `scripts/test-t003-authorization.cjs` invokes the production renderer bridge and preserves failing regressions; `docs/project/CURRENT_STATUS.md`, `NEXT_TASKS.md`, `SECURITY_AND_AUDIT.md`, `FEATURE_REGISTER.md`, and this handoff record evidence and the remediation proposal.
 
-T-002 is complete within its documented scope. T-001 remains partial. T-003 was not started. T-013 and T-014 capture the existing typecheck and lint failures. No merge, release, installer publication, or application behavior change was performed.
+T-003 is complete as verification only. T-015 proposes the first separately authorized remediation: fail closed for unauthenticated database/file IPC and bind the principal to the invoking renderer, retaining explicit signup/login access. T-016 captures required role, engagement, bulk, export and evidence-state policy decisions. T-007 whole-file finalization remains separate. No production rule change, merge or release occurred.
 
-## Next recommended activity
+## Next executable activity
 
-T-003 is the next recommended application task: verify backend authorization and locking using synthetic users and engagements before relying on role or engagement restrictions. Start it only with an explicit task request. The pending Codex instruction-loading and Claude checks remain available to complete T-001 independently.
+Review the T-003 control matrix and decide whether to authorize T-015. Before implementing broader role/engagement checks, obtain the decisions listed in T-016. Continue to treat unauthenticated and cross-engagement IPC as a blocker to relying on current UI access guards. Keep all regression fixtures synthetic and run the test harness only in its temporary profile.

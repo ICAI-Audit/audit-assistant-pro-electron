@@ -4,9 +4,9 @@ These are recommended tasks derived from the review. They do not grant approval 
 
 | ID | Priority | Status | Outcome | Dependencies |
 | --- | --- | --- | --- | --- |
-| T-001 | P1 | Partial verification | This VS Code assistant session manually read the shared records and retrieved the requested project facts. Automatic loading is unverified; an actual Codex session and Claude loading remain unverified. These client checks did not block T-002 | Run a fresh session in the installed Codex client; verify automatic instructions with direct client evidence |
+| T-001 | P1 | Partial verification | This VS Code assistant session manually read the shared records and retrieved the requested project facts. Automatic loading is unverified; an actual Codex session and Claude loading remain unverified. These client checks did not block T-002 or T-003 | Run a fresh session in the installed Codex client; verify automatic instructions with direct client evidence |
 | T-002 | P1 | Complete (scoped) | Reproduced and repaired stale lock metadata; set release workflow to Node 24; two clean `npm ci` runs with postinstall and synthetic Electron native smoke passed. See DEVELOPMENT_GUIDE.md and SESSION_HANDOFF.md for evidence and limits | None |
-| T-003 | P1 | Ready for investigation | Verify and specify backend authorization and locking | Isolated executable environment for runtime tests |
+| T-003 | P1 | Complete (verification only) | Actual Electron IPC tests confirmed unauthenticated, cross-engagement, role-escalation and unfiltered mutation bypasses; evidence lock and export policy decisions remain open. No production authorization or finalization rules changed. See SECURITY_AND_AUDIT.md and SESSION_HANDOFF.md | Separate remediation authorization; product policy decisions for roles, assignments, bulk operations and evidence states |
 | T-004 | P1 | Decision required | Confirm release scope and deployment model | Product owner decisions D-001 to D-004 |
 | T-005 | P2 | Ready for analysis | Detailed requirements-to-code coverage and UAT matrix | T-004 for acceptance boundaries |
 | T-006 | P2 | Proposed implementation | Persist misstatements and connect real materiality | Confirm workflow and permissions; T-003 |
@@ -18,6 +18,8 @@ These are recommended tasks derived from the review. They do not grant approval 
 | T-011 | P3 | Scope decision required | AI and knowledge integration specification | T-004; provider, privacy and evaluation approval |
 | T-013 | P2 | Ready for investigation | Triage 114 existing TypeScript diagnostics across 28 files from `npx tsc -p tsconfig.app.json --noEmit`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
 | T-014 | P2 | Ready for investigation | Triage 515 lint errors and 101 warnings from `npm run lint`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
+| T-015 | P0 | Proposed remediation; not authorized | Fail closed for unauthenticated `sqlite-query` and evidence-file IPC, bind identity to the invoking renderer, and retain only explicit signup/login access. Expand only after a scoped authorization request | Separate user authorization; coordinate with T-016 before role and engagement rules |
+| T-016 | P1 | Product decision required | Approve admin/partner/manager/senior/staff/viewer policy, engagement assignment/listing semantics, bulk mutation limits, export access, and evidence approval/lock/reopen transitions | Product owner decisions; T-003 control matrix |
 
 ## T-001 Session continuity
 
@@ -35,7 +37,7 @@ Completed on the T-002 branch. The pre-change EUSAGE lock mismatch was reproduce
 
 ## T-003 Authorization and locks
 
-Trace sqlite-query and file handlers in active main.cjs, then compare sqlite/access-control.ts. Build synthetic admin, manager and staff users and two engagements with distinct assignments. Test unauthenticated access, cross-engagement reads and writes, indirect evidence links, role changes, forged identifiers, bulk update/delete without filters, and writes to locked records. Record which restrictions are required versus already enforced. Inspect table/column/action validation and return-field exposure. Produce failing regression evidence before a scoped fix. Accept only when forbidden actions are rejected by the main process and permitted work still succeeds. Never use real engagement data for these tests.
+Completed on this branch as verification and proposal only. The harness launches the real production Electron main and preload in a temporary profile, asserts that the profile and downloads directory are set and the database absent before requiring main.cjs, then uses synthetic admin, manager and staff accounts across two assigned engagements. Run `npm run test:t003-authorization`; the Vite build passes, while 14 of 19 behavioral regression assertions fail by design and remain visible as an exit-1 test result. Tests cover unauthenticated and post-logout reads, role operations, cross-engagement reads/writes and an indirect evidence link, forged IDs, protected role mutation, unfiltered bulk mutations, locked/approved evidence writes, all evidence file IPC operations, and unauthenticated export. See SECURITY_AND_AUDIT.md for each expected policy, source, result, classification, limitations and remediation. No production permission rules were changed. T-015 and T-016 are separate follow-ups; whole-file finalization remains T-007.
 
 ## T-004 Release scope
 
