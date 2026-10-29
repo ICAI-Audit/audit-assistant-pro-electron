@@ -25,6 +25,7 @@
     "electron:build:linux": "npm run build && electron-builder --linux",
     "test:classification": "ts-node --project tsconfig.app.json tests/classificationRules.test.ts",
     "test:bulk-update": "ts-node tests/bulkUpdateHelper.test.ts && ts-node tests/bulkUpdateDialog.integration.test.ts",
+    "test:native": "electron scripts/smoke-native-modules.cjs",
     "docs:check": "node scripts/check-project-docs.mjs",
     "docs:inventory": "node scripts/check-project-docs.mjs --refresh-inventory"
   },
