@@ -4,7 +4,7 @@ These are recommended tasks derived from the review. They do not grant approval 
 
 | ID | Priority | Status | Outcome | Dependencies |
 | --- | --- | --- | --- | --- |
-| T-001 | P1 | Partial verification | This fresh VS Code assistant session retrieved the shared product, data-path, feature-gap, task, and next-step facts; automatic loading and fresh Codex/Claude sessions remain unverified | This documentation change available in the checkout |
+| T-001 | P1 | Partial verification | This VS Code assistant session manually read the shared records and retrieved the requested project facts. Automatic loading is unverified; an actual Codex session and Claude loading remain unverified | Run a fresh session in the installed Codex client; verify automatic instructions with direct client evidence |
 | T-002 | P1 | Ready for scoped implementation | Reproducible dependency installation and supported toolchain | None; preserve package and lock provenance |
 | T-003 | P1 | Ready for investigation | Verify and specify backend authorization and locking | Isolated executable environment for runtime tests |
 | T-004 | P1 | Decision required | Confirm release scope and deployment model | Product owner decisions D-001 to D-004 |
@@ -19,7 +19,13 @@ These are recommended tasks derived from the review. They do not grant approval 
 
 ## T-001 Session continuity
 
-Open the same documentation branch from the repository root in each installed coding client. Start a fresh session using START_HERE.md. Ask it to identify product, active database path, sample screens, current install failure, selected task and next executable step. Require it to name the files it actually read. Do not provide those answers in the prompt. Verify settings permit repository instructions, and capture client version and loaded files. Read-only verification must not invent a new implementation task. A structural docs check is not a substitute for this test. Accept when all clients recover the same facts and close a small authorised change with an updated handoff.
+Open the same documentation branch from the repository root in each installed coding client. Start a fresh session using START_HERE.md. Ask it to identify product, active database path, sample screens, current install failure, selected task and next executable step. Require it to name the files it actually read. Do not provide those answers in the prompt. Verify settings permit repository instructions, and capture client version and direct evidence of automatically loaded instructions. Distinguish files the client reports loading automatically from files manually requested during the test; if direct evidence is unavailable, mark automatic loading unverified. Read-only verification must not invent a new implementation task. A structural docs check is not a substitute for this test. Accept only the clients actually tested; leave other installed clients pending.
+
+### T-001 evidence recorded 29 October 2026
+
+The current assistant session is hosted by the Copilot SDK in VS Code. `code --version` reported VS Code 1.143.1 (`e646868227c3e3a9e3f24277c8c7220be42c0be7`, x64). The installed extension list included `openai.chatgpt@26.1021.22027`, `openai.codex-audio@26.1021.22027`, and `anthropic.claude-code@2.1.312`; these inventory entries do not establish which extension hosted this session. No standalone `codex` executable or Copilot CLI was available. Therefore no Codex client version or fresh Codex-session result is claimed. Claude was not exercised.
+
+This assistant explicitly opened AGENTS.md and the project records with workspace file-reading tools. No direct session discovery log or other client evidence identifying automatically loaded repository instructions was available. Automatic loading is unverified, not failed. In this manually requested read, the assistant recovered the product purpose, active Electron/React/SQLite design and storage, sample-driven Misstatements and Completion gaps, validation limits, and next activity; the supporting paths and detail are recorded in SESSION_HANDOFF.md. This is a partial manual continuity check only.
 
 ## T-002 Reproducible install
 

@@ -7,7 +7,7 @@
 - Source branch and base commit: `main`, `c0ea50820094952b3bad9c83b45cc00cbff0381c`.
 - Application package version: 0.9.1.
 - Documentation branch: `docs/project-continuity-2026-10-29`.
-- Published commit: `f26895a924804288c7979b29709211706cf55430`.
+- Documentation branch HEAD: resolve with Git (`git rev-parse HEAD`); do not copy a commit's own SHA into its self-updating handoff.
 - Local validation environment: Node.js 24.12.0 and npm 11.6.2.
 - Scope: project documentation, shared agent instructions, portable workflows, source inventory, and documentation validation. No application logic, dependencies, or lockfile are changed.
 
@@ -23,9 +23,9 @@ The shared project record now contains scope, architecture, data ownership, feat
 - Inventory: `npm run docs:inventory` passed and reported 31 routes, 9 schema files, and 13 test files. The generated inventory had no diff.
 - Documentation integrity: `npm run docs:check` passed for 31 required documents, local links, shared adapters, and source inventory.
 - Regression test: `node --test scripts/check-project-docs.test.mjs` passed (1 test, 0 failures), covering missing handoff, broken links, disconnected adapters, and route/inventory drift.
-- Whitespace: `git diff --check` passed; staged-diff validation is required before commit.
+- T-001 follow-up validation: on Node.js 24.12.0/npm 11.6.2, `npm run docs:check` passed, `node --test scripts/check-project-docs.test.mjs` passed (1 test, 0 failures), and `git diff --check` passed. The staged-diff check is required before commit.
 - Runtime: these documentation commands ran under Node.js 24.12.0 and npm 11.6.2. The package-review clean-install diagnostic (`npm ci --ignore-scripts --no-audit --no-fund`) previously failed under Node.js 24.22.1/npm 11.9.0 with package-lock mismatch details. That diagnostic was not rerun here and does not establish the result on this toolchain.
-- Session continuity: this fresh VS Code assistant session read the shared instructions/status/task records and source anchors, then identified the Electron desktop product, SQLite database under Electron `userData`, sample-driven Misstatements and Completion screens, T-001 as the selected verification task, and the next action to test client loading. This is a manual retrieval exercise, not proof of automatic instruction loading. Codex and Claude loading remain unverified.
+- Session continuity (T-001 follow-up): VS Code reported version 1.143.1 (`e646868227c3e3a9e3f24277c8c7220be42c0be7`, x64). The current assistant explicitly opened AGENTS.md and project records. No direct instruction-discovery log or other client evidence was available, so automatic repository instruction loading is unverified. No standalone Codex client was found; `openai.chatgpt@26.1021.22027` is installed but does not establish that this was a Codex session. Claude 2.1.312 is installed but was not exercised. This single manual retrieval test is not cross-client acceptance. T-001 remains partial.
 - Application tests, app typecheck, lint, renderer build, desktop launch, native loading, installer, and manual UAT: not run. No dependency installation was attempted for this documentation-only task.
 
 ## Blocking or material gaps
@@ -40,7 +40,7 @@ The shared project record now contains scope, architecture, data ownership, feat
 
 ## First next activity
 
-Complete T-001 in NEXT_TASKS.md by testing fresh Codex and Claude sessions and verifying each client's repository-instruction loading settings. This session's manual retrieval does not close that task. T-002 restores a reproducible install; treat T-003 authorization verification as a priority before pilot use that depends on role or engagement restrictions. The ordering is a recommended development sequence, not a new product-owner approval of feature expansion.
+Continue T-001 in NEXT_TASKS.md in a fresh actual Codex client, record its client version, and capture direct evidence for automatic instruction loading or leave that result unverified. Claude remains pending until exercised. This session's manually requested reading does not close T-001. Do not start T-002 without a separate task request; T-003 authorization verification remains a priority before pilot reliance on role or engagement restrictions.
 
 ## Review and publication state
 
