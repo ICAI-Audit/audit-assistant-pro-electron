@@ -4,8 +4,8 @@ These are recommended tasks derived from the review. They do not grant approval 
 
 | ID | Priority | Status | Outcome | Dependencies |
 | --- | --- | --- | --- | --- |
-| T-001 | P1 | Partial verification | This VS Code assistant session manually read the shared records and retrieved the requested project facts. Automatic loading is unverified; an actual Codex session and Claude loading remain unverified | Run a fresh session in the installed Codex client; verify automatic instructions with direct client evidence |
-| T-002 | P1 | Ready for scoped implementation | Reproducible dependency installation and supported toolchain | None; preserve package and lock provenance |
+| T-001 | P1 | Partial verification | This VS Code assistant session manually read the shared records and retrieved the requested project facts. Automatic loading is unverified; an actual Codex session and Claude loading remain unverified. These client checks did not block T-002 | Run a fresh session in the installed Codex client; verify automatic instructions with direct client evidence |
+| T-002 | P1 | Complete (scoped) | Reproduced and repaired stale lock metadata; set release workflow to Node 24; two clean `npm ci` runs with postinstall and synthetic Electron native smoke passed. See DEVELOPMENT_GUIDE.md and SESSION_HANDOFF.md for evidence and limits | None |
 | T-003 | P1 | Ready for investigation | Verify and specify backend authorization and locking | Isolated executable environment for runtime tests |
 | T-004 | P1 | Decision required | Confirm release scope and deployment model | Product owner decisions D-001 to D-004 |
 | T-005 | P2 | Ready for analysis | Detailed requirements-to-code coverage and UAT matrix | T-004 for acceptance boundaries |
@@ -16,10 +16,12 @@ These are recommended tasks derived from the review. They do not grant approval 
 | T-010 | P2 | Ready for verification | Target-platform installer and updater smoke evidence | T-002; release destination and signing decision |
 | T-012 | P2 | Ready for scoped correction | Resolve duplicate feedback route and document intended guard | Confirm route access policy |
 | T-011 | P3 | Scope decision required | AI and knowledge integration specification | T-004; provider, privacy and evaluation approval |
+| T-013 | P2 | Ready for investigation | Triage 114 existing TypeScript diagnostics across 28 files from `npx tsc -p tsconfig.app.json --noEmit`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
+| T-014 | P2 | Ready for investigation | Triage 515 lint errors and 101 warnings from `npm run lint`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
 
 ## T-001 Session continuity
 
-Open the same documentation branch from the repository root in each installed coding client. Start a fresh session using START_HERE.md. Ask it to identify product, active database path, sample screens, current install failure, selected task and next executable step. Require it to name the files it actually read. Do not provide those answers in the prompt. Verify settings permit repository instructions, and capture client version and direct evidence of automatically loaded instructions. Distinguish files the client reports loading automatically from files manually requested during the test; if direct evidence is unavailable, mark automatic loading unverified. Read-only verification must not invent a new implementation task. A structural docs check is not a substitute for this test. Accept only the clients actually tested; leave other installed clients pending.
+Open the same documentation branch from the repository root in each installed coding client. Start a fresh session using START_HERE.md. Ask it to identify product, active database path, sample screens, the recorded installation/toolchain result, selected task and next executable step. Require it to name the files it actually read. Do not provide those answers in the prompt. Verify settings permit repository instructions, and capture client version and direct evidence of automatically loaded instructions. Distinguish files the client reports loading automatically from files manually requested during the test; if direct evidence is unavailable, mark automatic loading unverified. Read-only verification must not invent a new implementation task. A structural docs check is not a substitute for this test. Accept only the clients actually tested; leave other installed clients pending.
 
 ### T-001 evidence recorded 29 October 2026
 
@@ -29,7 +31,7 @@ This assistant explicitly opened AGENTS.md and the project records with workspac
 
 ## T-002 Reproducible install
 
-Inspect package.json, package-lock.json and the release workflow. Select and document supported Node/npm versions based on package engine requirements and target Electron tooling. Reproduce the lock failure. Correct only justified lock/dependency discrepancies, review resolution changes and native ABI implications, then demonstrate npm ci from a clean checkout with normal postinstall. Run tax-audit tests, legacy regressions, explicit app typecheck, lint and renderer build. Record existing failures separately. Accept when a second clean install succeeds with the documented toolchain and native modules load in Electron. Do not upgrade unrelated packages to make the task larger.
+Completed on the T-002 branch. The pre-change EUSAGE lock mismatch was reproduced; lock metadata was repaired without direct dependency upgrades. The workflow now uses Node 24. Two separate clean worktrees passed `npm ci --no-audit --no-fund` with normal postinstall and `npm run test:native` on Windows x64 with Node.js 24.12.0/npm 11.6.2. `npx vitest run src/lib` (8 files, 37 tests), `npm run test:classification`, `npm run test:bulk-update`, and `npm run build` passed. The explicit application typecheck failed with 114 diagnostics across 28 files; lint failed with 515 errors and 101 warnings. T-013 and T-014 track those separate follow-ups. Electron launch, installer, cross-platform support, ODBC/Tally and owner UAT remain unverified; see CURRENT_STATUS.md and DEVELOPMENT_GUIDE.md. No unrelated package versions were upgraded.
 
 ## T-003 Authorization and locks
 

@@ -10,7 +10,7 @@ Read DEVELOPMENT_GUIDE, TESTING, package.json, run-electron.cjs, main.cjs, prelo
 
 ## Procedure
 
-1. Complete a clean install with the documented Node/npm version and successful native rebuild. Resolve recorded failures within a scoped task; do not silently skip them.
+1. Complete a clean install with the documented Node/npm version and successful native rebuild. T-002 records successful Windows checks and the repaired lock metadata; repeat on the target platform. Report any new failures rather than silently skipping them.
 
 2. Use isolated synthetic data. Test development launch and built production launch separately. Verify no unexpected dev-server dependency in production.
 

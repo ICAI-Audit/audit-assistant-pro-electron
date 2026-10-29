@@ -13,7 +13,7 @@ Review date 29 October 2026. Scope: current main source, root documentation, sel
 | A-007 | Tax-audit pilot notes exclude formats now present in TaxAudit.tsx | Added supersession notices pointing to current register | T-008 verifies current drafts and professional content |
 | A-008 | Updater guides refer to main.js and auto-updater.js while package selects .cjs paths | Added warning links and active architecture record | Revalidate old examples before copying |
 | A-009 | Older documents claim security or completeness without a current evidence boundary | Added control matrix and evidence vocabulary | T-003, T-007, T-009 and T-010 need runtime evidence |
-| A-010 | Setup guidance says Node/npm alone suffices; clean-install diagnostic fails | Recorded exact failure and native-module prerequisites | T-002 fixes and verifies reproducibility |
+| A-010 | Setup guidance omitted native-module prerequisites; clean-install diagnostic exposed stale lock metadata | T-002 documented the engine evidence, corrected lock metadata and added native smoke guidance | Two Windows clean installs and native smoke tests passed; other platforms, installer and full desktop launch remain unverified |
 | A-011 | No check detects missing handoff links or stale route/schema inventory | Added dependency-free documentation validator and CI | Structural checks cannot detect incorrect prose or stale professional judgement |
 | A-012 | Multiple TB generations, localStorage, and local files complicate onboarding | Added persistence ownership map and generated source inventory | T-005 needs field-level read/write coverage |
 

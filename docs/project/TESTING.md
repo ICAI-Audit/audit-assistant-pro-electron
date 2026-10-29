@@ -18,11 +18,11 @@ Static inspection proves only the observed code path. Unit tests verify stated b
 | Report export | Compare saved inputs, preview and each format; reopen and visually inspect exported pages and tables |
 | Electron or packaging | Native rebuild, dev launch, production launch and target-platform installer smoke |
 
-## Application commands after install is restored
+## Application checks and current evidence
 
 Use `npx tsc -p tsconfig.app.json --noEmit` to explicitly check the application source. Root tsconfig uses references; do not assume a root noEmit command proves every referenced project was checked. Use `npx vitest run src/lib` for the existing tax-audit helpers, and select other Vitest-style files as applicable. tests/classificationRules.test.ts and the bulk-update scripts are custom runners, not automatically Vitest suites. package.json has no generic npm test command. Validate the existing ts-node commands under the supported ESM toolchain rather than claiming they pass by inspection.
 
-The review could not execute application checks because the clean dependency install failed. Do not turn a dependency or toolchain failure into an application test pass, and do not conceal an existing failure in a documentation update.
+T-002 verified `npm ci --no-audit --no-fund` with normal postinstall twice in separate clean Windows worktrees on Node.js 24.12.0/npm 11.6.2. `npm run test:native`, `npx vitest run src/lib` (8 files, 37 tests), `npm run test:classification`, `npm run test:bulk-update`, and `npm run build` passed. The explicit application typecheck currently fails with 114 diagnostics across 28 files; `npm run lint` currently reports 515 errors and 101 warnings. These failures are tracked separately in NEXT_TASKS.md. See CURRENT_STATUS.md and SESSION_HANDOFF.md for the complete boundary and exact result classification. Do not conceal existing failures or claim a passing application typecheck/lint.
 
 ## Synthetic engagement scenarios
 

@@ -21,7 +21,7 @@ These are feature areas, not a statement that every workflow is complete or acce
 
 ## Development Setup
 
-Read the [development guide](docs/project/DEVELOPMENT_GUIDE.md) first. It records a clean-install lockfile failure and native-module prerequisites. The commands below are the intended flow, not evidence of a successful setup on every platform.
+Read the [development guide](docs/project/DEVELOPMENT_GUIDE.md) first. T-002 repaired a reproduced lockfile mismatch and verified clean installs with native rebuild on Windows using Node.js 24.12.0/npm 11.6.2. This does not establish successful setup on every platform.
 
 Follow these steps:
 
@@ -32,8 +32,8 @@ git clone https://github.com/ICAI-Audit/audit-assistant-pro-electron.git
 # Step 2: Navigate to the project directory.
 cd audit-assistant-pro-electron
 
-# Step 3: Install after resolving the recorded lockfile issue.
-npm ci
+# Step 3: Install dependencies with the supported toolchain.
+npm ci --no-audit --no-fund
 
 # Step 4: Start the Electron app in development mode
 npm run electron:dev

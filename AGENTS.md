@@ -26,7 +26,7 @@ The [.agents index](.agents/README.md) points to the same maintained project wor
 - Use synthetic or authorised anonymised data. Do not commit credentials, client records, database files, evidence, session tokens, or private chat transcripts.
 - Do not reset an existing database to fix a schema problem. Changes need upgrade, backup, restore, and failure-recovery evidence.
 - Run `npm run docs:check` for documentation changes. Use [testing guide](docs/project/TESTING.md) for code changes. Report failed and skipped checks separately from passed checks.
-- Installation currently has a recorded lockfile failure. Do not describe installation, native modules, or packaged launch as validated until a fresh run proves it.
+- T-002 reproduced and repaired the recorded stale lock metadata. Two clean Windows worktrees on Node.js 24.12.0/npm 11.6.2 passed `npm ci --no-audit --no-fund` with postinstall and `npm run test:native`; see [development guide](docs/project/DEVELOPMENT_GUIDE.md). Do not generalize these results to other platforms or claim packaged launch is validated.
 - Before closing a task, update the feature register if behaviour changed, current status, task state, and latest handoff. Record decisions and their approval source when applicable. Keep updates in the same reviewable change as the implementation.
 - Preserve historical documents; add a warning and authoritative link when superseding guidance. Do not treat an old completion report as current verification.
 

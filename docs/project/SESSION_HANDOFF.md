@@ -3,53 +3,62 @@
 ## Session identity
 
 - Date: 29 October 2026.
-- Agent: Copilot SDK assistant hosted in VS Code; this is not an observed Codex session.
-- Requested outcome: perform the T-001 continuity check on the existing documentation branch, record only demonstrated client evidence, correct self-referential commit wording, validate, and push only documentation updates.
-- Branch: `docs/project-continuity-2026-10-29`, tracking `origin`; use `git rev-parse HEAD` as the authority for current HEAD instead of embedding its SHA here.
-- Source/base commit: `c0ea50820094952b3bad9c83b45cc00cbff0381c` from `main`.
+- Agent: AI assistant using Copilot SDK in VS Code.
+- Requested task: T-002, reproducible installation and supported toolchain.
+- Branch: `docs/t002-reproducible-install-2026-10-29`, created separately from the published T-001 documentation branch.
+- Source/base application commit: `main` at `c0ea50820094952b3bad9c83b45cc00cbff0381c`.
 - Application package version: 0.9.1.
-- Client evidence: VS Code 1.143.1 (`e646868227c3e3a9e3f24277c8c7220be42c0be7`, x64); installed extension list included OpenAI ChatGPT 26.1021.22027 and Claude Code 2.1.312. No standalone `codex` executable or Copilot CLI was available. This does not provide a Codex client version.
-- Validation toolchain: record the Node.js and npm versions reported during this T-001 follow-up validation below.
-- Work boundary: documentation only. No application logic, dependencies, lockfile, merge, or T-002 implementation is authorised.
+- Verified local toolchain: Windows x64, Node.js 24.12.0, npm 11.6.2.
+- Current branch HEAD: use `git rev-parse HEAD`; compare with `git ls-remote origin refs/heads/docs/t002-reproducible-install-2026-10-29`. This handoff intentionally does not embed its own commit SHA.
 
-## T-001 manual continuity evidence
+## T-001 status and client evidence
 
-This assistant explicitly read AGENTS.md, docs/project/README.md, PRODUCT_CONTEXT.md, CURRENT_STATUS.md, NEXT_TASKS.md, SESSION_HANDOFF.md, FEATURE_REGISTER.md, ARCHITECTURE.md, DATA_MODEL.md, DECISIONS.md, TESTING.md, SKILLS_INDEX.md, SECURITY_AND_AUDIT.md, DEVELOPMENT_GUIDE.md, SOURCES_AND_RULES.md, SCREEN_MAP.md, DOCUMENTATION_AUDIT.md, and workflows/session-continuity.md during this request. This was manual reading through file tools; it is not evidence that any repository instructions were automatically loaded.
+T-001 remains **partial**. Its remaining client checks are non-blocking for T-002.
 
-Recovered facts from those files:
+- This assistant explicitly read AGENTS.md and the requested project records. That is manual reading, not evidence of automatic repository-instruction loading.
+- VS Code evidence recorded for T-001: version 1.143.1 (`e646868227c3e3a9e3f24277c8c7220be42c0be7`, x64). The installed extension list included `openai.chatgpt@26.1021.22027`, `openai.codex-audio@26.1021.22027`, and `anthropic.claude-code@2.1.312`; installed extensions do not identify which client hosted the assistant.
+- No standalone Codex executable or direct Codex client version/session evidence was available. Automatic instruction loading is unverified.
+- Claude was not exercised; its check remains pending.
 
-- **Purpose:** ICAI VERA is a desktop audit-assistance application for chartered accountants and audit teams, covering engagements, financial review, workpapers/evidence, and statutory/tax-audit drafting. It does not certify professional or regulatory compliance. Sources: PRODUCT_CONTEXT.md and FEATURE_REGISTER.md.
-- **Active architecture and storage:** Electron uses `electron/main.cjs` and `electron/preload.cjs`; React/Vite render the UI; `src/integrations/sqlite/client.ts` proxies through IPC. SQLite is `audit_assistant.db` under Electron `userData`; evidence bytes are under `userData/files`; some engagement/configuration state also uses renderer localStorage. Sources: ARCHITECTURE.md and DATA_MODEL.md.
-- **Implementation gaps:** Misstatements and Completion are sample-driven prototypes (F-015/F-016); the active generic SQLite IPC authorization/lock path needs verification (T-003); complete backup/restore and durable finalization are not established; Phase I scope conflicts with broader AI/web proposals (D-001–D-004); tax-audit code is tagged AY 2025-26 and current statutory accuracy is not established. Sources: FEATURE_REGISTER.md, SECURITY_AND_AUDIT.md, DECISIONS.md, PRODUCT_CONTEXT.md, and CURRENT_STATUS.md.
-- **Validation limits:** Existing records describe an earlier `npm ci --ignore-scripts --no-audit --no-fund` lockfile mismatch under Node 24.22.1/npm 11.9.0. It was not reproduced in this T-001-only session. Application tests, typecheck, lint, renderer build, Electron/native launch, installer, and UAT remain unverified. This follow-up runs documentation checks only. Sources: CURRENT_STATUS.md and TESTING.md.
-- **Next activity:** finish T-001 in a fresh actual Codex client, record its version and direct instruction-loading evidence if available; keep Claude pending until exercised. Do not start T-002 in this task. Source: NEXT_TASKS.md.
+## T-002 findings and changes
 
-Client evidence is limited: `code --version` returned VS Code 1.143.1 (`e646868227c3e3a9e3f24277c8c7220be42c0be7`, x64). `code --list-extensions --show-versions` listed `openai.chatgpt@26.1021.22027`, `openai.codex-audio@26.1021.22027`, and `anthropic.claude-code@2.1.312`; these installed versions do not prove which extension hosted this assistant. `codex` was not on PATH. The Copilot shim reported that GitHub Copilot CLI was not installed. No session-discovery log or direct client report of automatically loaded repository instructions was available. Therefore automatic loading is **unverified**, not failed. No Codex or Claude fresh-session test was performed.
+Before editing, `npm ci --ignore-scripts --no-audit --no-fund` was run in a clean worktree and reproduced npm EUSAGE. The lockfile had `@emnapi/wasi-threads` 1.2.2 while 1.2.3 was required, and 26 Vitest optional platform `@esbuild/*` entries at 0.28.1 while 0.28.2 was required.
 
-## T-001 follow-up validation
+The lock metadata was regenerated with `npm install --package-lock-only --ignore-scripts --no-audit --no-fund`. Review found stale platform entries, the emnapi mismatch, and an `iconv-lite` optional/dev flag change. Root dependency metadata and direct dependency versions did not change. The release workflow was updated from Node 18 to Node 24 because the locked `@electron/rebuild` requires Node >=22.12.0 and Node 18 is EOL. The locked `better-sqlite3` supports Node 20.x and 22.x–25.x. `package.json` adds only the `test:native` script; the script uses synthetic inputs and a temporary Electron profile.
 
-- Client loading evidence: automatic repository instruction loading unverified; files listed above were manually read.
-- Codex client version/session: not available in this run; no standalone Codex executable and no fresh Codex session. Installed `openai.chatgpt` version is not asserted to be the active Codex client.
-- Claude: pending; installed extension version 2.1.312, but not exercised.
-- Node.js 24.12.0; npm 11.6.2.
-- `npm run docs:check`: passed; 31 required documents, local links, shared adapters, and source inventory.
-- `node --test scripts/check-project-docs.test.mjs`: passed; 1 test, 0 failures.
-- `git diff --check` and `git diff --cached --check`: passed before commit.
-- Application checks and T-002: not run; explicitly outside this task.
-- T-001 status: partial. Manual fact retrieval is demonstrated for this assistant; automatic loading and other client checks are not.
+The earlier installation fix is committed on this branch. This task's final documentation change is limited to project guidance, status, task tracking and handoff. No application source behavior or direct dependency version was changed.
 
-## Open issues and decisions
+## Validation results
 
-Phase I versus AI/web scope, reporting boundary and next release focus remain D-001 to D-004. Existing code is preserved. Backend authorization and locks need T-003. Sample Misstatements and Completion need scoped product work. Old tax-audit beta exclusions conflict with current draft exporters. Complete backup/restore and release destination need verification.
+**Passed**
 
-## Next executable step
+- `npm ci --no-audit --no-fund`, with normal postinstall, in two separate clean worktrees on Windows x64 with Node.js 24.12.0/npm 11.6.2. Electron rebuild completed in both.
+- `npm run test:native` after both installs. Electron loaded SQLite using `:memory:` and bcrypt processed a synthetic password; Electron used a unique temporary userData directory. Existing client databases and evidence files were not accessed.
+- `npx vitest run src/lib`: 8 files and 37 tests passed.
+- `npm run test:classification`: passed.
+- `npm run test:bulk-update`: passed.
+- `npm run build`: passed; existing stale Browserslist, dynamic-import/chunk, and large-chunk warnings remain.
+- `npm run docs:inventory`: passed; refreshed and reported 31 routes, 9 schema files, and 13 test files. Generated diff was reviewed.
+- `npm run docs:check`: passed.
+- `node --test scripts/check-project-docs.test.mjs`: 1 test passed, 0 failures.
+- `git diff --check`: passed. Run `git diff --cached --check` after staging and before commit.
 
-Continue T-001 with a fresh actual Codex client session, follow START_HERE.md without supplying the answers, record the client version, and verify automatic instructions with direct client evidence or mark them unverified. Repeat for Claude only if that client is to be accepted. Do not start T-002 as part of this handoff.
+**Failed**
 
-## Handoff maintenance
+- `npx tsc -p tsconfig.app.json --noEmit`: 114 diagnostics across 28 files. Tracked as T-013; no application source was changed.
+- `npm run lint`: 515 errors and 101 warnings. Tracked as T-014; no application source was changed.
 
-The next session must update task states and this handoff with its exact evidence. Do not label a recommended task approved, a draft report signed, a UI guard secure, or a structural documentation check a completed application UAT.
+**Skipped / not established**
 
-## Publication state
+- Electron development and production launch, installer/package build, ODBC/Tally integration, cross-platform installation, restart persistence, and owner UAT were not tested.
+- npm reported existing transitive deprecations; unrelated package upgrades were out of scope.
 
-The intended remote is `https://github.com/ICAI-Audit/audit-assistant-pro-electron`; remote `main` matched the source baseline when the documentation branch was created. Git is the authority for the latest branch HEAD; do not record a commit's own SHA in its commit. Preserve the untracked `ICAI-VERA-Context-Pack/`; it is unrelated user input and must not be staged. No application release or merge is authorised.
+## Changed records and task state
+
+The branch contains the install/toolchain fix and native smoke-test harness, plus updated records in AGENTS.md, README.md, START_HERE.md, DEVELOPMENT_GUIDE.md, CURRENT_STATUS.md, NEXT_TASKS.md, SESSION_HANDOFF.md, DECISIONS.md, DOCUMENTATION_AUDIT.md, FEATURE_REGISTER.md, TESTING.md, and the desktop-validation workflow.
+
+T-002 is complete within its documented scope. T-001 remains partial. T-003 was not started. T-013 and T-014 capture the existing typecheck and lint failures. No merge, release, installer publication, or application behavior change was performed.
+
+## Next recommended activity
+
+T-003 is the next recommended application task: verify backend authorization and locking using synthetic users and engagements before relying on role or engagement restrictions. Start it only with an explicit task request. The pending Codex instruction-loading and Claude checks remain available to complete T-001 independently.
