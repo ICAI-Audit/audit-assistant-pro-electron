@@ -5,7 +5,7 @@
 - Date: 29 October 2026.
 - Agent: VS Code assistant session.
 - Requested outcome: integrate and validate the supplied shared project documentation and workflows, then publish a dedicated documentation branch and draft pull request.
-- Branch: `docs/project-continuity-2026-10-29`.
+- Branch: `docs/project-continuity-2026-10-29`, pushed to `origin` and verified at commit `f26895a924804288c7979b29709211706cf55430`.
 - Source/base commit: `c0ea50820094952b3bad9c83b45cc00cbff0381c` from `main`.
 - Application package version: 0.9.1.
 - Validation toolchain: Node.js 24.12.0 and npm 11.6.2.
@@ -22,7 +22,7 @@ Reviewed active source anchors: `package.json` selects `electron/main.cjs`; `ele
 - `npm run docs:inventory`: passed; 31 routes, 9 schema files, 13 test files; generated inventory had no diff.
 - `npm run docs:check`: passed; 31 required documents, local links, shared adapters, and source inventory.
 - `node --test scripts/check-project-docs.test.mjs`: passed (1 test, 0 failures).
-- `git diff --check`: passed; staged-diff validation remains before commit.
+- `git diff --cached --check`: passed before commit. Commit `f26895a924804288c7979b29709211706cf55430` is present on the remote branch at the same SHA.
 - Package hashes, sizes, patch hash, and modified-file base blobs: all matched; `git apply --check` passed.
 - Package-review install diagnostic previously failed under Node 24.22.1/npm 11.9.0 with package-lock mismatch details; it was not rerun in this session. No install or lifecycle scripts ran.
 - Application tests, typecheck, lint, build, Electron launch, native loading, installer, and UAT: not run for this documentation task.
@@ -42,4 +42,4 @@ The next session must update task states and this handoff with its exact evidenc
 
 ## Publication state
 
-The intended remote is `https://github.com/ICAI-Audit/audit-assistant-pro-electron`; remote `main` matched the source baseline when this session started. The dedicated branch is local at handoff preparation. Verify push and draft PR creation before recording publication as complete. Keep `ICAI-VERA-Context-Pack/` and its ZIP out of the commit; no application release or merge is authorised.
+The intended remote is `https://github.com/ICAI-Audit/audit-assistant-pro-electron`; remote `main` matched the source baseline when this session started. The dedicated documentation commit has been pushed and independently matched by `git ls-remote`. No draft PR was found by repository PR search; create and verify one against `main` if an authenticated PR-creation route is available. Keep `ICAI-VERA-Context-Pack/` and its ZIP out of the commit; no application release or merge is authorised.

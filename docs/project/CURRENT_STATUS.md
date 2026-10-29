@@ -7,6 +7,7 @@
 - Source branch and base commit: `main`, `c0ea50820094952b3bad9c83b45cc00cbff0381c`.
 - Application package version: 0.9.1.
 - Documentation branch: `docs/project-continuity-2026-10-29`.
+- Published commit: `f26895a924804288c7979b29709211706cf55430`.
 - Local validation environment: Node.js 24.12.0 and npm 11.6.2.
 - Scope: project documentation, shared agent instructions, portable workflows, source inventory, and documentation validation. No application logic, dependencies, or lockfile are changed.
 
@@ -43,4 +44,4 @@ Complete T-001 in NEXT_TASKS.md by testing fresh Codex and Claude sessions and v
 
 ## Review and publication state
 
-The user authorised publishing this documentation and its recorded findings to the public repository as a draft pull request on 29 October 2026. The documentation branch is being prepared for that publication. Do not report a successful push or pull request until its remote state is verified. Publication is not approval to merge or release the application.
+The user authorised publishing this documentation and its recorded findings to the public repository as a draft pull request on 29 October 2026. Commit `f26895a924804288c7979b29709211706cf55430` was pushed to `docs/project-continuity-2026-10-29` and its remote SHA was verified. A draft pull request is not yet verified. Publication is not approval to merge or release the application.
