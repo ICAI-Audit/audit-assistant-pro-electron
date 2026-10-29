@@ -24,7 +24,9 @@
     "electron:build:mac": "npm run build && electron-builder --mac",
     "electron:build:linux": "npm run build && electron-builder --linux",
     "test:classification": "ts-node --project tsconfig.app.json tests/classificationRules.test.ts",
-    "test:bulk-update": "ts-node tests/bulkUpdateHelper.test.ts && ts-node tests/bulkUpdateDialog.integration.test.ts"
+    "test:bulk-update": "ts-node tests/bulkUpdateHelper.test.ts && ts-node tests/bulkUpdateDialog.integration.test.ts",
+    "docs:check": "node scripts/check-project-docs.mjs",
+    "docs:inventory": "node scripts/check-project-docs.mjs --refresh-inventory"
   },
   "build": {
     "appId": "com.icai-vera.app",
