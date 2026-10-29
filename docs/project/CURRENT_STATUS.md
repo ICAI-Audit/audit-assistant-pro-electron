@@ -44,4 +44,4 @@ Complete T-001 in NEXT_TASKS.md by testing fresh Codex and Claude sessions and v
 
 ## Review and publication state
 
-The user authorised publishing this documentation and its recorded findings to the public repository as a draft pull request on 29 October 2026. Commit `f26895a924804288c7979b29709211706cf55430` was pushed to `docs/project-continuity-2026-10-29` and its remote SHA was verified. A draft pull request is not yet verified. Publication is not approval to merge or release the application.
+The user authorised publishing this documentation and its recorded findings to the public repository as a draft pull request on 29 October 2026. The documentation branch was pushed and its remote SHA verified. No draft pull request was created: the available GitHub integration is read-only and the browser GitHub session is signed out. The [compare link](https://github.com/ICAI-Audit/audit-assistant-pro-electron/compare/main...docs/project-continuity-2026-10-29?expand=1) is available to create one after authenticating. Publication is not approval to merge or release the application.
