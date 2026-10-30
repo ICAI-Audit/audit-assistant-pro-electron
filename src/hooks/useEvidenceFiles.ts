@@ -146,14 +146,6 @@ export function useEvidenceFiles(engagementId?: string) {
     try {
       const filePath = `${effectiveEngagementId}/${user.id}/${Date.now()}-${file.name}`;
 
-      // Upload to storage
-      const { error: uploadError } = await storage
-        .from('evidence')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Save metadata to database
       const { data, error: dbError } = await db
         .from('evidence_files')
         .insert({
@@ -174,6 +166,24 @@ export function useEvidenceFiles(engagementId?: string) {
       const newFile = Array.isArray(data) ? data[0] : data;
       if (!newFile) {
         throw new Error('Failed to save file metadata');
+      }
+
+      try {
+        const { error: uploadError } = await storage
+          .from('evidence')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+      } catch (uploadError) {
+        const { error: cleanupError } = await db
+          .from('evidence_files')
+          .delete()
+          .eq('id', newFile.id)
+          .execute();
+        if (cleanupError) {
+          throw new Error(`Evidence upload failed and its metadata could not be removed: ${cleanupError.message}`);
+        }
+        throw uploadError;
       }
 
       // Log activity

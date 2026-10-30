@@ -679,6 +679,7 @@
     "electron/preload.cjs",
     "electron/preload.js",
     "electron/run-electron.cjs",
+    "electron/sqlite-authorization.cjs",
     "sqlite/README.md",
     "sqlite/access-control.ts",
     "sqlite/database-manager.ts",

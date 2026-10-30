@@ -231,6 +231,7 @@ async function testHarness(t) {
   await connectCdp(page.webSocketDebuggerUrl);
   await cdp('Runtime.enable');
   await waitForApi();
+  await new Promise((resolve) => setTimeout(resolve, 1500));
   assert.equal(path.resolve(profilePath), path.resolve(JSON.parse(stdout.match(/T003_PROFILE_ISOLATED (.+)/)[1]).userData));
 
   await assertDenied(
@@ -258,6 +259,7 @@ async function testHarness(t) {
   const manager = managerSignup.data;
   const staff = staffSignup.data;
 
+  await login(adminEmail, password);
   const managerRoleChange = await query({
     table: 'user_roles',
     action: 'update',
@@ -266,8 +268,10 @@ async function testHarness(t) {
   });
   assert.equal(managerRoleChange.error, null, 'failed to assign synthetic manager role');
 
+  await login(adminEmail, password);
   const clientA = await insert('clients', { id: 't003-client-a', name: 'Synthetic Client A' });
   const clientB = await insert('clients', { id: 't003-client-b', name: 'Synthetic Client B' });
+  await login(adminEmail, password);
   const engagementA = await insert('engagements', {
     id: 't003-engagement-a',
     name: 'Synthetic Engagement A',
@@ -294,6 +298,7 @@ async function testHarness(t) {
     });
   }
 
+  await login(adminEmail, password);
   const procedureA = await insert('audit_procedures', {
     id: 't003-procedure-a',
     engagement_id: engagementA.id,
@@ -339,13 +344,18 @@ async function testHarness(t) {
     file_size: 4,
     uploaded_by: admin.user_id,
   });
-  const crossLink = await insert('evidence_links', {
-    id: 't003-cross-link',
-    procedure_id: procedureA.id,
-    evidence_id: foreignEvidence.id,
-    linked_by: admin.user_id,
+  const crossLink = await query({
+    table: 'evidence_links',
+    action: 'insert',
+    data: {
+      id: 't003-cross-link',
+      procedure_id: procedureA.id,
+      evidence_id: foreignEvidence.id,
+      linked_by: admin.user_id,
+    },
   });
 
+  await login(adminEmail, password);
   const fileSave = await evaluate(`globalThis.electronAPI.saveFile({
     bucket: 'evidence',
     path: 'engagement-b/private.bin',
@@ -366,7 +376,7 @@ async function testHarness(t) {
     assert.equal(result.data[0].name, 'Synthetic Client A Updated by Manager');
   });
 
-  await t.test('admin role has no matching helper role definition', async () => {
+  await t.test('admin role follows partner-level core update permissions', async () => {
     await login(adminEmail, password);
     const result = await query({
       table: 'clients',
@@ -374,7 +384,7 @@ async function testHarness(t) {
       filters: [{ column: 'id', value: clientB.id }],
       data: { name: 'Synthetic Client B Updated by Admin' },
     });
-    console.log(`[T003 ${result.error ? 'DENIED' : 'ALLOWED'}] admin client update; helper=undetermined because Role omits admin; error=${result.error?.message || 'none'}`);
+    console.log(`[T003 ${result.error ? 'DENIED' : 'ALLOWED'}] admin client update; policy=admin mapped to partner permissions; error=${result.error?.message || 'none'}`);
     assert.equal(result.error, null);
   });
 
@@ -456,11 +466,11 @@ async function testHarness(t) {
     const result = await query({
       table: 'evidence_links',
       action: 'select',
-      filters: [{ column: 'id', value: crossLink.id }],
+      filters: [{ column: 'id', value: 't003-cross-link' }],
     });
     const linkedEvidenceIds = result.data?.map((row) => row.evidence_id) || [];
-    console.log(`[T003 ${result.error ? 'DENIED' : 'ALLOWED'}] indirect evidence link; procedureEngagement=${engagementA.id}; evidenceEngagement=${engagementB.id}; evidenceIds=${JSON.stringify(linkedEvidenceIds)}`);
-    assert.ok(result.error || !linkedEvidenceIds.includes(foreignEvidence.id), 'staff followed a link from an assigned procedure to another engagement’s evidence');
+    console.log(`[T003 ${result.error ? 'DENIED' : 'ALLOWED'}] indirect evidence link; insertError=${crossLink.error?.message || 'none'}; procedureEngagement=${engagementA.id}; evidenceEngagement=${engagementB.id}; evidenceIds=${JSON.stringify(linkedEvidenceIds)}`);
+    assert.ok(crossLink.error || result.error || !linkedEvidenceIds.includes(foreignEvidence.id), 'staff followed a link from an assigned procedure to another engagement’s evidence');
   });
 
   await t.test('file path lookup enforces engagement ownership', async () => {
@@ -564,7 +574,7 @@ async function testHarness(t) {
     });
     await insert('audit_procedures', {
       id: 't003-procedure-bulk-b',
-      engagement_id: engagementB.id,
+      engagement_id: engagementA.id,
       procedure_name: 'Synthetic bulk procedure B',
       area: 'Synthetic',
       created_by: admin.user_id,
@@ -633,6 +643,7 @@ test('T-003 production IPC authorization and locking verification', async (t) =>
         await waitForChildExit();
       } catch (error) {
         console.error(`Electron process remains active; retaining synthetic profile at ${runtimeRoot}: ${error.message}`);
+        child.kill('SIGKILL');
       }
     }
 
