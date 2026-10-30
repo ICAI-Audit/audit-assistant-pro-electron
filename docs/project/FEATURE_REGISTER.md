@@ -1,6 +1,8 @@
 # Feature register
 
-Reviewed 29 October 2026 at source commit c0ea50820094952b3bad9c83b45cc00cbff0381c. This is an implementation and coverage register, not certification of audit compliance.
+Reviewed for documentation on 30 October 2026 at source commit cc5c04729604fba7d05240a07f24682e0644665c. This is an implementation and coverage register, not certification of audit compliance.
+
+See the [complete module coverage](MODULE_COVERAGE_MATRIX.md) and [detailed specification index](MODULE_INDEX.md). Each of the 28 features maps to a module; code facts, reported tests and owner acceptance remain separate.
 
 ## Status vocabulary
 
@@ -46,4 +48,4 @@ All rows below have runtime verification pending unless stated otherwise. Eviden
 
 ## Coverage limits
 
-The original Phase I also requests searchable audit checklist and MRL formats and line-item workpaper linkage. Programmes, templates and evidence exist, but their exact coverage against those original requirements is not established. Treat this as task T-005, not an assertion that these capabilities are complete. The tax guidance PDFs supplied in this conversation were not audited clause by clause during this documentation review.
+The original Phase I also requests searchable audit checklist and MRL formats and line-item workpaper linkage. Programmes, templates and evidence exist, but their exact coverage against those original requirements is not established. T-005 now has a documented trace and gap register prepared for owner review; this does not mean these capabilities are implemented or accepted. The tax guidance PDFs supplied in this conversation were not audited clause by clause during this documentation review.

@@ -24,3 +24,7 @@ A new developer can find the product boundary, active runtime, feature status, d
 ## Review limits
 
 All source files were inventoried by path; selected runtime, data, route, report, tax-audit, auth and sample-screen paths were inspected. This is not an exhaustive functional, security, statutory or performance assessment. No claim is made that every screen, calculation, clause, integration or native component has been tested. Detailed missing application components are recorded as tasks rather than silently implemented as part of documentation work.
+
+## Documentation review completion pass 30 October 2026
+
+T-018 produces the owner review edition, 19 detailed modules, every retained feature mapping, 35 traced source statements, declared field/caller/tax catalogues, verification boundaries, gaps and one consolidated decision list. This closes the missing detailed-documentation structure for review, not the implementation or acceptance gaps. The next action is owner review. Effective runtime schema parity, all UI bindings, current-law correctness, client auto-loading and complete application UAT remain explicitly unverified.

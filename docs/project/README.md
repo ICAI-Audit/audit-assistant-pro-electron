@@ -1,6 +1,10 @@
 # ICAI VERA project knowledge
 
-This directory is the shared project record for developers, Copilot, Codex, and Claude. It separates observed implementation from approved requirements and proposed work. Baseline review: 29 October 2026, source commit `c0ea50820094952b3bad9c83b45cc00cbff0381c`, package version `0.9.1`.
+This directory is the shared project record for developers, Copilot, Codex, and Claude. It separates observed implementation from approved requirements and proposed work. Latest documentation review: 30 October 2026, source commit `cc5c04729604fba7d05240a07f24682e0644665c`, package version `0.9.1`. The original source/inventory baseline remains identifiable in historical records.
+
+## Owner review
+
+Start with [the review guide](REVIEW_START_HERE.md) and [the assembled application review](APPLICATION_REVIEW.md). The current task is documentation completion and owner review. All 28 feature areas are mapped to 19 detailed modules (start at the [module index](MODULE_INDEX.md), then `modules/M-01.md` to `modules/M-19.md`); the [coverage matrix](MODULE_COVERAGE_MATRIX.md), [requirements traceability](REQUIREMENTS_TRACEABILITY.md), [field catalogue](SCHEMA_FIELD_CATALOG.md), [open gaps](OPEN_GAPS.md) and [owner decisions](OWNER_REVIEW_DECISIONS.md) supply the detail.
 
 ## Read first
 

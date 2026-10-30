@@ -10,7 +10,7 @@ src/main.tsx mounts src/App.tsx. HashRouter supports packaged local-file navigat
 
 A page or hook calls src/integrations/sqlite/client.ts. Its Supabase-shaped chain sends a structured payload through window.electronAPI.sqliteQuery. The preload invokes sqlite-query. The main handler builds and executes SQLite queries through better-sqlite3. Authentication uses sqlite-auth and an in-memory currentUserId. Profiles and roles are loaded into React after sign-in. AuthContext deliberately signs out on startup.
 
-The active handler is inline in main.cjs. sqlite/database-manager.ts and sqlite/access-control.ts define a different abstraction; their presence is not proof that the active IPC path enforces their checks. The generic handler needs the authorization verification task in NEXT_TASKS.md.
+The active handler is inline in main.cjs. sqlite/database-manager.ts and sqlite/access-control.ts define a different abstraction; their presence is not proof that the active IPC path enforces their checks. The active handler now imports electron/sqlite-authorization.cjs, applies scoped authentication/authorization and prospective-record checks, and validates canonical evidence ownership. Reported IPC regressions cover selected paths. Session identity, renderer trust, export policy and lock-state rules remain limited as recorded in SECURITY_AND_AUDIT.md.
 
 The database opens under app.getPath('userData') as audit_assistant.db, with foreign keys enabled and WAL journalling. Startup reads sqlite/schema SQL and runs additional report, template, and tax-audit backfills in main.cjs. Migration scripts in scripts and Supabase artefacts must be classified before reuse; they are not interchangeable with desktop startup migrations.
 
@@ -40,3 +40,7 @@ Tally uses local ODBC and other connection hooks; ODBC loading is optional. GSTZ
 ## Known uncertainties
 
 No complete runtime dependency graph or end-to-end validation was performed. Browser-only use fails where module-level getSQLiteClient requires electronAPI. LAN, multi-device concurrency, encryption at rest, complete audit-event coverage, and finalization enforcement remain unverified. The generated inventory records lexical declarations, not runtime reachability.
+
+## Detailed module and review references
+
+The latest documentation baseline is `cc5c04729604fba7d05240a07f24682e0644665c`. Use [module specifications](MODULE_INDEX.md), [coverage](MODULE_COVERAGE_MATRIX.md), [declared fields](SCHEMA_FIELD_CATALOG.md) and [verification limits](VERIFICATION_EVIDENCE.md) for the current owner review. Canonical evidence paths now restrict legacy rows; no legacy migration was performed by this documentation task.

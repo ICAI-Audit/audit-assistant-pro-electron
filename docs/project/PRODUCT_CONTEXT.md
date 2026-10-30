@@ -1,5 +1,7 @@
 # Product context
 
+Documentation review baseline: 30 October 2026 at `cc5c04729604fba7d05240a07f24682e0644665c`. Detailed scope and implementation are in the [module coverage](MODULE_COVERAGE_MATRIX.md); owner questions are consolidated in [review decisions](OWNER_REVIEW_DECISIONS.md).
+
 ## Purpose and users
 
 ICAI VERA assists chartered accountants and audit teams with client and engagement records, appointment documents, financial review, applicability, materiality, risk, working papers, evidence, statutory and tax-audit drafting. Professional judgement, sufficient evidence, and report approval remain with the auditor. This describes the repository's product direction, not certification by ICAI or a regulator.
@@ -35,4 +37,4 @@ Core workflow to verify: sign in, select or create client and engagement, assess
 
 ## Completion evidence
 
-No feature is labelled accepted solely from static inspection. Code-backed functionality must be exercised with an isolated synthetic engagement, persisted and reopened, tested for forbidden actions, and accepted by an identified reviewer before its status advances to UAT accepted. Current evidence is in the status record.
+No feature is labelled accepted solely from static inspection. Code-backed functionality must be exercised with an isolated synthetic engagement, persisted and reopened, tested for forbidden actions, and accepted by an identified reviewer before its status advances to UAT accepted. Current evidence is in the status record and VERIFICATION_EVIDENCE.md. The 19 detailed modules now supply source-grounded business fields, workflows, outputs and proposed acceptance cases. UI/schema parity, professional accuracy and owner acceptance remain distinct verification gaps.

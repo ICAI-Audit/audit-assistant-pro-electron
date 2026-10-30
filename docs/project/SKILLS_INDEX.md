@@ -20,3 +20,7 @@ Select only workflows relevant to the request. Session continuity is always rele
 Each procedure specifies when it applies, what to read, the steps and required result. Add scripts only when they provide repeatable, testable value. Do not turn every documentation page into a separate skill. If native skill packaging is later required for a particular IDE, first verify its version and official supported discovery paths, and make any adapter point to these canonical procedures. Verify the actual client loads them rather than relying on a folder name.
 
 Coverage still needs validation: eight runbooks exist and are structurally checked; fresh-session use by each installed coding client is T-001. Native integration tests, legal review, desktop execution and application completeness are separate evidence levels. The documentation checker cannot certify them.
+
+## Module context for a workflow
+
+Use [module index](MODULE_INDEX.md) to load only the affected specification, then the relevant runbook. The current task is owner documentation review; open code gaps are not new authorisation to implement fixes. See [review guide](REVIEW_START_HERE.md).

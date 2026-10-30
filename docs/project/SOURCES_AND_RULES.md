@@ -36,3 +36,7 @@ These official pages were retrieved through Firecrawl on 29 October 2026 to veri
 - [GitHub Copilot repository instructions](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions): repository and agent instructions.
 
 The shared runbooks are explicitly loaded through AGENTS.md. They do not claim automatic native SKILL.md discovery in every client. Avoid duplicating business rules into three tool-specific copies.
+
+## Latest documentation evidence
+
+S-009: source snapshot cc5c04729604fba7d05240a07f24682e0644665c and the latest reported T-003 outcome, reviewed on 30 October 2026. S-010: the user’s direction to complete documentation for one review and keep further code fixes outside the current task. The source trace enumerates 35 original Phase I statements/blueprint proposals; the module and field catalogues document the current implementation without legal or owner acceptance claims.

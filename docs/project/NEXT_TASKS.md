@@ -8,7 +8,7 @@ These are recommended tasks derived from the review. They do not grant approval 
 | T-002 | P1 | Complete (scoped) | Reproduced and repaired stale lock metadata; set release workflow to Node 24; two clean `npm ci` runs with postinstall and synthetic Electron native smoke passed. See DEVELOPMENT_GUIDE.md and SESSION_HANDOFF.md for evidence and limits | None |
 | T-003 | P1 | Complete (verification + scoped remediation) | Active Electron IPC now enforces authentication, engagement-scoped query/file access, protected-role update denial, and filtered-only update/delete in production handlers. Remaining policy decisions: export authorization and evidence state transitions. | Product policy decisions for export and evidence-state transitions |
 | T-004 | P1 | Decision required | Confirm release scope and deployment model | Product owner decisions D-001 to D-004 |
-| T-005 | P2 | Ready for analysis | Detailed requirements-to-code coverage and UAT matrix | T-004 for acceptance boundaries |
+| T-005 | P2 | Documentation prepared for owner review | 28 feature areas, 19 module specifications, 35 traced source statements/proposals, declared field/caller catalogues and proposed acceptance cases completed at cc5c0472; approval and later UI/UAT remain open | Owner review; T-004 for accepted release boundary |
 | T-006 | P2 | Proposed implementation | Persist misstatements and connect real materiality | Confirm workflow and permissions; T-003 |
 | T-007 | P2 | Design required | Durable completion and file finalization | T-003, T-006 and approved sign-off rules |
 | T-008 | P2 | Ready for verification | Validate tax-audit content and draft exports | Reproducible environment and authoritative legal review |
@@ -20,7 +20,12 @@ These are recommended tasks derived from the review. They do not grant approval 
 | T-014 | P2 | Ready for investigation | Triage 515 lint errors and 101 warnings from `npm run lint`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
 | T-015 | P0 | Complete (scoped) | Implemented fail-closed backend checks for unauthenticated database/file IPC, engagement ownership enforcement, protected role-field checks, and unfiltered mutation denial with isolated regression evidence | Continue with T-016 policy decisions for remaining behavior |
 | T-016 | P1 | Product decision required | Approve admin/partner/manager/senior/staff/viewer policy, engagement assignment/listing semantics, bulk mutation limits, export access, and evidence approval/lock/reopen transitions | Product owner decisions; T-003 control matrix |
+| T-018 | P1 | Ready for owner review | Complete documentation baseline and consolidated owner review; no application fixes | Owner decisions and corrections |
 | T-017 | P2 | Ready for investigation | Add missing `engagement_tb_classification` and `ifc_clause_library` definitions to `sqlite/schema` with upgrade evidence; callers currently fail with missing-table errors | Backup/upgrade approach from T-009 |
+
+## Current activity and scope
+
+T-018 documentation review is the active task. The user directed a return to documentation on 30 October 2026. Review the assembled application document and consolidated decisions before selecting more code work. T-003's scoped reported tests remain recorded; no further production changes are part of T-018.
 
 ## T-001 Session continuity
 
@@ -75,3 +80,7 @@ If selected, document AI use cases, deterministic boundaries, provider contract,
 ## T-012 Route guard consistency
 
 src/App.tsx declares /feedback twice, once with ProtectedEngagementRoute and once with ProtectedRoute. Determine whether feedback requires a selected engagement, preserve intended access, remove the duplicate declaration and test unauthenticated and authenticated navigation with and without an engagement. Refresh inventory and screen map. Accept when one route expresses the approved policy and navigation has regression evidence.
+
+## T-018 Documentation review
+
+The documentation-only pass is prepared against cc5c04729604fba7d05240a07f24682e0644665c. Start with REVIEW_START_HERE.md and APPLICATION_REVIEW.md. Coverage includes every retained feature, the enumerated original requirements/proposals, principal module fields/workflows/outputs, declared schema fields and proposed acceptance scenarios. OWNER_REVIEW_DECISIONS.md collects unresolved scope and policy in one place. Code fixes, migration, legal-content approval and owner UAT are not claimed complete. After owner review, record precise answers, update canonical specifications and agree the next implementation or verification task.

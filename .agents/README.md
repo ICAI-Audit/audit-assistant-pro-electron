@@ -24,3 +24,7 @@ Read [shared instructions](../AGENTS.md), the [project index](../docs/project/RE
 Maintain detailed instructions in docs/project and shared rules in the root AGENTS.md. Do not copy product state into competing files in this directory. Claude and Copilot have short root/client adapters to the same shared rules. This README is explicitly linked from AGENTS.md; its mere presence does not guarantee automatic loading by any particular IDE.
 
 The listed workflows are portable Markdown runbooks. This package does not install personal ChatGPT skills or claim native SKILL.md discovery. If native IDE skills are added later, verify the installed client's documented discovery rules, keep their wrappers small and point them to the canonical workflows. Verify the actual loaded context in a fresh session.
+
+## Current owner review
+
+The application specification is prepared for [one owner review](../docs/project/REVIEW_START_HERE.md). Load the relevant [module](../docs/project/MODULE_INDEX.md) for later tasks. The current documentation scope does not authorise further code repairs.

@@ -2,6 +2,10 @@
 
 The [.agents index](.agents/README.md) points to the same maintained project workflows.
 
+## Current documentation review scope
+
+The user directed a return to documentation on 30 October 2026. T-018 prepares the [owner review](docs/project/REVIEW_START_HERE.md) and [module specifications](docs/project/MODULE_INDEX.md). Keep recorded implementation/security gaps open without automatically fixing them. The next activity is owner review and decisions. A later explicit implementation request can supersede this scope.
+
 ## Start every session
 
 1. Read [project index](docs/project/README.md), [product context](docs/project/PRODUCT_CONTEXT.md), [current status](docs/project/CURRENT_STATUS.md), [next tasks](docs/project/NEXT_TASKS.md), and [latest handoff](docs/project/SESSION_HANDOFF.md).

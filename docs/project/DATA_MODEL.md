@@ -1,5 +1,9 @@
 # Data model and persistence
 
+## Detailed field reference
+
+The [schema field catalogue](SCHEMA_FIELD_CATALOG.md) records 78 declared tables and 1,055 columns from the nine current SQL files. The [caller catalogue](PERSISTENCE_CALLER_CATALOG.md) supplies literal targets and source paths; the [tax field catalogue](TAX_AUDIT_FIELD_CATALOG.md) covers configured clause/field objects with lexical extraction limits. These references are source facts, not a claim that installed databases match every UI/type model. T-017 records missing engagement_tb_classification and ifc_clause_library declarations.
+
 ## Ownership
 
 One local SQLite database sits in Electron userData. It contains firm settings, users and roles, clients, engagements, audit work, templates and tax-audit content. Local evidence bytes and renderer localStorage are additional stores. Multi-firm tenancy and shared-network database access have not been established. Do not place the database on a mapped drive or invent a sync architecture as part of a documentation task.
@@ -18,7 +22,7 @@ One local SQLite database sits in Electron userData. It contains firm settings, 
 | 08_template_system_tables.sql | standard programs/procedures, template checklist/evidence, FS templates, activity_logs, audit_trail, Tally bridge, feedback | Local mutable logs are not demonstrated immutable evidence |
 | 09_tax_audit_tables.sql | client GSTINs, statutory versions, tax-audit engagements, clause responses/evidence, acceptance, qualifications, review notes, exports | Version key and assessment year affect interpretation and output |
 
-The exact declared table names are in inventory.json. It is generated from SQL declarations and excludes tables created only by runtime migrations. Inspect main.cjs for the latter. This is a navigation model, not a field-complete data dictionary or proof that every foreign key and index is adequate.
+The exact declared table names are in inventory.json. It is generated from SQL declarations and excludes tables created only by runtime migrations. Inspect main.cjs for the latter. This summary is complemented by the complete declared-schema field catalogue. It is not proof that effective runtime migrations, UI fields, foreign keys and indexes all agree or are adequate.
 
 ## Existing conventions
 
