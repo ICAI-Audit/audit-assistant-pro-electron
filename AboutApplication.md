@@ -1,3 +1,5 @@
+> Historical application guide. For the reviewed architecture, feature status and validation limits, start with [project knowledge](docs/project/README.md). Do not infer feature completeness from this older guide.
+
 # 📊 ICAI VERA - Professional Audit Management System
 
 ## Application Overview

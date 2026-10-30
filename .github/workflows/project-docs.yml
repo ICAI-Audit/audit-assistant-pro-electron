@@ -1,0 +1,22 @@
+name: Project documentation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check project knowledge and inventory
+        run: node scripts/check-project-docs.mjs
+      - name: Verify documentation checker failures
+        run: node --test scripts/check-project-docs.test.mjs

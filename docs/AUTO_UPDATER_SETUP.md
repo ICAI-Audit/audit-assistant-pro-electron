@@ -1,3 +1,5 @@
+> Historical updater guidance. The active entry points are main.cjs and preload.cjs, with auto-updater.cjs. Verify examples and security/readiness claims against [current architecture](project/ARCHITECTURE.md) and [status](project/CURRENT_STATUS.md).
+
 # Auto-Updater Setup Guide
 
 Complete setup for electron-updater with GitHub Releases provider.

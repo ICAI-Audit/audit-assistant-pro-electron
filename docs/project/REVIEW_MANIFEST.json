@@ -1,0 +1,793 @@
+{
+  "reviewDate": "2026-10-30",
+  "sourceBaseline": "cc5c04729604fba7d05240a07f24682e0644665c",
+  "scope": "Documentation only; no application changes or fresh application execution",
+  "featureIds": [
+    "F-001",
+    "F-002",
+    "F-003",
+    "F-004",
+    "F-005",
+    "F-006",
+    "F-007",
+    "F-008",
+    "F-009",
+    "F-010",
+    "F-011",
+    "F-012",
+    "F-013",
+    "F-014",
+    "F-015",
+    "F-016",
+    "F-017",
+    "F-018",
+    "F-019",
+    "F-020",
+    "F-021",
+    "F-022",
+    "F-023",
+    "F-024",
+    "F-025",
+    "F-026",
+    "F-027",
+    "F-028"
+  ],
+  "modules": [
+    {
+      "id": "M-01",
+      "title": "Accounts and access",
+      "features": [
+        "F-001"
+      ],
+      "file": "modules/M-01.md",
+      "sourcePaths": [
+        "src/pages/Auth.tsx",
+        "src/contexts/AuthContext.tsx",
+        "electron/main.cjs",
+        "electron/sqlite-authorization.cjs"
+      ],
+      "tableNames": [
+        "profiles",
+        "user_roles",
+        "engagement_assignments"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-01-01",
+        "AC-M-01-02",
+        "AC-M-01-03"
+      ]
+    },
+    {
+      "id": "M-02",
+      "title": "Firm client partner and team masters",
+      "features": [
+        "F-002",
+        "F-024"
+      ],
+      "file": "modules/M-02.md",
+      "sourcePaths": [
+        "src/pages/Settings.tsx",
+        "src/hooks/useFirmSettings.ts",
+        "src/hooks/useClients.ts",
+        "src/hooks/usePartners.ts",
+        "src/hooks/useTeamMembers.ts",
+        "src/pages/AdminSettings.tsx"
+      ],
+      "tableNames": [
+        "firm_settings",
+        "clients",
+        "partners",
+        "profiles",
+        "user_roles",
+        "client_gstins"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-02-01",
+        "AC-M-02-02",
+        "AC-M-02-03"
+      ]
+    },
+    {
+      "id": "M-03",
+      "title": "Engagement selection assignment and dashboards",
+      "features": [
+        "F-003"
+      ],
+      "file": "modules/M-03.md",
+      "sourcePaths": [
+        "src/pages/Engagements.tsx",
+        "src/pages/SelectEngagement.tsx",
+        "src/contexts/EngagementContext.tsx",
+        "src/hooks/useEngagements.ts",
+        "src/pages/dashboard/EngagementDashboard.tsx"
+      ],
+      "tableNames": [
+        "engagements",
+        "engagement_assignments",
+        "financial_years"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-03-01",
+        "AC-M-03-02",
+        "AC-M-03-03"
+      ]
+    },
+    {
+      "id": "M-04",
+      "title": "Appointment communications and engagement letters",
+      "features": [
+        "F-004",
+        "F-005"
+      ],
+      "file": "modules/M-04.md",
+      "sourcePaths": [
+        "src/pages/Appointment.tsx",
+        "src/components/appointment/Letters.tsx",
+        "src/types/engagementLetter.ts",
+        "src/services/engagementLetterEngine.ts",
+        "src/services/engagementLetterDocxTemplate.ts",
+        "src/hooks/useEligibilityCertificate.ts",
+        "src/hooks/usePreviousAuditorCommunication.ts"
+      ],
+      "tableNames": [
+        "engagement_letter_templates",
+        "audit_report_documents",
+        "evidence_files"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-04-01",
+        "AC-M-04-02",
+        "AC-M-04-03"
+      ]
+    },
+    {
+      "id": "M-05",
+      "title": "Applicability and reporting requirements",
+      "features": [
+        "F-006"
+      ],
+      "file": "modules/M-05.md",
+      "sourcePaths": [
+        "src/pages/ComplianceApplicability.tsx",
+        "src/lib/taxAuditApplicability.ts",
+        "src/lib/taxAuditReportFormSelection.ts"
+      ],
+      "tableNames": [
+        "compliance_applicability",
+        "tax_audit_engagements"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-05-01",
+        "AC-M-05-02",
+        "AC-M-05-03"
+      ]
+    },
+    {
+      "id": "M-06",
+      "title": "Trial balance classification and Tally ingestion",
+      "features": [
+        "F-007",
+        "F-008"
+      ],
+      "file": "modules/M-06.md",
+      "sourcePaths": [
+        "src/pages/FinancialReview.tsx",
+        "src/hooks/useEngagementTrialBalance.ts",
+        "src/services/trialBalanceNewClassification.ts",
+        "src/utils/classificationRules.ts",
+        "src/hooks/useTallyODBC.ts",
+        "electron/main.cjs"
+      ],
+      "tableNames": [
+        "engagement_trial_balance_header",
+        "engagement_trial_balance_lines",
+        "tb_new_entity_info",
+        "tb_new_ledgers",
+        "tb_new_stock_items",
+        "tb_new_classification_mappings",
+        "tb_new_sessions",
+        "trial_balance_lines"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-06-01",
+        "AC-M-06-02",
+        "AC-M-06-03",
+        "AC-M-06-04"
+      ]
+    },
+    {
+      "id": "M-07",
+      "title": "Financial statements notes and layouts",
+      "features": [
+        "F-009"
+      ],
+      "file": "modules/M-07.md",
+      "sourcePaths": [
+        "src/pages/FinancialReview.tsx",
+        "src/data/entityTypeConfig.ts",
+        "src/utils/financialExport.ts",
+        "src/utils/noteBuilder.ts",
+        "src/utils/noteFaceBuilder.ts",
+        "src/utils/statementFormula.ts",
+        "src/utils/computePLNoteValues.ts"
+      ],
+      "tableNames": [
+        "fs_templates",
+        "schedule_iii_config",
+        "tb_new_classification_mappings"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-07-01",
+        "AC-M-07-02",
+        "AC-M-07-03"
+      ]
+    },
+    {
+      "id": "M-08",
+      "title": "Materiality and risk register",
+      "features": [
+        "F-010",
+        "F-011"
+      ],
+      "file": "modules/M-08.md",
+      "sourcePaths": [
+        "src/pages/Materiality.tsx",
+        "src/pages/RiskRegister.tsx",
+        "src/hooks/useRisks.ts"
+      ],
+      "tableNames": [
+        "materiality_risk_assessment",
+        "risks",
+        "engagements"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-08-01",
+        "AC-M-08-02",
+        "AC-M-08-03"
+      ]
+    },
+    {
+      "id": "M-09",
+      "title": "Audit programmes procedures and workpapers",
+      "features": [
+        "F-012"
+      ],
+      "file": "modules/M-09.md",
+      "sourcePaths": [
+        "src/pages/AuditExecution.tsx",
+        "src/pages/ProcedureWorkpaper.tsx",
+        "src/hooks/useAuditExecution.ts",
+        "src/types/auditExecution.ts"
+      ],
+      "tableNames": [
+        "audit_programs_new",
+        "audit_program_sections",
+        "audit_program_boxes",
+        "audit_program_attachments",
+        "audit_procedures",
+        "procedure_assignees",
+        "procedure_checklist_items",
+        "procedure_evidence_requirements",
+        "standard_programs",
+        "standard_procedures"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-09-01",
+        "AC-M-09-02",
+        "AC-M-09-03"
+      ]
+    },
+    {
+      "id": "M-10",
+      "title": "Evidence storage review and rollback",
+      "features": [
+        "F-013"
+      ],
+      "file": "modules/M-10.md",
+      "sourcePaths": [
+        "src/pages/EvidenceVault.tsx",
+        "src/hooks/useEvidenceFiles.ts",
+        "electron/main.cjs",
+        "electron/preload.cjs",
+        "electron/sqlite-authorization.cjs"
+      ],
+      "tableNames": [
+        "evidence_files",
+        "evidence_links",
+        "tax_audit_clause_evidence",
+        "audit_trail",
+        "activity_logs"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-10-01",
+        "AC-M-10-02",
+        "AC-M-10-03",
+        "AC-M-10-04"
+      ]
+    },
+    {
+      "id": "M-11",
+      "title": "Review notes and misstatements",
+      "features": [
+        "F-014",
+        "F-015"
+      ],
+      "file": "modules/M-11.md",
+      "sourcePaths": [
+        "src/pages/ReviewNotes.tsx",
+        "src/hooks/useReviewNotes.ts",
+        "src/pages/Misstatements.tsx",
+        "src/data/sampleData.ts"
+      ],
+      "tableNames": [
+        "review_notes",
+        "notifications",
+        "audit_trail",
+        "activity_logs"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-11-01",
+        "AC-M-11-02",
+        "AC-M-11-03"
+      ]
+    },
+    {
+      "id": "M-12",
+      "title": "Completion sign-off and audit history",
+      "features": [
+        "F-016",
+        "F-017"
+      ],
+      "file": "modules/M-12.md",
+      "sourcePaths": [
+        "src/pages/Completion.tsx",
+        "src/pages/AuditTrail.tsx",
+        "src/hooks/useActivityLogs.ts",
+        "src/data/sampleData.ts"
+      ],
+      "tableNames": [
+        "activity_logs",
+        "audit_trail",
+        "engagements"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-12-01",
+        "AC-M-12-02",
+        "AC-M-12-03"
+      ]
+    },
+    {
+      "id": "M-13",
+      "title": "Statutory report CARO and IFC drafts",
+      "features": [
+        "F-018"
+      ],
+      "file": "modules/M-13.md",
+      "sourcePaths": [
+        "src/pages/AuditReport.tsx",
+        "src/hooks/useAuditReportSetup.ts",
+        "src/hooks/useAuditReportDocument.ts",
+        "src/hooks/useCAROClauseResponses.ts",
+        "src/hooks/useIFCReportContent.ts",
+        "src/components/audit-report/ReportExport.tsx"
+      ],
+      "tableNames": [
+        "audit_report_setup",
+        "audit_report_main_content",
+        "audit_report_documents",
+        "audit_report_document_versions",
+        "audit_report_comments",
+        "audit_report_evidence",
+        "audit_report_exports",
+        "key_audit_matters",
+        "caro_clause_library",
+        "caro_clause_responses",
+        "caro_standard_answers",
+        "audit_report_ifc_content"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-13-01",
+        "AC-M-13-02",
+        "AC-M-13-03"
+      ]
+    },
+    {
+      "id": "M-14",
+      "title": "Tax audit clauses programme readiness and outputs",
+      "features": [
+        "F-019",
+        "F-020",
+        "F-021"
+      ],
+      "file": "modules/M-14.md",
+      "sourcePaths": [
+        "src/pages/TaxAudit.tsx",
+        "src/hooks/useTaxAudit.ts",
+        "src/types/taxAudit.ts",
+        "src/data/taxAudit3CDClauses.ts",
+        "src/data/taxAudit3CDFieldSchemas.ts",
+        "src/lib/taxAuditReportReadiness.ts",
+        "src/lib/taxAuditReportPack.ts",
+        "src/lib/taxAuditForm3CDExport.ts",
+        "src/hooks/useForm3CADocument.ts",
+        "src/hooks/useForm3CBDocument.ts"
+      ],
+      "tableNames": [
+        "tax_audit_statutory_versions",
+        "tax_audit_engagements",
+        "tax_audit_clause_responses",
+        "tax_audit_clause_evidence",
+        "tax_audit_acceptance_checks",
+        "tax_audit_qualifications",
+        "tax_audit_review_notes",
+        "tax_audit_exports",
+        "audit_report_documents"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-14-01",
+        "AC-M-14-02",
+        "AC-M-14-03",
+        "AC-M-14-04"
+      ]
+    },
+    {
+      "id": "M-15",
+      "title": "GSTZen sessions and GST data",
+      "features": [
+        "F-022"
+      ],
+      "file": "modules/M-15.md",
+      "sourcePaths": [
+        "src/services/gstzen-api.ts",
+        "src/pages/GstzenIntegration.tsx",
+        "src/pages/GstzenLogin.tsx",
+        "src/pages/Gstr1Dashboard.tsx",
+        "src/hooks/useGstins.ts",
+        "src/hooks/useGstr1Download.ts",
+        "electron/main.cjs"
+      ],
+      "tableNames": [
+        "client_gstins"
+      ],
+      "acceptanceCaseIds": [
+        "AC-M-15-01",
+        "AC-M-15-02",
+        "AC-M-15-03"
+      ]
+    },
+    {
+      "id": "M-16",
+      "title": "Audit tools calculators and utilities",
+      "features": [
+        "F-023"
+      ],
+      "file": "modules/M-16.md",
+      "sourcePaths": [
+        "src/pages/AuditTools.tsx",
+        "src/components/audit/DeferredTaxCalculator.tsx",
+        "src/components/audit/RatioAnalysisCalculator.tsx"
+      ],
+      "tableNames": [],
+      "acceptanceCaseIds": [
+        "AC-M-16-01",
+        "AC-M-16-02",
+        "AC-M-16-03"
+      ]
+    },
+    {
+      "id": "M-17",
+      "title": "Desktop operations distribution and recovery",
+      "features": [
+        "F-025",
+        "F-026"
+      ],
+      "file": "modules/M-17.md",
+      "sourcePaths": [
+        "package.json",
+        "electron/run-electron.cjs",
+        "electron/main.cjs",
+        "electron/preload.cjs",
+        "electron/auto-updater.cjs",
+        ".github/workflows/release.yml",
+        "scripts/smoke-native-modules.cjs"
+      ],
+      "tableNames": [],
+      "acceptanceCaseIds": [
+        "AC-M-17-01",
+        "AC-M-17-02",
+        "AC-M-17-03"
+      ]
+    },
+    {
+      "id": "M-18",
+      "title": "Proposed AI analytics and knowledge support",
+      "features": [
+        "F-027"
+      ],
+      "file": "modules/M-18.md",
+      "sourcePaths": [
+        "docs/project/PRODUCT_CONTEXT.md",
+        "docs/project/SOURCES_AND_RULES.md"
+      ],
+      "tableNames": [],
+      "acceptanceCaseIds": [
+        "AC-M-18-01",
+        "AC-M-18-02",
+        "AC-M-18-03"
+      ]
+    },
+    {
+      "id": "M-19",
+      "title": "Agent instructions documentation and handoffs",
+      "features": [
+        "F-028"
+      ],
+      "file": "modules/M-19.md",
+      "sourcePaths": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".github/copilot-instructions.md",
+        ".agents/README.md",
+        "docs/project/README.md",
+        "docs/project/SKILLS_INDEX.md",
+        "scripts/check-project-docs.mjs"
+      ],
+      "tableNames": [],
+      "acceptanceCaseIds": [
+        "AC-M-19-01",
+        "AC-M-19-02",
+        "AC-M-19-03"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-P01",
+      "features": [
+        "F-025",
+        "F-026"
+      ]
+    },
+    {
+      "id": "REQ-P02",
+      "features": [
+        "F-002"
+      ]
+    },
+    {
+      "id": "REQ-P03",
+      "features": [
+        "F-002",
+        "F-003"
+      ]
+    },
+    {
+      "id": "REQ-P04",
+      "features": [
+        "F-002",
+        "F-003"
+      ]
+    },
+    {
+      "id": "REQ-P05",
+      "features": [
+        "F-010"
+      ]
+    },
+    {
+      "id": "REQ-P06",
+      "features": [
+        "F-007",
+        "F-009"
+      ]
+    },
+    {
+      "id": "REQ-P07",
+      "features": [
+        "F-007",
+        "F-009"
+      ]
+    },
+    {
+      "id": "REQ-P08",
+      "features": [
+        "F-004"
+      ]
+    },
+    {
+      "id": "REQ-P09",
+      "features": [
+        "F-005"
+      ]
+    },
+    {
+      "id": "REQ-P10",
+      "features": [
+        "F-004",
+        "F-012",
+        "F-013"
+      ]
+    },
+    {
+      "id": "REQ-P11",
+      "features": [
+        "F-006"
+      ]
+    },
+    {
+      "id": "REQ-P12",
+      "features": [
+        "F-006",
+        "F-018"
+      ]
+    },
+    {
+      "id": "REQ-P13",
+      "features": [
+        "F-007",
+        "F-008"
+      ]
+    },
+    {
+      "id": "REQ-P14",
+      "features": [
+        "F-007",
+        "F-009"
+      ]
+    },
+    {
+      "id": "REQ-P15",
+      "features": [
+        "F-009"
+      ]
+    },
+    {
+      "id": "REQ-P16",
+      "features": [
+        "F-012",
+        "F-013"
+      ]
+    },
+    {
+      "id": "REQ-P17",
+      "features": [
+        "F-007",
+        "F-009",
+        "F-010"
+      ]
+    },
+    {
+      "id": "REQ-P18",
+      "features": [
+        "F-003",
+        "F-007",
+        "F-009",
+        "F-012"
+      ]
+    },
+    {
+      "id": "REQ-P19",
+      "features": [
+        "F-023"
+      ]
+    },
+    {
+      "id": "REQ-P20",
+      "features": [
+        "F-023"
+      ]
+    },
+    {
+      "id": "REQ-P21",
+      "features": [
+        "F-023"
+      ]
+    },
+    {
+      "id": "REQ-P22",
+      "features": [
+        "F-010",
+        "F-011"
+      ]
+    },
+    {
+      "id": "REQ-P23",
+      "features": [
+        "F-007",
+        "F-009",
+        "F-010"
+      ]
+    },
+    {
+      "id": "REQ-P24",
+      "features": [
+        "F-012"
+      ]
+    },
+    {
+      "id": "REQ-P25",
+      "features": [
+        "F-004",
+        "F-005",
+        "F-012"
+      ]
+    },
+    {
+      "id": "REQ-P26",
+      "features": [
+        "F-006",
+        "F-018",
+        "F-019",
+        "F-021",
+        "F-027"
+      ]
+    },
+    {
+      "id": "REQ-P27",
+      "features": [
+        "F-009"
+      ]
+    },
+    {
+      "id": "REQ-B01",
+      "features": [
+        "F-027"
+      ]
+    },
+    {
+      "id": "REQ-B02",
+      "features": [
+        "F-027"
+      ]
+    },
+    {
+      "id": "REQ-B03",
+      "features": [
+        "F-025",
+        "F-027"
+      ]
+    },
+    {
+      "id": "REQ-B04",
+      "features": [
+        "F-012",
+        "F-018",
+        "F-019",
+        "F-021"
+      ]
+    },
+    {
+      "id": "REQ-B05",
+      "features": [
+        "F-019",
+        "F-027"
+      ]
+    },
+    {
+      "id": "REQ-B06",
+      "features": [
+        "F-022"
+      ]
+    },
+    {
+      "id": "REQ-B07",
+      "features": [
+        "F-013",
+        "F-017",
+        "F-026"
+      ]
+    },
+    {
+      "id": "REQ-B08",
+      "features": [
+        "F-022",
+        "F-027"
+      ]
+    }
+  ],
+  "declaredTables": 78,
+  "declaredColumns": 1055,
+  "literalFromTargets": 41,
+  "configuredTaxClauses": 49,
+  "extractedTaxLiteralFieldObjects": 785
+}

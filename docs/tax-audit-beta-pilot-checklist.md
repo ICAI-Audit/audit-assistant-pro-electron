@@ -1,3 +1,5 @@
+> Historical beta scope. Current code includes draft Form 3CD Word, Excel, PDF and HTML exports. Read [current feature status](project/FEATURE_REGISTER.md) and [validation limits](project/CURRENT_STATUS.md) before applying the older exclusions below. Professional review and portal acceptance remain separate.
+
 # Tax Audit Beta Pilot Checklist
 
 Beta label: Tax Audit Beta v0.1 RC1  

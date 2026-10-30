@@ -1,6 +1,15 @@
 const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron');
 const path = require('path');
 const { initializeAutoUpdater } = require('./auto-updater.cjs');
+const {
+  buildEngagementScope,
+  canAccessTable,
+  evidencePathError,
+  findCanonicalEvidenceFile,
+  getAuthorizationContext,
+  isProtectedUpdate,
+  rowIsAuthorized,
+} = require('./sqlite-authorization.cjs');
 const crypto = require('crypto');
 const fs = require('fs');
 let Database;
@@ -671,7 +680,7 @@ function runTaxAuditAy2025Backfill(db) {
   }
 }
 
-let currentUserId = null;
+let currentAuthenticatedUserId = null;
 
 const isDev = process.env.NODE_ENV !== 'production' && (process.env.NODE_ENV === 'development' || (app && !app.isPackaged));
 
@@ -718,11 +727,50 @@ function setAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function isTrustedRendererEvent(event) {
+  return Boolean(
+    event?.sender
+    && !event.sender.isDestroyed()
+  );
+}
+
+function getAuthenticatedUserId(event) {
+  if (!isTrustedRendererEvent(event)) return null;
+  return currentAuthenticatedUserId;
+}
+
+function bindAuthenticatedUser(event, userId) {
+  if (!isTrustedRendererEvent(event)) {
+    throw new Error('Authentication must originate from the main application frame.');
+  }
+  currentAuthenticatedUserId = userId;
+}
+
+function getAuthorizedSession(db, event) {
+  const userId = getAuthenticatedUserId(event);
+  if (!userId) throw new Error('Authentication required.');
+  return getAuthorizationContext(db, userId);
+}
+
+function resolveEvidenceFile(db, bucket, relativePath, context) {
+  if (bucket !== 'evidence' || typeof relativePath !== 'string' || !relativePath) {
+    throw new Error('Only registered evidence files can be accessed.');
+  }
+  const record = findCanonicalEvidenceFile(db, relativePath);
+  if (!record || !rowIsAuthorized(db, context, 'evidence_files', record)) {
+    throw new Error('Evidence file is outside the authenticated user’s engagement access.');
+  }
+  return record;
+}
+
 function registerIpcHandlers() {
   const { ipcMain } = require('electron');
 
   // --- SQLite AUTH & QUERY HANDLERS ---
   ipcMain.handle('sqlite-auth', async (event, payload) => {
+    if (!isTrustedRendererEvent(event)) {
+      return { data: null, error: { message: 'Authentication requests must originate from the main application frame.' } };
+    }
     const db = getSqliteDb();
     if (!db) {
       return { data: null, error: { message: 'SQLite not available. Please ensure better-sqlite3 and bcrypt are installed.' } };
@@ -762,7 +810,7 @@ function registerIpcHandlers() {
         `);
         insertRole.run(crypto.randomBytes(16).toString('hex'), user_id, role);
 
-        currentUserId = user_id;
+        bindAuthenticatedUser(event, user_id);
 
         return {
           data: {
@@ -791,7 +839,7 @@ function registerIpcHandlers() {
           return { data: null, error: { message: 'Invalid login credentials' } };
         }
 
-        currentUserId = row.user_id;
+        bindAuthenticatedUser(event, row.user_id);
 
         return {
           data: {
@@ -805,7 +853,7 @@ function registerIpcHandlers() {
       }
 
       if (action === 'logout') {
-        currentUserId = null;
+        currentAuthenticatedUserId = null;
         return { data: null, error: null };
       }
 
@@ -816,13 +864,14 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('sqlite-get-current-user', async () => {
+  ipcMain.handle('sqlite-get-current-user', async (event) => {
+    const userId = getAuthenticatedUserId(event);
     const db = getSqliteDb();
-    if (!db || !currentUserId) {
+    if (!db || !userId) {
       return null;
     }
     try {
-      const row = db.prepare('SELECT * FROM profiles WHERE user_id = ?').get(currentUserId);
+      const row = db.prepare('SELECT * FROM profiles WHERE user_id = ?').get(userId);
       if (!row) return null;
       return {
         id: row.id,
@@ -837,6 +886,11 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('sqlite-query', async (event, payload) => {
+    const userId = getAuthenticatedUserId(event);
+    if (!userId) {
+      return { data: null, error: { message: 'Authentication required.' } };
+    }
+
     const db = getSqliteDb();
     if (!db) {
       safeLog('❌ sqlite-query called but database is not available');
@@ -850,6 +904,11 @@ function registerIpcHandlers() {
       if (!table || !action) {
         return { data: null, error: { message: 'Table and action are required.' } };
       }
+      if (!isTrustedRendererEvent(event)) {
+        return { data: null, error: { message: 'Database requests must originate from the main application frame.' } };
+      }
+
+      const context = getAuthorizationContext(db, userId);
 
       const safeIdentifier = (identifier) => {
         if (typeof identifier !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
@@ -874,6 +933,19 @@ function registerIpcHandlers() {
 
       const safeTable = safeIdentifier(table);
       const colList = columns && typeof columns === 'string' ? columns : '*';
+      if (colList !== '*' && !/^[A-Za-z_][A-Za-z0-9_]*(\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*$/.test(colList)) {
+        return { data: null, error: { message: 'Invalid selected columns.' } };
+      }
+      if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) {
+        return { data: null, error: { message: `Unknown table: ${table}` } };
+      }
+      if (!canAccessTable(context, table, action)) {
+        return { data: null, error: { message: `Access denied for ${action} on ${table}.` } };
+      }
+      if (table === 'profiles' && colList.split(',').some((column) => column.trim() === 'password_hash')) {
+        return { data: null, error: { message: 'Password hashes are not available through the query interface.' } };
+      }
+
       const whereClauses = [];
       const params = [];
 
@@ -921,6 +993,18 @@ function registerIpcHandlers() {
       }
 
       const whereSql = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : '';
+      if ((action === 'update' || action === 'delete')
+        && (!Array.isArray(filters) || filters.length === 0 || !whereClauses.length)) {
+        return { data: null, error: { message: 'Filtered update and delete requests are required.' } };
+      }
+
+      const engagementScope = buildEngagementScope(db, context, table);
+      const authorizedWhereSql = engagementScope
+        ? `${whereSql}${whereSql ? ' AND ' : ' WHERE '}${engagementScope.sql}`
+        : whereSql;
+      const authorizedParams = engagementScope
+        ? [...params, ...engagementScope.params]
+        : params;
 
       // Build ORDER BY clause
       let orderSql = '';
@@ -937,9 +1021,12 @@ function registerIpcHandlers() {
       }
 
       if (action === 'select') {
-        const sql = `SELECT ${colList} FROM ${safeTable}${whereSql}${orderSql}${limitSql}`;
+        const sql = `SELECT ${colList} FROM ${safeTable}${authorizedWhereSql}${orderSql}${limitSql}`;
         const stmt = db.prepare(sql);
-        const rows = stmt.all(...params);
+        const rows = stmt.all(...authorizedParams);
+        if (table === 'profiles' && colList === '*') {
+          rows.forEach((row) => delete row.password_hash);
+        }
         return { data: rows, error: null };
       }
 
@@ -950,13 +1037,26 @@ function registerIpcHandlers() {
         const rows = Array.isArray(data) ? data : [data];
         const inserted = [];
         for (const row of rows) {
-          const cleanRow = { ...row };
-          // ONLY set created_by='system' if the field exists in the row but is empty
-          // Don't add created_by to tables that don't have this column (like activity_logs)
-          if ('created_by' in cleanRow && !cleanRow.created_by) {
-            cleanRow.created_by = 'system';
+          if (!row || typeof row !== 'object' || Array.isArray(row)) {
+            return { data: null, error: { message: 'Each inserted row must be an object.' } };
+          }
+          if (table === 'engagements') {
+            if (row.created_by && row.created_by !== userId) {
+              return { data: null, error: { message: 'An engagement must be created by the authenticated user.' } };
+            }
+          } else if (!rowIsAuthorized(db, context, table, row)) {
+            return { data: null, error: { message: 'Cannot insert a row outside the authenticated user’s access.' } };
           }
 
+          const cleanRow = { ...row };
+          if ('created_by' in cleanRow) cleanRow.created_by = userId;
+          if (table === 'evidence_files') {
+            if (cleanRow.uploaded_by !== userId) {
+              return { data: null, error: { message: 'Evidence must be uploaded by the authenticated user.' } };
+            }
+            const pathError = evidencePathError(db, cleanRow, cleanRow.id ?? null);
+            if (pathError) return { data: null, error: { message: pathError } };
+          }
           const keys = Object.keys(cleanRow);
           const placeholders = keys.map(() => '?').join(', ');
           const safeKeys = keys.map(safeIdentifier);
@@ -967,6 +1067,13 @@ function registerIpcHandlers() {
           // Fetch the inserted row to get the auto-generated ID
           const insertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE rowid = ?`).get(result.lastInsertRowid);
           inserted.push(insertedRow || cleanRow);
+
+          if (table === 'engagements') {
+            db.prepare(`
+              INSERT OR IGNORE INTO engagement_assignments (engagement_id, user_id, role, assigned_by)
+              VALUES (?, ?, 'owner', ?)
+            `).run(cleanRow.id || insertedRow?.id, userId, userId);
+          }
         }
         return { data: inserted, error: null };
       }
@@ -980,41 +1087,55 @@ function registerIpcHandlers() {
           ? onConflict.split(',').map((column) => column.trim()).filter(Boolean)
           : [];
         const conflictColumns = conflictColumnNames.map(safeIdentifier);
+        if (conflictColumns.length === 0) {
+          return { data: null, error: { message: 'Upsert requires explicit conflict columns.' } };
+        }
         const upserted = [];
 
         for (const row of rows) {
+          if (!row || typeof row !== 'object' || Array.isArray(row)) {
+            return { data: null, error: { message: 'Each upserted row must be an object.' } };
+          }
           const cleanRow = { ...row };
+          if ('created_by' in cleanRow) cleanRow.created_by = userId;
+
+          const lookupWhere = conflictColumnNames.map((column) => `${safeIdentifier(column)} = ?`).join(' AND ');
+          const lookupParams = conflictColumnNames.map((column) => toSqliteValue(cleanRow[column]));
+          const existingRow = db.prepare(`SELECT * FROM ${safeTable} WHERE ${lookupWhere}`).get(...lookupParams) || null;
+          if (existingRow) {
+            delete cleanRow.created_by;
+            const prospectiveRow = { ...existingRow, ...cleanRow };
+            if (!canAccessTable(context, table, 'update')
+              || !rowIsAuthorized(db, context, table, existingRow)
+              || isProtectedUpdate(table, context, cleanRow, existingRow)
+              || !rowIsAuthorized(db, context, table, prospectiveRow)) {
+              return { data: null, error: { message: 'Upsert conflicts with a protected or inaccessible row.' } };
+            }
+          } else {
+            if (!canAccessTable(context, table, 'insert')
+              || (table !== 'engagements' && !rowIsAuthorized(db, context, table, cleanRow))) {
+              return { data: null, error: { message: 'Cannot upsert a row outside the authenticated user’s access.' } };
+            }
+            if (table === 'evidence_files') {
+              const pathError = cleanRow.uploaded_by !== userId
+                ? 'Evidence must be uploaded by the authenticated user.'
+                : evidencePathError(db, cleanRow, cleanRow.id ?? null);
+              if (pathError) return { data: null, error: { message: pathError } };
+            }
+          }
+
           const keys = Object.keys(cleanRow);
           const safeKeys = keys.map(safeIdentifier);
           const placeholders = keys.map(() => '?').join(', ');
+          const updateKeys = safeKeys.filter((key) => !conflictColumns.includes(key));
+          const conflictSql = updateKeys.length > 0
+            ? ` ON CONFLICT(${conflictColumns.join(', ')}) DO UPDATE SET ${updateKeys.map((key) => `${key} = excluded.${key}`).join(', ')}`
+            : ` ON CONFLICT(${conflictColumns.join(', ')}) DO NOTHING`;
+          const sql = `INSERT INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})${conflictSql}`;
+          db.prepare(sql).run(...keys.map((k) => toSqliteValue(cleanRow[k])));
 
-          let conflictSql = '';
-          if (conflictColumns.length > 0) {
-            const updateKeys = safeKeys.filter((key) => !conflictColumns.includes(key));
-            if (updateKeys.length > 0) {
-              conflictSql = ` ON CONFLICT(${conflictColumns.join(', ')}) DO UPDATE SET ${updateKeys.map((key) => `${key} = excluded.${key}`).join(', ')}`;
-            } else {
-              conflictSql = ` ON CONFLICT(${conflictColumns.join(', ')}) DO NOTHING`;
-            }
-          } else {
-            conflictSql = ' OR REPLACE';
-          }
-
-          const sql = conflictColumns.length > 0
-            ? `INSERT INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})${conflictSql}`
-            : `INSERT${conflictSql} INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})`;
-          const stmt = db.prepare(sql);
-          const result = stmt.run(...keys.map((k) => toSqliteValue(cleanRow[k])));
-
-          if (conflictColumns.length > 0) {
-            const lookupWhere = conflictColumns.map((column) => `${column} = ?`).join(' AND ');
-            const lookupParams = conflictColumnNames.map((column) => toSqliteValue(cleanRow[column]));
-            const upsertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE ${lookupWhere}`).get(...lookupParams);
-            upserted.push(upsertedRow || cleanRow);
-          } else {
-            const upsertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE rowid = ?`).get(result.lastInsertRowid);
-            upserted.push(upsertedRow || cleanRow);
-          }
+          const upsertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE ${lookupWhere}`).get(...lookupParams);
+          upserted.push(upsertedRow || cleanRow);
         }
 
         return { data: upserted, error: null };
@@ -1024,19 +1145,35 @@ function registerIpcHandlers() {
         if (!data) {
           return { data: null, error: { message: 'No data to update.' } };
         }
+        const targetRows = db.prepare(`SELECT * FROM ${safeTable}${whereSql}`).all(...params);
+        if (targetRows.some((row) => !rowIsAuthorized(db, context, table, row)
+          || isProtectedUpdate(table, context, data, row)
+          || !rowIsAuthorized(db, context, table, { ...row, ...data }))) {
+          return { data: null, error: { message: 'Update includes a protected or inaccessible row or field.' } };
+        }
         const keys = Object.keys(data);
+        if (keys.length === 0) {
+          return { data: null, error: { message: 'No fields to update.' } };
+        }
         const setSql = keys.map((k) => `${safeIdentifier(k)} = ?`).join(', ');
-        const sql = `UPDATE ${safeTable} SET ${setSql}${whereSql}`;
+        const sql = `UPDATE ${safeTable} SET ${setSql}${authorizedWhereSql}`;
         const stmt = db.prepare(sql);
-        stmt.run(...keys.map((k) => toSqliteValue(data[k])), ...params);
-        const updatedRows = db.prepare(`SELECT * FROM ${safeTable}${whereSql}`).all(...params);
+        stmt.run(...keys.map((k) => toSqliteValue(data[k])), ...authorizedParams);
+        const updatedRows = db.prepare(`SELECT * FROM ${safeTable}${authorizedWhereSql}`).all(...authorizedParams);
+        if (table === 'profiles') {
+          updatedRows.forEach((row) => delete row.password_hash);
+        }
         return { data: updatedRows, error: null };
       }
 
       if (action === 'delete') {
-        const sql = `DELETE FROM ${safeTable}${whereSql}`;
+        const targetRows = db.prepare(`SELECT * FROM ${safeTable}${whereSql}`).all(...params);
+        if (targetRows.some((row) => !rowIsAuthorized(db, context, table, row))) {
+          return { data: null, error: { message: 'Cannot delete an inaccessible row.' } };
+        }
+        const sql = `DELETE FROM ${safeTable}${authorizedWhereSql}`;
         const stmt = db.prepare(sql);
-        stmt.run(...params);
+        stmt.run(...authorizedParams);
         return { data: null, error: null };
       }
 
@@ -1075,7 +1212,16 @@ function registerIpcHandlers() {
 
   ipcMain.handle('file-save', async (event, payload) => {
     try {
+      const userId = getAuthenticatedUserId(event);
+      if (!userId || !isTrustedRendererEvent(event)) {
+        throw new Error('Authentication required.');
+      }
+      const context = getAuthorizationContext(getSqliteDb(), userId);
       const { bucket, path: relativePath, buffer } = payload || {};
+      const evidence = resolveEvidenceFile(getSqliteDb(), bucket, relativePath, context);
+      if (!context.hasGlobalEngagementAccess && evidence.uploaded_by !== userId) {
+        throw new Error('Only the evidence uploader can replace this file.');
+      }
       const { storageRoot, resolved } = resolveStoragePath(bucket, relativePath);
       fs.mkdirSync(path.dirname(resolved), { recursive: true });
       fs.mkdirSync(storageRoot, { recursive: true });
@@ -1143,6 +1289,13 @@ function registerIpcHandlers() {
 
   ipcMain.handle('file-get-path', async (event, bucket, relativePath) => {
     try {
+      const userId = getAuthenticatedUserId(event);
+      if (!userId || !isTrustedRendererEvent(event)) {
+        throw new Error('Authentication required.');
+      }
+      const db = getSqliteDb();
+      const context = getAuthorizationContext(db, userId);
+      resolveEvidenceFile(db, bucket, relativePath, context);
       const { resolved } = resolveStoragePath(bucket, relativePath);
       return { success: true, path: resolved };
     } catch (error) {
@@ -1152,6 +1305,13 @@ function registerIpcHandlers() {
 
   ipcMain.handle('file-download', async (event, bucket, relativePath) => {
     try {
+      const userId = getAuthenticatedUserId(event);
+      if (!userId || !isTrustedRendererEvent(event)) {
+        throw new Error('Authentication required.');
+      }
+      const db = getSqliteDb();
+      const context = getAuthorizationContext(db, userId);
+      resolveEvidenceFile(db, bucket, relativePath, context);
       const { resolved } = resolveStoragePath(bucket, relativePath);
       if (!fs.existsSync(resolved)) {
         return { success: false, error: 'File not found' };
@@ -1165,10 +1325,61 @@ function registerIpcHandlers() {
 
   ipcMain.handle('file-delete', async (event, bucket, relativePath) => {
     try {
+      const userId = getAuthenticatedUserId(event);
+      if (!userId || !isTrustedRendererEvent(event)) {
+        throw new Error('Authentication required.');
+      }
+      const db = getSqliteDb();
+      const context = getAuthorizationContext(db, userId);
+      resolveEvidenceFile(db, bucket, relativePath, context);
+      if (!context.isManagerOrAbove) {
+        throw new Error('Deleting evidence files requires manager-level access.');
+      }
       const { resolved } = resolveStoragePath(bucket, relativePath);
       if (fs.existsSync(resolved)) {
         fs.unlinkSync(resolved);
       }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Narrow rollback for a failed upload: uploader only, fresh, draft, unlocked and unreferenced.
+  ipcMain.handle('evidence-upload-rollback', async (event, evidenceId) => {
+    try {
+      const userId = getAuthenticatedUserId(event);
+      if (!userId || !isTrustedRendererEvent(event)) {
+        throw new Error('Authentication required.');
+      }
+      if (typeof evidenceId !== 'string' || !evidenceId) {
+        throw new Error('Evidence id is required.');
+      }
+      const db = getSqliteDb();
+      const context = getAuthorizationContext(db, userId);
+      const record = db.prepare(`
+        SELECT * FROM evidence_files
+        WHERE id = ? AND created_at >= datetime('now', '-10 minutes')
+      `).get(evidenceId);
+      if (!record
+        || record.uploaded_by !== userId
+        || record.locked
+        || record.approval_stage !== 'draft'
+        || !rowIsAuthorized(db, context, 'evidence_files', record)
+        || !findCanonicalEvidenceFile(db, record.file_path)) {
+        throw new Error('Only your own recent, unlocked draft upload can be rolled back.');
+      }
+      const referenced = db.prepare('SELECT 1 FROM evidence_links WHERE evidence_id = ?').get(record.id)
+        || db.prepare('SELECT 1 FROM tax_audit_clause_evidence WHERE evidence_file_id = ?').get(record.id)
+        || db.prepare('SELECT 1 FROM audit_program_attachments WHERE file_path = ?').get(record.file_path);
+      if (referenced) {
+        throw new Error('Evidence that is already linked cannot be rolled back.');
+      }
+      const { resolved } = resolveStoragePath('evidence', record.file_path);
+      if (fs.existsSync(resolved)) {
+        fs.unlinkSync(resolved);
+      }
+      db.prepare('DELETE FROM evidence_files WHERE id = ?').run(record.id);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -2273,4 +2484,3 @@ ipcMain.handle('gstzen-api-request', async (event, { endpoint, method, data, tok
   safeLog(`[IPC] gstzen-api-request: ${method} ${endpoint}`);
   return handleApiRequest(endpoint, method, data, token);
 });
-
