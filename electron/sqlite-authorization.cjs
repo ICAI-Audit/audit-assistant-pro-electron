@@ -52,6 +52,9 @@ const ENGAGEMENT_TABLES = new Set([
   'tax_audit_qualifications',
   'tax_audit_review_notes',
   'tax_audit_exports',
+  'engagement_trial_balance_header',
+  'engagement_trial_balance_lines',
+  'engagement_tb_classification',
 ]);
 
 const MANAGER_DELETE_TABLES = new Set([
@@ -87,6 +90,7 @@ const GLOBAL_MANAGER_TABLES = new Set([
   'procedure_template_checklist_items',
   'procedure_template_evidence_requirements',
   'engagement_letter_templates',
+  'ifc_clause_library',
 ]);
 
 const GLOBAL_READ_TABLES = new Set([
@@ -112,6 +116,7 @@ const PARENT_RELATIONS = {
   tax_audit_acceptance_checks: ['tax_audit_id', 'tax_audit_engagements'],
   tax_audit_qualifications: ['tax_audit_id', 'tax_audit_engagements'],
   tax_audit_review_notes: ['tax_audit_id', 'tax_audit_engagements'],
+  engagement_tb_classification: ['tb_line_id', 'engagement_trial_balance_lines'],
 };
 
 const VALID_ROLES = new Set(['admin', 'partner', 'manager', 'senior', 'staff']);
@@ -237,7 +242,21 @@ function getRecordEngagementIds(db, table, row, visited = new Set()) {
     if (!procedure?.engagement_id || procedure.engagement_id !== evidence?.engagement_id) {
       return [];
     }
+    if (row.evidence_requirement_id) {
+      const requirement = db.prepare(
+        'SELECT procedure_id FROM procedure_evidence_requirements WHERE id = ?'
+      ).get(row.evidence_requirement_id);
+      if (!requirement || requirement.procedure_id !== row.procedure_id) return [];
+    }
     return [procedure.engagement_id];
+  }
+
+  if (table === 'engagement_trial_balance_lines') {
+    const header = db.prepare(
+      'SELECT engagement_id FROM engagement_trial_balance_header WHERE id = ?'
+    ).get(row.tb_header_id);
+    if (!header?.engagement_id || header.engagement_id !== row.engagement_id) return [];
+    return [header.engagement_id];
   }
 
   if (table === 'tax_audit_clause_evidence') {
@@ -384,9 +403,44 @@ function buildEngagementScope(db, context, table, sourceAlias = table, visited =
     : null;
 }
 
+function evidencePathError(db, row, selfId = null, { checkUnique = true } = {}) {
+  const filePath = row?.file_path;
+  if (typeof filePath !== 'string' || !filePath || filePath.includes('\\') || filePath.includes('\0')
+    || filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath)) {
+    return 'Evidence file_path must be a relative forward-slash path.';
+  }
+  const segments = filePath.split('/');
+  if (segments.length < 2 || segments.some((segment) => (
+    !segment || segment === '.' || segment === '..' || /[:*?"<>|]/.test(segment) || /[. ]$/.test(segment)
+  ))) {
+    return 'Evidence file_path contains an unsafe segment.';
+  }
+  if (!row.engagement_id || segments[0] !== row.engagement_id) {
+    return 'Evidence file_path must be inside its own engagement folder.';
+  }
+  if (checkUnique && db.prepare(
+    'SELECT 1 FROM evidence_files WHERE lower(file_path) = lower(?) AND id IS NOT ?'
+  ).get(filePath, selfId)) {
+    return 'Evidence file_path is already registered.';
+  }
+  return null;
+}
+
+function findCanonicalEvidenceFile(db, filePath) {
+  if (typeof filePath !== 'string' || !filePath) return null;
+  const rows = db.prepare(
+    'SELECT * FROM evidence_files WHERE lower(file_path) = lower(?)'
+  ).all(filePath);
+  if (rows.length !== 1 || rows[0].file_path !== filePath) return null;
+  return evidencePathError(db, rows[0], rows[0].id, { checkUnique: false }) ? null : rows[0];
+}
+
 function isProtectedUpdate(table, context, data, row) {
-  const keys = Object.keys(data || {});
+  const keys = Object.keys(data || {}).filter((key) => !(
+    key in row && String(row[key] ?? '') === String(data[key] ?? '')
+  ));
   if (keys.some((key) => key === 'id')) return true;
+  if (table === 'evidence_files' && keys.includes('file_path')) return true;
   if (table === 'profiles') {
     const allowed = new Set(['full_name', 'avatar_url', 'phone', 'membership_number']);
     return row.user_id !== context.userId
@@ -408,6 +462,8 @@ function isProtectedUpdate(table, context, data, row) {
 module.exports = {
   buildEngagementScope,
   canAccessTable,
+  evidencePathError,
+  findCanonicalEvidenceFile,
   getAuthorizationContext,
   getRecordEngagementIds,
   isProtectedUpdate,

@@ -175,13 +175,17 @@ export function useEvidenceFiles(engagementId?: string) {
 
         if (uploadError) throw uploadError;
       } catch (uploadError) {
-        const { error: cleanupError } = await db
-          .from('evidence_files')
-          .delete()
-          .eq('id', newFile.id)
-          .execute();
-        if (cleanupError) {
-          throw new Error(`Evidence upload failed and its metadata could not be removed: ${cleanupError.message}`);
+        try {
+          const rollback = (window as unknown as {
+            electronAPI?: { rollbackEvidenceUpload?: (evidenceId: string) => Promise<boolean> };
+          }).electronAPI?.rollbackEvidenceUpload;
+          if (!rollback) {
+            throw new Error('rollback is unavailable');
+          }
+          await rollback(newFile.id);
+        } catch (cleanupError) {
+          const detail = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+          throw new Error(`Evidence upload failed and its metadata could not be removed: ${detail}`);
         }
         throw uploadError;
       }

@@ -4,6 +4,8 @@ const { initializeAutoUpdater } = require('./auto-updater.cjs');
 const {
   buildEngagementScope,
   canAccessTable,
+  evidencePathError,
+  findCanonicalEvidenceFile,
   getAuthorizationContext,
   isProtectedUpdate,
   rowIsAuthorized,
@@ -754,9 +756,7 @@ function resolveEvidenceFile(db, bucket, relativePath, context) {
   if (bucket !== 'evidence' || typeof relativePath !== 'string' || !relativePath) {
     throw new Error('Only registered evidence files can be accessed.');
   }
-  const record = db.prepare(`
-    SELECT * FROM evidence_files WHERE file_path = ?
-  `).get(relativePath);
+  const record = findCanonicalEvidenceFile(db, relativePath);
   if (!record || !rowIsAuthorized(db, context, 'evidence_files', record)) {
     throw new Error('Evidence file is outside the authenticated user’s engagement access.');
   }
@@ -1050,8 +1050,12 @@ function registerIpcHandlers() {
 
           const cleanRow = { ...row };
           if ('created_by' in cleanRow) cleanRow.created_by = userId;
-          if (table === 'evidence_files' && cleanRow.uploaded_by !== userId) {
-            return { data: null, error: { message: 'Evidence must be uploaded by the authenticated user.' } };
+          if (table === 'evidence_files') {
+            if (cleanRow.uploaded_by !== userId) {
+              return { data: null, error: { message: 'Evidence must be uploaded by the authenticated user.' } };
+            }
+            const pathError = evidencePathError(db, cleanRow, cleanRow.id ?? null);
+            if (pathError) return { data: null, error: { message: pathError } };
           }
           const keys = Object.keys(cleanRow);
           const placeholders = keys.map(() => '?').join(', ');
@@ -1083,6 +1087,9 @@ function registerIpcHandlers() {
           ? onConflict.split(',').map((column) => column.trim()).filter(Boolean)
           : [];
         const conflictColumns = conflictColumnNames.map(safeIdentifier);
+        if (conflictColumns.length === 0) {
+          return { data: null, error: { message: 'Upsert requires explicit conflict columns.' } };
+        }
         const upserted = [];
 
         for (const row of rows) {
@@ -1090,55 +1097,45 @@ function registerIpcHandlers() {
             return { data: null, error: { message: 'Each upserted row must be an object.' } };
           }
           const cleanRow = { ...row };
+          if ('created_by' in cleanRow) cleanRow.created_by = userId;
+
+          const lookupWhere = conflictColumnNames.map((column) => `${safeIdentifier(column)} = ?`).join(' AND ');
+          const lookupParams = conflictColumnNames.map((column) => toSqliteValue(cleanRow[column]));
+          const existingRow = db.prepare(`SELECT * FROM ${safeTable} WHERE ${lookupWhere}`).get(...lookupParams) || null;
+          if (existingRow) {
+            delete cleanRow.created_by;
+            const prospectiveRow = { ...existingRow, ...cleanRow };
+            if (!canAccessTable(context, table, 'update')
+              || !rowIsAuthorized(db, context, table, existingRow)
+              || isProtectedUpdate(table, context, cleanRow, existingRow)
+              || !rowIsAuthorized(db, context, table, prospectiveRow)) {
+              return { data: null, error: { message: 'Upsert conflicts with a protected or inaccessible row.' } };
+            }
+          } else {
+            if (!canAccessTable(context, table, 'insert')
+              || (table !== 'engagements' && !rowIsAuthorized(db, context, table, cleanRow))) {
+              return { data: null, error: { message: 'Cannot upsert a row outside the authenticated user’s access.' } };
+            }
+            if (table === 'evidence_files') {
+              const pathError = cleanRow.uploaded_by !== userId
+                ? 'Evidence must be uploaded by the authenticated user.'
+                : evidencePathError(db, cleanRow, cleanRow.id ?? null);
+              if (pathError) return { data: null, error: { message: pathError } };
+            }
+          }
+
           const keys = Object.keys(cleanRow);
           const safeKeys = keys.map(safeIdentifier);
           const placeholders = keys.map(() => '?').join(', ');
-          if ('created_by' in cleanRow) cleanRow.created_by = userId;
+          const updateKeys = safeKeys.filter((key) => !conflictColumns.includes(key));
+          const conflictSql = updateKeys.length > 0
+            ? ` ON CONFLICT(${conflictColumns.join(', ')}) DO UPDATE SET ${updateKeys.map((key) => `${key} = excluded.${key}`).join(', ')}`
+            : ` ON CONFLICT(${conflictColumns.join(', ')}) DO NOTHING`;
+          const sql = `INSERT INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})${conflictSql}`;
+          db.prepare(sql).run(...keys.map((k) => toSqliteValue(cleanRow[k])));
 
-          let existingRow = null;
-          if (conflictColumnNames.length > 0) {
-            const lookupWhere = conflictColumnNames.map((column) => `${safeIdentifier(column)} = ?`).join(' AND ');
-            const lookupParams = conflictColumnNames.map((column) => toSqliteValue(cleanRow[column]));
-            existingRow = db.prepare(`SELECT * FROM ${safeTable} WHERE ${lookupWhere}`).get(...lookupParams) || null;
-          }
-          if (existingRow) {
-            if (!canAccessTable(context, table, 'update')
-              || !rowIsAuthorized(db, context, table, existingRow)
-              || isProtectedUpdate(table, context, cleanRow, existingRow)) {
-              return { data: null, error: { message: 'Upsert conflicts with a protected or inaccessible row.' } };
-            }
-          } else if (!canAccessTable(context, table, 'insert')
-            || (table !== 'engagements' && !rowIsAuthorized(db, context, table, cleanRow))) {
-            return { data: null, error: { message: 'Cannot upsert a row outside the authenticated user’s access.' } };
-          }
-
-          let conflictSql = '';
-          if (conflictColumns.length > 0) {
-            const updateKeys = safeKeys.filter((key) => !conflictColumns.includes(key));
-            if (updateKeys.length > 0) {
-              conflictSql = ` ON CONFLICT(${conflictColumns.join(', ')}) DO UPDATE SET ${updateKeys.map((key) => `${key} = excluded.${key}`).join(', ')}`;
-            } else {
-              conflictSql = ` ON CONFLICT(${conflictColumns.join(', ')}) DO NOTHING`;
-            }
-          } else {
-            conflictSql = ' OR REPLACE';
-          }
-
-          const sql = conflictColumns.length > 0
-            ? `INSERT INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})${conflictSql}`
-            : `INSERT${conflictSql} INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders})`;
-          const stmt = db.prepare(sql);
-          const result = stmt.run(...keys.map((k) => toSqliteValue(cleanRow[k])));
-
-          if (conflictColumns.length > 0) {
-            const lookupWhere = conflictColumns.map((column) => `${column} = ?`).join(' AND ');
-            const lookupParams = conflictColumnNames.map((column) => toSqliteValue(cleanRow[column]));
-            const upsertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE ${lookupWhere}`).get(...lookupParams);
-            upserted.push(upsertedRow || cleanRow);
-          } else {
-            const upsertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE rowid = ?`).get(result.lastInsertRowid);
-            upserted.push(upsertedRow || cleanRow);
-          }
+          const upsertedRow = db.prepare(`SELECT * FROM ${safeTable} WHERE ${lookupWhere}`).get(...lookupParams);
+          upserted.push(upsertedRow || cleanRow);
         }
 
         return { data: upserted, error: null };
@@ -1150,7 +1147,8 @@ function registerIpcHandlers() {
         }
         const targetRows = db.prepare(`SELECT * FROM ${safeTable}${whereSql}`).all(...params);
         if (targetRows.some((row) => !rowIsAuthorized(db, context, table, row)
-          || isProtectedUpdate(table, context, data, row))) {
+          || isProtectedUpdate(table, context, data, row)
+          || !rowIsAuthorized(db, context, table, { ...row, ...data }))) {
           return { data: null, error: { message: 'Update includes a protected or inaccessible row or field.' } };
         }
         const keys = Object.keys(data);
@@ -1334,10 +1332,54 @@ function registerIpcHandlers() {
       const db = getSqliteDb();
       const context = getAuthorizationContext(db, userId);
       resolveEvidenceFile(db, bucket, relativePath, context);
+      if (!context.isManagerOrAbove) {
+        throw new Error('Deleting evidence files requires manager-level access.');
+      }
       const { resolved } = resolveStoragePath(bucket, relativePath);
       if (fs.existsSync(resolved)) {
         fs.unlinkSync(resolved);
       }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Narrow rollback for a failed upload: uploader only, fresh, draft, unlocked and unreferenced.
+  ipcMain.handle('evidence-upload-rollback', async (event, evidenceId) => {
+    try {
+      const userId = getAuthenticatedUserId(event);
+      if (!userId || !isTrustedRendererEvent(event)) {
+        throw new Error('Authentication required.');
+      }
+      if (typeof evidenceId !== 'string' || !evidenceId) {
+        throw new Error('Evidence id is required.');
+      }
+      const db = getSqliteDb();
+      const context = getAuthorizationContext(db, userId);
+      const record = db.prepare(`
+        SELECT * FROM evidence_files
+        WHERE id = ? AND created_at >= datetime('now', '-10 minutes')
+      `).get(evidenceId);
+      if (!record
+        || record.uploaded_by !== userId
+        || record.locked
+        || record.approval_stage !== 'draft'
+        || !rowIsAuthorized(db, context, 'evidence_files', record)
+        || !findCanonicalEvidenceFile(db, record.file_path)) {
+        throw new Error('Only your own recent, unlocked draft upload can be rolled back.');
+      }
+      const referenced = db.prepare('SELECT 1 FROM evidence_links WHERE evidence_id = ?').get(record.id)
+        || db.prepare('SELECT 1 FROM tax_audit_clause_evidence WHERE evidence_file_id = ?').get(record.id)
+        || db.prepare('SELECT 1 FROM audit_program_attachments WHERE file_path = ?').get(record.file_path);
+      if (referenced) {
+        throw new Error('Evidence that is already linked cannot be rolled back.');
+      }
+      const { resolved } = resolveStoragePath('evidence', record.file_path);
+      if (fs.existsSync(resolved)) {
+        fs.unlinkSync(resolved);
+      }
+      db.prepare('DELETE FROM evidence_files WHERE id = ?').run(record.id);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };

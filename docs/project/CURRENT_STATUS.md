@@ -35,7 +35,7 @@ Implemented backend changes:
 
 Latest isolated regression result:
 
-- `node --test scripts/test-t003-authorization.cjs`: **passed** (20 tests, 20 passed, 0 failed).
+- `node --test scripts/test-t003-authorization.cjs`: **passed** (26 tests, 26 passed, 0 failed), including four review-finding regressions that failed before the fixes (canonical file ownership, parent-key moves, trial balance authorization, scoped upload rollback).
 
 Observation-only cases intentionally remain:
 
@@ -50,7 +50,8 @@ Observation-only cases intentionally remain:
 - `node --check electron/sqlite-authorization.cjs`
 - `node --check electron/main.cjs`
 - `node --check scripts/test-t003-authorization.cjs`
-- `node --test scripts/test-t003-authorization.cjs` (20/20 pass)
+- `node --test scripts/test-t003-authorization.cjs` (26/26 pass)
+- `npm run test:native`, `npx vitest run src/lib` (8 files, 37 tests), `npm run test:classification`, `npm run test:bulk-update`, `npm run build`
 
 **Failed (existing baseline, tracked separately)**
 

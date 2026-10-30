@@ -20,6 +20,7 @@ These are recommended tasks derived from the review. They do not grant approval 
 | T-014 | P2 | Ready for investigation | Triage 515 lint errors and 101 warnings from `npm run lint`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
 | T-015 | P0 | Complete (scoped) | Implemented fail-closed backend checks for unauthenticated database/file IPC, engagement ownership enforcement, protected role-field checks, and unfiltered mutation denial with isolated regression evidence | Continue with T-016 policy decisions for remaining behavior |
 | T-016 | P1 | Product decision required | Approve admin/partner/manager/senior/staff/viewer policy, engagement assignment/listing semantics, bulk mutation limits, export access, and evidence approval/lock/reopen transitions | Product owner decisions; T-003 control matrix |
+| T-017 | P2 | Ready for investigation | Add missing `engagement_tb_classification` and `ifc_clause_library` definitions to `sqlite/schema` with upgrade evidence; callers currently fail with missing-table errors | Backup/upgrade approach from T-009 |
 
 ## T-001 Session continuity
 
@@ -37,7 +38,7 @@ Completed on the T-002 branch. The pre-change EUSAGE lock mismatch was reproduce
 
 ## T-003 Authorization and locks
 
-Completed with scoped remediation on `fix/t003-backend-authorization-2026-10-29`. The harness still launches the real production Electron main and preload in a temporary profile and exercises the actual preload IPC API with synthetic users/data. Current result: `node --test scripts/test-t003-authorization.cjs` passes 20/20 tests. Enforced paths include unauthenticated denial, engagement-scoped query/file access, protected role update denial, cross-engagement forged-ID denial, and filtered-only update/delete. Observation-only checks remain for export authorization and evidence lock/approval transitions pending product decisions (T-016). Whole-file finalization remains T-007.
+Completed with scoped remediation on `fix/t003-backend-authorization-2026-10-29`. The harness still launches the real production Electron main and preload in a temporary profile and exercises the actual preload IPC API with synthetic users/data. Current result: `node --test scripts/test-t003-authorization.cjs` passes 26/26 tests. Enforced paths include unauthenticated denial, engagement-scoped query/file access, protected role update denial, cross-engagement forged-ID denial, filtered-only update/delete, canonical evidence file ownership, parent-key move prevention, trial balance table authorization, and a scoped staff upload rollback. Observation-only checks remain for export authorization and evidence lock/approval transitions pending product decisions (T-016). Missing `engagement_tb_classification` and `ifc_clause_library` schema definitions are a separate follow-up. Whole-file finalization remains T-007.
 
 ## T-004 Release scope
 

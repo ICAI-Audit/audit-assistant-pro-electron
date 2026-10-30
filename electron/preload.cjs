@@ -101,6 +101,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     return true;
   },
+  rollbackEvidenceUpload: async (evidenceId) => {
+    const result = await ipcRenderer.invoke('evidence-upload-rollback', evidenceId);
+    if (!result?.success) {
+      throw new Error(result?.error || 'Evidence upload rollback failed');
+    }
+    return true;
+  },
   app: {
     getDownloadsPath: () => ipcRenderer.invoke('app:getDownloadsPath'),
     openPath: (targetPath) => ipcRenderer.invoke('app:openPath', targetPath),

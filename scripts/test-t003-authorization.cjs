@@ -317,7 +317,7 @@ async function testHarness(t) {
     id: 't003-evidence-locked',
     engagement_id: engagementA.id,
     name: 'Synthetic locked evidence',
-    file_path: 'engagement-a/locked.bin',
+    file_path: 't003-engagement-a/locked.bin',
     file_type: 'application/octet-stream',
     file_size: 4,
     uploaded_by: admin.user_id,
@@ -327,7 +327,7 @@ async function testHarness(t) {
     id: 't003-evidence-approved',
     engagement_id: engagementA.id,
     name: 'Synthetic approved evidence',
-    file_path: 'engagement-a/approved.bin',
+    file_path: 't003-engagement-a/approved.bin',
     file_type: 'application/octet-stream',
     file_size: 4,
     uploaded_by: admin.user_id,
@@ -339,7 +339,7 @@ async function testHarness(t) {
     id: 't003-evidence-b',
     engagement_id: engagementB.id,
     name: 'Synthetic engagement B evidence',
-    file_path: 'engagement-b/private.bin',
+    file_path: 't003-engagement-b/private.bin',
     file_type: 'application/octet-stream',
     file_size: 4,
     uploaded_by: admin.user_id,
@@ -358,10 +358,10 @@ async function testHarness(t) {
   await login(adminEmail, password);
   const fileSave = await evaluate(`globalThis.electronAPI.saveFile({
     bucket: 'evidence',
-    path: 'engagement-b/private.bin',
+    path: 't003-engagement-b/private.bin',
     buffer: Uint8Array.from([84, 51, 45, 66])
   })`);
-  assert.equal(fileSave, 'engagement-b/private.bin', 'failed to create synthetic evidence bytes');
+  assert.equal(fileSave, 't003-engagement-b/private.bin', 'failed to create synthetic evidence bytes');
 
   await t.test('manager role allows helper-authorized core update', async () => {
     await login(managerEmail, password);
@@ -477,7 +477,7 @@ async function testHarness(t) {
     await evaluate('globalThis.electronAPI.sqliteAuth({ action: "logout" })');
     const result = await evaluate(`(async () => {
       try {
-        return { allowed: true, path: await globalThis.electronAPI.getFilePath('evidence', 'engagement-b/private.bin') };
+        return { allowed: true, path: await globalThis.electronAPI.getFilePath('evidence', 't003-engagement-b/private.bin') };
       } catch (error) {
         return { allowed: false, error: error.message };
       }
@@ -491,7 +491,7 @@ async function testHarness(t) {
       try {
         const path = await globalThis.electronAPI.saveFile({
           bucket: 'evidence',
-          path: 'engagement-b/unauthorized.bin',
+          path: 't003-engagement-b/unauthorized.bin',
           buffer: Uint8Array.from([84, 51, 45, 85])
         });
         return { allowed: true, path };
@@ -507,7 +507,7 @@ async function testHarness(t) {
     await evaluate('globalThis.electronAPI.sqliteAuth({ action: "logout" })');
     const result = await evaluate(`(async () => {
       try {
-        const file = await globalThis.electronAPI.downloadFile('evidence', 'engagement-b/private.bin');
+        const file = await globalThis.electronAPI.downloadFile('evidence', 't003-engagement-b/private.bin');
         return { allowed: true, bytes: Array.from(file.buffer) };
       } catch (error) {
         return { allowed: false, error: error.message };
@@ -520,7 +520,7 @@ async function testHarness(t) {
   await t.test('file delete enforces authentication and engagement ownership', async () => {
     const result = await evaluate(`(async () => {
       try {
-        await globalThis.electronAPI.deleteFile('evidence', 'engagement-b/private.bin');
+        await globalThis.electronAPI.deleteFile('evidence', 't003-engagement-b/private.bin');
         return { allowed: true };
       } catch (error) {
         return { allowed: false, error: error.message };
@@ -601,6 +601,278 @@ async function testHarness(t) {
     const after = (await query({ table: 'audit_procedures', action: 'select' })).data.length;
     console.log(`[T003 ${result.error ? 'DENIED' : 'ALLOWED'}] unfiltered delete; expected=deny pending explicit bulk policy; before=${before}; after=${after}; error=${result.error?.message || 'none'}`);
     assert.ok(result.error, `unfiltered delete removed ${before - after} records`);
+  });
+
+  const fileCall = (expression) => evaluate(`(async () => {
+    try {
+      return { allowed: true, value: await ${expression} };
+    } catch (error) {
+      return { allowed: false, error: error.message };
+    }
+  })()`);
+  const bytesOf = (...values) => `Uint8Array.from([${values.join(',')}])`;
+
+  await t.test('review finding 1: evidence metadata cannot claim another engagement’s file path', async () => {
+    await login(adminEmail, password);
+    const orphan = await insert('evidence_files', {
+      id: 't003-evidence-orphan',
+      engagement_id: engagementB.id,
+      name: 'Synthetic engagement B orphan',
+      file_path: 't003-engagement-b/orphan.bin',
+      file_type: 'application/octet-stream',
+      file_size: 4,
+      uploaded_by: admin.user_id,
+    });
+    const saved = await fileCall(`globalThis.electronAPI.saveFile({ bucket: 'evidence', path: '${orphan.file_path}', buffer: ${bytesOf(79, 82, 80, 72)} })`);
+    assert.equal(saved.allowed, true, 'failed to create synthetic orphan bytes');
+    const removed = await query({ table: 'evidence_files', action: 'delete', filters: [{ column: 'id', value: orphan.id }] });
+    assert.equal(removed.error, null);
+
+    await login(staffEmail, password);
+    const claim = await query({
+      table: 'evidence_files',
+      action: 'insert',
+      data: {
+        id: 't003-evidence-claim',
+        engagement_id: engagementA.id,
+        name: 'Synthetic claim on engagement B path',
+        file_path: orphan.file_path,
+        file_type: 'application/octet-stream',
+        file_size: 4,
+        uploaded_by: staff.user_id,
+      },
+    });
+    const download = await fileCall(`globalThis.electronAPI.downloadFile('evidence', '${orphan.file_path}')`);
+    const overwrite = await fileCall(`globalThis.electronAPI.saveFile({ bucket: 'evidence', path: '${orphan.file_path}', buffer: ${bytesOf(66, 65, 68)} })`);
+    console.log(`[T003 REVIEW-1] insertError=${claim.error?.message || 'none'}; downloadAllowed=${download.allowed}; overwriteAllowed=${overwrite.allowed}`);
+    assert.ok(claim.error, 'own-engagement metadata was accepted for another engagement’s file path');
+    assert.equal(download.allowed, false, 'staff downloaded another engagement’s file through own metadata');
+    assert.equal(overwrite.allowed, false, 'staff overwrote another engagement’s file through own metadata');
+  });
+
+  await t.test('review finding 1: evidence file_path cannot be re-pointed or made non-canonical', async () => {
+    await login(staffEmail, password);
+    const own = await query({
+      table: 'evidence_files',
+      action: 'insert',
+      data: {
+        id: 't003-evidence-own',
+        engagement_id: engagementA.id,
+        name: 'Synthetic own upload',
+        file_path: `${engagementA.id}/${staff.user_id}/own.bin`,
+        file_type: 'application/octet-stream',
+        file_size: 4,
+        uploaded_by: staff.user_id,
+      },
+    });
+    assert.equal(own.error, null, `legitimate canonical upload metadata was rejected: ${own.error?.message}`);
+    const repoint = await query({
+      table: 'evidence_files',
+      action: 'update',
+      filters: [{ column: 'id', value: 't003-evidence-own' }],
+      data: { file_path: 't003-engagement-b/private.bin' },
+    });
+    const traversal = await query({
+      table: 'evidence_files',
+      action: 'insert',
+      data: {
+        id: 't003-evidence-traversal',
+        engagement_id: engagementA.id,
+        name: 'Synthetic traversal',
+        file_path: `${engagementA.id}/../${engagementB.id}/private.bin`,
+        file_type: 'application/octet-stream',
+        file_size: 4,
+        uploaded_by: staff.user_id,
+      },
+    });
+    const duplicate = await query({
+      table: 'evidence_files',
+      action: 'insert',
+      data: {
+        id: 't003-evidence-duplicate',
+        engagement_id: engagementA.id,
+        name: 'Synthetic duplicate path',
+        file_path: `${engagementA.id}/${staff.user_id}/own.bin`,
+        file_type: 'application/octet-stream',
+        file_size: 4,
+        uploaded_by: staff.user_id,
+      },
+    });
+    console.log(`[T003 REVIEW-1] repoint=${repoint.error?.message || 'ALLOWED'}; traversal=${traversal.error?.message || 'ALLOWED'}; duplicate=${duplicate.error?.message || 'ALLOWED'}`);
+    assert.ok(repoint.error, 'file_path was re-pointed at another engagement');
+    assert.ok(traversal.error, 'path traversal was accepted in metadata');
+    assert.ok(duplicate.error, 'duplicate file_path was accepted');
+  });
+
+  await t.test('review finding 1: file operations stay bound to the canonical owner', async () => {
+    await login(staffEmail, password);
+    const save = await fileCall(`globalThis.electronAPI.saveFile({ bucket: 'evidence', path: '${engagementA.id}/${staff.user_id}/own.bin', buffer: ${bytesOf(79, 75)} })`);
+    const download = await fileCall(`globalThis.electronAPI.downloadFile('evidence', '${engagementA.id}/${staff.user_id}/own.bin')`);
+    const crossDownload = await fileCall(`globalThis.electronAPI.downloadFile('evidence', 't003-engagement-b/private.bin')`);
+    const crossPath = await fileCall(`globalThis.electronAPI.getFilePath('evidence', 't003-engagement-b/private.bin')`);
+    const traversal = await fileCall(`globalThis.electronAPI.downloadFile('evidence', '${engagementA.id}/../t003-engagement-b/private.bin')`);
+    const staffDelete = await fileCall(`globalThis.electronAPI.deleteFile('evidence', '${engagementA.id}/${staff.user_id}/own.bin')`);
+    console.log(`[T003 FILES] ownSave=${save.allowed}; ownDownload=${download.allowed}; crossDownload=${crossDownload.allowed}; crossPath=${crossPath.allowed}; traversal=${traversal.allowed}; staffByteDelete=${staffDelete.allowed}`);
+    assert.equal(save.allowed, true, save.error);
+    assert.equal(download.allowed, true, download.error);
+    assert.equal(crossDownload.allowed, false);
+    assert.equal(crossPath.allowed, false);
+    assert.equal(traversal.allowed, false);
+    assert.equal(staffDelete.allowed, false, 'staff removed evidence bytes without manager-level evidence deletion rights');
+    await login(managerEmail, password);
+    const managerDownload = await fileCall(`globalThis.electronAPI.downloadFile('evidence', 't003-engagement-b/private.bin')`);
+    assert.equal(managerDownload.allowed, false, 'manager assigned only to engagement A reached engagement B bytes');
+  });
+
+  await t.test('review finding 2: child parent keys cannot move rows into an inaccessible engagement', async () => {
+    await login(adminEmail, password);
+    const checklist = await insert('procedure_checklist_items', {
+      id: 't003-checklist-a',
+      procedure_id: procedureA.id,
+      text: 'Synthetic checklist item',
+    });
+    const link = await insert('evidence_links', {
+      id: 't003-link-a',
+      procedure_id: procedureA.id,
+      evidence_id: approvedEvidence.id,
+      linked_by: admin.user_id,
+    });
+    await login(staffEmail, password);
+    const moveChecklist = await query({
+      table: 'procedure_checklist_items',
+      action: 'update',
+      filters: [{ column: 'id', value: checklist.id }],
+      data: { procedure_id: procedureB.id },
+    });
+    const moveLinkProcedure = await query({
+      table: 'evidence_links',
+      action: 'update',
+      filters: [{ column: 'id', value: link.id }],
+      data: { procedure_id: procedureB.id },
+    });
+    const moveLinkEvidence = await query({
+      table: 'evidence_links',
+      action: 'update',
+      filters: [{ column: 'id', value: link.id }],
+      data: { evidence_id: foreignEvidence.id },
+    });
+    const upsertMove = await query({
+      table: 'procedure_checklist_items',
+      action: 'upsert',
+      onConflict: 'id',
+      data: { id: checklist.id, procedure_id: procedureB.id, text: 'Moved by upsert' },
+    });
+    const legitimate = await query({
+      table: 'procedure_checklist_items',
+      action: 'update',
+      filters: [{ column: 'id', value: checklist.id }],
+      data: { text: 'Updated within engagement', status: 'completed' },
+    });
+    await login(adminEmail, password);
+    const after = (await query({ table: 'procedure_checklist_items', action: 'select', filters: [{ column: 'id', value: checklist.id }] })).data[0];
+    console.log(`[T003 REVIEW-2] checklistMove=${moveChecklist.error?.message || 'ALLOWED'}; linkProcedure=${moveLinkProcedure.error?.message || 'ALLOWED'}; linkEvidence=${moveLinkEvidence.error?.message || 'ALLOWED'}; upsertMove=${upsertMove.error?.message || 'ALLOWED'}; legitimate=${legitimate.error?.message || 'ok'}; finalProcedure=${after.procedure_id}`);
+    assert.ok(moveChecklist.error, 'checklist item moved to another engagement’s procedure');
+    assert.ok(moveLinkProcedure.error, 'evidence link moved to another engagement’s procedure');
+    assert.ok(moveLinkEvidence.error, 'evidence link re-pointed at another engagement’s evidence');
+    assert.ok(upsertMove.error, 'upsert moved a child row to another engagement');
+    assert.equal(legitimate.error, null, `in-engagement child update was rejected: ${legitimate.error?.message}`);
+    assert.equal(after.procedure_id, procedureA.id);
+  });
+
+  await t.test('review finding 3: engagement trial balance workflow is authorized for assigned staff only', async () => {
+    await login(staffEmail, password);
+    const headerA = await query({
+      table: 'engagement_trial_balance_header',
+      action: 'insert',
+      data: { id: 't003-tb-header-a', engagement_id: engagementA.id, period_type: 'CY', financial_year: '2025-26', imported_by: staff.user_id },
+    });
+    assert.equal(headerA.error, null, `legitimate TB header insert rejected: ${headerA.error?.message}`);
+    const lineInsert = await query({
+      table: 'engagement_trial_balance_lines',
+      action: 'insert',
+      data: [{ id: 't003-tb-line-a', tb_header_id: 't003-tb-header-a', engagement_id: engagementA.id, ledger_name: 'Synthetic Cash', composite_key: 'cash|asset', closing: 100 }],
+    });
+    assert.equal(lineInsert.error, null, `legitimate TB line insert rejected: ${lineInsert.error?.message}`);
+    const lineUpsert = await query({
+      table: 'engagement_trial_balance_lines',
+      action: 'upsert',
+      onConflict: 'tb_header_id,composite_key',
+      data: [{ tb_header_id: 't003-tb-header-a', engagement_id: engagementA.id, ledger_name: 'Synthetic Cash', composite_key: 'cash|asset', closing: 150 }],
+    });
+    assert.equal(lineUpsert.error, null, `legitimate TB line upsert rejected: ${lineUpsert.error?.message}`);
+    assert.equal(lineUpsert.data[0].closing, 150);
+    const read = await query({ table: 'engagement_trial_balance_lines', action: 'select', filters: [{ column: 'tb_header_id', value: 't003-tb-header-a' }] });
+    assert.equal(read.error, null);
+    assert.equal(read.data.length, 1);
+
+    await login(adminEmail, password);
+    await insert('engagement_trial_balance_header', { id: 't003-tb-header-b', engagement_id: engagementB.id, period_type: 'CY', financial_year: '2025-26' });
+    await login(staffEmail, password);
+    const crossRead = await query({ table: 'engagement_trial_balance_header', action: 'select' });
+    const crossHeader = await query({
+      table: 'engagement_trial_balance_header',
+      action: 'insert',
+      data: { id: 't003-tb-header-x', engagement_id: engagementB.id, period_type: 'PY', financial_year: '2025-26' },
+    });
+    const mismatchedLine = await query({
+      table: 'engagement_trial_balance_lines',
+      action: 'insert',
+      data: { id: 't003-tb-line-x', tb_header_id: 't003-tb-header-b', engagement_id: engagementA.id, ledger_name: 'Synthetic', composite_key: 'x|y' },
+    });
+    const moveLine = await query({
+      table: 'engagement_trial_balance_lines',
+      action: 'update',
+      filters: [{ column: 'id', value: 't003-tb-line-a' }],
+      data: { tb_header_id: 't003-tb-header-b' },
+    });
+    console.log(`[T003 REVIEW-3] visibleHeaders=${JSON.stringify(crossRead.data?.map((row) => row.id))}; crossHeader=${crossHeader.error?.message || 'ALLOWED'}; mismatchedLine=${mismatchedLine.error?.message || 'ALLOWED'}; moveLine=${moveLine.error?.message || 'ALLOWED'}`);
+    assert.deepEqual(crossRead.data.map((row) => row.id), ['t003-tb-header-a']);
+    assert.ok(crossHeader.error);
+    assert.ok(mismatchedLine.error, 'TB line accepted a header from another engagement');
+    assert.ok(moveLine.error, 'TB line moved to another engagement’s header');
+
+    const deleteLines = await query({ table: 'engagement_trial_balance_lines', action: 'delete', filters: [{ column: 'tb_header_id', value: 't003-tb-header-a' }] });
+    assert.equal(deleteLines.error, null, `legitimate TB line replacement delete rejected: ${deleteLines.error?.message}`);
+    const deleteHeader = await query({ table: 'engagement_trial_balance_header', action: 'delete', filters: [{ column: 'id', value: 't003-tb-header-a' }] });
+    assert.equal(deleteHeader.error, null, `legitimate TB header delete rejected: ${deleteHeader.error?.message}`);
+  });
+
+  await t.test('review finding 4: failed staff upload can roll back only its own fresh metadata', async () => {
+    await login(staffEmail, password);
+    const upload = await query({
+      table: 'evidence_files',
+      action: 'insert',
+      data: {
+        id: 't003-evidence-rollback',
+        engagement_id: engagementA.id,
+        name: 'Synthetic failed upload',
+        file_path: `${engagementA.id}/${staff.user_id}/rollback.bin`,
+        file_type: 'application/octet-stream',
+        file_size: 4,
+        uploaded_by: staff.user_id,
+      },
+    });
+    assert.equal(upload.error, null, upload.error?.message);
+    const currentCleanup = await query({ table: 'evidence_files', action: 'delete', filters: [{ column: 'id', value: 't003-evidence-rollback' }] });
+    console.log(`[T003 REVIEW-4] general staff evidence delete=${currentCleanup.error?.message || 'ALLOWED'}`);
+    assert.ok(currentCleanup.error, 'staff must not gain general evidence deletion');
+
+    const rollbackOther = await fileCall(`globalThis.electronAPI.rollbackEvidenceUpload('${approvedEvidence.id}')`);
+    const rollbackForeign = await fileCall(`globalThis.electronAPI.rollbackEvidenceUpload('${foreignEvidence.id}')`);
+    const rollback = await fileCall(`globalThis.electronAPI.rollbackEvidenceUpload('t003-evidence-rollback')`);
+    const remaining = (await query({ table: 'evidence_files', action: 'select', filters: [{ column: 'id', value: 't003-evidence-rollback' }] })).data;
+    console.log(`[T003 REVIEW-4] rollbackOther=${rollbackOther.allowed}; rollbackForeign=${rollbackForeign.allowed}; rollbackOwn=${rollback.allowed}; remaining=${remaining?.length}`);
+    assert.equal(rollbackOther.allowed, false, 'rollback removed evidence uploaded by another user');
+    assert.equal(rollbackForeign.allowed, false, 'rollback removed evidence in another engagement');
+    assert.equal(rollback.allowed, true, rollback.error);
+    assert.equal(remaining.length, 0);
+
+    await login(adminEmail, password);
+    await query({ table: 'evidence_links', action: 'insert', data: { id: 't003-link-own', procedure_id: procedureA.id, evidence_id: 't003-evidence-own', linked_by: admin.user_id } });
+    await login(staffEmail, password);
+    const linkedRollback = await fileCall(`globalThis.electronAPI.rollbackEvidenceUpload('t003-evidence-own')`);
+    console.log(`[T003 REVIEW-4] rollbackOwnLinked=${linkedRollback.allowed}`);
+    assert.equal(linkedRollback.allowed, false, 'rollback removed evidence that is already linked to a procedure');
   });
 
   await t.test('unauthenticated export remains inside isolated downloads directory', async () => {

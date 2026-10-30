@@ -295,6 +295,7 @@
         "app:exportFile",
         "app:getDownloadsPath",
         "app:openPath",
+        "evidence-upload-rollback",
         "file-delete",
         "file-download",
         "file-get-path",
