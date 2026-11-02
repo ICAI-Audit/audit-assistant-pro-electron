@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getSQLiteClient } from '@/integrations/sqlite/client';
+import { getFsgEngagementSummary, buildFinancialReviewSnapshot, type FinancialReviewPeriod } from '@/lib/fsgEngagementSummary';
 
 const db = getSQLiteClient();
 
@@ -12,14 +13,7 @@ type ActivityLog = {
   created_at: string;
 };
 
-type FinancialReviewPeriod = {
-  periodType: 'CY' | 'PY';
-  hasData: boolean;
-  totalLines: number;
-  classifiedLines: number;
-  unclassifiedLines: number;
-  classificationComplete: boolean;
-};
+
 
 type ReadinessItem = {
   label: string;
@@ -116,57 +110,6 @@ export function useEngagementDashboardData(engagementId?: string) {
   const [data, setData] = useState<EngagementDashboardData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
 
-  const buildFinancialReviewSnapshot = (
-    headers: { id: string; period_type: 'CY' | 'PY' }[],
-    lines: { id: string; tb_header_id: string }[],
-    classifications: { tb_line_id: string }[]
-  ): FinancialReviewPeriod[] => {
-    const lineHeaderMap = new Map<string, string>();
-    const linesByHeader = new Map<string, number>();
-
-    lines.forEach((line) => {
-      lineHeaderMap.set(line.id, line.tb_header_id);
-      linesByHeader.set(line.tb_header_id, (linesByHeader.get(line.tb_header_id) || 0) + 1);
-    });
-
-    const classifiedByHeader = new Map<string, Set<string>>();
-    classifications.forEach((classification) => {
-      const headerId = lineHeaderMap.get(classification.tb_line_id);
-      if (!headerId) return;
-      if (!classifiedByHeader.has(headerId)) {
-        classifiedByHeader.set(headerId, new Set());
-      }
-      classifiedByHeader.get(headerId)?.add(classification.tb_line_id);
-    });
-
-    return (['CY', 'PY'] as const).map((periodType) => {
-      const header = headers.find((item) => item.period_type === periodType);
-      if (!header) {
-        return {
-          periodType,
-          hasData: false,
-          totalLines: 0,
-          classifiedLines: 0,
-          unclassifiedLines: 0,
-          classificationComplete: false,
-        };
-      }
-
-      const totalLines = linesByHeader.get(header.id) || 0;
-      const classifiedLines = classifiedByHeader.get(header.id)?.size || 0;
-      const unclassifiedLines = Math.max(totalLines - classifiedLines, 0);
-
-      return {
-        periodType,
-        hasData: totalLines > 0,
-        totalLines,
-        classifiedLines,
-        unclassifiedLines,
-        classificationComplete: totalLines > 0 && unclassifiedLines === 0,
-      };
-    });
-  };
-
   const fetchData = async () => {
     if (!engagementId) {
       setData(EMPTY_DATA);
@@ -185,8 +128,8 @@ export function useEngagementDashboardData(engagementId?: string) {
         reviewNotesRes,
         reportSetupRes,
         activityRes,
-        tbHeadersRes,
         programsRes,
+        fsgSummary,
       ] = await Promise.all([
         db
           .from('compliance_applicability')
@@ -220,19 +163,15 @@ export function useEngagementDashboardData(engagementId?: string) {
           .order('created_at', { ascending: false })
           .limit(10),
         db
-          .from('engagement_trial_balance_header')
-          .select('id, period_type')
-          .eq('engagement_id', engagementId),
-        db
           .from('audit_programs_new')
           .select('id')
           .eq('engagement_id', engagementId),
+        getFsgEngagementSummary(engagementId),
       ]);
 
       const risks = risksRes.data || [];
       const evidence = evidenceRes.data || [];
       const reviewNotes = reviewNotesRes.data || [];
-      const tbHeaders = (tbHeadersRes.data || []) as { id: string; period_type: 'CY' | 'PY' }[];
       const programs = programsRes.data || [];
 
       const evidenceStats = {
@@ -289,28 +228,9 @@ export function useEngagementDashboardData(engagementId?: string) {
         }
       }
 
-      let financialReview = EMPTY_DATA.financialReview;
-      if (tbHeaders.length > 0) {
-        const headerIds = tbHeaders.map((header) => header.id);
-        const { data: lines } = await db
-          .from('engagement_trial_balance_lines')
-          .select('id, tb_header_id')
-          .in('tb_header_id', headerIds);
-
-        const lineRows = lines || [];
-        const lineIds = lineRows.map((line) => line.id);
-
-        let classificationRows: { tb_line_id: string }[] = [];
-        if (lineIds.length > 0) {
-          const { data: classifications } = await db
-            .from('engagement_tb_classification')
-            .select('tb_line_id')
-            .in('tb_line_id', lineIds);
-          classificationRows = classifications || [];
-        }
-
-        financialReview = buildFinancialReviewSnapshot(tbHeaders, lineRows, classificationRows);
-      }
+      const financialReview = fsgSummary
+        ? buildFinancialReviewSnapshot(fsgSummary)
+        : EMPTY_DATA.financialReview;
 
       const appointmentFiles = evidence.filter((file) =>
         ['appointment_letter', 'engagement_acceptance_checklist_signed'].includes(file.file_type)

@@ -65,6 +65,15 @@ function seedUpgradeDatabase() {
     const db = new Database(process.argv[2]);
     db.pragma('foreign_keys = ON');
     for (const f of fs.readdirSync(process.argv[3]).sort()) db.exec(fs.readFileSync(path.join(process.argv[3], f), 'utf8'));
+    // The legacy tables no longer exist in HEAD's schema, so recreate empty stand-ins of an older install.
+    db.exec(\`
+      CREATE TABLE schedule_iii_config (id TEXT PRIMARY KEY, engagement_id TEXT);
+      CREATE TABLE tb_new_entity_info (id TEXT PRIMARY KEY, engagement_id TEXT);
+      CREATE TABLE tb_new_ledgers (id TEXT PRIMARY KEY, entity_info_id TEXT REFERENCES tb_new_entity_info(id));
+      CREATE TABLE tb_new_stock_items (id TEXT PRIMARY KEY, entity_info_id TEXT REFERENCES tb_new_entity_info(id));
+      CREATE TABLE tb_new_classification_mappings (id TEXT PRIMARY KEY, entity_info_id TEXT REFERENCES tb_new_entity_info(id));
+      CREATE TABLE tb_new_sessions (id TEXT PRIMARY KEY, engagement_id TEXT);
+    \`);
     db.prepare("INSERT INTO clients (id, name, constitution) VALUES ('existing-client', 'Existing Client Before Upgrade', 'company')").run();
     db.close();
   `, [projectRoot, databasePath, dir]);

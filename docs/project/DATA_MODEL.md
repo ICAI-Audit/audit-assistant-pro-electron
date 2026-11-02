@@ -27,7 +27,7 @@ The exact declared table names are in inventory.json. It is generated from SQL d
 
 ## Existing conventions
 
-IDs are commonly text. Some objects and arrays cross IPC and are JSON-serialised. Boolean values can become SQLite integers. The active client's result wrapper returns data and error; some operations execute via a thenable chain and others call execute explicitly. Do not mix assumptions from client-ipc.ts with the active client.ts.
+IDs are commonly text. Some objects and arrays cross IPC and are JSON-serialised. Boolean values can become SQLite integers. The active client's result wrapper returns data and error; some operations execute via a thenable chain and others call execute explicitly. `src/integrations/sqlite/client-ipc.ts` (an unused alternative client) was removed in T-020; `client.ts` is the only client.
 
 Auth stores password hashes with bcrypt. The active process tracks the signed-in user in memory. React's remembered email and selected engagement are convenience state, not authority to read records. Inspect each payload's engagement_id and ownership, including indirect links through procedure or report IDs.
 

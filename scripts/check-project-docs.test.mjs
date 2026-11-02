@@ -11,6 +11,7 @@ test('documentation checker detects broken handoffs, links, adapters and source 
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vera-docs-'));
   try {
     for (const rel of ['src', 'electron', 'sqlite', 'tests', 'docs', '.agents', 'package.json', 'AGENTS.md', 'CLAUDE.md', 'START_HERE.md', '.github/copilot-instructions.md']) {
+      if (!fs.existsSync(path.join(root, rel))) continue;
       const dest = path.join(fixture, rel);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.cpSync(path.join(root, rel), dest, { recursive: true });
@@ -32,6 +33,25 @@ test('documentation checker detects broken handoffs, links, adapters and source 
     assert.ok(checkDocs(fixture).some(error => error.includes('Source inventory is stale')));
     assert.ok(checkDocs(fixture).some(error => error.includes('Screen map is stale')));
     assert.ok(requiredDocs.length > 20);
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('inventory and checks work when the tests directory does not exist', () => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vera-docs-notests-'));
+  try {
+    for (const rel of ['src', 'electron', 'sqlite', 'docs', '.agents', 'package.json', 'AGENTS.md', 'CLAUDE.md', 'START_HERE.md', '.github/copilot-instructions.md']) {
+      const dest = path.join(fixture, rel);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.cpSync(path.join(root, rel), dest, { recursive: true });
+    }
+    assert.equal(fs.existsSync(path.join(fixture, 'tests')), false);
+    // Git on Windows may check the generated screen map out with CRLF line endings.
+    const screenMapPath = path.join(fixture, 'docs/project/SCREEN_MAP.md');
+    fs.writeFileSync(screenMapPath, fs.readFileSync(screenMapPath, 'utf8').replace(/\r?\n/g, '\r\n'));
+    assert.deepEqual(checkDocs(fixture), []);
+    assert.ok(!buildInventory(fixture).sourcePaths.some(name => name.startsWith('tests/')));
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true });
   }

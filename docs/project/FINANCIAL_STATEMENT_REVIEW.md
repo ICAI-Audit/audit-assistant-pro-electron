@@ -54,6 +54,22 @@ Start-up order: VERA schema files → existing migrations → legacy-table clean
 | `financial_periods` | `engagements.financial_year` (`2024-25`) | 1 April 2024 – 31 March 2025. |
 | `entity_periods` | the client's engagements for that year | One per client and year, shared by every engagement of that client and year (e.g. statutory and tax audit). `engagement_id` records the engagement that first opened it. The previous year is created for comparatives and linked to that year's engagement when one exists. |
 
+### Engagement summary for Dashboard, Audit Report setup and Data Integrity (T-021)
+
+The three screens that used to read `engagement_trial_balance_*` / `trial_balance_lines` now call the read-only channel `fsg:engagement:summary` (`electron/fsg/engagement-summary.js`, renderer client `src/lib/fsgEngagementSummary.ts`). Owner decision (2 November 2026): read Financial Statement Review data only; legacy rows are neither read, migrated nor deleted.
+
+| Aspect | Rule |
+| --- | --- |
+| Access | Same check as `fsg:context:open`: the main process requires an authenticated, trusted frame and `hasEngagementAccess` for the engagement. A user outside the engagement gets a refusal, so figures never cross clients or unassigned engagements. The channel writes nothing and does not open or create FSG records. |
+| Client | `engagements.client_id` → `entities.client_id`. No entity (screen never opened for the client) → "no trial balance". |
+| Engagement and year | `engagements.financial_year` (`2024-25`) → `financial_periods` (1 April – 31 March) → `entity_periods` of that entity. Statutory and tax-audit engagements of the same client and year read the same figures. CY is that year; PY is the year before it (the period created for comparatives). |
+| Trial balances | Every `trial_balances` row of the entity period is included, so branch trial balances of one year are added together. |
+| Classification | A `tb_rows` line counts as classified when its `mapped_tb` row has status `auto_high`, `auto_medium`, `auto_low`, `user_approved` or `user_override` (the statuses used by the Balance Sheet query in `electron/fsg/ipc/financials.js`). Unclassified = rows − classified. The Dashboard shows classification complete when rows exist and none is unclassified. |
+| Amount | `tb_rows.closing_balance` after adjustments (revised balance), taken as an absolute value per ledger line and summed, exactly as the former cross-check did with `Math.abs(closing_balance)`. The ledger sign stays in `tb_rows` unchanged; the absolute value is used only for the cross-check. |
+| Face lines | Level 2 caption of the mapped line, from `level_format.level2` (else `mapped_tb.mapping2_resultant`), compared case-insensitively: Paid-up capital = "Share capital"; Reserves and surplus = "Reserves and surplus"; Borrowings = "Long-term borrowings" + "Short-term borrowings" (Schedule III 2021 current maturities map into Short-term borrowings). Non-company constitutions use other captions ("Partners' capital" and similar) and therefore return 0 for Paid-up capital; the owner has not approved a mapping for them. |
+| Data Integrity | The delete-engagement guard counts the FSG trial balance rows of the engagement's client and year. Those rows belong to the client and year, not the engagement, and survive engagement deletion (`engagement_id` is set to NULL), so the guard is conservative. |
+| Legacy data | `trial_balance_lines` and `engagement_trial_balance_*` remain in the database untouched and are no longer read. Deleting an engagement still cascades to its legacy rows, as before. `useTrialBalance` is kept without a consumer. |
+
 ### Tables
 
 Global masters: `schema_migrations`, `mapping_rule_sets`, `level_format`, `map1`, `map2`, `map3`, `auditor_firms`, `global_signatories`, `financial_periods`. Per client: `entities`, `auditors`, `signatories`, `entity_note_details`, `entity_note_disclosures`, `entity_manual_py_entries`, `it_blocks_custom`, `learned_ledger_rules`. Per year: `entity_periods`, `form_3cd`, `ppe_ledgers`, `ratio_gp_selection`, `fs_snapshots`, `general_notes`, `deferred_tax_computations`, `tax_computations`, `cash_flow_entries`. Per trial balance: `trial_balances`, `tb_rows`, `mapped_tb`, `note_details`, `note_disclosures`, `remarks`, `dep_schedules`, `dep_it_schedules`, `dep_comp_schedules`, `itr_details`, `manual_py_entries`, `tb_adjustment_log`, `manual_face_lines`. Column detail is in the schema file.

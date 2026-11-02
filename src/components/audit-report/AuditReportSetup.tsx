@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Building2, CheckCircle2, AlertTriangle, Info, ArrowRight, User, Calendar, MapPin, FileSignature } from 'lucide-react';
 import type { AuditReportSetup as SetupType } from '@/hooks/useAuditReportSetup';
-import { useTrialBalance } from '@/hooks/useTrialBalance';
+import { getFsgEngagementSummary, type FsgEngagementSummary } from '@/lib/fsgEngagementSummary';
 import { usePartners } from '@/hooks/usePartners';
 import { useEngagement } from '@/contexts/EngagementContext';
 import { useClient } from '@/hooks/useClient';
@@ -37,8 +37,6 @@ const companyTypes = [
 ];
 
 const CARO_EXCLUDED_TYPES = ['banking', 'insurance', 'section_8', 'opc', 'small_company'] as const;
-
-const TB_CROSSCHECK_AREAS = ['Equity', 'Reserves', 'Borrowings', 'Short Term Borrowings'] as const;
 
 type TBCrosscheck = {
   available: boolean;
@@ -93,36 +91,34 @@ export function AuditReportSetup({
     udin: '',
   });
 
-  const { lines: tbLines, loading: tbLoading } = useTrialBalance(engagementId);
+  const [fsgSummary, setFsgSummary] = useState<FsgEngagementSummary | null>(null);
+  const [tbLoading, setTbLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTbLoading(true);
+    getFsgEngagementSummary(engagementId).then((summary) => {
+      if (cancelled) return;
+      setFsgSummary(summary);
+      setTbLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [engagementId]);
 
   const tbCrosscheck: TBCrosscheck = useMemo(() => {
-    const relevant = tbLines.filter((l) => TB_CROSSCHECK_AREAS.includes((l.fs_area || '') as any));
-    if (relevant.length === 0) {
-      return {
-        available: false,
-        paidUpCapitalTB: 0,
-        reservesSurplusTB: 0,
-        borrowingsTB: 0,
-      };
+    const amounts = fsgSummary?.amounts;
+    if (!amounts) {
+      return { available: false, paidUpCapitalTB: 0, reservesSurplusTB: 0, borrowingsTB: 0 };
     }
-
-    const sumByFsArea = (fsArea: string) =>
-      relevant
-        .filter((l) => l.fs_area === fsArea)
-        .reduce((sum, l) => sum + Math.abs(Number(l.closing_balance)), 0);
-
-    const paidUpCapitalTB = sumByFsArea('Equity');
-    const reservesSurplusTB = sumByFsArea('Reserves');
-    const borrowingsTB = sumByFsArea('Borrowings') + sumByFsArea('Short Term Borrowings');
-
     return {
       available: true,
-      paidUpCapitalTB,
-      reservesSurplusTB,
-      borrowingsTB,
+      paidUpCapitalTB: amounts.paidUpCapital,
+      reservesSurplusTB: amounts.reservesSurplus,
+      borrowingsTB: amounts.borrowings,
     };
-  }, [tbLines]);
-
+  }, [fsgSummary]);
   const formatINR = (amount: number) => `₹${Math.round(amount).toLocaleString('en-IN')}`;
 
   const paidUpDiff = tbCrosscheck.available
@@ -514,7 +510,7 @@ export function AuditReportSetup({
                   </Alert>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Trial Balance mapping not found for Equity/Reserves/Borrowings. Map your Trial Balance to Schedule III to enable auto cross-check.
+                    No mapped Financial Statement Review trial balance was found for this client and financial year. Import and map the trial balance in Financial Statement Review to enable the cross-check.
                   </p>
                 )}
               </div>

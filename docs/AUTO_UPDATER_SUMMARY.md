@@ -20,12 +20,12 @@ Complete production-ready auto-update system for Audit Assistant Pro using elect
 2. **[electron/auto-updater-preload.js](../electron/auto-updater-preload.js)** (Optional)
    - Preload helper for additional security (future use)
 
-3. **[electron/main.js](../electron/main.js)** (Modified)
+3. **electron/main.js** (Modified; file removed in T-020 as an unused predecessor of main.cjs)
    - Integrated new auto-updater
    - Removed deprecated update code
    - Cleaner initialization
 
-4. **[electron/preload.js](../electron/preload.js)** (Modified)
+4. **electron/preload.js** (Modified; file removed in T-020 as an unused predecessor of preload.cjs)
    - Added updater API to context bridge
    - Safe IPC exposure for update methods
 

@@ -24,7 +24,9 @@ Use `npx tsc -p tsconfig.app.json --noEmit` to explicitly check the application 
 
 Financial Statement Review (T-019): `npm run test:fsg` runs the main-process integration test (Electron main process, in-memory database, synthetic data). `npm run test:fsg-ui` builds the renderer and drives the production app in an isolated profile seeded with an upgrade database, including a restart. Neither touches a real audit_assistant.db. `test:classification` and `test:bulk-update` were removed with the code they tested.
 
-T-002 verified `npm ci --no-audit --no-fund` with normal postinstall twice in separate clean Windows worktrees on Node.js 24.12.0/npm 11.6.2. `npm run test:native`, `npx vitest run src/lib` (8 files, 37 tests), `npm run test:classification`, `npm run test:bulk-update`, and `npm run build` passed. The explicit application typecheck currently fails with 114 diagnostics across 28 files; `npm run lint` currently reports 515 errors and 101 warnings. These failures are tracked separately in NEXT_TASKS.md. See CURRENT_STATUS.md and SESSION_HANDOFF.md for the complete boundary and exact result classification. Do not conceal existing failures or claim a passing application typecheck/lint.
+T-002 verified `npm ci --no-audit --no-fund` with normal postinstall twice in separate clean Windows worktrees on Node.js 24.12.0/npm 11.6.2 (historical, before the T-019 dependency additions). `npm run test:native` and `npm run build` passed then. The current application typecheck fails with 76 diagnostics across 18 files and `npm run lint` reports 475 errors and 71 warnings (T-020). These failures are tracked separately in NEXT_TASKS.md. See CURRENT_STATUS.md and SESSION_HANDOFF.md for the complete boundary and exact result classification. Do not conceal existing failures or claim a passing application typecheck/lint.
+
+Documentation checks: `npm run docs:check` and `node --test scripts/check-project-docs.test.mjs`. They must pass in a fresh checkout; the source inventory tolerates a `tests/` directory that does not exist.
 
 ## Synthetic engagement scenarios
 

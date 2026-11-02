@@ -298,16 +298,6 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/feedback"
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Feedback />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
                   path="/gstr1-integration"
                   element={
                     <ProtectedRoute>

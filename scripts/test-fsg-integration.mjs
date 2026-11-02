@@ -236,6 +236,53 @@ async function main() {
   }
   check('failed transaction rolls back', rolledBack)
 
+  // ── T-021: read-only engagement summary for Dashboard / Audit Report / Data Integrity ──
+  r = await staff('engagement:summary', 'e1')
+  check('engagement summary counts the FSG trial balance of the engagement year', r.ok
+    && r.result.current.found && r.result.current.yearLabel === '2024-25'
+    && r.result.current.totalRows === 5 && r.result.current.tbCount === 1
+    && r.result.current.classifiedRows + r.result.current.unclassifiedRows === 5
+    && r.result.current.classifiedRows >= 3, r)
+  check('engagement summary reports no previous-year trial balance', r.ok
+    && r.result.previous.yearLabel === '2023-24' && r.result.previous.found === false && r.result.previous.totalRows === 0, r)
+  check('engagement summary returns the Share capital face-line amount', r.ok && r.result.amounts
+    && r.result.amounts.paidUpCapital === 100000 && r.result.amounts.reservesSurplus === 0
+    && r.result.amounts.borrowings === 0, r)
+  r = await partner('engagement:summary', 'e1b')
+  check('a second engagement of the same client and year reads the same data', r.ok && r.result.current.totalRows === 5
+    && r.result.amounts && r.result.amounts.paidUpCapital === 100000, r)
+  r = await staff('engagement:summary', 'e1b')
+  check('engagement summary refuses an engagement the user is not assigned to', r.ok === false && r.denied === true, r)
+  r = await staff('engagement:summary', 'e2')
+  check('engagement summary does not cross to another client', r.ok === false && r.denied === true, r)
+  r = await partner('engagement:summary', 'e2')
+  check('engagement of a client without a trial balance reports none and no amounts', r.ok
+    && r.result.current.found === false && r.result.current.totalRows === 0 && r.result.amounts === null, r)
+  r = await partner('engagement:summary', 'e3')
+  check('engagement of a client never opened in FSG reports none', r.ok && r.result.current.found === false && r.result.amounts === null, r)
+  r = await handlers.get('fsg:engagement:summary')({ trusted: true }, 'e1')
+  check('engagement summary needs authentication', r.ok === false && r.denied === true, r)
+  const before = db.prepare('SELECT (SELECT COUNT(*) FROM entities) AS e, (SELECT COUNT(*) FROM entity_periods) AS p, (SELECT COUNT(*) FROM trial_balances) AS t').get()
+  await partner('engagement:summary', 'e3')
+  const after = db.prepare('SELECT (SELECT COUNT(*) FROM entities) AS e, (SELECT COUNT(*) FROM entity_periods) AS p, (SELECT COUNT(*) FROM trial_balances) AS t').get()
+  check('engagement summary writes nothing', JSON.stringify(before) === JSON.stringify(after), { before, after })
+
+  const beforeBranch = db.prepare('SELECT COUNT(*) AS c FROM trial_balances').get().c
+  r = await staff('tb:uploadRealBooks', { entityId, entityPeriodId: periodId, fileName: 'branch.xlsx', tbRows: [
+    { ...ledger('Term Loan from Bank', 'Secured Loans', 'Loans (Liability)', 40000), branch: 'B2' },
+    { ...ledger('General Reserve', 'Reserves & Surplus', 'Reserves & Surplus', 25000), branch: 'B2' },
+  ] })
+  if (r.ok) {
+    await staff('mappedTB:run', r.result.tb.id, defaultRs, {})
+    const s = await staff('engagement:summary', 'e1')
+    check('branch trial balances of the same year are added together', s.ok && s.result.current.tbCount === 2
+      && s.result.current.totalRows === 7 && s.result.amounts.paidUpCapital === 100000
+      && s.result.amounts.reservesSurplus === 25000 && s.result.amounts.borrowings === 40000, s)
+  } else {
+    check('branch trial balance upload for summary test', false, r)
+  }
+  check('summary test inserted one extra trial balance', db.prepare('SELECT COUNT(*) AS c FROM trial_balances').get().c === beforeBranch + 1)
+
   // ── Engagement / client deletion behaviour ───────────────────────────────
   db.prepare(`DELETE FROM engagements WHERE id = 'e1b'`).run()
   check('deleting one engagement keeps the shared financial statements', db.prepare('SELECT COUNT(*) AS c FROM trial_balances WHERE id = ?').get(tbId).c === 1)
