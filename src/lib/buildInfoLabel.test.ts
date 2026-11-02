@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { BuildInfoLabel } from '@/components/layout/BuildInfoLabel';
+import { buildDetailLines } from '@/config/buildMessage';
 import { BUILD_MESSAGE } from '@/config/buildMessage';
 
 describe('build information label', () => {
@@ -10,14 +11,17 @@ describe('build information label', () => {
 
   it('renders the central message lines and the build commit', () => {
     for (const line of BUILD_MESSAGE.lines) expect(html).toContain(line);
-    expect(html).toContain('Welcome to ICAI Audit Tool');
-    expect(html).toContain('Developer handover baseline: 2 November 2026');
-    expect(html).toContain(`Build: ${__BUILD_COMMIT__}`);
+    expect(html).toContain('Update:');
+    expect(html).toContain(BUILD_MESSAGE.updateNote);
+    expect(html).not.toContain(__BUILD_COMMIT__);
+    expect(html).toContain('border-2 border-solid border-red-600');
     expect(__BUILD_COMMIT__).toMatch(/^([0-9a-f]{7,}|unknown)$/);
   });
 
   it('shows "Local changes present" only when the build flagged modified tracked files', () => {
-    expect(html.includes('Local changes present')).toBe(__BUILD_DIRTY__);
+    expect(buildDetailLines().includes('Local changes present')).toBe(__BUILD_DIRTY__);
+    expect(buildDetailLines()).toContain(`Commit: ${__BUILD_COMMIT__}`);
+    expect(html).not.toContain('Local changes present');
   });
 
   it('makes no claim about being current or about new commits', () => {

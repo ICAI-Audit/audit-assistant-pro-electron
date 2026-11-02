@@ -78,7 +78,7 @@ export function Header() {
     <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between gap-4 px-6">
       {/* Left: Current Engagement */}
       <div className="flex items-center gap-4 min-w-0">
-        <BuildInfoLabel compact className="hidden md:block shrink-0 text-[11px]" />
+        <BuildInfoLabel compact className="hidden md:block shrink-0 px-2 py-1 text-[11px] leading-tight" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2 text-foreground hover:bg-muted max-w-xs">
