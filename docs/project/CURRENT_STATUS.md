@@ -12,7 +12,26 @@
 - Verification branch retained: `docs/t003-auth-lock-verification-2026-10-29` from `229a098f375050be1c5d4cd45236b5e0ec903325`.
 - Branch HEAD: resolve with Git (`git rev-parse HEAD`); do not copy a commit's own SHA into this document.
 - Local validation environment: Node.js 24.12.0 and npm 11.6.2.
-- Current scope: T-020 scoped cleanup (2 November 2026, branch `chore/remove-unused-code` from `main` at `cad1727eeb2500c8ecd06d9ffa3a86664a9246b4`). T-019 (Financial Statement Review) is merged to `main` as PR #105; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md). The T-018 documentation review and its open owner decisions otherwise stand.
+- Current scope: handover preparation (2 November 2026): T-020 cleanup plus T-021 and T-012, integrated on `integration/handover-2026-11-02` from `main` at `cad1727eeb2500c8ecd06d9ffa3a86664a9246b4`. T-019 (Financial Statement Review) is merged to `main` as PR #105; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md). The T-018 documentation review and its open owner decisions otherwise stand.
+
+## T-021 handover result (2 November 2026)
+
+Fresh clone of `feat/t021-reconnect-tb-readers` (Windows, Node.js 24.12.0/npm 11.6.2, synthetic data): `npm ci --no-audit --no-fund` with normal postinstall, then the checks below. Branches and decisions: [SESSION_HANDOFF.md](SESSION_HANDOFF.md); module classification: [HANDOVER_CHECKLIST.md](HANDOVER_CHECKLIST.md).
+
+| Check | Result |
+| --- | --- |
+| `npm ci --no-audit --no-fund` | Passed (exit 0; electron-rebuild of better-sqlite3 and bcrypt) |
+| `npm run docs:check`; `node --test scripts/check-project-docs.test.mjs` | Passed; 3/3 |
+| `npm run build` | Passed |
+| `npm run test:native` | Passed (Electron 40.9.1) |
+| `npm run test:fsg` | Passed, 53/53 (41 earlier + 12 for `fsg:engagement:summary`: counts, CY/PY, face-line amounts, branch trial balances, access refusal across engagements and clients, authentication, no writes) |
+| `node scripts/test-fsg-ui.cjs` | Passed, 37/37 |
+| `node --test scripts/test-t003-authorization.cjs` | Passed, 26/26 |
+| `npx vitest run src/lib` | Passed; 8 files, 37 tests |
+| `npx tsc -p tsconfig.app.json --noEmit` | **Failed**, 76 diagnostics in 18 files, same as the starting baseline (none in the T-021 files' own logic; none suppressed) |
+| `npm run lint` | **Failed**, 545 problems (474 errors, 71 warnings); 546 before T-021 |
+
+Skipped / not established: the three reconnected screens in the running application, PDF and Excel contents, sign-in and engagement switching through the UI, close and reopen through the UI, packaged launch, installer, live Tally, owner UAT. The engagement-isolation evidence is for the `fsg:engagement:summary` channel only.
 
 ## T-020 result (2 November 2026)
 
@@ -124,8 +143,8 @@ Observation-only cases intentionally remain:
 3. Long-term role mapping decisions for `viewer` and `user` remain open.
 4. TypeScript and lint baselines remain failing and must be triaged separately.
 5. Prototype feature gaps remain for Misstatements and Completion (T-007 scope continues separately).
-6. Dashboard, Audit Report setup and Data Integrity still read the old trial-balance tables, not Financial Statement Review data (T-021).
-7. Duplicate deferred-tax tools, placeholder actions and the duplicate `/feedback` route are unresolved (T-022, T-012).
+6. Dashboard, Audit Report setup and Data Integrity now read Financial Statement Review data (T-021, awaiting owner acceptance); the legacy tables stay unread and untouched, and their fate is an open owner decision.
+7. Duplicate deferred-tax tools and placeholder actions are recorded and unchanged (T-022). The duplicate `/feedback` route is resolved (T-012).
 
 ## Documentation review result
 

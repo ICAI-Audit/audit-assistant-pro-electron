@@ -4,11 +4,22 @@
 
 - Date: 2 November 2026.
 - Agent: Copilot SDK in VS Code.
-- Requested outcome: scoped cleanup after the Financial Statement Review replacement; repair the documentation checker; correct stale records.
-- Task: T-020. Features: none changed. Related: T-019 (merged), T-012, T-021, T-022.
-- Branch: `chore/remove-unused-code`. Base and starting commit: `main` = `origin/main` = `cad1727eeb2500c8ecd06d9ffa3a86664a9246b4` (the commit the earlier review examined; unchanged). Resolve the branch head with `git rev-parse HEAD`.
-- Not merged and not released. CA Venugopal Gella reviews, tests and merges.
+- Requested outcome: developer handover preparation: reconcile branches, integrate T-020, reconnect the old trial-balance readers (T-021), resolve the duplicate feedback route (T-012), verify a fresh install and validate. Earlier in the day: T-020 scoped cleanup.
+- Task: T-021 and T-012 (with T-020). Features: F-007 consumers, F-018 setup, F-024 route. Related: T-019 (merged), T-022 (recorded only).
+- Branches: `chore/remove-unused-code` (T-020, `04d0c9fd33fc997805e112b91138b3d18d85304c`) → `feat/t021-reconnect-tb-readers` (T-021/T-012 on top) → `integration/handover-2026-11-02` (same head as the T-021 branch). Base: `main` = `origin/main` = `cad1727eeb2500c8ecd06d9ffa3a86664a9246b4`. Resolve heads with `git rev-parse`.
+- Not merged and not released. CA Venugopal Gella reviews, tests and merges; no acceptance is recorded yet.
 - The previous handoff (T-019) is in git history at the base commit; its work is merged as PR #105.
+
+## T-021 and T-012 (this session's change)
+
+- New read-only channel `fsg:engagement:summary` (`electron/fsg/engagement-summary.js`, registered in `electron/fsg/index.js` with the same engagement-access check as `fsg:context:open`; renderer client `src/lib/fsgEngagementSummary.ts`). Mapping, sign and amount rules are in [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md#engagement-summary-for-dashboard-audit-report-setup-and-data-integrity-t-021).
+- `useEngagementDashboardData`, `AuditReportSetup` and `DataIntegrityPanel` use it. Legacy tables are untouched and unread; no migration, no dropped table (owner decision).
+- Duplicate `ProtectedRoute` `/feedback` declaration removed; the engagement-scoped one was already effective (owner decision). `check-project-docs.mjs` note and the screen map updated.
+- Owner decisions recorded 2 November 2026: read FSG only; Audit Report cross-check on the FSG face lines with absolute closing balance (labelled "please confirm"); `/feedback` engagement-scoped; placeholders and duplicate deferred-tax tools recorded only.
+- Checks: see [CURRENT_STATUS.md](CURRENT_STATUS.md#t-021-handover-result-2-november-2026) (fresh clone; all harnesses passed; `tsc` and lint unchanged baseline failures).
+- Handover classification: [HANDOVER_CHECKLIST.md](HANDOVER_CHECKLIST.md).
+
+## T-020 (earlier in the day)
 
 ## Preserved, not committed
 
@@ -33,7 +44,7 @@ The working tree already held a modified `package-lock.json` and untracked `ICAI
 - `electron/auto-updater-preload.js`: `preload.cjs` mirrors it and the updater guides cite it.
 - `sqlite/migrate-from-supabase.ts`, `sqlite/package.json.example`: documented in `sqlite/README.md`; legacy data migration was out of scope.
 - `supabase/` (edge functions, config) and `_archive/`: not requested; not run.
-- `useTrialBalance`, `trial_balance_lines`, `engagement_trial_balance_*` and their readers (Dashboard via `useEngagementDashboardData`, Audit Report setup, `DataIntegrityPanel`): out of scope; see T-021.
+- `useTrialBalance`, `trial_balance_lines`, `engagement_trial_balance_*`: kept in the schema and database; since T-021 no screen reads them (`useTrialBalance` has no consumer).
 - `useTallyODBC`, `TallyContext`, `@supabase/supabase-js` and every npm dependency.
 - Both deferred-tax tools, all visible prototype screens, permissions and route guards; no financial calculation changed.
 - No table dropped, no stored data deleted, no migration run.
@@ -60,9 +71,10 @@ Recorded in the final report of this session: a clean clone of the pushed branch
 ## Unresolved
 
 - Owner assumptions in [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md#assumptions-awaiting-confirmation); T-019 UAT.
-- T-021 reconnection of old trial-balance readers; T-022 duplicate tools and placeholders; T-012 duplicate `/feedback` route.
+- T-021 is implemented but awaits owner acceptance; owner decisions listed in [HANDOVER_CHECKLIST.md](HANDOVER_CHECKLIST.md#owner-decisions-still-needed). T-022 duplicate tools and placeholders remain recorded only.
 - Materiality logs "Failed to load materiality risk assessment" when no record exists (unchanged catch block in `src/pages/Materiality.tsx`).
+- `tsc` (76) and lint (474 errors) baselines fail as at the start.
 
 ## First executable next step
 
-Reviewer: `git fetch`, check out `chore/remove-unused-code`, run `npm run docs:check`, `npm run build` and `npm run test:fsg-ui`, then confirm the removals in the table above by launching the app (`npm run electron`) and opening Dashboard, Audit Report setup, VERA Tools and Financial Statement Review. Merge only after that review.
+Reviewer: `git fetch`, check out `integration/handover-2026-11-02`, run `npm ci --no-audit --no-fund`, `npm run docs:check`, `npm run build`, `npm run test:fsg`, `npm run test:fsg-ui`. Then in `npm run electron` with a synthetic client: open Financial Statement Review for an engagement, import and map a trial balance, then open Dashboard (readiness classification), Audit Report setup (Step with capital, reserves and borrowings: the cross-check must equal the Balance Sheet face lines) and Admin → Data Integrity; also open a second engagement of another client and confirm it shows no trial balance. Record acceptance in the owner decision log, then merge through GitHub.
