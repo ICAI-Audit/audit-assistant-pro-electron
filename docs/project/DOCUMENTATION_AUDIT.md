@@ -16,7 +16,7 @@ Review date 29 October 2026. Scope: current main source, root documentation, sel
 | A-010 | Setup guidance omitted native-module prerequisites; clean-install diagnostic exposed stale lock metadata | T-002 documented the engine evidence, corrected lock metadata and added native smoke guidance | Two Windows clean installs and native smoke tests passed; other platforms, installer and full desktop launch remain unverified |
 | A-011 | No check detects missing handoff links or stale route/schema inventory | Added dependency-free documentation validator and CI | Structural checks cannot detect incorrect prose or stale professional judgement |
 | A-012 | Multiple TB generations, localStorage, and local files complicate onboarding | Added persistence ownership map and generated source inventory | T-005 needs field-level read/write coverage |
-| A-013 | `docs:check` and its regression test failed in a fresh checkout because the inventory scanned a missing `tests/` directory; current guides still named removed npm scripts and described merged T-019 work as uncommitted | T-020 made the scan tolerate absent directories, added a regression test, and corrected the current records | Historical validation records keep their original wording |
+| A-013 | `docs:check` and its regression test failed in a fresh checkout because the inventory scanned a missing `tests/` directory; current guides still named removed npm scripts and described merged T-019 work as uncommitted | T-020 made the scan tolerate absent directories and CRLF screen maps, added a regression test, and corrected the current records | Historical validation records keep their original wording |
 
 ## Definition of documentation readiness
 

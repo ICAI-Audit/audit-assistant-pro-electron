@@ -40,7 +40,7 @@ The working tree already held a modified `package-lock.json` and untracked `ICAI
 
 ## Tooling and records repaired
 
-- `scripts/check-project-docs.mjs`: the source scan skips directories that do not exist, so a fresh checkout without `tests/` passes. `scripts/check-project-docs.test.mjs` no longer requires every source directory to exist and has a regression test for a fixture without `tests/`.
+- `scripts/check-project-docs.mjs`: the source scan skips directories that do not exist, so a fresh checkout without `tests/` passes; the screen-map comparison ignores CRLF line endings, which Git on Windows can introduce (found in a fresh clone, where it also failed). `scripts/check-project-docs.test.mjs` no longer requires every source directory to exist and has a regression test for a fixture without `tests/` and with a CRLF screen map.
 - `scripts/test-fsg-ui.cjs`: the upgrade seed read `HEAD`'s schema, which no longer declares the legacy tables after T-019, so two checks failed (35/37). The seed now adds empty stand-ins for them; the cleanup under test is unchanged.
 - Current records no longer call merged T-019 work uncommitted; `TESTING.md` and `DEVELOPMENT_GUIDE.md` no longer instruct running removed scripts; historical results keep their wording and are labelled.
 - Inventory and screen map refreshed with `npm run docs:inventory`. The diff removes only the deleted paths.
@@ -55,7 +55,7 @@ Node.js 24.12.0, npm 11.6.2, Windows, synthetic data. See the table in [CURRENT_
 
 ## Fresh-checkout verification
 
-Recorded in the final report of this session: a clean clone of the pushed branch, `npm ci --no-audit --no-fund`, then `npm run docs:check` and the documentation regression test.
+Recorded in the final report of this session: a clean clone of the pushed branch (no `tests/` directory), then `npm run docs:check` and the documentation regression test. The first clone of commit 685a4c8 failed on a CRLF screen map; the follow-up commit fixes it and the re-check result is in the final report.
 
 ## Unresolved
 

@@ -103,7 +103,7 @@ export function checkDocs(root = defaultRoot) {
       errors.push('Source inventory is stale. Run npm run docs:inventory and review the diff.');
     }
     if (fs.existsSync(path.join(root, 'docs/project/SCREEN_MAP.md')) &&
-        read(root, 'docs/project/SCREEN_MAP.md') !== screenMap(actual)) {
+        read(root, 'docs/project/SCREEN_MAP.md').replace(/\r\n/g, '\n') !== screenMap(actual)) {
       errors.push('Screen map is stale. Run npm run docs:inventory and review the diff.');
     }
   } catch (error) {

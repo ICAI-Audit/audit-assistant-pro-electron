@@ -47,6 +47,9 @@ test('inventory and checks work when the tests directory does not exist', () => 
       fs.cpSync(path.join(root, rel), dest, { recursive: true });
     }
     assert.equal(fs.existsSync(path.join(fixture, 'tests')), false);
+    // Git on Windows may check the generated screen map out with CRLF line endings.
+    const screenMapPath = path.join(fixture, 'docs/project/SCREEN_MAP.md');
+    fs.writeFileSync(screenMapPath, fs.readFileSync(screenMapPath, 'utf8').replace(/\r?\n/g, '\r\n'));
     assert.deepEqual(checkDocs(fixture), []);
     assert.ok(!buildInventory(fixture).sourcePaths.some(name => name.startsWith('tests/')));
   } finally {
