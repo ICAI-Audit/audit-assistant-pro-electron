@@ -22,10 +22,30 @@ These are recommended tasks derived from the review. They do not grant approval 
 | T-016 | P1 | Product decision required | Approve admin/partner/manager/senior/staff/viewer policy, engagement assignment/listing semantics, bulk mutation limits, export access, and evidence approval/lock/reopen transitions | Product owner decisions; T-003 control matrix |
 | T-018 | P1 | Ready for owner review | Complete documentation baseline and consolidated owner review; no application fixes | Owner decisions and corrections |
 | T-017 | P2 | Ready for investigation | Add missing `engagement_tb_classification` and `ifc_clause_library` definitions to `sqlite/schema` with upgrade evidence; callers currently fail with missing-table errors | Backup/upgrade approach from T-009 |
+| T-019 | P1 | Implemented; owner confirmation and UAT pending | Replace Financial Review with Financial Statement Review (FSG_Bharat ported to SQLite). Synthetic integration (41/41) and UI (37/37) evidence; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md) | Owner answers to the listed assumptions; same-TB comparison with FSG_Bharat; owner UAT; not committed or merged |
 
 ## Current activity and scope
 
-T-018 documentation review is the active task. The user directed a return to documentation on 30 October 2026. Review the assembled application document and consolidated decisions before selecting more code work. T-003's scoped reported tests remain recorded; no further production changes are part of T-018.
+T-019 (2 November 2026) is the active implementation task: the explicit user request to replace Financial Review with the FSG_Bharat financial statement generator on SQLite. Its changes are uncommitted on `work/developer-task`. T-018 documentation review otherwise remains in place: review the assembled application document and consolidated decisions before selecting more code work.
+
+## T-019 Financial Statement Review
+
+Delivered:
+- old Financial Review code, tests and the unused legacy tables removed, the tables only when empty and after a backup;
+- `sqlite/schema/10_fsg_tables.sql`;
+- the `electron/fsg` main-process module with authorised `fsg:*` channels;
+- the `src/modules/fsg` screens;
+- the route, sidebar and shortcut;
+- `npm run test:fsg` and `npm run test:fsg-ui`.
+
+Accept when:
+- the owner confirms or changes the [assumptions](FINANCIAL_STATEMENT_REVIEW.md#assumptions-awaiting-confirmation);
+- the same anonymised trial balance gives identical mapped TB, statements and exports in FSG_Bharat and in VERA;
+- PDF/Excel outputs are inspected;
+- a real-profile upgrade is rehearsed on a copy of an installed database;
+- the owner records UAT.
+
+Follow-ups (owner decision): GAP-17 (dashboard and Audit Report TB consumers); whether to port FSG_Bharat's PostgreSQL self-tests to SQLite; re-verify `npm ci` on Node 24.12 after the dependency additions.
 
 ## T-001 Session continuity
 

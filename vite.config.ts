@@ -29,6 +29,29 @@ function excludeSQLite() {
   };
 }
 
+// xlsx-js-style (used by Financial Statement Review exports) ships only a
+// CommonJS build that calls require('fs') for its desktop file helpers. The
+// renderer never uses them (workbooks are written to a buffer and saved
+// through IPC), and the package's own "browser" field maps fs to nothing.
+// Give it an empty module so no bare `import "fs"` reaches the renderer.
+const EMPTY_FS_ID = '\0xlsx-js-style-empty-fs';
+const isXlsxJsStyle = (importer?: string) => Boolean(importer && /[\\/]xlsx-js-style[\\/]/.test(importer));
+
+function xlsxJsStyleWithoutFs() {
+  return {
+    name: 'xlsx-js-style-without-fs',
+    enforce: 'pre' as const,
+    resolveId(id: string, importer?: string) {
+      if (id === 'fs' && isXlsxJsStyle(importer)) return EMPTY_FS_ID;
+      return null;
+    },
+    load(id: string) {
+      if (id === EMPTY_FS_ID) return 'export default {};';
+      return null;
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   base: mode === "development" ? "/" : "./",
@@ -43,7 +66,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [
-    react(), 
+    xlsxJsStyleWithoutFs(),
+    react(),
     mode === "development" && componentTagger(),
     excludeSQLite()
   ].filter(Boolean),
@@ -56,11 +80,12 @@ export default defineConfig(({ mode }) => ({
     outDir: "dist",
     emptyOutDir: true,
     rollupOptions: {
-      external: (id) => {
+      external: (id, importer) => {
         // Mark Node.js modules and sqlite directory as external
+        // (except fs inside xlsx-js-style: see xlsxJsStyleWithoutFs)
         return id === 'better-sqlite3' ||
                id === 'bcrypt' ||
-               id === 'fs' ||
+               (id === 'fs' && !isXlsxJsStyle(importer)) ||
                id === 'path' ||
                id === 'crypto' ||
                id.includes('sqlite/database-manager') ||

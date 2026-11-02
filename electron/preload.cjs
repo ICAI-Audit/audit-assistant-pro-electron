@@ -109,8 +109,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return true;
   },
   app: {
-    getDownloadsPath: () => ipcRenderer.invoke('app:getDownloadsPath'),
-    openPath: (targetPath) => ipcRenderer.invoke('app:openPath', targetPath),
     exportFile: async ({ defaultFilename, buffer, mimeType, showSaveDialog }) => {
       const result = await ipcRenderer.invoke('app:exportFile', { defaultFilename, buffer, mimeType, showSaveDialog });
       if (!result?.success) {
@@ -158,6 +156,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   odbcFetchGSTNotFeeded: () => ipcRenderer.invoke('odbc-fetch-gst-not-feeded'),
   // Stock Items methods
   odbcFetchStockItems: () => ipcRenderer.invoke('odbc-fetch-stock-items'),
+  // Financial Statement Review (FSG) module. Every fsg:* channel is checked in
+  // the main process (electron/fsg/authorization.js); this bridge only limits
+  // the renderer to that channel family.
+  fsg: {
+    invoke: (channel, ...args) => {
+      if (typeof channel !== 'string' || !/^fsg:[A-Za-z0-9:_-]+$/.test(channel)) {
+        return Promise.reject(new Error('Invalid Financial Statement Review request.'));
+      }
+      return ipcRenderer.invoke(channel, ...args);
+    },
+  },
 });
 
 // Log when preload script is loaded

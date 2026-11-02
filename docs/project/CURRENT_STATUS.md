@@ -12,7 +12,36 @@
 - Verification branch retained: `docs/t003-auth-lock-verification-2026-10-29` from `229a098f375050be1c5d4cd45236b5e0ec903325`.
 - Branch HEAD: resolve with Git (`git rev-parse HEAD`); do not copy a commit's own SHA into this document.
 - Local validation environment: Node.js 24.12.0 and npm 11.6.2.
-- Current scope: documentation only. Reconcile the latest source and reported evidence, produce full module/requirement coverage and detailed specifications, and collect owner decisions. No application or tooling source, dependency, migration or security logic changes.
+- Current scope: T-019 implementation (2 November 2026, branch `work/developer-task` from `03d1a46f16b36da16d3821cee2e1c3280897a78c`, uncommitted). Financial Review replaced by Financial Statement Review; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md). The T-018 documentation review and its open owner decisions otherwise stand.
+
+## T-019 result (2 November 2026)
+
+Windows, Electron 40.9.1, SQLite 3.53.0, Node.js 22.14.0/npm 10.9.2, synthetic data only.
+
+**Passed**
+- `npm run docs:check` (31 documents, links, inventory) and `node --test scripts/check-project-docs.test.mjs` (2/2).
+- `npm run test:fsg`: 41/41.
+- `node scripts/test-fsg-ui.cjs` after `npm run build`: 37/37.
+- `node --test scripts/test-t003-authorization.cjs`: 26/26.
+- `npm run test:native`.
+- `npx vitest run src/lib`: 8 files, 37 tests.
+- `npm run build`.
+
+**Failing as baseline, reduced**
+- TypeScript: 76 diagnostics in 18 files, none new in changed files.
+- Lint: 492 errors and 72 warnings; changed TypeScript files are clean.
+
+**Not established**
+- Same-TB comparison with FSG_Bharat on PostgreSQL.
+- PDF/Excel content review.
+- Live Tally.
+- Installer.
+- Upgrade of a real installed database.
+- `npm ci` on Node 24.12 after adding 11 renderer packages.
+- Owner UAT.
+
+**Removed**
+- `test:classification` and `test:bulk-update`, with the code they tested.
 
 ## What is established
 
@@ -85,5 +114,7 @@ Prepared the owner review edition and 19 canonical module specifications coverin
 Documentation-only checks completed on Node.js 24.22.1: `node scripts/check-project-docs.mjs` passed, and `node --test scripts/check-project-docs.test.mjs` passed one regression test with zero failures. Additional review validation passed for 61 Markdown files, 617 local links, all 28 feature IDs, 19 module sections, 35 traced source statements, 60 unique proposed acceptance cases and 16 owner review groups. Source anchors exist and all 46 changed paths are Markdown or documentation JSON. `git diff --check` passed; staged/final diff is checked at commit. No application tests or legal review were rerun.
 
 ## First next activity
+
+T-019: the owner reviews [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md), answers the listed assumptions, and compares one anonymised trial balance in FSG_Bharat and in VERA. The T-018 activity below is unchanged.
 
 The owner reviews REVIEW_START_HERE.md and APPLICATION_REVIEW.md and records decisions/corrections in OWNER_REVIEW_DECISIONS.md. Update the canonical modules and approved scope after that review. Do not automatically start export-policy implementation, schema repair, security remediation, typecheck or lint work from the previous handoff. Those remain documented pending tasks requiring a separate implementation request.

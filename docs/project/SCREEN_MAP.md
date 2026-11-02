@@ -8,8 +8,9 @@ Generated from src/App.tsx by npm run docs:inventory. This maps route declaratio
 | /select-engagement | SelectEngagement | ProtectedRoute |
 | / | Dashboard | ProtectedEngagementRoute |
 | /engagements | Engagements | ProtectedRoute |
-| /trial-balance | FinancialReview | ProtectedEngagementRoute |
-| /financial-review | FinancialReview | ProtectedEngagementRoute |
+| /financial-statement-review | FinancialStatementReview | ProtectedEngagementRoute |
+| /financial-review | Redirect to /financial-statement-review | public |
+| /trial-balance | Redirect to /financial-statement-review | public |
 | /appointment | Appointment | ProtectedEngagementRoute |
 | /appointment/engagement-letter | EngagementLetterGenerator | ProtectedEngagementRoute |
 | /materiality | Materiality | ProtectedEngagementRoute |
@@ -36,4 +37,4 @@ Generated from src/App.tsx by npm run docs:inventory. This maps route declaratio
 | /compliance-applicability | ComplianceApplicability | ProtectedEngagementRoute |
 | * | NotFound | public |
 
-Both /trial-balance and /financial-review select FinancialReview. /programs-new aliases AuditExecution. /feedback is declared twice with different guards; resolve intent in a scoped route task rather than inferring permissions from its label. A public fallback is not an authentication guarantee for other screens.
+/financial-statement-review (Audit Execution → Financial Statement Review, T-019) replaced the former Financial Review screen; /trial-balance and /financial-review redirect to it. /programs-new aliases AuditExecution. /feedback is declared twice with different guards; resolve intent in a scoped route task rather than inferring permissions from its label. A public fallback is not an authentication guarantee for other screens.

@@ -2,9 +2,9 @@
 
 The [.agents index](.agents/README.md) points to the same maintained project workflows.
 
-## Current documentation review scope
+## Current scope
 
-The user directed a return to documentation on 30 October 2026. T-018 prepares the [owner review](docs/project/REVIEW_START_HERE.md) and [module specifications](docs/project/MODULE_INDEX.md). Keep recorded implementation/security gaps open without automatically fixing them. The next activity is owner review and decisions. A later explicit implementation request can supersede this scope.
+On 2 November 2026 an explicit implementation request (T-019) replaced the former Financial Review with Financial Statement Review, the FSG_Bharat generator ported to SQLite; see [Financial Statement Review](docs/project/FINANCIAL_STATEMENT_REVIEW.md). Otherwise the T-018 documentation scope of 30 October 2026 stands: the [owner review](docs/project/REVIEW_START_HERE.md) and [module specifications](docs/project/MODULE_INDEX.md) await owner decisions; keep recorded implementation/security gaps open without automatically fixing them.
 
 ## Start every session
 
@@ -18,7 +18,7 @@ The user directed a return to documentation on 30 October 2026. T-018 prepares t
 - ICAI VERA is an Electron desktop audit-assistance application. The active main process is `electron/main.cjs`; the active bridge is `electron/preload.cjs`. The `.js` siblings are not the selected package entry points.
 - React and Vite render the UI. `src/integrations/sqlite/client.ts` proxies through IPC to local SQLite. Supabase-compatible method names and remaining files do not establish a Supabase production backend.
 - The database is `audit_assistant.db` under Electron `userData`; evidence files are stored under its `files` directory. Renderer localStorage also holds some configuration and engagement data. Never claim a database-only backup is complete.
-- `src/App.tsx` maps both `/trial-balance` and `/financial-review` to `FinancialReview`. Inspect this active path before editing the legacy TrialBalance page.
+- Trial balances, mapping and financial statements live in Financial Statement Review (`/financial-statement-review`; `/trial-balance` and `/financial-review` redirect). Its main-process code is ES modules in `electron/fsg` with `fsg:*` IPC channels authorised in `electron/fsg/authorization.js`, its renderer is JavaScript in `src/modules/fsg`, and its tables are `sqlite/schema/10_fsg_tables.sql`. Keep FSG changes close to the FSG_Bharat original and run `npm run test:fsg` and `npm run test:fsg-ui`.
 - Some routed screens use sample data. A route, table, button, or passing build alone does not prove a feature works. Use the status vocabulary in the feature register.
 - Preserve source ledger values, signs, classification identifiers, periods, and engagement boundaries. Record user overrides and their basis. Do not change a financial or legal rule merely to make a test pass.
 - Tax-audit content is tagged AY 2025-26 in code. Verify authoritative sources and effective dates before changing legal logic. A draft export is not evidence of portal acceptance or professional approval.

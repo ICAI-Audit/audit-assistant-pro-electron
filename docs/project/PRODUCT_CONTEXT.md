@@ -17,7 +17,7 @@ The reviewed package is a desktop application, version 0.9.1. Local SQLite and l
 | Supplied AI Audit Tool Summary | Broad AI, analytics, knowledge and regulatory vision | Proposal; performance and adoption claims are not validated product metrics |
 | Current repository | Electron, SQLite, financial statement layout and export code, tax-audit draft exports, and some sample screens | Current implementation evidence, not automatic approval of expanded scope |
 
-Preserve existing behaviour while resolving scope. Do not remove reporting code because Phase I excluded preparation, and do not implement the broader AI blueprint without a recorded product decision. Decisions D-001 to D-004 remain open.
+Preserve existing behaviour while resolving scope. Do not implement the broader AI blueprint without a recorded product decision. D-002 was answered on 2 November 2026: financial statement preparation is in the product, provided by Financial Statement Review (T-019, [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md)). Management-FS comparison remains open. Decisions D-001, D-003 and D-004 remain open.
 
 ## Product requirements needing traceability
 

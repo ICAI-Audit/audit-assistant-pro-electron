@@ -117,17 +117,16 @@ export function KeyboardShortcutsDialog() {
             </div>
           </div>
 
-          {/* Trial Balance Specific */}
+          {/* Financial Statement Review */}
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <Badge variant="outline">Trial Balance Tabs</Badge>
+              <Badge variant="outline">Financial Statement Review</Badge>
             </h3>
             <div className="bg-muted/30 rounded-lg p-4">
-              <ShortcutRow keys={[modKey, '1']} description="Trial Balance" />
-              <ShortcutRow keys={[modKey, '2']} description="Balance Sheet" />
-              <ShortcutRow keys={[modKey, '3']} description="Profit & Loss" />
-              <ShortcutRow keys={[modKey, '4']} description="Cash Flow" />
-              <ShortcutRow keys={[modKey, '5']} description="Audit Report" />
+              <ShortcutRow keys={[modKey, 'Shift', 'letter']} description="Open the menu tab whose letter is underlined" />
+              <ShortcutRow keys={['Esc']} description="Back to the previous screen" />
+              <ShortcutRow keys={[modKey, 'Z']} description="Undo the last categorisation" />
+              <ShortcutRow keys={[modKey, 'Y']} description="Redo the categorisation" />
             </div>
           </div>
 

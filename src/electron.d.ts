@@ -3,8 +3,6 @@ declare global {
     electronAPI: {
       platform: string;
       app?: {
-        getDownloadsPath: () => Promise<string>;
-        openPath: (targetPath: string) => Promise<string>;
         exportFile: (payload: {
           defaultFilename: string;
           buffer: ArrayBuffer;
@@ -50,6 +48,10 @@ declare global {
         error?: string;
         lines?: any[];
       }>;
+      // Financial Statement Review (FSG) module: fsg:* channels only
+      fsg?: {
+        invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+      };
     };
   }
 }

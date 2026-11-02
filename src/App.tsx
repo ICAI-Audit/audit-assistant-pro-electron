@@ -1,24 +1,24 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { HashRouter, Navigate, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { EngagementProvider } from "@/contexts/EngagementContext";
 import { TallyProvider } from "@/contexts/TallyContext";
-import { ExportedFileDialogProvider } from "@/contexts/ExportedFileDialogContext";
 import { AppUpdaterManager } from "@/components/AppUpdaterManager";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ProtectedEngagementRoute } from "@/components/auth/ProtectedEngagementRoute";
 import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import Dashboard from "./pages/Dashboard";
 import SelectEngagement from "./pages/SelectEngagement";
 import Engagements from "./pages/Engagements";
-// import TrialBalance from "./pages/TrialBalance"; // DEPRECATED - Migrated to TrialBalanceNew
-import FinancialReview from "./pages/FinancialReview";
+// Large module (FSG financial statement generator): loaded when first opened.
+const FinancialStatementReview = lazy(() => import("./pages/FinancialStatementReview"));
 import Appointment from "./pages/Appointment";
 import Materiality from "./pages/Materiality";
 import RiskRegister from "./pages/RiskRegister";
@@ -65,7 +65,6 @@ function AuthRedirector() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ExportedFileDialogProvider>
       <TooltipProvider>
         <AppUpdaterManager />
         <Toaster />
@@ -110,27 +109,24 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                {/* Old Trial Balance route - DEPRECATED, redirecting to new */}
+                {/* Audit Execution → Financial Statement Review (T-019). It replaced the
+                    former Financial Review screen; the old paths redirect here. */}
                 <Route
-                  path="/trial-balance"
+                  path="/financial-statement-review"
                   element={
                     <ProtectedEngagementRoute>
-                      <MainLayout>
-                        <FinancialReview />
+                      <MainLayout fullBleed>
+                        <RouteErrorBoundary title="Financial Statement Review">
+                          <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading Financial Statement Review…</div>}>
+                            <FinancialStatementReview />
+                          </Suspense>
+                        </RouteErrorBoundary>
                       </MainLayout>
                     </ProtectedEngagementRoute>
                   }
                 />
-                <Route
-                  path="/financial-review"
-                  element={
-                    <ProtectedEngagementRoute>
-                      <MainLayout>
-                        <FinancialReview />
-                      </MainLayout>
-                    </ProtectedEngagementRoute>
-                  }
-                />
+                <Route path="/financial-review" element={<Navigate to="/financial-statement-review" replace />} />
+                <Route path="/trial-balance" element={<Navigate to="/financial-statement-review" replace />} />
                 <Route
                   path="/appointment"
                   element={
@@ -376,7 +372,6 @@ const App = () => (
         </AuthProvider>
       </HashRouter>
     </TooltipProvider>
-  </ExportedFileDialogProvider>
 </QueryClientProvider>
 );
 
