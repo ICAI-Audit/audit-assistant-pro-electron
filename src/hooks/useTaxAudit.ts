@@ -202,7 +202,8 @@ const createClausePrefill = (
   const setupLink = sourceChip('Setup', 'tax_audit_setup', '/tax-audit');
   const engagementLink = sourceChip('Engagement', 'engagement', '/select-engagement');
   const gstLink = sourceChip('GST', 'gst', '/audit-tools?tab=gst', 'client_gstins');
-  const financialReviewLink = sourceChip('FR', 'financial_review', '/financial-review');
+  // 'financial_review' is the stored source key; the screen is now Financial Statement Review (T-019).
+  const financialReviewLink = sourceChip('FSR', 'financial_review', '/financial-statement-review');
   const clientAddress = buildClientAddress(client);
 
   switch (definition.key) {
@@ -889,7 +890,7 @@ const createClausePrefill = (
           responseJson: {},
           status: 'needs_input',
           links: [financialReviewLink],
-          missingFields: ['Review Financial Review source and enter clause particulars'],
+          missingFields: ['Review Financial Statement Review source and enter clause particulars'],
         };
       }
       return {

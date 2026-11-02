@@ -2,37 +2,73 @@
 
 ## Session identity
 
-- Date: 30 October 2026.
-- Agent: Codex in ChatGPT Work.
-- Requested outcome: return to documentation, reconcile the latest VS Code result and complete a detailed application review for the owner.
-- Current task: T-018 documentation review; T-005 traceability baseline prepared for review.
-- Branch: docs/application-review-2026-10-30.
-- Reviewed application/source commit: cc5c04729604fba7d05240a07f24682e0644665c.
-- Source branch: fix/t003-backend-authorization-2026-10-29. Original main baseline remains c0ea50820094952b3bad9c83b45cc00cbff0381c in historical records.
-- Work boundary: Markdown and documentation metadata only. No production code, tooling code, dependencies, schema, client database, security policy or professional rule changes.
+- Date: 2 November 2026.
+- Agent: Claude Code (VS Code extension).
+- Requested outcome: remove the existing Financial Review / financial statement generation and replace it with the supplied FSG_Bharat 0.1.137 financial statement generator, converted from PostgreSQL to ICAI VERA's SQLite database, under Audit Execution → Financial Statement Review.
+- Task: T-019. Features: F-007, F-008, F-009. Decisions: D-002 (answered), D-010.
+- Branch: `work/developer-task`. Base commit: `03d1a46f16b36da16d3821cee2e1c3280897a78c`.
+- **Not committed and not merged.** The user has not asked for a commit.
+- The previous handoff (T-018 documentation review, 30 October 2026) is in git history at the base commit.
 
-## Completed documentation
+## Completed work
 
-Created the owner review entry, a single assembled application review, 19 canonical detailed module specifications, 28-feature coverage matrix, 35-source-statement requirements trace, 78-table/1,055-column declared field catalogue, literal persistence caller catalogue, configured tax clause/literal field catalogue, open-gap register, verification-evidence register and 16 consolidated owner decision groups. Each module records sources, workflow, principal business fields, current rules/permissions, outputs, evidence limits and proposed acceptance cases.
+See [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md) for the full record.
 
-Reconciled existing context, architecture, data, decisions, feature register, current status and task records. The shared instructions now identify documentation review as current scope. Automatic client loading is still unverified; eight portable workflows remain available.
+**Owner answers recorded (D-010):**
+- port every FSG feature;
+- entity = client, period = engagement financial year;
+- drop only the empty legacy tables, after a backup;
+- same sidebar slot, labelled Financial Statement Review.
 
-## Evidence preserved from earlier work
+**Removed:**
+- the old Financial Review page, components, classification code, legacy utilities, tests and npm scripts;
+- the `app:openPath`/`app:getDownloadsPath` IPC;
+- `schedule_iii_config` and the `tb_new_*` tables (declarations and the start-up cleanup with backup).
 
-The latest VS Code report records 26/26 Electron IPC regressions, native smoke, 37 tax helper tests, classification/bulk tests and renderer build passing. It records before-fix failures for four T-003 findings. Those are prior reported results, not application tests rerun in this documentation session. The reported typecheck/lint baseline remains 114 diagnostics across 28 files and 515 errors/101 warnings. Actual renderer upload/TB import, installer, integration and owner UAT remain unverified.
+**Added:**
+- `sqlite/schema/10_fsg_tables.sql`;
+- `electron/fsg/` (SQLite adapter, ported handlers and services, channel authorization, assets);
+- `src/modules/fsg/` (ported screens, `api.js` bridge, scoped styles);
+- `src/pages/FinancialStatementReview.tsx`;
+- `src/components/RouteErrorBoundary.tsx`;
+- the route, sidebar entry, shortcut and redirects;
+- `scripts/test-fsg-integration.mjs`, `scripts/test-fsg-ui.cjs`, `scripts/fsg-electron-entry.cjs`.
 
-Missing classification/IFC tables, legacy evidence paths, module-wide session identity, renderer trust, export policy, evidence transitions and viewer/user policy remain documented. Manager-level byte deletion and the rollback timeout are implementation assumptions awaiting owner acceptance. Do not restart remediation automatically.
+**Dependencies added (exact FSG-tested versions):** ag-grid-community/react 31.3.4, @tiptap 2.27.2 (eight packages), xlsx-js-style 1.2.0.
 
-## Documentation validation
+**Configuration:** `vite.config.ts` gives `xlsx-js-style` an empty `fs` module; Tailwind now scans `src/modules/fsg`. Documentation registers are updated, and the inventory and screen map are refreshed.
 
-Documentation-only checks completed on Node.js 24.22.1: `node scripts/check-project-docs.mjs` passed, and `node --test scripts/check-project-docs.test.mjs` passed one regression test with zero failures. Additional review validation passed for 61 Markdown files, 617 local links, all 28 feature IDs, 19 module sections, 35 traced source statements, 60 unique proposed acceptance cases and 16 owner review groups. Source anchors exist and all 46 changed paths are Markdown or documentation JSON. `git diff --check` passed; staged/final diff is checked at commit. No application tests or legal review were rerun. No installation, Electron launch, app tests, database migration or source fix is required for this pass. Schema cataloguing uses only an in-memory SQLite database and the declared SQL files.
+## Checks and outcomes
 
-## Next executable step
+**Passed:**
+- `npm run test:fsg`: 41/41.
+- `npm run build` followed by `node scripts/test-fsg-ui.cjs`: 37/37.
+- `node --test scripts/test-t003-authorization.cjs`: 26/26.
+- `npm run test:native`.
+- `npx vitest run src/lib`: 37/37.
+- `npm run docs:check` and `node --test scripts/check-project-docs.test.mjs` (results in CURRENT_STATUS.md).
 
-The owner reads REVIEW_START_HERE.md and APPLICATION_REVIEW.md and records corrections/decisions against RV-01 to RV-16. After review, update canonical modules and release scope, then select the next explicitly authorised implementation or UAT task. Do not continue the old security-first next-step wording as the active task.
+**Failing as baseline:**
+- TypeScript: 76 diagnostics in 18 files, down from 114 in 28.
+- Lint: 492 errors and 72 warnings, down from 515/101.
+- No new diagnostics in changed files.
 
-## Publication and integration
+**Observed:** Materiality logs "Failed to load materiality risk assessment" when no record exists. This comes from an unchanged catch block in `src/pages/Materiality.tsx`.
 
-Integrated in VS Code on 30 October 2026 from the transfer package. All 46 payload files matched the manifest SHA-256 values (after line-ending normalisation), and `changes.patch` passed `git apply --check` and applied cleanly to a worktree at `cc5c047` before the two navigation links were added to `START_HERE.md` and `docs/project/README.md`. The checkout and the package baseline were identical, so no newer code or owner decision needed merging. Use `git rev-parse HEAD` for the published commit; this file does not record its own SHA. The transfer folders and ZIP are excluded from the commit. Prior approval to publish reviewed documentation does not authorise merging or application release.
+**Environment note:** the checks ran on Node.js 22.14.0/npm 10.9.2, not the recorded Node 24.12 toolchain. `npm ci` was not re-run after the dependency additions.
 
-Checks executed in this integration on Node.js 24.12.0: `npm run docs:check` and `node --test scripts/check-project-docs.test.mjs` passed after `npm run docs:inventory` (a fresh worktree checkout converts `SCREEN_MAP.md` to CRLF under autocrlf, which makes the unmodified checker report a stale map until it is regenerated; regeneration produced no content diff). No application tests, build, typecheck or lint were rerun.
+## Unresolved
+
+- [Assumptions awaiting owner confirmation](FINANCIAL_STATEMENT_REVIEW.md#assumptions-awaiting-confirmation).
+- GAP-16 (parity and acceptance) and GAP-17 (dashboard and Audit Report trial-balance consumers).
+- Python ODBC fallback retained.
+- The module stays light in dark theme.
+
+## First executable next step
+
+Owner: answer the assumptions in [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md).
+
+Developer:
+1. On Node 24.12 run `npm ci --no-audit --no-fund`, `npm run test:fsg` and `npm run test:fsg-ui`.
+2. Load one anonymised trial balance into FSG_Bharat (PostgreSQL) and into VERA.
+3. Compare the mapped TB, Balance Sheet, Profit and Loss, notes and the generated PDF/Excel.

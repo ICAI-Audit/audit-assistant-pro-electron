@@ -4,7 +4,7 @@
 
 The package entry is electron/main.cjs. npm run electron uses electron/run-electron.cjs, which removes ELECTRON_RUN_AS_NODE and spawns Electron. Development runs Vite on port 8080 and supplies VITE_DEV_SERVER_URL. Production loads dist/index.html. The active BrowserWindow selects electron/preload.cjs, disables nodeIntegration, and enables contextIsolation and webSecurity. These settings do not by themselves establish secure IPC authorization.
 
-src/main.tsx mounts src/App.tsx. HashRouter supports packaged local-file navigation. React Query handles query state. AuthContext, EngagementContext, TallyContext, and ExportedFileDialogContext provide session, engagement, integration, and export state. src/components/layout holds the shared navigation and layout.
+src/main.tsx mounts src/App.tsx. HashRouter supports packaged local-file navigation. React Query handles query state. AuthContext, EngagementContext and TallyContext provide session, engagement and integration state. src/components/layout holds the shared navigation and layout.
 
 ## Data path
 
@@ -16,11 +16,11 @@ The database opens under app.getPath('userData') as audit_assistant.db, with for
 
 ## File path
 
-Evidence metadata uses evidence_files and linking tables. src/hooks/useEvidenceFiles.ts calls the storage wrapper in the active SQLite client; preload forwards file-save, file-download, file-delete, and file-get-path. Main stores bytes below userData/files/bucket and normalises file paths. App exports use separate app:exportFile and app:openPath handlers. Check path validation, engagement authorization, cleanup on failed metadata writes, and backup completeness before relying on the evidence vault.
+Evidence metadata uses evidence_files and linking tables. src/hooks/useEvidenceFiles.ts calls the storage wrapper in the active SQLite client; preload forwards file-save, file-download, file-delete, and file-get-path. Main stores bytes below userData/files/bucket and normalises file paths. App exports use the separate app:exportFile handler (app:openPath and app:getDownloadsPath were removed with the Financial Review export dialog in T-019). Check path validation, engagement authorization, cleanup on failed metadata writes, and backup completeness before relying on the evidence vault.
 
 ## Modules and integrations
 
-FinancialReview is the active TB and statement workspace. Both /trial-balance and /financial-review route there. Multiple TB table families exist; follow its imports and hooks rather than assuming the legacy TrialBalance page is active. LocalStorage retains entity details, stock, classification settings, and layouts in parts of this module.
+Financial Statement Review (T-019) is the TB, mapping and financial statement workspace at /financial-statement-review; /trial-balance and /financial-review redirect there. It is the FSG_Bharat generator ported to SQLite: ES-module main-process code in electron/fsg (loaded by main.cjs with import()), its own fsg:* IPC channels authorised by electron/fsg/authorization.js, renderer code in src/modules/fsg, and the 39 tables of sqlite/schema/10_fsg_tables.sql. It does not use the generic sqlite-query proxy. See [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md). The former FinancialReview page and legacy TrialBalance page were removed; trial_balance_lines remains for Audit Report setup.
 
 TaxAudit uses useTaxAudit, clause definitions and field schemas, readiness and report-pack builders, statutory-version checks, and report editors. Draft 3CD Word, Excel, PDF and HTML exporters are in TaxAudit.tsx. Draft 3CA and 3CB editors have persisted report-document hooks. The portal submission path has not been established.
 

@@ -41,6 +41,20 @@ This record is code-grounded verification against active Electron handlers. It i
 - Prospective-row validation on update and upsert; upsert now requires explicit conflict columns and no longer uses `OR REPLACE`.
 - Authorization coverage review against all `.from('<table>')` callers added `engagement_trial_balance_header`, `engagement_trial_balance_lines`, `engagement_tb_classification` (parent-scoped) and read-only `ifc_clause_library`.
 
+## Financial Statement Review channels (T-019)
+
+FSG tables are not in any `sqlite-query` allow-list, so the generic proxy refuses them. The module uses its own `fsg:*` channels. Each is checked in the main process by `electron/fsg/authorization.js`:
+- authenticated active user and trusted frame;
+- a per-channel policy, with unknown channels refused;
+- client and financial-year scope for every named id, with all ids in one call belonging to one client;
+- manager-only unlock and global masters;
+- partner-only full export;
+- file paths limited to those chosen in a dialog during the session;
+- ITR template names restricted to the bundled three;
+- the PDF render window blocked from navigation and pop-ups.
+
+Removed in the same change: `app:openPath` (opened any path) and `app:getDownloadsPath`. Evidence: `npm run test:fsg` (41/41) and `npm run test:fsg-ui` (37/37); the T-003 suite still passes 26/26. The same session limitations apply: one module-global user, and no protection against an untrusted renderer. The policy choices are listed as assumptions in [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md).
+
 ## Known gaps found by the coverage review
 
 - `engagement_tb_classification` and `ifc_clause_library` have no definition in `sqlite/schema` (only in `_archive` Supabase migrations); callers fail with a missing-table error. This is a schema defect outside this task, not an authorization result. The mapping is forward-looking only.

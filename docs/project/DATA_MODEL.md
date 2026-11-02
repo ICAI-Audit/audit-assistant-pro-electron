@@ -2,7 +2,7 @@
 
 ## Detailed field reference
 
-The [schema field catalogue](SCHEMA_FIELD_CATALOG.md) records 78 declared tables and 1,055 columns from the nine current SQL files. The [caller catalogue](PERSISTENCE_CALLER_CATALOG.md) supplies literal targets and source paths; the [tax field catalogue](TAX_AUDIT_FIELD_CATALOG.md) covers configured clause/field objects with lexical extraction limits. These references are source facts, not a claim that installed databases match every UI/type model. T-017 records missing engagement_tb_classification and ifc_clause_library declarations.
+The [schema field catalogue](SCHEMA_FIELD_CATALOG.md) records 78 declared tables and 1,055 columns from the nine SQL files reviewed on 30 October 2026; it predates T-019 (39 tables added in 10_fsg_tables.sql, 6 legacy tables removed from 05_trial_balance_tables.sql) and has not been regenerated. The [caller catalogue](PERSISTENCE_CALLER_CATALOG.md) supplies literal targets and source paths; the [tax field catalogue](TAX_AUDIT_FIELD_CATALOG.md) covers configured clause/field objects with lexical extraction limits. These references are source facts, not a claim that installed databases match every UI/type model. T-017 records missing engagement_tb_classification and ifc_clause_library declarations.
 
 ## Ownership
 
@@ -16,7 +16,8 @@ One local SQLite database sits in Electron userData. It contains firm settings, 
 | 02_audit_workflow_tables.sql | audit_procedures, procedure_assignees, checklist items, evidence_files, evidence_links, risks, review_notes, compliance_applicability, materiality_risk_assessment, notifications | Procedures, evidence and review records must stay within the engagement |
 | 03_audit_program_tables.sql | audit_programs_new, audit_program_sections, audit_program_boxes, audit_program_attachments, engagement_letter_templates | Program hierarchy and letter templates; do not confuse templates with engagement execution |
 | 04_audit_report_tables.sql | setup, content, documents, versions, comments, evidence, exports, key audit matters, CARO libraries and responses, IFC content | Saved report sections and exports need a consistent source snapshot and review history |
-| 05_trial_balance_tables.sql | trial_balance_lines, tb_new entity/ledgers/stock/mappings/sessions, engagement_trial_balance_header and lines | Multiple generations coexist; map active reads and writes before migration |
+| 05_trial_balance_tables.sql | trial_balance_lines, engagement_trial_balance_header and lines | schedule_iii_config and the tb_new_* tables were removed in T-019 (dropped at start-up only when empty, after a backup). The remaining tables have no writer in the active UI (GAP-17) |
+| 10_fsg_tables.sql | Financial Statement Review: entities (= clients), entity_periods (client financial year), trial_balances, tb_rows, mapped_tb, mapping rules, notes, depreciation, statements and year documents (39 tables) | Integer keys; linked to VERA by entities.client_id and entity_periods.engagement_id. Converted from PostgreSQL; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md) |
 | 06_going_concern_tables.sql | workpapers, checklist items, net worth, profitability, borrowings, cash flows, ratios | Table presence does not verify a live completed workpaper flow |
 | 07_rule_engine_tables.sql | AILE rule sets and mapping rules; group, keyword, override and validation rules | Distinguish stored rules from static classification data and user overrides |
 | 08_template_system_tables.sql | standard programs/procedures, template checklist/evidence, FS templates, activity_logs, audit_trail, Tally bridge, feedback | Local mutable logs are not demonstrated immutable evidence |

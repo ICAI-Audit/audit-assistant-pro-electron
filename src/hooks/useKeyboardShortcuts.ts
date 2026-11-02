@@ -19,9 +19,8 @@ export const navigationShortcuts = [
   { key: 'd', route: '/', description: 'Dashboard', category: 'Navigation' },
   { key: 'e', route: '/engagements', description: 'Engagements', category: 'Navigation' },
   { key: 'c', route: '/compliance-applicability', description: 'Compliance Applicability', category: 'Navigation', requiresEngagement: true },
-  { key: 't', route: '/trial-balance', description: 'Trial Balance', category: 'Navigation', requiresEngagement: true },
   { key: 'x', route: '/appointment', description: 'Appointment', category: 'Navigation', requiresEngagement: true },
-  { key: 'b', route: '/financial-review', description: 'Financial Review', category: 'Navigation', requiresEngagement: true },
+  { key: 'b', route: '/financial-statement-review', description: 'Financial Statement Review', category: 'Navigation', requiresEngagement: true },
   { key: 'm', route: '/materiality', description: 'Materiality', category: 'Navigation', requiresEngagement: true },
   { key: 'r', route: '/risks', description: 'Risk Register', category: 'Navigation', requiresEngagement: true },
   { key: 'v', route: '/evidence', description: 'Evidence Vault', category: 'Navigation', requiresEngagement: true },
@@ -41,6 +40,12 @@ export function useGlobalKeyboardShortcuts() {
   const { currentEngagement } = useEngagement();
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    // A screen with its own shortcuts (e.g. Financial Statement Review) has
+    // already handled this key.
+    if (event.defaultPrevented) {
+      return;
+    }
+
     // Don't trigger shortcuts when typing in inputs
     const target = event.target as HTMLElement;
     if (

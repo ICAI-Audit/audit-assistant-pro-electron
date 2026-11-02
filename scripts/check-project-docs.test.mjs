@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkDocs, requiredDocs } from './check-project-docs.mjs';
+import { buildInventory, checkDocs, requiredDocs } from './check-project-docs.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('documentation checker detects broken handoffs, links, adapters and source drift', () => {
@@ -35,4 +35,11 @@ test('documentation checker detects broken handoffs, links, adapters and source 
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true });
   }
+});
+
+test('inventory records redirect routes with their target', () => {
+  const routes = buildInventory(root).routes;
+  const redirect = routes.find(route => route.path === '/financial-review');
+  assert.equal(redirect?.component, 'Redirect to /financial-statement-review');
+  assert.equal(routes.find(route => route.path === '/financial-statement-review')?.component, 'FinancialStatementReview');
 });

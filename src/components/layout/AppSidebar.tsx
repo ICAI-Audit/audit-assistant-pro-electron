@@ -48,7 +48,7 @@ const navItems: SidebarItem[] = [
     requiresEngagement: true,
   },
   { name: 'Audit Execution', href: '/audit-execution', icon: ClipboardList, requiresEngagement: true },
-  { name: 'Financial Review', href: '/financial-review', icon: FileSpreadsheet, requiresEngagement: true },
+  { name: 'Financial Statement Review', href: '/financial-statement-review', icon: FileSpreadsheet, requiresEngagement: true },
   { name: 'Audit Report', href: '/audit-report', icon: FileText, requiresEngagement: true },
   { name: 'Tax Audit', href: '/tax-audit', icon: Landmark, requiresEngagement: true },
   { name: 'Review Notes', href: '/review-notes', icon: MessageSquare, requiresEngagement: true },

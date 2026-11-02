@@ -28,9 +28,10 @@ export function buildInventory(root) {
     const block = app.slice(start, starts[i + 1] ?? app.length);
     const route = block.match(/\bpath="([^"]+)"/)[1];
     const names = [...block.matchAll(/<([A-Z]\w*)\s*\/>/g)].map(match => match[1]);
+    const redirect = block.match(/<Navigate\s+to="([^"]+)"/)?.[1];
     return {
       path: route,
-      component: names.at(-1) ?? 'unknown',
+      component: names.at(-1) ?? (redirect ? `Redirect to ${redirect}` : 'unknown'),
       guard: block.match(/<(Protected\w+)/)?.[1] ?? 'public',
     };
   });
@@ -65,7 +66,7 @@ export function screenMap(inventory) {
   return '# Screen map\n\nGenerated from src/App.tsx by npm run docs:inventory. This maps route declarations and their guards, not verified end-to-end behaviour. See the [feature register](FEATURE_REGISTER.md) for implementation limits.\n\n'
     + '| Route | Component | Declared guard |\n| --- | --- | --- |\n'
     + inventory.routes.map(route => `| ${route.path} | ${route.component} | ${route.guard} |`).join('\n')
-    + '\n\nBoth /trial-balance and /financial-review select FinancialReview. /programs-new aliases AuditExecution. /feedback is declared twice with different guards; resolve intent in a scoped route task rather than inferring permissions from its label. A public fallback is not an authentication guarantee for other screens.\n';
+    + '\n\n/financial-statement-review (Audit Execution → Financial Statement Review, T-019) replaced the former Financial Review screen; /trial-balance and /financial-review redirect to it. /programs-new aliases AuditExecution. /feedback is declared twice with different guards; resolve intent in a scoped route task rather than inferring permissions from its label. A public fallback is not an authentication guarantee for other screens.\n';
 }
 
 export function checkDocs(root = defaultRoot) {

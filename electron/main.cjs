@@ -7,6 +7,7 @@ const {
   evidencePathError,
   findCanonicalEvidenceFile,
   getAuthorizationContext,
+  hasEngagementAccess,
   isProtectedUpdate,
   rowIsAuthorized,
 } = require('./sqlite-authorization.cjs');
@@ -82,6 +83,7 @@ function getSqliteDb() {
         runAuditReportSetupSchemaMigration(sqliteDb);
         runAuditReportMainContentSchemaMigration(sqliteDb);
         runEngagementLetterTemplateTypeMigration(sqliteDb);
+        runLegacyTrialBalanceTableCleanup(sqliteDb, userDataPath);
         safeLog('✅ All database tables initialized successfully!');
         runTaxAuditAy2025Backfill(sqliteDb);
 
@@ -220,7 +222,8 @@ function initializeDatabaseSchema(db) {
     '06_going_concern_tables.sql',
     '07_rule_engine_tables.sql',
     '08_template_system_tables.sql',
-    '09_tax_audit_tables.sql'
+    '09_tax_audit_tables.sql',
+    '10_fsg_tables.sql'
   ];
 
   safeLog(`   Executing ${schemaFiles.length} schema files...`);
@@ -318,6 +321,53 @@ function initializeDatabaseSchema(db) {
   }
 
   safeLog(`✅ Verified all ${importantTables.length} critical tables exist`);
+}
+
+/**
+ * T-019: remove the legacy trial-balance tables that had no reader or writer
+ * (schedule_iii_config and the tb_new_* family, formerly declared in
+ * 05_trial_balance_tables.sql). Owner decision 2026-11-02: drop them only when
+ * every one of them is empty, after a consistent copy of the database has been
+ * written to <userData>/backups. If any still holds rows nothing is dropped and
+ * the tables are left for review. trial_balance_lines and
+ * engagement_trial_balance_* are shared with other modules and are kept.
+ */
+function runLegacyTrialBalanceTableCleanup(db, userDataPath) {
+  // Children before their parent (tb_new_* rows reference tb_new_entity_info).
+  const legacyTables = [
+    'tb_new_ledgers',
+    'tb_new_stock_items',
+    'tb_new_classification_mappings',
+    'tb_new_sessions',
+    'tb_new_entity_info',
+    'schedule_iii_config',
+  ];
+  const present = legacyTables.filter((table) => db.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"
+  ).get(table));
+  if (present.length === 0) return;
+
+  const nonEmpty = present.filter((table) => db.prepare(`SELECT 1 FROM "${table}" LIMIT 1`).get());
+  if (nonEmpty.length > 0) {
+    safeLog(`   ⚠️  Legacy trial balance tables kept because they contain data: ${nonEmpty.join(', ')}`);
+    return;
+  }
+
+  const backupDir = path.join(userDataPath, 'backups');
+  fs.mkdirSync(backupDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = path.join(backupDir, `audit_assistant-before-T019-legacy-tb-cleanup-${stamp}.db`);
+  db.prepare('VACUUM INTO ?').run(backupPath);
+  if (!fs.existsSync(backupPath)) {
+    throw new Error(`Backup before legacy table cleanup was not written: ${backupPath}`);
+  }
+
+  db.transaction(() => {
+    for (const table of present) {
+      db.exec(`DROP TABLE IF EXISTS "${table}"`);
+    }
+  })();
+  safeLog(`   Legacy trial balance tables removed (${present.join(', ')}); backup: ${backupPath}`);
 }
 
 function runAuditReportSetupSchemaMigration(db) {
@@ -1231,17 +1281,6 @@ function registerIpcHandlers() {
       safeLog('File save error:', error.message);
       return { success: false, error: error.message };
     }
-  });
-
-  ipcMain.handle('app:getDownloadsPath', async () => {
-    return app.getPath('downloads');
-  });
-
-  ipcMain.handle('app:openPath', async (event, targetPath) => {
-    if (!targetPath || typeof targetPath !== 'string') {
-      return 'Invalid path.';
-    }
-    return shell.openPath(targetPath);
   });
 
   ipcMain.handle('app:exportFile', async (event, payload) => {
@@ -2367,7 +2406,38 @@ function createWindow() {
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
-app.whenReady().then(() => {
+/**
+ * Financial Statement Review (FSG) module: ESM code under electron/fsg,
+ * registered as fsg:* IPC channels on VERA's SQLite connection. A start-up
+ * failure is reported to the renderer through fsg:status and never stops the
+ * rest of VERA from starting.
+ */
+let fsgStartupError = null;
+async function initFinancialStatementReview() {
+  ipcMain.handle('fsg:status', async () => ({ ok: !fsgStartupError, error: fsgStartupError }));
+  const db = getSqliteDb();
+  if (!db) {
+    fsgStartupError = 'The local database is not available.';
+    return;
+  }
+  try {
+    const fsg = await import('./fsg/index.js');
+    await fsg.initFsg({
+      db,
+      ipcMain,
+      getAuthorizedSession,
+      isTrustedRendererEvent,
+      hasEngagementAccess,
+      appVersion: app.getVersion(),
+      log: safeLog,
+    });
+  } catch (error) {
+    fsgStartupError = error && error.message ? error.message : String(error);
+    safeLog('❌ Financial Statement Review failed to start:', error && error.stack ? error.stack : error);
+  }
+}
+
+app.whenReady().then(async () => {
   try {
     app.setPath('cache', path.join(app.getPath('userData'), 'Cache'));
   } catch (error) {
@@ -2392,6 +2462,7 @@ app.whenReady().then(() => {
   safeLog('Electron app ready - IPC handlers should be registered');
   setAppMenu();
   registerIpcHandlers();
+  await initFinancialStatementReview();
   createWindow();
 
   // Initialize auto-updater with GitHub provider
