@@ -68,7 +68,7 @@ export function screenMap(inventory) {
   return '# Screen map\n\nGenerated from src/App.tsx by npm run docs:inventory. This maps route declarations and their guards, not verified end-to-end behaviour. See the [feature register](FEATURE_REGISTER.md) for implementation limits.\n\n'
     + '| Route | Component | Declared guard |\n| --- | --- | --- |\n'
     + inventory.routes.map(route => `| ${route.path} | ${route.component} | ${route.guard} |`).join('\n')
-    + '\n\n/financial-statement-review (Audit Execution → Financial Statement Review, T-019) replaced the former Financial Review screen; /trial-balance and /financial-review redirect to it. /programs-new aliases AuditExecution. /feedback is declared twice with different guards; resolve intent in a scoped route task rather than inferring permissions from its label. A public fallback is not an authentication guarantee for other screens.\n';
+    + '\n\n/financial-statement-review (Audit Execution → Financial Statement Review, T-019) replaced the former Financial Review screen; /trial-balance and /financial-review redirect to it. /programs-new aliases AuditExecution. /feedback is declared once, engagement-scoped (T-012, owner decision 2 November 2026). A public fallback is not an authentication guarantee for other screens.\n';
 }
 
 export function checkDocs(root = defaultRoot) {

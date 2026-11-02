@@ -13,6 +13,7 @@ Start with [the review guide](REVIEW_START_HERE.md) and [the assembled applicati
 3. [Next tasks](NEXT_TASKS.md) gives ordered work with acceptance criteria.
 4. [Latest handoff](SESSION_HANDOFF.md) tells the next session where to resume.
 5. [Workflow index](SKILLS_INDEX.md) selects repeatable procedures for the task.
+6. [Handover checklist](HANDOVER_CHECKLIST.md) classifies every module (working, partial, placeholder, disconnected) with owner decisions.
 
 ## Find the detail
 
