@@ -28,7 +28,6 @@ Generated from src/App.tsx by npm run docs:inventory. This maps route declaratio
 | /audit-report | AuditReport | ProtectedEngagementRoute |
 | /feedback | Feedback | ProtectedEngagementRoute |
 | /settings | Settings | ProtectedRoute |
-| /feedback | Feedback | ProtectedRoute |
 | /gstr1-integration | GstzenIntegration | ProtectedRoute |
 | /gstzen-login | GstzenLogin | ProtectedRoute |
 | /gstin/:gstinUuid/gstr1 | Gstr1Dashboard | ProtectedRoute |

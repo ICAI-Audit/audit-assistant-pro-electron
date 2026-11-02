@@ -128,11 +128,6 @@
       "guard": "ProtectedRoute"
     },
     {
-      "path": "/feedback",
-      "component": "Feedback",
-      "guard": "ProtectedRoute"
-    },
-    {
       "path": "/gstr1-integration",
       "component": "GstzenIntegration",
       "guard": "ProtectedRoute"
@@ -572,6 +567,7 @@
     "src/integrations/sqlite/client.ts",
     "src/integrations/sqlite/hooks.ts",
     "src/lib/formatters/currency.ts",
+    "src/lib/fsgEngagementSummary.ts",
     "src/lib/taxAuditApplicability.test.ts",
     "src/lib/taxAuditApplicability.ts",
     "src/lib/taxAuditComplianceTracker.ts",
@@ -800,6 +796,7 @@
     "electron/fsg/db/mapping-v3-migration.js",
     "electron/fsg/db/noteStore.js",
     "electron/fsg/db/schema.js",
+    "electron/fsg/engagement-summary.js",
     "electron/fsg/index.js",
     "electron/fsg/ipc-registry.js",
     "electron/fsg/ipc/cfs.js",

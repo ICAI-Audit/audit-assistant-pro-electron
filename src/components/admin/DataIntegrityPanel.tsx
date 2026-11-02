@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { getSQLiteClient } from '@/integrations/sqlite/client';
+import { getFsgEngagementSummary } from '@/lib/fsgEngagementSummary';
 import { useAuth } from '@/contexts/AuthContext';
 
 const db = getSQLiteClient();
@@ -85,7 +86,7 @@ interface ChildCounts {
   risks: number;
   review_notes: number;
   evidence_files: number;
-  trial_balance_lines: number;
+  fsg_tb_rows: number;
   assignments: number;
 }
 
@@ -212,7 +213,7 @@ export function DataIntegrityPanel() {
       db.from('risks').select('id').eq('engagement_id', engagementId).execute().then(r => ({ count: r.data?.length || 0 })),
       db.from('review_notes').select('id').eq('engagement_id', engagementId).execute().then(r => ({ count: r.data?.length || 0 })),
       db.from('evidence_files').select('id').eq('engagement_id', engagementId).execute().then(r => ({ count: r.data?.length || 0 })),
-      db.from('trial_balance_lines').select('id').eq('engagement_id', engagementId).execute().then(r => ({ count: r.data?.length || 0 })),
+      getFsgEngagementSummary(engagementId).then(s => ({ count: s?.current.totalRows || 0 })),
       db.from('engagement_assignments').select('id').eq('engagement_id', engagementId).execute().then(r => ({ count: r.data?.length || 0 })),
     ]);
 
@@ -220,7 +221,7 @@ export function DataIntegrityPanel() {
       risks: risks.count || 0,
       review_notes: notes.count || 0,
       evidence_files: evidence.count || 0,
-      trial_balance_lines: tb.count || 0,
+      fsg_tb_rows: tb.count || 0,
       assignments: assignments.count || 0,
     };
   };
@@ -230,7 +231,7 @@ export function DataIntegrityPanel() {
       counts.risks > 0 ||
       counts.review_notes > 0 ||
       counts.evidence_files > 0 ||
-      counts.trial_balance_lines > 0
+      counts.fsg_tb_rows > 0
     );
   };
 
@@ -909,7 +910,7 @@ export function DataIntegrityPanel() {
                   {childCounts.risks > 0 && <li>• {childCounts.risks} risk(s)</li>}
                   {childCounts.review_notes > 0 && <li>• {childCounts.review_notes} review note(s)</li>}
                   {childCounts.evidence_files > 0 && <li>• {childCounts.evidence_files} evidence file(s)</li>}
-                  {childCounts.trial_balance_lines > 0 && <li>• {childCounts.trial_balance_lines} trial balance line(s)</li>}
+                  {childCounts.fsg_tb_rows > 0 && <li>• {childCounts.fsg_tb_rows} Financial Statement Review trial balance row(s) for this client and year</li>}
                 </ul>
                 <p className="text-sm mt-2 text-muted-foreground">
                   Please archive this engagement instead to preserve audit history.

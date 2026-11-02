@@ -31,6 +31,7 @@ import { registerRatioHandlers } from './ipc/ratio.js'
 import { registerGeneralNotesHandlers } from './ipc/general-notes.js'
 import { registerCfsHandlers } from './ipc/cfs.js'
 import { registerFsSnapshotHandlers } from './ipc/fs-snapshot.js'
+import { summarizeEngagement } from './engagement-summary.js'
 import { AuthorizationError, CHANNEL_POLICY, authorizeCall, createPathGuard, filterResult } from './authorization.js'
 
 export const CHANNEL_PREFIX = 'fsg:'
@@ -264,6 +265,21 @@ export async function initFsg({ db, ipcMain, getAuthorizedSession, isTrustedRend
       return { ok: true, result: await openEngagementContext(db, engagementId) }
     } catch (err) {
       if (!(err instanceof AuthorizationError)) log(`[FSG] context:open failed: ${toErrorMessage(err)}`)
+      return { ok: false, error: toErrorMessage(err), denied: err instanceof AuthorizationError }
+    }
+  })
+
+  // Read-only; same engagement-access rule as context:open.
+  ipcMain.handle(`${CHANNEL_PREFIX}engagement:summary`, async (event, engagementId) => {
+    try {
+      const context = authorize(event)
+      if (typeof engagementId !== 'string' || !engagementId) throw new AuthorizationError('Select an engagement first.')
+      if (!hasEngagementAccess(db, context, engagementId)) {
+        throw new AuthorizationError('This engagement is outside your engagement access.')
+      }
+      return { ok: true, result: summarizeEngagement(db, engagementId) }
+    } catch (err) {
+      if (!(err instanceof AuthorizationError)) log(`[FSG] engagement:summary failed: ${toErrorMessage(err)}`)
       return { ok: false, error: toErrorMessage(err), denied: err instanceof AuthorizationError }
     }
   })
