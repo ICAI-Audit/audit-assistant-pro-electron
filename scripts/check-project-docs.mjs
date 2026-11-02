@@ -15,10 +15,12 @@ export const requiredDocs = [
     .map(name => `docs/project/workflows/${name}.md`),
 ];
 const read = (root, name) => fs.readFileSync(path.join(root, name), 'utf8');
-const walk = (root, rel) => fs.readdirSync(path.join(root, rel), { withFileTypes: true })
-  .flatMap(entry => entry.isDirectory()
-    ? walk(root, `${rel}/${entry.name}`)
-    : [`${rel}/${entry.name}`]).sort();
+// A source directory may be absent (for example an unused tests/ directory in a fresh checkout).
+const walk = (root, rel) => !fs.existsSync(path.join(root, rel)) ? []
+  : fs.readdirSync(path.join(root, rel), { withFileTypes: true })
+    .flatMap(entry => entry.isDirectory()
+      ? walk(root, `${rel}/${entry.name}`)
+      : [`${rel}/${entry.name}`]).sort();
 
 export function buildInventory(root) {
   const pkg = JSON.parse(read(root, 'package.json'));

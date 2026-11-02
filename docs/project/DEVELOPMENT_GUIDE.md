@@ -22,11 +22,12 @@ Electron native modules must match Electron's ABI. `postinstall` runs `electron-
 | Desktop development | npm run electron:dev | Defined; not launched in this review |
 | Production renderer build | npm run build | Passed; existing chunk-size, dynamic-import and stale Browserslist warnings remain |
 | Run built desktop | npm run electron | Requires dist from build; not executed in this review |
-| Static typing | npx tsc -p tsconfig.app.json --noEmit | Executed; currently fails with 114 existing diagnostics across 28 files; tracked separately |
-| Lint | npm run lint | Executed; currently reports 515 errors and 101 warnings; tracked separately |
+| Static typing | npx tsc -p tsconfig.app.json --noEmit | Executed at T-020; fails with 76 existing diagnostics across 18 files (114 across 28 before T-019); tracked separately |
+| Lint | npm run lint | Executed at T-020; reports 475 errors and 71 warnings (515/101 before T-019); tracked separately |
 | Tax-audit/library tests | npx vitest run src/lib | Passed: 8 files, 37 tests |
-| Classification regression | npm run test:classification | Passed |
-| Bulk-update regressions | npm run test:bulk-update | Passed |
+| Financial Statement Review integration | npm run test:fsg | Passed at T-020: 41/41 (Electron main process, in-memory database, synthetic data) |
+| Financial Statement Review UI/upgrade | npm run test:fsg-ui | Passed at T-020: 37/37 (builds the renderer; isolated profile seeded with an upgrade database) |
+| IPC authorization | npm run test:t003-authorization | Passed at T-020: 26/26 (builds the renderer; isolated profile) |
 | Installer | npm run electron:build:win | Packaging step; not a routine documentation check |
 
 The `npm run test:native` script is a synthetic smoke test, not an installer or application UAT. T-002 also ran the documentation checks, regression test, and Git whitespace checks; the exact results are in SESSION_HANDOFF.md.

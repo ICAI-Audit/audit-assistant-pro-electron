@@ -4,6 +4,8 @@ Lexical extraction of literal .from() calls under live src at `cc5c04729604fba7d
 
 The field catalogue describes declared SQLite tables. The module specifications describe known JSON/localStorage and file stores. This catalogue supplies exact source paths for reconciliation, not proof that every operation succeeds.
 
+T-020 note: `src/hooks/useDashboardStats.ts` and `src/integrations/sqlite/client-ipc.ts` listed below were removed because nothing imported them; the catalogue is otherwise unchanged from the reviewed commit.
+
 | Literal target | Declaration status | Caller paths |
 | --- | --- | --- |
 | activity_logs | Declared SQLite table | `src/contexts/AuthContext.tsx`; `src/hooks/useActivityLogs.ts`; `src/hooks/useDashboardStats.ts`; `src/hooks/useEngagementDashboardData.ts`; `src/hooks/useEngagements.ts`; `src/hooks/useEvidenceFiles.ts`; `src/hooks/useOverallDashboardData.ts`; `src/hooks/useReviewNotes.ts`; `src/hooks/useRisks.ts`; `src/pages/AdminDashboard.tsx` |

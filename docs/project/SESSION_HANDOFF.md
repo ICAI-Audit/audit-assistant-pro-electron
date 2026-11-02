@@ -3,72 +3,66 @@
 ## Session identity
 
 - Date: 2 November 2026.
-- Agent: Claude Code (VS Code extension).
-- Requested outcome: remove the existing Financial Review / financial statement generation and replace it with the supplied FSG_Bharat 0.1.137 financial statement generator, converted from PostgreSQL to ICAI VERA's SQLite database, under Audit Execution → Financial Statement Review.
-- Task: T-019. Features: F-007, F-008, F-009. Decisions: D-002 (answered), D-010.
-- Branch: `work/developer-task`. Base commit: `03d1a46f16b36da16d3821cee2e1c3280897a78c`.
-- **Not committed and not merged.** The user has not asked for a commit.
-- The previous handoff (T-018 documentation review, 30 October 2026) is in git history at the base commit.
+- Agent: Copilot SDK in VS Code.
+- Requested outcome: scoped cleanup after the Financial Statement Review replacement; repair the documentation checker; correct stale records.
+- Task: T-020. Features: none changed. Related: T-019 (merged), T-012, T-021, T-022.
+- Branch: `chore/remove-unused-code`. Base and starting commit: `main` = `origin/main` = `cad1727eeb2500c8ecd06d9ffa3a86664a9246b4` (the commit the earlier review examined; unchanged). Resolve the branch head with `git rev-parse HEAD`.
+- Not merged and not released. CA Venugopal Gella reviews, tests and merges.
+- The previous handoff (T-019) is in git history at the base commit; its work is merged as PR #105.
 
-## Completed work
+## Preserved, not committed
 
-See [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md) for the full record.
+The working tree already held a modified `package-lock.json` and untracked `ICAI-VERA-Context-Pack/` and `ICAI-VERA-Documentation-Review/` before this task, plus a stash ("backing untracked files before pulling main"). None of them was touched or committed.
 
-**Owner answers recorded (D-010):**
-- port every FSG feature;
-- entity = client, period = engagement financial year;
-- drop only the empty legacy tables, after a backup;
-- same sidebar slot, labelled Financial Statement Review.
+## Removed (each had no import, route, IPC registration, package script, build setting, test or live documentation use)
 
-**Removed:**
-- the old Financial Review page, components, classification code, legacy utilities, tests and npm scripts;
-- the `app:openPath`/`app:getDownloadsPath` IPC;
-- `schedule_iii_config` and the `tb_new_*` tables (declarations and the start-up cleanup with backup).
+| Files | Evidence |
+| --- | --- |
+| `src/components/audit/RatioAnalysisCalculator.tsx` | No importer or route; its only dependency, `useTrialBalance`, has other consumers and is kept |
+| `src/modules/fsg/components/Notes/InventoryScheduleForm.jsx` | Name appears only in its own file; no component map, `import.meta.glob` or dynamic import in the module |
+| `src/modules/fsg/components/Notes/TradePayablesAgingForm.jsx` | Not imported. The IPC channels it called (`notesGetTradePayablesAging`, `notesSaveTradePayablesAging`) stay: `TradePayablesDisclosureForm.jsx` uses them |
+| `src/modules/fsg/components/shared/FixCategorisationModal.jsx` | Only a comment in `src/modules/fsg/App.jsx` names it |
+| `electron/main.js`, `electron/preload.js` | `package.json` `main` is `electron/main.cjs`; `preload.cjs` is the loaded bridge; `run-electron.cjs` launches `.`. `main.js` uses `require` in a `"type": "module"` package, so it cannot load as a `.js` entry. Only historical updater guides (already marked historical) name them |
+| `src/integrations/sqlite/client-ipc.ts` | No importer; `client.ts` is the only client used |
+| `src/integrations/supabase/client.ts`, `types.ts` | Only commented-out imports remain (`TallyContext.tsx`, `useTallyBridge.ts`). `@supabase/supabase-js` stays: `AuthContext.tsx` imports its types |
+| `src/hooks/useDashboardStats.ts`, `useTallyBridge.ts`, `useTallyConnection.ts` | No importer. Dashboards use `useEngagementDashboardData` and `useOverallDashboardData`; VERA Tools uses `useTallyODBC` |
+| `scripts/apply-migration.cjs`, `batch-migrate-hooks.js`, `complete-migration.js`, `finalize-migration.js`, `migrate-to-sqlite.js`, `run-migration.js`, `run-migration-simple.js`, `run-tb-new-migration.js`, `run-migration-direct.ps1`, `run-migration-psql.ps1`, `setup-migration-helper.sql` | No npm script uses them. The `run-*` helpers read `supabase/migrations/…`, which does not exist (the files are under `_archive/`), target the `tb_new_*` tables removed in T-019, and import `dotenv`, which `package.json` does not declare. The four rewriters were one-shot Supabase-to-SQLite codemods; no Supabase client import remains for them to rewrite. `apply-migration.cjs` held a hard-coded Supabase URL and only printed manual instructions. The only manual-usage text is `docs/RUN_MIGRATION.md`, now marked historical |
 
-**Added:**
-- `sqlite/schema/10_fsg_tables.sql`;
-- `electron/fsg/` (SQLite adapter, ported handlers and services, channel authorization, assets);
-- `src/modules/fsg/` (ported screens, `api.js` bridge, scoped styles);
-- `src/pages/FinancialStatementReview.tsx`;
-- `src/components/RouteErrorBoundary.tsx`;
-- the route, sidebar entry, shortcut and redirects;
-- `scripts/test-fsg-integration.mjs`, `scripts/test-fsg-ui.cjs`, `scripts/fsg-electron-entry.cjs`.
+## Retained
 
-**Dependencies added (exact FSG-tested versions):** ag-grid-community/react 31.3.4, @tiptap 2.27.2 (eight packages), xlsx-js-style 1.2.0.
+- `electron/auto-updater-preload.js`: `preload.cjs` mirrors it and the updater guides cite it.
+- `sqlite/migrate-from-supabase.ts`, `sqlite/package.json.example`: documented in `sqlite/README.md`; legacy data migration was out of scope.
+- `supabase/` (edge functions, config) and `_archive/`: not requested; not run.
+- `useTrialBalance`, `trial_balance_lines`, `engagement_trial_balance_*` and their readers (Dashboard via `useEngagementDashboardData`, Audit Report setup, `DataIntegrityPanel`): out of scope; see T-021.
+- `useTallyODBC`, `TallyContext`, `@supabase/supabase-js` and every npm dependency.
+- Both deferred-tax tools, all visible prototype screens, permissions and route guards; no financial calculation changed.
+- No table dropped, no stored data deleted, no migration run.
 
-**Configuration:** `vite.config.ts` gives `xlsx-js-style` an empty `fs` module; Tailwind now scans `src/modules/fsg`. Documentation registers are updated, and the inventory and screen map are refreshed.
+## Tooling and records repaired
+
+- `scripts/check-project-docs.mjs`: the source scan skips directories that do not exist, so a fresh checkout without `tests/` passes. `scripts/check-project-docs.test.mjs` no longer requires every source directory to exist and has a regression test for a fixture without `tests/`.
+- `scripts/test-fsg-ui.cjs`: the upgrade seed read `HEAD`'s schema, which no longer declares the legacy tables after T-019, so two checks failed (35/37). The seed now adds empty stand-ins for them; the cleanup under test is unchanged.
+- Current records no longer call merged T-019 work uncommitted; `TESTING.md` and `DEVELOPMENT_GUIDE.md` no longer instruct running removed scripts; historical results keep their wording and are labelled.
+- Inventory and screen map refreshed with `npm run docs:inventory`. The diff removes only the deleted paths.
 
 ## Checks and outcomes
 
-**Passed:**
-- `npm run test:fsg`: 41/41.
-- `npm run build` followed by `node scripts/test-fsg-ui.cjs`: 37/37.
-- `node --test scripts/test-t003-authorization.cjs`: 26/26.
-- `npm run test:native`.
-- `npx vitest run src/lib`: 37/37.
-- `npm run docs:check` and `node --test scripts/check-project-docs.test.mjs` (results in CURRENT_STATUS.md).
+Node.js 24.12.0, npm 11.6.2, Windows, synthetic data. See the table in [CURRENT_STATUS.md](CURRENT_STATUS.md#t-020-result-2-november-2026).
 
-**Failing as baseline:**
-- TypeScript: 76 diagnostics in 18 files, down from 114 in 28.
-- Lint: 492 errors and 72 warnings, down from 515/101.
-- No new diagnostics in changed files.
+- Passed: `npm run docs:check`; `node --test scripts/check-project-docs.test.mjs` (3/3); `npm run build`; `npm run test:fsg` (41/41); `node scripts/test-fsg-ui.cjs` (37/37); `node --test scripts/test-t003-authorization.cjs` (26/26); `npm run test:native`; `npx vitest run src/lib` (37 tests).
+- Failed, existing baseline: `npx tsc -p tsconfig.app.json --noEmit` (76 diagnostics in 18 files, same as the start); `npm run lint` (475 errors, 71 warnings; 492/72 at the start).
+- Skipped / not established: packaged launch, installer, live Tally, owner UAT, behaviour beyond the harnesses. `npm ci` was not re-run in this working tree; the fresh-checkout check is in the section below.
 
-**Observed:** Materiality logs "Failed to load materiality risk assessment" when no record exists. This comes from an unchanged catch block in `src/pages/Materiality.tsx`.
+## Fresh-checkout verification
 
-**Environment note:** the checks ran on Node.js 22.14.0/npm 10.9.2, not the recorded Node 24.12 toolchain. `npm ci` was not re-run after the dependency additions.
+Recorded in the final report of this session: a clean clone of the pushed branch, `npm ci --no-audit --no-fund`, then `npm run docs:check` and the documentation regression test.
 
 ## Unresolved
 
-- [Assumptions awaiting owner confirmation](FINANCIAL_STATEMENT_REVIEW.md#assumptions-awaiting-confirmation).
-- GAP-16 (parity and acceptance) and GAP-17 (dashboard and Audit Report trial-balance consumers).
-- Python ODBC fallback retained.
-- The module stays light in dark theme.
+- Owner assumptions in [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md#assumptions-awaiting-confirmation); T-019 UAT.
+- T-021 reconnection of old trial-balance readers; T-022 duplicate tools and placeholders; T-012 duplicate `/feedback` route.
+- Materiality logs "Failed to load materiality risk assessment" when no record exists (unchanged catch block in `src/pages/Materiality.tsx`).
 
 ## First executable next step
 
-Owner: answer the assumptions in [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md).
-
-Developer:
-1. On Node 24.12 run `npm ci --no-audit --no-fund`, `npm run test:fsg` and `npm run test:fsg-ui`.
-2. Load one anonymised trial balance into FSG_Bharat (PostgreSQL) and into VERA.
-3. Compare the mapped TB, Balance Sheet, Profit and Loss, notes and the generated PDF/Excel.
+Reviewer: `git fetch`, check out `chore/remove-unused-code`, run `npm run docs:check`, `npm run build` and `npm run test:fsg-ui`, then confirm the removals in the table above by launching the app (`npm run electron`) and opening Dashboard, Audit Report setup, VERA Tools and Financial Statement Review. Merge only after that review.

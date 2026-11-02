@@ -1218,7 +1218,7 @@ Offer auxiliary analysis and utilities. AuditTools has Tally, GST, MCA, income-t
 
 - [src/pages/AuditTools.tsx](../../src/pages/AuditTools.tsx)
 - [src/components/audit/DeferredTaxCalculator.tsx](../../src/components/audit/DeferredTaxCalculator.tsx)
-- [src/components/audit/RatioAnalysisCalculator.tsx](../../src/components/audit/RatioAnalysisCalculator.tsx)
+- `src/components/audit/RatioAnalysisCalculator.tsx` (removed in T-020; it had no route or importer, so this historical review entry no longer describes a visible feature)
 
 ### Observed workflow
 

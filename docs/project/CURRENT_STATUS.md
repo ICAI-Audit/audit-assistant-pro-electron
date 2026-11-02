@@ -12,11 +12,29 @@
 - Verification branch retained: `docs/t003-auth-lock-verification-2026-10-29` from `229a098f375050be1c5d4cd45236b5e0ec903325`.
 - Branch HEAD: resolve with Git (`git rev-parse HEAD`); do not copy a commit's own SHA into this document.
 - Local validation environment: Node.js 24.12.0 and npm 11.6.2.
-- Current scope: T-019 implementation (2 November 2026, branch `work/developer-task` from `03d1a46f16b36da16d3821cee2e1c3280897a78c`, uncommitted). Financial Review replaced by Financial Statement Review; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md). The T-018 documentation review and its open owner decisions otherwise stand.
+- Current scope: T-020 scoped cleanup (2 November 2026, branch `chore/remove-unused-code` from `main` at `cad1727eeb2500c8ecd06d9ffa3a86664a9246b4`). T-019 (Financial Statement Review) is merged to `main` as PR #105; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md). The T-018 documentation review and its open owner decisions otherwise stand.
 
-## T-019 result (2 November 2026)
+## T-020 result (2 November 2026)
 
-Windows, Electron 40.9.1, SQLite 3.53.0, Node.js 22.14.0/npm 10.9.2, synthetic data only.
+Windows, Node.js 24.12.0/npm 11.6.2, synthetic data only. Starting commit `cad1727eeb2500c8ecd06d9ffa3a86664a9246b4` (origin/main, unchanged since the earlier review).
+
+| Check | Baseline at start | After cleanup |
+| --- | --- | --- |
+| `npm run docs:check` | Failed: `ENOENT scandir tests` | Passed |
+| `node --test scripts/check-project-docs.test.mjs` | Failed (same cause) | Passed, 3/3 |
+| `npm run build` | Passed | Passed |
+| `npm run test:fsg` | 41/41 | 41/41 |
+| `node scripts/test-fsg-ui.cjs` (after build) | Failed, 35/37 (seed used `HEAD`'s schema, which no longer has the legacy tables) | 37/37 |
+| `node --test scripts/test-t003-authorization.cjs` | 26/26 | 26/26 |
+| `npm run test:native`, `npx vitest run src/lib` | not run at baseline | Passed; 8 files, 37 tests |
+| `npx tsc -p tsconfig.app.json --noEmit` | 76 diagnostics | 76 diagnostics (unchanged) |
+| `npm run lint` | 564 problems (492 errors, 72 warnings) | 546 problems (475 errors, 71 warnings) |
+
+Not established: application behaviour beyond the synthetic harnesses, packaged launch, installer, live Tally, owner UAT. Removals and retained candidates are listed in [SESSION_HANDOFF.md](SESSION_HANDOFF.md). The T-019 snapshot below is historical.
+
+## T-019 result (2 November 2026, historical; merged to `main` as PR #105)
+
+Windows, Electron 40.9.1, SQLite 3.53.0, Node.js 22.14.0/npm 10.9.2, synthetic data only. Developed on `work/developer-task` from `03d1a46f16b36da16d3821cee2e1c3280897a78c`.
 
 **Passed**
 - `npm run docs:check` (31 documents, links, inventory) and `node --test scripts/check-project-docs.test.mjs` (2/2).
@@ -76,7 +94,7 @@ Observation-only cases intentionally remain:
 - Evidence `locked`/`approval_stage` transition policy is still unresolved and not yet enforced by finalized business rules.
 - Export while logged out still succeeds to local downloads; export authorization policy remains unresolved.
 
-## Validation summary
+## Validation summary (T-003 time; historical, `test:classification` and `test:bulk-update` were removed in T-019)
 
 **Passed**
 
@@ -106,6 +124,8 @@ Observation-only cases intentionally remain:
 3. Long-term role mapping decisions for `viewer` and `user` remain open.
 4. TypeScript and lint baselines remain failing and must be triaged separately.
 5. Prototype feature gaps remain for Misstatements and Completion (T-007 scope continues separately).
+6. Dashboard, Audit Report setup and Data Integrity still read the old trial-balance tables, not Financial Statement Review data (T-021).
+7. Duplicate deferred-tax tools, placeholder actions and the duplicate `/feedback` route are unresolved (T-022, T-012).
 
 ## Documentation review result
 

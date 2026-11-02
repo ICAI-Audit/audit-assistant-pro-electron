@@ -16,17 +16,20 @@ These are recommended tasks derived from the review. They do not grant approval 
 | T-010 | P2 | Ready for verification | Target-platform installer and updater smoke evidence | T-002; release destination and signing decision |
 | T-012 | P2 | Ready for scoped correction | Resolve duplicate feedback route and document intended guard | Confirm route access policy |
 | T-011 | P3 | Scope decision required | AI and knowledge integration specification | T-004; provider, privacy and evaluation approval |
-| T-013 | P2 | Ready for investigation | Triage 114 existing TypeScript diagnostics across 28 files from `npx tsc -p tsconfig.app.json --noEmit`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
-| T-014 | P2 | Ready for investigation | Triage 515 lint errors and 101 warnings from `npm run lint`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
+| T-013 | P2 | Ready for investigation | Triage the 76 existing TypeScript diagnostics across 18 files (114 across 28 before T-019) from `npx tsc -p tsconfig.app.json --noEmit`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
+| T-014 | P2 | Ready for investigation | Triage 475 lint errors and 71 warnings (515/101 before T-019) from `npm run lint`; establish baseline and resolve in scoped changes | None; preserve T-002 install/toolchain fixes |
 | T-015 | P0 | Complete (scoped) | Implemented fail-closed backend checks for unauthenticated database/file IPC, engagement ownership enforcement, protected role-field checks, and unfiltered mutation denial with isolated regression evidence | Continue with T-016 policy decisions for remaining behavior |
 | T-016 | P1 | Product decision required | Approve admin/partner/manager/senior/staff/viewer policy, engagement assignment/listing semantics, bulk mutation limits, export access, and evidence approval/lock/reopen transitions | Product owner decisions; T-003 control matrix |
 | T-018 | P1 | Ready for owner review | Complete documentation baseline and consolidated owner review; no application fixes | Owner decisions and corrections |
 | T-017 | P2 | Ready for investigation | Add missing `engagement_tb_classification` and `ifc_clause_library` definitions to `sqlite/schema` with upgrade evidence; callers currently fail with missing-table errors | Backup/upgrade approach from T-009 |
-| T-019 | P1 | Implemented; owner confirmation and UAT pending | Replace Financial Review with Financial Statement Review (FSG_Bharat ported to SQLite). Synthetic integration (41/41) and UI (37/37) evidence; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md) | Owner answers to the listed assumptions; same-TB comparison with FSG_Bharat; owner UAT; not committed or merged |
+| T-019 | P1 | Merged to `main` (PR #105, `cad1727eeb2500c8ecd06d9ffa3a86664a9246b4`); owner confirmation and UAT pending | Replace Financial Review with Financial Statement Review (FSG_Bharat ported to SQLite). Synthetic integration (41/41) and UI (37/37) evidence; see [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md) | Owner answers to the listed assumptions; same-TB comparison with FSG_Bharat; owner UAT |
+| T-020 | P2 | Complete (scoped), awaiting owner review and merge | Remove files demonstrated unused after T-019, repair the documentation checker for a fresh checkout and correct current records. See [SESSION_HANDOFF.md](SESSION_HANDOFF.md) | None |
+| T-021 | P2 | Owner decision and design required | Reconnect the Dashboard, Audit Report setup and Data Integrity trial-balance readers to Financial Statement Review data. Affected: `useEngagementDashboardData` (reads `engagement_trial_balance_header/_lines`), `AuditReportSetup` via `useTrialBalance` (reads `trial_balance_lines`), `DataIntegrityPanel` (counts `trial_balance_lines`). Needs a mapping from FSG tables (`sqlite/schema/10_fsg_tables.sql`; entity = client, period = engagement financial year) to the fields those screens consume, sign and period rules, and a data-migration or dual-read decision. Do not drop the old tables first | Owner decision on source of truth; T-019 acceptance; T-009 backup approach |
+| T-022 | P3 | Findings recorded; owner decision required | Duplicate tools, placeholders and routes found during T-020, none changed: three deferred-tax implementations (`src/components/audit/DeferredTax.tsx` and `DeferredTaxCalculator.tsx`, both mounted in `AuditTools.tsx`, and the FSG module `src/modules/fsg/components/DeferredTax`); placeholder actions that only show a notice (`AuditTools.tsx` "Coming Soon" Excel import, GST portal authentication and file-processing toasts; "not yet implemented" email invitation and admin password reset in `BulkTeamImportDialog.tsx`, `PartnersTabContent.tsx`, `AdminDashboard.tsx` and `AdminSettings.tsx`; `ProcedureWorkpaper.tsx` stub); `/feedback` declared twice with different guards (see T-012). Decide which tool is canonical, which placeholders to build or hide, and the intended feedback guard before any consolidation | Owner decisions; T-012 for the route |
 
 ## Current activity and scope
 
-T-019 (2 November 2026) is the active implementation task: the explicit user request to replace Financial Review with the FSG_Bharat financial statement generator on SQLite. Its changes are uncommitted on `work/developer-task`. T-018 documentation review otherwise remains in place: review the assembled application document and consolidated decisions before selecting more code work.
+T-019 (2 November 2026) was merged to `main` as PR #105 (`cad1727eeb2500c8ecd06d9ffa3a86664a9246b4`); owner confirmation and UAT remain pending. T-020 is a scoped cleanup on `chore/remove-unused-code` from that commit. T-018 documentation review otherwise remains in place: review the assembled application document and consolidated decisions before selecting more code work.
 
 ## T-019 Financial Statement Review
 
@@ -45,7 +48,7 @@ Accept when:
 - a real-profile upgrade is rehearsed on a copy of an installed database;
 - the owner records UAT.
 
-Follow-ups (owner decision): GAP-17 (dashboard and Audit Report TB consumers); whether to port FSG_Bharat's PostgreSQL self-tests to SQLite; re-verify `npm ci` on Node 24.12 after the dependency additions.
+Follow-ups (owner decision): GAP-17 is now T-021 (dashboard and Audit Report TB consumers); whether to port FSG_Bharat's PostgreSQL self-tests to SQLite; re-verify `npm ci` on Node 24.12 after the dependency additions.
 
 ## T-001 Session continuity
 
