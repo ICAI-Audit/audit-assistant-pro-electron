@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { execFileSync } from "node:child_process";
 import { componentTagger } from "lovable-tagger";
 
 // Vite plugin to exclude SQLite from bundling
@@ -52,9 +53,27 @@ function xlsxJsStyleWithoutFs() {
   };
 }
 
+// Short commit and local-changes flag shown by BuildInfoLabel. Falls back to
+// "unknown" when git is unavailable (for example a source archive).
+function readBuildInfo() {
+  const git = (args: string[]) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  try {
+    const commit = git(['rev-parse', '--short', 'HEAD']);
+    const dirty = git(['status', '--porcelain', '--untracked-files=no']).length > 0;
+    return { commit, dirty };
+  } catch {
+    return { commit: 'unknown', dirty: false };
+  }
+}
+const buildInfo = readBuildInfo();
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   base: mode === "development" ? "/" : "./",
+  define: {
+    __BUILD_COMMIT__: JSON.stringify(buildInfo.commit),
+    __BUILD_DIRTY__: JSON.stringify(buildInfo.dirty),
+  },
   server: {
     host: "::",
     port: 8080,

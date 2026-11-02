@@ -1,3 +1,4 @@
+import { BuildInfoLabel } from '@/components/layout/BuildInfoLabel';
 import { useState, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -297,6 +298,7 @@ export default function Auth() {
           <p className="text-muted-foreground mt-2">
             Professional audit management for chartered accountants
           </p>
+          <BuildInfoLabel className="mt-3" />
         </div>
 
         {/* Auth Card */}

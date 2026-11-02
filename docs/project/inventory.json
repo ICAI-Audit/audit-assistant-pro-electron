@@ -368,6 +368,7 @@
     }
   ],
   "testFiles": [
+    "src/lib/buildInfoLabel.test.ts",
     "src/lib/taxAuditApplicability.test.ts",
     "src/lib/taxAuditDisclaimer.test.ts",
     "src/lib/taxAuditForm3CDExport.test.ts",
@@ -440,6 +441,7 @@
     "src/components/icons/PdfIcon.tsx",
     "src/components/icons/WordIcon.tsx",
     "src/components/layout/AppSidebar.tsx",
+    "src/components/layout/BuildInfoLabel.tsx",
     "src/components/layout/Header.tsx",
     "src/components/layout/MainLayout.tsx",
     "src/components/tax-audit/AuditProgrammePanel.tsx",
@@ -500,6 +502,7 @@
     "src/components/ui/toggle.tsx",
     "src/components/ui/tooltip.tsx",
     "src/components/ui/use-toast.ts",
+    "src/config/buildMessage.ts",
     "src/contexts/AuthContext.tsx",
     "src/contexts/EngagementContext.tsx",
     "src/contexts/TallyContext.tsx",
@@ -566,6 +569,7 @@
     "src/index.css",
     "src/integrations/sqlite/client.ts",
     "src/integrations/sqlite/hooks.ts",
+    "src/lib/buildInfoLabel.test.ts",
     "src/lib/formatters/currency.ts",
     "src/lib/fsgEngagementSummary.ts",
     "src/lib/taxAuditApplicability.test.ts",

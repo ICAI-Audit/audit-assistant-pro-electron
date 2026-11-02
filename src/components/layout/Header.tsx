@@ -1,3 +1,4 @@
+import { BuildInfoLabel } from '@/components/layout/BuildInfoLabel';
 import { Bell, Search, User, ChevronDown, LogOut, Settings, Check, Trash2, MessageSquare, FileText, Briefcase, ArrowLeftRight, Keyboard, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,9 +75,10 @@ export function Header() {
   const otherEngagements = engagements.filter(e => e.id !== currentEngagement?.id);
 
   return (
-    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-6">
+    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between gap-4 px-6">
       {/* Left: Current Engagement */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 min-w-0">
+        <BuildInfoLabel compact className="hidden md:block shrink-0 px-2 py-1 text-[11px] leading-tight" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2 text-foreground hover:bg-muted max-w-xs">
@@ -112,7 +114,7 @@ export function Header() {
                     <div className="flex flex-col">
                       <span className="font-medium">{engagement.client_name}</span>
                       <span className="text-xs text-muted-foreground">
-                        {engagement.name} • {engagement.financial_year}
+                        {engagement.name} â€¢ {engagement.financial_year}
                       </span>
                     </div>
                   </DropdownMenuItem>
@@ -142,7 +144,7 @@ export function Header() {
       {/* Right: Version, Updates & Actions */}
       <div className="flex items-center gap-3">
         {/* Version badge */}
-        <VersionBadge version={currentVersion || '—'} isBeta={isBeta} />
+        <VersionBadge version={currentVersion || 'â€”'} isBeta={isBeta} />
 
         {/* Manual update check button */}
         <Button
@@ -155,7 +157,7 @@ export function Header() {
         >
           <Download className="h-4 w-4" />
           <span className="hidden sm:inline">
-            {isCheckingForUpdates ? 'Checking…' : 'Check for updates'}
+            {isCheckingForUpdates ? 'Checkingâ€¦' : 'Check for updates'}
           </span>
         </Button>
 

@@ -10,6 +10,14 @@
 - Not merged and not released. CA Venugopal Gella reviews, tests and merges; no acceptance is recorded yet.
 - The previous handoff (T-019) is in git history at the base commit; its work is merged as PR #105.
 
+## Build-information label (after PR #106 merged at 7ef0bc3)
+
+- Branch eat/build-info-label from origin/main 7ef0bc3da3b4be33238724e797e52ac72bffa9d6. Not merged; no acceptance recorded.
+- Central message file: `src/config/buildMessage.ts` (`BUILD_MESSAGE.lines`, `updateNote` and optional `sourceBranch`). Edit it only there for each accepted merge; the login page (`src/pages/Auth.tsx`) and the common header (`src/components/layout/Header.tsx`, shown from the `md` breakpoint) both render it through `src/components/layout/BuildInfoLabel.tsx`.
+- The short commit ID and the "Local changes present" flag are injected at build time by `vite.config.ts` (`git rev-parse --short HEAD`; `git status --porcelain --untracked-files=no`; `unknown` if git is unavailable). In `npm run dev` they are fixed when the dev server starts. Untracked files do not set the flag.
+- The label shows static build facts only. There is no GitHub polling, updater or "latest code" claim. A local build here shows "Local changes present" because the preserved `package-lock.json` modification is tracked.
+- Revision 2: the label is a red 2px bordered, rounded, light box showing the two message lines and "Update: <updateNote>" (currently "Initial developer handover"). Change only `updateNote` in `src/config/buildMessage.ts` for each merge. The commit ID, optional source branch and "Local changes present" moved into a "Build details" hover tooltip (`buildDetailLines()` in the same file). Not verified visually in a running window; header fit at 64px height is untested.
+- Checks: `vitest src/lib` 41 passed (new `src/lib/buildInfoLabel.test.ts`: label text, commit, dirty flag, no "latest" claims, both screens use the shared component); `npm run build` passed and the bundle contains the message and `7ef0bc3`; `tsc` 76 diagnostics (unchanged baseline); eslint clean on the new files. Not verified: visual rendering in a running window.
 ## T-021 and T-012 (this session's change)
 
 - New read-only channel `fsg:engagement:summary` (`electron/fsg/engagement-summary.js`, registered in `electron/fsg/index.js` with the same engagement-access check as `fsg:context:open`; renderer client `src/lib/fsgEngagementSummary.ts`). Mapping, sign and amount rules are in [FINANCIAL_STATEMENT_REVIEW.md](FINANCIAL_STATEMENT_REVIEW.md#engagement-summary-for-dashboard-audit-report-setup-and-data-integrity-t-021).
