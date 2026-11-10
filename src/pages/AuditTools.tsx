@@ -16,6 +16,7 @@ import { useEngagement } from "@/contexts/EngagementContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTallyODBC } from "@/hooks/useTallyODBC";
 import { cn } from "@/lib/utils";
+import { formatGstinInput, getGstinValidationError } from "@/lib/gstinValidation";
 import { getSQLiteClient } from "@/integrations/sqlite/client";
 import { gstzenApi } from "@/services/gstzen-api";
 
@@ -2458,7 +2459,7 @@ const GSTTools = () => {
   };
 
   const handleAddGstin = async () => {
-    const normalized = gstinInput.trim().toUpperCase();
+    const normalized = formatGstinInput(gstinInput);
     const name = gstinName.trim();
 
     if (!clientId) {
@@ -2473,10 +2474,11 @@ const GSTTools = () => {
       toast({ title: "GSTIN required", description: "Enter a GST number to continue." });
       return;
     }
-    if (!/^[0-9A-Z]{15}$/.test(normalized)) {
+    const gstinValidationError = getGstinValidationError(normalized);
+    if (gstinValidationError) {
       toast({
         title: "Invalid GSTIN",
-        description: "GSTIN must be 15 characters (A-Z, 0-9).",
+        description: gstinValidationError,
         variant: "destructive",
       });
       return;
@@ -2564,7 +2566,7 @@ const GSTTools = () => {
 
   const startEditGstin = (gstinId: string, gstinValue: string) => {
     setEditingGstinId(gstinId);
-    setEditingGstinValue(gstinValue);
+    setEditingGstinValue(formatGstinInput(gstinValue));
   };
 
   const cancelEditGstin = () => {
@@ -2574,16 +2576,17 @@ const GSTTools = () => {
 
   const handleUpdateGstin = async () => {
     if (!clientId || !editingGstinId) return;
-    const normalized = editingGstinValue.trim().toUpperCase();
+    const normalized = formatGstinInput(editingGstinValue);
 
     if (!normalized) {
       toast({ title: "GSTIN required", description: "Enter a GST number to continue." });
       return;
     }
-    if (!/^[0-9A-Z]{15}$/.test(normalized)) {
+    const gstinValidationError = getGstinValidationError(normalized);
+    if (gstinValidationError) {
       toast({
         title: "Invalid GSTIN",
-        description: "GSTIN must be 15 characters (A-Z, 0-9).",
+        description: gstinValidationError,
         variant: "destructive",
       });
       return;
@@ -2736,7 +2739,7 @@ const GSTTools = () => {
                 <Input
                   id="gstin-input"
                   value={gstinInput}
-                  onChange={(e) => setGstinInput(e.target.value.toUpperCase())}
+                  onChange={(e) => setGstinInput(formatGstinInput(e.target.value))}
                   placeholder="Enter GSTIN (15 characters)"
                   maxLength={15}
                   className="font-mono"
@@ -2808,7 +2811,7 @@ const GSTTools = () => {
                         <div className="flex flex-col sm:flex-row gap-2">
                           <Input
                             value={editingGstinValue}
-                            onChange={(e) => setEditingGstinValue(e.target.value.toUpperCase())}
+                            onChange={(e) => setEditingGstinValue(formatGstinInput(e.target.value))}
                             maxLength={15}
                             className="font-mono"
                           />

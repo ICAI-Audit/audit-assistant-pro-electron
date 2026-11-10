@@ -27,6 +27,7 @@ import {
   TaxAuditStructuredTable,
   TaxAuditStructuredTableColumn,
 } from '@/data/taxAudit3CDFieldSchemas';
+import { formatGstinInput, getGstinValidationError } from '@/lib/gstinValidation';
 import { TaxAuditClauseResponse } from '@/types/taxAudit';
 
 type StructuredValue = string | number | boolean | null;
@@ -289,6 +290,16 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
             }
           }
         });
+
+        if (table.key === 'registrations' && schema.clauseKey === 'clause_4' && row.law === 'GST') {
+          const registrationNumber = typeof row.registration_number === 'string' ? row.registration_number : '';
+          if (!isBlank(registrationNumber)) {
+            const gstinError = getGstinValidationError(registrationNumber);
+            if (gstinError) {
+              warnings.push(`Row ${index + 1}: ${gstinError}`);
+            }
+          }
+        }
       });
     });
 
@@ -1759,12 +1770,18 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
   };
 
   const updateEditorField = (key: string, value: StructuredValue) => {
-    setRowEditor((current) => current ? { ...current, draft: { ...current.draft, [key]: value } } : current);
+    const nextValue =
+      (typeof value === 'string' && (key === 'registration_number' || key === 'gstin_or_branch_reference' || key === 'gstin' || key.includes('gstin'))) ? formatGstinInput(value) : value;
+    setRowEditor((current) => current ? { ...current, draft: { ...current.draft, [key]: nextValue } } : current);
   };
 
   const updateRow = async (tableKey: string, rowIndex: number, key: string, value: StructuredValue) => {
+    const sanitizedValue =
+      typeof value === 'string' && (key === 'registration_number' || key === 'gstin_or_branch_reference' || key === 'gstin' || key.includes('gstin'))
+        ? formatGstinInput(value)
+        : value;
     const rows = getRows(structured, tableKey);
-    const nextRows = rows.map((row, index) => (index === rowIndex ? { ...row, [key]: value } : row));
+    const nextRows = rows.map((row, index) => (index === rowIndex ? { ...row, [key]: sanitizedValue } : row));
     await persistStructured({ ...structured, [tableKey]: nextRows });
   };
 
@@ -1785,6 +1802,15 @@ export function StructuredClauseFields({ clause, schema, activeTableKey, disable
     if (!rowEditor) return;
     const table = tables.find((item) => item.key === rowEditor.tableKey);
     if (!table) return;
+
+    if (table.key === 'registrations' && rowEditor.draft.law === 'GST') {
+      const registrationNumber = typeof rowEditor.draft.registration_number === 'string' ? rowEditor.draft.registration_number : '';
+      const gstinError = getGstinValidationError(registrationNumber);
+      if (!isBlank(registrationNumber) && gstinError) {
+        return;
+      }
+    }
+
     const rows = getRows(structured, table.key);
     const nextRows =
       rowEditor.rowIndex === null
