@@ -1,5 +1,29 @@
 # Latest session handoff
 
+## T-024 CAAT Tools (11 November 2026)
+
+- Agent: Claude Code (desktop app). Approval source: the user's instructions of 11 November 2026 (review the tool first, then fix items 1, 3 and 6, save values in the database, ignore the disclaimer, leave limits to the user, embed on a new branch, do not push).
+- Validation environment: Windows, Node.js 24.12.0, npm 11.6.2, fresh `npm ci --no-audit --no-fund`.
+- Branch: `feature/caat-tools` from `main` at `26d3b9f`; committed locally, not pushed.
+- Changed paths: `public/caat/*`, `src/pages/CaatTools.tsx`, `src/App.tsx`, `src/components/layout/AppSidebar.tsx`, `sqlite/schema/11_caat_tables.sql`, `electron/main.cjs` (schema list), `electron/sqlite-authorization.cjs`, `scripts/test-caat-ui.cjs`, `package.json` (`test:caat-ui`), `docs/project/{CAAT_TOOLS,CURRENT_STATUS,NEXT_TASKS,FEATURE_REGISTER,DATA_MODEL,SESSION_HANDOFF}.md` and the refreshed inventory.
+- Completed: see [CAAT_TOOLS.md](CAAT_TOOLS.md) for the review findings, the changes made to the owner's file and how saving works.
+
+### Exact checks and outcomes
+
+- `npm run build`: passed (existing chunk-size warnings).
+- `node scripts/test-caat-ui.cjs`: passed, 29/29.
+- `node --test scripts/test-t003-authorization.cjs`: passed, 26/26.
+- `node scripts/test-fsg-ui.cjs`: passed, 37/37.
+- `npx vitest run src/lib`: passed, 10 files / 45 tests.
+- `npx eslint src/pages/CaatTools.tsx public/caat/caat-bridge.js`: passed.
+- `npx tsc -p tsconfig.app.json --noEmit`: failed, 76 diagnostics, the recorded baseline; none in the new files.
+- `npm run docs:inventory`: passed (32 routes, 11 schema files, 10 test files); diff adds the CAAT route and schema file only.
+- `npm run docs:check`: passed (31 required documents, local links, adapters and inventory).
+
+### First next step
+
+Owner UAT: open an engagement, CAAT Tools, load a real (authorised) ledger, run the tests and a sample, enter audited values, close and reopen VERA and confirm everything returns.
+
 ## T-023 GSTIN merge and startup label (11 November 2026)
 
 - Agent: Copilot SDK in VS Code. Approval source: the user's request to pull/merge PR #108 and update the starting label.

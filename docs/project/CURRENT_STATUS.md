@@ -1,5 +1,14 @@
 # Current status
 
+## T-024 CAAT Tools (11 November 2026)
+
+- User-authorized outcome: review the owner's tested `CAAT_Tools2.html`, then embed it in VERA on a new local branch (`feature/caat-tools`, not pushed) with the owner-approved fixes and per-engagement saving. See [CAAT_TOOLS.md](CAAT_TOOLS.md).
+- Added `/caat-tools` (sidebar: CAAT Tools), `public/caat` (tool, SheetJS 0.20.3, bridge), `src/pages/CaatTools.tsx`, `sqlite/schema/11_caat_tables.sql` (`caat_workspaces`, `caat_source_files`, engagement-scoped in `electron/sqlite-authorization.cjs`), `scripts/test-caat-ui.cjs` and `npm run test:caat-ui`.
+- Changes to the tool: large-ledger `Math.max(...)` crash fixed, SheetJS 0.18.5 replaced with 0.20.3, sampling evaluation wording corrected; disclaimer left unchanged at the owner's instruction.
+- Passed: `node scripts/test-caat-ui.cjs` 29/29; `node --test scripts/test-t003-authorization.cjs` 26/26; `node scripts/test-fsg-ui.cjs` 37/37; `npx vitest run src/lib` 10 files / 45 tests; eslint on the new files; `npm run build`.
+- Failed (unchanged baseline): `npx tsc -p tsconfig.app.json --noEmit`, 76 diagnostics, none in the new files.
+- Not established: owner UAT with real ledgers, packaged installer, review of the statutory defaults. Tests used throw-away profiles with synthetic data.
+
 ## T-023 GSTIN merge and startup label (11 November 2026)
 
 - User-authorized outcome: pull PR #108 and identify that code update on startup.

@@ -24,6 +24,7 @@ Generated from src/App.tsx by npm run docs:inventory. This maps route declaratio
 | /audit-trail | AuditTrail | ProtectedEngagementRoute |
 | /completion | Completion | ProtectedEngagementRoute |
 | /audit-tools | AuditTools | ProtectedRoute |
+| /caat-tools | CaatTools | ProtectedEngagementRoute |
 | /tax-audit | TaxAudit | ProtectedEngagementRoute |
 | /audit-report | AuditReport | ProtectedEngagementRoute |
 | /feedback | Feedback | ProtectedEngagementRoute |
