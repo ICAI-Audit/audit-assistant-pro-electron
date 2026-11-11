@@ -369,6 +369,7 @@
   ],
   "testFiles": [
     "src/lib/buildInfoLabel.test.ts",
+    "src/lib/gstinValidation.test.ts",
     "src/lib/taxAuditApplicability.test.ts",
     "src/lib/taxAuditDisclaimer.test.ts",
     "src/lib/taxAuditForm3CDExport.test.ts",
@@ -572,6 +573,8 @@
     "src/lib/buildInfoLabel.test.ts",
     "src/lib/formatters/currency.ts",
     "src/lib/fsgEngagementSummary.ts",
+    "src/lib/gstinValidation.test.ts",
+    "src/lib/gstinValidation.ts",
     "src/lib/taxAuditApplicability.test.ts",
     "src/lib/taxAuditApplicability.ts",
     "src/lib/taxAuditComplianceTracker.ts",
