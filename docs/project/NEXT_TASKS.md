@@ -29,6 +29,8 @@ These are recommended tasks derived from the review. They do not grant approval 
 
 ## Current activity and scope
 
+T-023 (11 November 2026, explicit user request): complete (scoped). PR #108 was already merged at `f4d5597`; local `main` was fast-forwarded and the central startup/header label updated to identify the GSTIN change and its date. Regression tests and build passed; the existing 76 TypeScript diagnostics remain. See [current status](CURRENT_STATUS.md#t-023-gstin-merge-and-startup-label-11-november-2026) and [handoff](SESSION_HANDOFF.md#t-023-gstin-merge-and-startup-label-11-november-2026). Next: restart the desktop app from the updated source and verify the label, build tooltip and GST input/save flows with synthetic data. No owner UAT or installer acceptance is claimed.
+
 T-019 (2 November 2026) was merged to `main` as PR #105 (`cad1727eeb2500c8ecd06d9ffa3a86664a9246b4`); owner confirmation and UAT remain pending. T-020 is a scoped cleanup on `chore/remove-unused-code` from that commit. T-018 documentation review otherwise remains in place: review the assembled application document and consolidated decisions before selecting more code work.
 
 ## T-019 Financial Statement Review

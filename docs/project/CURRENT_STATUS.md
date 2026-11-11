@@ -1,5 +1,15 @@
 # Current status
 
+## T-023 GSTIN merge and startup label (11 November 2026)
+
+- User-authorized outcome: pull PR #108 and identify that code update on startup.
+- PR #108 was already merged by the owner at `f4d559742e8bf969a0c49125156c65b5c09345d6`; its GitHub `documentation` check passed. PR #107 (shared build label) was also already merged. Local `main` was fast-forwarded to `origin/main`, retaining the existing lockfile modification and untracked documentation packs.
+- The shared login/header label now reads `Code baseline: 11 November 2026` and `Update: GSTIN normalization and validation (PR #108)`. The tooltip identifies `main` and the build-time commit; it does not poll GitHub or certify that an installed build is current.
+- Passed: `npx --no-install vitest run src\lib` (10 files, 45 tests, including GSTIN validation and five label tests); `npx --no-install eslint src\config\buildMessage.ts src\lib\buildInfoLabel.test.ts`; `npm run build`.
+- Failed: `npx --no-install tsc -p tsconfig.app.json --noEmit` (76 diagnostics in the same 18 files listed in the prior baseline, none in the label changes).
+- `npm run docs:inventory` regenerated the inventory and screen map with no substantive diff. Documentation closeout results and remaining verification limits are in [SESSION_HANDOFF.md](SESSION_HANDOFF.md#t-023-gstin-merge-and-startup-label-11-november-2026).
+- Not established: GST screen persistence/UAT, Electron visual fit, installer or release. The attempted production browser preview could not render because the application requires Electron; its temporary server was stopped. No client database was accessed or migrated.
+
 ## Snapshot
 
 - Documentation review date: 30 October 2026.

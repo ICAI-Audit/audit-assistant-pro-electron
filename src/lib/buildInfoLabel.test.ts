@@ -28,6 +28,13 @@ describe('build information label', () => {
     expect(html).not.toMatch(/latest|up to date|new commits/i);
   });
 
+  it('identifies the merged GSTIN update on the startup label', () => {
+    expect(html).toContain('Code baseline: 11 November 2026');
+    expect(html).toContain('Update: GSTIN normalization and validation (PR #108)');
+    expect(html).not.toContain('Initial developer handover');
+    expect(buildDetailLines()).toContain('Source branch: main');
+  });
+
   it('is the only source of the text for both the login page and the header', () => {
     for (const file of ['src/pages/Auth.tsx', 'src/components/layout/Header.tsx']) {
       const source = readFileSync(file, 'utf8');

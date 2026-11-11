@@ -15,6 +15,10 @@ See the [complete module coverage](MODULE_COVERAGE_MATRIX.md) and [detailed spec
 
 All rows below have runtime verification pending unless stated otherwise. Evidence paths are navigational pointers. For a changed feature, add its detailed contract using the task template, test evidence and owner acceptance.
 
+## T-023 update (11 November 2026)
+
+PR #108 is merged: shared GSTIN normalization/validation is used by GST master/bulk entry and tax-audit registration rows; appointment-letter GSTIN entry and draft restore normalize uppercase. Related features: F-005, F-019 and F-023. Helper tests pass; this is not end-to-end persistence or statutory acceptance evidence. The F-001 login page and common header share the updated build label (`src/config/buildMessage.ts`, `src/components/layout/BuildInfoLabel.tsx`): `Code baseline: 11 November 2026`, `Update: GSTIN normalization and validation (PR #108)`, with source branch and build-time commit in the tooltip. Five label tests pass, including the exact displayed update and both mounting points. Desktop visual fit and owner UAT remain open. See [current validation](CURRENT_STATUS.md#t-023-gstin-merge-and-startup-label-11-november-2026).
+
 | ID | Capability and user purpose | Implementation evidence | Status and next verification |
 | --- | --- | --- | --- |
 | F-001 | Local account creation and sign-in | src/pages/Auth.tsx; src/contexts/AuthContext.tsx; electron/main.cjs | Code present; verify first admin, staff, inactive account, incorrect password and restart. Remembered email is not a remembered authenticated session |

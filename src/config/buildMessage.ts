@@ -5,10 +5,10 @@
 export const BUILD_MESSAGE = {
   lines: [
     'Welcome to ICAI Audit Tool',
-    'Developer handover baseline: 2 November 2026',
+    'Code baseline: 11 November 2026',
   ],
-  updateNote: 'Initial developer handover',
-  sourceBranch: '' as string,
+  updateNote: 'GSTIN normalization and validation (PR #108)',
+  sourceBranch: 'main' as string,
 };
 
 // Static build facts only. The commit and the local-changes flag are fixed at build

@@ -1,6 +1,35 @@
 # Latest session handoff
 
-## Session identity
+## T-023 GSTIN merge and startup label (11 November 2026)
+
+- Agent: Copilot SDK in VS Code. Approval source: the user's request to pull/merge PR #108 and update the starting label.
+- Validation environment: Windows, Node.js 24.12.0, npm 11.6.2; existing dependencies were used without reinstalling.
+- Requested outcome: synchronize the merged GSTIN work and identify the code users are running, without a false live "latest" claim.
+- Features: F-001 (login label), shared application header, F-005/F-019/F-023 (merged GSTIN entry changes). Workflow files used: `workflows/session-continuity.md`, `workflows/feature-change.md`, and `TESTING.md`, after the required project startup records.
+- Starting branch/commit: `feat/build-info-label`, `140d224`. PR #107 was already merged. PR #108 was already merged by the owner at `f4d559742e8bf969a0c49125156c65b5c09345d6`, with its GitHub `documentation` check successful.
+- Current branch: `main`, fast-forwarded to source/base `f4d559742e8bf969a0c49125156c65b5c09345d6`. Publication target: `origin/main`. Resolve the label commit with `git rev-parse HEAD` and compare `origin/main` after publishing.
+- Changed paths in this follow-up: `src/config/buildMessage.ts`, `src/lib/buildInfoLabel.test.ts`, and `docs/project/{CURRENT_STATUS,NEXT_TASKS,FEATURE_REGISTER,SESSION_HANDOFF}.md`. Inventory refresh produced no substantive changes.
+- Completed: central label now displays `Code baseline: 11 November 2026` and `Update: GSTIN normalization and validation (PR #108)` on login and in the common header. Tooltip source branch is `main`; existing build-time commit and dirty-state injection is preserved. No GST algorithm, financial/legal rule, IPC handler or database migration was changed in this follow-up.
+
+### Exact checks and outcomes
+
+- `npx --no-install vitest run src\lib`: passed, 10 files / 45 tests (including three GSTIN validation tests and five shared-label tests).
+- `npx --no-install eslint src\config\buildMessage.ts src\lib\buildInfoLabel.test.ts`: passed.
+- `npm run build`: passed (4144 modules). Warnings: old Browserslist data, mixed static/dynamic imports and large chunks; none blocks the build.
+- `npx --no-install tsc -p tsconfig.app.json --noEmit`: failed, 76 diagnostics in the same 18 files as the recorded baseline; none in this follow-up's source/test files. Not suppressed or repaired.
+- `npm run docs:inventory`: passed (31 routes, 10 schema files, 10 test files); reviewed inventory/screen-map diff, no substantive change.
+- Browser verification attempt: `npm run preview -- --host 127.0.0.1 --port 4179 --strictPort` served the production app, but `/auth` raised `Electron API not available. This app must run in Electron.` No browser-rendered label result is claimed; the temporary preview process was stopped.
+- `npm run docs:check`: passed (31 required documents, local links, adapters and inventory).
+- `node --test scripts\check-project-docs.test.mjs`: passed, 3/3.
+- Production bundle inspection: both exact label strings occur in the built main renderer asset.
+
+### Preserved work, limits and next step
+
+- Preserved and excluded from this commit: pre-existing modified `package-lock.json`, untracked `ICAI-VERA-Context-Pack/` and `ICAI-VERA-Documentation-Review/`. No stash was applied. No client data was read or modified.
+- Skipped/not established: full repository lint (targeted lint passed), Electron visual fit and tooltip interaction, GST screen save/reopen, real-profile upgrade, installer, release and owner UAT. Existing TypeScript/lint backlog and unrelated product/security gaps remain open.
+- First executable next step: run `npm run electron:dev` from updated `main`; verify the login/header update and tooltip, then exercise GST normalization and invalid-checksum rejection using synthetic data. Restart an already running dev server because commit metadata is injected at startup. Existing packaged installations require a separate rebuilt/released installer to receive the change.
+
+## Earlier session identity (2 November 2026, historical)
 
 - Date: 2 November 2026.
 - Agent: Copilot SDK in VS Code.
