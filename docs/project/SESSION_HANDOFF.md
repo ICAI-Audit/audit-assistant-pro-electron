@@ -10,6 +10,18 @@
 - Not merged and not released. CA Venugopal Gella reviews, tests and merges; no acceptance is recorded yet.
 - The previous handoff (T-019) is in git history at the base commit; its work is merged as PR #105.
 
+## Current session: GSTIN validation and uppercase normalization (11 November 2026)
+
+- Selected task ID: GSTIN validation and UI normalization across all GST-related entry points; no separate project feature ID was assigned in the current repo workflow.
+- Requested outcome: keep the checksum/structure validation in the shared GSTIN validator, enforce it wherever GST numbers are entered or saved, and ensure every GSTIN input auto-normalizes to uppercase before save or as soon as the user types it.
+- Validation approach: reuse the shared GSTIN validator already used in the GST number master and bulk GSTIN add flow, apply the same normalization at input and save boundaries across the main GST entry points, and record terminal execution limits separately from the focused fix.
+- Updated implementation: `src/lib/gstinValidation.ts` now exports `formatGstinInput()` and keeps the required checksum wording; `src/components/tax-audit/StructuredClauseFields.tsx` normalizes and blocks invalid GST registrations when `law === 'GST'` and `registration_number` is entered; `src/pages/AuditTools.tsx` and `src/components/gstin/AddGstinDialog.tsx` now uppercase on input and before validation/save; `src/components/appointment/Letters.tsx` also normalizes the GSTIN field immediately while typing and on draft restore.
+- Exact checks run in this session:
+  - Workspace diagnostics on all changed files: `No errors found` for `src/lib/gstinValidation.ts`, `src/components/gstin/AddGstinDialog.tsx`, `src/pages/AuditTools.tsx`, `src/components/tax-audit/StructuredClauseFields.tsx`, and `src/components/appointment/Letters.tsx`.
+  - Attempted terminal verification: the shell in this environment returned immediate exit-code errors with no useful output for direct commands such as `echo hi`, `cmd /c ...`, and `npm exec ...`, so no repo-level terminal test result is claimable from this session.
+- Remaining failures / gaps in this session: the terminal-based `npm run docs:check` and `npx vitest run src/lib/gstinValidation.test.ts` checks could not be completed because the terminal execution environment is failing before command output is produced. The repo-wide `tsc` and `lint` baselines remain unchanged outside this scope and were not re-run here.
+- Next executable step: run `npm run docs:check`, then `npx vitest run src/lib/gstinValidation.test.ts` (or `npx vitest run src/lib`), and finally re-check the repo-wide `tsc` and `lint` baselines in a working terminal before merging.
+
 ## Build-information label (after PR #106 merged at 7ef0bc3)
 
 - Branch eat/build-info-label from origin/main 7ef0bc3da3b4be33238724e797e52ac72bffa9d6. Not merged; no acceptance recorded.
