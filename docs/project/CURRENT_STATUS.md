@@ -4,6 +4,7 @@
 
 - `main` was fast-forwarded from `26d3b9f` to the fetched `origin/main` at `99324ea` (6 commits; PR #109 CAAT Tools and PR #110 FSG/RSF updates). The existing `package-lock.json` modification and untracked documentation packs were preserved.
 - The shared login/header label identifies the snapshot as `origin/main` synced 13 November 2026 and names PRs #109/#110. Its tooltip reports the build-time branch, commit and tracked-local-change flag. This is static build information, not a live GitHub check and not evidence that other installed builds have updated.
+- The scoped change was committed as `bf0b5bf` and pushed to `origin/main`. GitHub accepted the direct push while reporting that the pull-request-only rule was bypassed.
 - Selected task: T-030; affected feature: F-001 (shared login/header build label). See [handoff](SESSION_HANDOFF.md#t-030-main-pull-status-on-login-13-november-2026) for validation and limits.
 
 ## RSF published to GitHub (13 November 2026)

@@ -2,7 +2,7 @@
 
 ## F-001 startup build label update (13 November 2026)
 
-After fast-forwarding local `main` to `origin/main` at `99324ea`, the shared login/header label identifies the pulled snapshot date and PR #109 CAAT Tools / PR #110 FSG and RSF updates. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests pass; desktop visual fit and owner UAT are not established. See [T-030 status](CURRENT_STATUS.md#t-030-main-pull-status-on-login-13-november-2026).
+After fast-forwarding local `main` to `origin/main` at `99324ea`, the shared login/header label identifies the pulled snapshot date and PR #109 CAAT Tools / PR #110 FSG and RSF updates. Published on `origin/main` in `bf0b5bf`. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests pass; desktop visual fit and owner UAT are not established. See [T-030 status](CURRENT_STATUS.md#t-030-main-pull-status-on-login-13-november-2026).
 
 F-007/F-009, 13 November 2026: owner confirmed the reviewed T-023 through T-028 source commit on RSF after typecheck-debt disclosure. No further feature changes or UAT acceptance; known gaps remain. Full scope and validation: [RSF review](RSF_PRE_COMMIT_REVIEW.md).
 
