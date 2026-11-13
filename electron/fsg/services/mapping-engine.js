@@ -556,11 +556,15 @@ export async function runMappingEngine(tbId, rsId, constitution, { excludeZero =
     }
 
     if (!m1Hit) {
-      // Fallback: use "Uncategorised {ALIE}" as Level 1
+      // Known ALIE with no Map1 match: a terminal Level 1 fallback. Use the
+      // constitution's master caption/id, without inventing Level 2/3 heads.
       if (result.alie) {
-        result.mapping1_resultant = `Uncategorised ${result.alie}`
-        result.mapping2_resultant = `Uncategorised ${result.alie}`
-        result.mapping3_resultant = `Uncategorised ${result.alie}`
+        const caption = result.alie === 'EQUITY AND LIABILITIES' ? 'Uncategorised Equity and Liabilities'
+          : result.alie === 'ASSETS' ? 'Uncategorised Assets' : `Uncategorised ${result.alie}`
+        const fallback = lf.find(r => r.alie === result.alie && (r.level1 || '').trim().toLowerCase() === caption.toLowerCase()
+          && !r.level2 && !r.level3 && !r.level4 && !r.level5 && !r.level6 && !r.level7)
+        result.mapping1_resultant = fallback?.level1 || caption
+        result.level_format_id = fallback?.id || null
         result.status = 'auto_low'; result.confidence = 'low'
       } else {
         result.status = 'unmapped'; result.confidence = 'none'

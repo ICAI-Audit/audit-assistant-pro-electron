@@ -1,3 +1,4 @@
+import { statementDates, statementColumnLabels } from '../../utils/statementDates'
 import React, { useState, useEffect } from 'react'
 import { useFinancials, fmtINR } from '../../hooks/useFinancials'
 import { useEps } from '../../hooks/useEps'
@@ -8,6 +9,7 @@ import RemarkCell, { useRemarks } from '../shared/RemarkCell'
 import { FormatRefButton, SCHEDULE3_SECTIONS } from '../shared/FormatReference'
 import { computeNonCorpPLLayout } from '../../utils/plStructureNonCorp'
 import { fixFilterWith } from '../../utils/fixTargets'
+import MissingAlieWarning from '../shared/MissingAlieWarning'
 import { EXPENSE_LINES, corpFaceTail, TAX_SECTION_RX } from '../../utils/plStructureCorp'
 import { fsgApi } from '../../api.js'
 
@@ -323,13 +325,12 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
     fsgApi?.listManualFaceLines(tbId, 'tax-expense-noncorp').then(rows => setManualTaxLines(rows || [])).catch(() => setManualTaxLines([]))
   }, [isNonCorp1, tbId, manualTaxTick])
   const nonCorpLayout = isNonCorp1 && data ? computeNonCorpPLLayout(data, entity?.constitution_display, manualTaxLines) : null
-  const period = activeTB?.period || ''
+  const period = statementDates(activeTB).cy
   const subtitle = period ? `for the year ended ${period}` : ''
   // Previous Year not required for this Financial Year (PYModeSelect) - see BS/index.jsx.
   const pyOff = !!data?.pyMode && data.pyMode !== 'required'
   const pyOffTitle = 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).'
-  const cyLabel = 'Current Year'
-  const pyLabel = 'Previous Year'
+  const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB, 'pl')
 
   const incSections = data?.incomeSections || []
   const expSections = data?.expenseSections || []
@@ -410,6 +411,7 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                 <p className="text-xs text-gray-400 mt-0.5">(Amount in ₹)</p>
               </div>
 
+              <MissingAlieWarning report={data.missingAlie} onFix={openFix} tbId={activeTB?.id} />
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b-2 border-blue-800">
@@ -643,6 +645,7 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                 </tbody>
               </table>
 
+              <MissingAlieWarning report={data.missingAlie} position="bottom" />
               {/* Key metrics */}
               {(() => {
                 const kmIncome = isNonCorp1 && nonCorpLayout ? nonCorpLayout.totalIncome : totalIncomeCY

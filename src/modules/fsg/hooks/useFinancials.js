@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { withCurrentTitleDeedsText } from '../utils/generalNoteText'
 import { resolveConsolidationSelection } from '../utils/consolidationSelection'
 import { fsgApi } from '../api.js'
+import { attachInvestmentDetails } from '../utils/investmentStore.js'
+import { attachMissingAlie } from '../utils/missingAlieStore.js'
 // Schedule III presentation order for company (constitution=3) note numbering,
 // so a note's number matches where its line appears on the face of the BS.
 // bsStructure.js has no imports of its own — no circular dependency.
@@ -812,7 +814,7 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
     }
     if (!a) {
       a = row.is_deemed_positive ? 'ASSETS' : 'EQUITY AND LIABILITIES'
-      const label = a === 'ASSETS' ? 'Uncategorised Assets' : 'Uncategorised Liabilities'
+      const label = a === 'ASSETS' ? 'Uncategorised Assets' : 'Uncategorised Equity and Liabilities'
       // ALIE was never determined for this row, so any level1/mapping1_resultant
       // already sitting on it is orphaned — computed by some earlier mapping
       // stage without a confirmed ALIE behind it (e.g. a Level-1 caption
@@ -822,7 +824,7 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
       // label instead of falling back to whatever was already on the row.
       row = { ...row, alie: a, level1: label, mapping1_resultant: label }
     } else if ((a === 'ASSETS' || a === 'EQUITY AND LIABILITIES') && !row.level1) {
-      const label = a === 'ASSETS' ? 'Uncategorised Assets' : 'Uncategorised Liabilities'
+      const label = a === 'ASSETS' ? 'Uncategorised Assets' : 'Uncategorised Equity and Liabilities'
       row = { ...row, level1: label, mapping1_resultant: row.mapping1_resultant || label }
     }
     if (!byAlie[a]) byAlie[a] = []
@@ -1516,7 +1518,7 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
 
   reconcilePrevTotals(incomeSections, 'Income', 'Other Income')
   reconcilePrevTotals(expenseSections, 'Expenses', 'Other Expenses')
-  reconcilePrevTotals(elSections, 'EQUITY AND LIABILITIES', 'Uncategorised Liabilities')
+  reconcilePrevTotals(elSections, 'EQUITY AND LIABILITIES', 'Uncategorised Equity and Liabilities')
   reconcilePrevTotals(assetSections, 'ASSETS', 'Uncategorised Assets')
 
   // ── Calculate Net Profit and inject into Reserves & Surplus note ──────────
@@ -3258,7 +3260,9 @@ export async function fetchFinancialsData(activeTB, prevTB, entity = null, activ
     applyManualPyOverrides(processed, !prevMap && manualPyEnabled, manualPyEntries)
     if (parseInt(entity?.constitution) === 3) computeEpsData(processed, ndList, epsOverrides)
     processed.generalNotes = refreshRatiosInNote(processed.generalNotes, processed)
-    return processed
+    processed.investmentPreviousRows = pyRows.length ? pyRows : (pyOff ? [] : null)
+    await attachMissingAlie(processed, activeTB, prevTB)
+    return attachInvestmentDetails(processed, activeTB)
   }
 
   const fetchCY = fsgApi?.getFinancialData(activeTB.id)
@@ -3343,7 +3347,9 @@ export async function fetchFinancialsData(activeTB, prevTB, entity = null, activ
   // The Financial Ratios table in General Notes, as of these figures — so the
   // PDF / Excel never print ratios from when the note was first created.
   processed.generalNotes = refreshRatiosInNote(processed.generalNotes, processed)
-  return processed
+  processed.investmentPreviousRows = pyRows.length ? pyRows : (pyOff ? [] : null)
+  await attachMissingAlie(processed, activeTB, prevTB)
+  return attachInvestmentDetails(processed, activeTB)
 }
 
 export function useFinancials(activeTB, prevTB, entity = null, activeRsId = null) {
@@ -3417,7 +3423,7 @@ export function useConsolidatedFinancials(entity, activeRsId, entityPeriodId = n
     const fetchCfsC = (entity.id && entityPeriodId) ? Promise.resolve(fsgApi?.getCfs?.(entity.id, entityPeriodId)).catch(() => null) : Promise.resolve(null)
 
     Promise.all([fetchCY, fetchLF, fetchND, fetchDep, fetchDepIT, fetchDepComp, fetchManualPyEnabled, fetchManualPyEntries, fetchPlClosedToCapital, fetchEps, fetchGN, fetchCfsC])
-      .then(([cyBoth, lfRows, ndList, depData, depITData, depCompData, manualPyEnabled, manualPyEntries, plClosedToCapital, epsOverrides, generalNotesRaw, cfsSavedC]) => {
+      .then(async ([cyBoth, lfRows, ndList, depData, depITData, depCompData, manualPyEnabled, manualPyEntries, plClosedToCapital, epsOverrides, generalNotesRaw, cfsSavedC]) => {
         ;({ depITData, depCompData } = consolidatedDepFromNoteDetails(ndList))   // entity-level schedules
         const cyRows = cyBoth.cur
         const cyGuard = ignoreForeignLevel2(cyRows, lfRows)
@@ -3471,6 +3477,9 @@ export function useConsolidatedFinancials(entity, activeRsId, entityPeriodId = n
         applyManualPyOverrides(processed, !prevMap && manualPyEnabled, manualPyEntries)
         if (parseInt(entity?.constitution) === 3) computeEpsData(processed, ndList, epsOverrides)
         processed.generalNotes = refreshRatiosInNote(processed.generalNotes, processed)
+        processed.investmentPreviousRows = pyRows.length ? pyRows : null
+        await attachMissingAlie(processed, { id: '__consolidated__', entity_id: entity.id, entity_period_id: entityPeriodId })
+        await attachInvestmentDetails(processed, { id: '__consolidated__', entity_period_id: entityPeriodId })
         setData(processed)
       })
       .catch(err => setError(err?.message || 'Failed to load consolidated financial data.'))
