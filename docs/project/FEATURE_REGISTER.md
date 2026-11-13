@@ -85,6 +85,7 @@ PR #108 is merged: shared GSTIN normalization/validation is used by GST master/b
 | F-026 | Backup and restore of the complete audit file | Database/file/localStorage stores identified in architecture | Not established; define consistent backup, restoration and failure recovery before claiming recoverability |
 | F-027 | AI grounded guidance and anomaly detection | Supplied AI blueprint; no verified provider and RAG execution path in reviewed runtime | Not established; scope decision and evaluation needed before implementation |
 | F-028 | Shared session knowledge and repeatable workflows | AGENTS.md; CLAUDE.md; .github/copilot-instructions.md; docs/project | Documentation implemented in this change; structural checks recorded in CURRENT_STATUS.md; actual IDE loading requires per-client smoke test |
+| F-029 | CAAT Tools: data analytics tests and SA 530 sampling (T-024) | src/pages/CaatTools.tsx; public/caat; sqlite/schema/11_caat_tables.sql | Owner-tested tool embedded with per-engagement saving; automated verified with synthetic data (`npm run test:caat-ui` 29/29, including restore after restart and a 150,000-row ledger); owner UAT with real ledgers pending. See [CAAT_TOOLS.md](CAAT_TOOLS.md) |
 
 ## Coverage limits
 

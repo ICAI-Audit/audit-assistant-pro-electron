@@ -26,6 +26,7 @@
     "test:native": "electron scripts/smoke-native-modules.cjs",
     "test:fsg": "electron scripts/test-fsg-integration.mjs",
     "test:fsg-ui": "npm run build && node scripts/test-fsg-ui.cjs",
+    "test:caat-ui": "npm run build && node scripts/test-caat-ui.cjs",
     "test:t003-authorization": "npm run build && node --test scripts/test-t003-authorization.cjs",
     "docs:check": "node scripts/check-project-docs.mjs",
     "docs:inventory": "node scripts/check-project-docs.mjs --refresh-inventory"

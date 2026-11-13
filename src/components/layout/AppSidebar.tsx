@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Wrench,
+  ScanSearch,
   Briefcase,
   Shield,
   FileText,
@@ -54,6 +55,7 @@ const navItems: SidebarItem[] = [
   { name: 'Review Notes', href: '/review-notes', icon: MessageSquare, requiresEngagement: true },
   { name: 'Evidence Vault', href: '/evidence', icon: FileCheck, requiresEngagement: true },
   { name: 'VERA Tools', href: '/audit-tools', icon: Wrench, requiresEngagement: true },
+  { name: 'CAAT Tools', href: '/caat-tools', icon: ScanSearch, requiresEngagement: true },
   { name: 'Feedback', href: '/feedback', icon: MessageSquare, requiresEngagement: true },
 ];
 

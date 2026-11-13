@@ -108,6 +108,11 @@
       "guard": "ProtectedRoute"
     },
     {
+      "path": "/caat-tools",
+      "component": "CaatTools",
+      "guard": "ProtectedEngagementRoute"
+    },
+    {
       "path": "/tax-audit",
       "component": "TaxAudit",
       "guard": "ProtectedEngagementRoute"
@@ -323,6 +328,13 @@
         "tb_adjustment_log",
         "tb_rows",
         "trial_balances"
+      ]
+    },
+    {
+      "path": "sqlite/schema/11_caat_tables.sql",
+      "declaredTables": [
+        "caat_source_files",
+        "caat_workspaces"
       ]
     }
   ],
@@ -748,6 +760,7 @@
     "src/pages/AuditTools.tsx",
     "src/pages/AuditTrail.tsx",
     "src/pages/Auth.tsx",
+    "src/pages/CaatTools.tsx",
     "src/pages/Completion.tsx",
     "src/pages/ComplianceApplicability.tsx",
     "src/pages/Dashboard.tsx",
@@ -859,6 +872,7 @@
     "sqlite/schema/07_rule_engine_tables.sql",
     "sqlite/schema/08_template_system_tables.sql",
     "sqlite/schema/09_tax_audit_tables.sql",
-    "sqlite/schema/10_fsg_tables.sql"
+    "sqlite/schema/10_fsg_tables.sql",
+    "sqlite/schema/11_caat_tables.sql"
   ]
 }

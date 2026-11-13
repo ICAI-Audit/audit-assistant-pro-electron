@@ -49,6 +49,8 @@ const ENGAGEMENT_TABLES = new Set([
   'engagement_trial_balance_header',
   'engagement_trial_balance_lines',
   'engagement_tb_classification',
+  'caat_workspaces',
+  'caat_source_files',
 ]);
 
 const MANAGER_DELETE_TABLES = new Set([

@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CAAT Tools</title>
+<script src="xlsx-0.20.3.core.min.js"></script>
+<style>
+:root{--blue:#0066CC;--blue-l:#e8f1fb;--green:#00A651;--green-l:#e6f6ec;--amber:#b7791f;--amber-l:#fdf3e1;--red:#c53030;--red-l:#fdecec;
+--ink:#1f2933;--mut:#616e7c;--line:#e4e7eb;--bg:#f5f7fa;--card:#fff;--sh:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04)}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
+.logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--green));display:grid;place-items:center;color:#fff;font-size:15px}
+.brand small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.eng{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.eng input{width:170px}
+.wrap{display:flex;min-height:calc(100vh - 57px)}
+nav{width:236px;background:#fff;border-right:1px solid var(--line);padding:12px 8px;flex-shrink:0}
+nav .sec{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);padding:12px 12px 4px}
+nav a{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:7px;color:var(--ink);text-decoration:none;cursor:pointer;font-size:13.5px}
+nav a:hover{background:var(--bg)}
+nav a.on{background:var(--blue-l);color:var(--blue);font-weight:600}
+nav a .n{width:20px;height:20px;border-radius:5px;background:var(--bg);display:grid;place-items:center;font-size:11px;color:var(--mut);flex-shrink:0}
+nav a.on .n{background:var(--blue);color:#fff}
+nav a .dot{margin-left:auto;font-size:11px;border-radius:9px;padding:0 7px;background:var(--bg);color:var(--mut)}
+nav a .dot.warn{background:var(--amber-l);color:var(--amber)}
+nav a .dot.ok{background:var(--green-l);color:var(--green)}
+main{flex:1;padding:20px 24px;min-width:0}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--mut);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);padding:16px 18px;margin-bottom:16px}
+.card h3{margin:0 0 10px;font-size:14.5px}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut);min-width:160px}
+input,select,textarea{font:inherit;font-size:13px;padding:6px 9px;border:1px solid #cbd2d9;border-radius:6px;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--blue-l);border-color:var(--blue)}
+.btn{font:inherit;font-size:13px;padding:7px 14px;border-radius:6px;border:1px solid #cbd2d9;background:#fff;cursor:pointer;color:var(--ink);white-space:nowrap}
+.btn:hover{background:var(--bg)}
+.btn.p{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.p:hover{background:#0057ad}
+.btn.g{background:var(--green);border-color:var(--green);color:#fff}
+.btn.sm{padding:3px 9px;font-size:12px}
+.drop{border:2px dashed #b8c4d0;border-radius:10px;padding:26px;text-align:center;color:var(--mut);cursor:pointer;background:#fafbfc}
+.drop.hv{border-color:var(--blue);background:var(--blue-l)}
+.drop b{color:var(--ink)}
+.chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12px;background:var(--bg);color:var(--mut)}
+.chip.ok{background:var(--green-l);color:#08783e}
+.chip.warn{background:var(--amber-l);color:var(--amber)}
+.chip.bad{background:var(--red-l);color:var(--red)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;box-shadow:var(--sh)}
+.kpi .l{font-size:12px;color:var(--mut)}
+.kpi .v{font-size:19px;font-weight:650;margin-top:2px;word-break:break-word}
+.kpi.warn{border-left:4px solid var(--amber)}
+.kpi.ok{border-left:4px solid var(--green)}
+.kpi.bad{border-left:4px solid var(--red)}
+.tw{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;background:#fff}
+th{position:sticky;top:0;background:#f0f3f7;text-align:left;font-weight:600;padding:7px 9px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none}
+th.r,td.r{text-align:right}
+td{padding:6px 9px;border-bottom:1px solid #f0f2f5;white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis}
+tr.ck{cursor:pointer}
+tr.ck:hover td{background:#f5f9ff}
+tr.sel td{background:#e8f1fb}
+.tbar{display:flex;gap:8px;align-items:center;margin:4px 0 8px;flex-wrap:wrap}
+.tbar h4{margin:0;font-size:13.5px;margin-right:auto}
+.tbar input{width:200px}
+.muted{color:var(--mut);font-size:12.5px}
+.help{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px}
+.help b{color:var(--ink)}
+.help p{margin:4px 0}
+.err{background:var(--red-l);color:var(--red);padding:10px 14px;border-radius:8px;margin-bottom:12px}
+.note{background:var(--amber-l);color:#7a5212;padding:9px 14px;border-radius:8px;margin-bottom:12px;font-size:13px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 16px}
+.cols{display:flex;flex-wrap:wrap;gap:6px 14px;max-height:150px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:6px;background:#fafbfc}
+.cols label{font-size:12.5px;display:flex;gap:5px;align-items:center}
+.dash{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.dash .kpi{cursor:pointer}
+.dash .kpi:hover{border-color:var(--blue)}
+.chart{overflow-x:auto}
+.toast{position:fixed;bottom:20px;right:20px;background:#1f2933;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
+.toast.on{opacity:1}
+footer{color:var(--mut);font-size:12px;padding:8px 0 20px}
+@media(max-width:820px){.wrap{flex-direction:column}nav{width:auto;display:flex;flex-wrap:wrap;gap:2px}nav .sec{width:100%}.eng{margin-left:0}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">∑</div><div>CAAT Tools<small>Data analytics tests for audit · Prototype v0.6</small></div></div>
+  <div class="eng">
+    <input id="eEnt" placeholder="Entity / client name">
+    <input id="ePer" placeholder="Period (e.g. FY 2025-26)">
+    <input id="ePrep" placeholder="Prepared by">
+    <button class="btn g" id="bExport">Export working papers (.xlsx)</button>
+  </div>
+</header>
+<div class="wrap">
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============ Utilities ============ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>(n==null||n===''||isNaN(n))?'':Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0=n=>(n==null||isNaN(n))?'':Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
+const pct=x=>(x==null||isNaN(x))?'':(x*100).toFixed(2)+'%';
+const dmy=s=>s?s.slice(8,10)+'-'+s.slice(5,7)+'-'+s.slice(0,4):'';
+const sumBy=(a,f)=>a.reduce((s,x)=>s+(f(x)||0),0);
+function groupBy(arr,f){const m=new Map();for(const x of arr){const k=f(x);let g=m.get(k);if(!g){g=[];m.set(k,g)}g.push(x)}return m}
+function quant(sorted,q){const p=(sorted.length-1)*q,b=Math.floor(p),r=p-b;return sorted[b+1]!==undefined?sorted[b]+r*(sorted[b+1]-sorted[b]):sorted[b]}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2600)}
+async function sha256(buf){try{const h=await crypto.subtle.digest('SHA-256',buf);return[...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('')}catch(e){return 'not available in this browser'}}
+const byAmtDesc=(a,b)=>Math.abs(b._amt)-Math.abs(a._amt);
+
+const DISCLAIMER='CAAT Tools is an independent prototype provided “as is” to assist with data analysis. It is not issued, approved or endorsed by any professional or regulatory body. Its results are indicators only: they are not audit evidence or an opinion by themselves. The auditor remains solely responsible for the procedures performed, the judgements made and the conclusions reached under the applicable Standards on Auditing, and should verify every parameter, threshold, statutory limit and sample size before relying on it. No responsibility or liability is accepted for any loss arising from the use of this tool or its results.';
+/* ============ Parsing ============ */
+const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+const yr=y=>{y=+y;return y<100?(y<50?2000+y:1900+y):y};
+function iso(y,m,d){if(!(m>=1&&m<=12&&d>=1&&d<=31&&y>1900&&y<2200))return '';return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')}
+function parseDate(v){
+  if(v==null||v==='')return '';
+  if(v instanceof Date&&!isNaN(v))return iso(v.getFullYear(),v.getMonth()+1,v.getDate());
+  if(typeof v==='number'){if(v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return iso(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate())}return ''}
+  const s=String(v).trim();let m;
+  if((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/)))return iso(+m[1],+m[2],+m[3]);
+  if((m=s.match(/^(\d{1,2})[-\/. ](\d{1,2})[-\/. ](\d{2,4})\b/))){let a=+m[1],b=+m[2];const f=S.dateFmt==='auto'?(S._dfAuto||'dmy'):S.dateFmt;if(f==='mdy')[a,b]=[b,a];return iso(yr(m[3]),b,a)} // day-first unless told otherwise
+  if((m=s.match(/^(\d{1,2})[-\/. ]([A-Za-z]{3,9})[-\/. ,]*(\d{2,4})/))){const mo=MON[m[2].toLowerCase().slice(0,3)];if(mo)return iso(yr(m[3]),mo,+m[1])}
+  if(/^\d{5}(\.\d+)?$/.test(s))return parseDate(+s);
+  return '';
+}
+function parseAmount(v){
+  if(typeof v==='number')return isFinite(v)?v:null;
+  if(v==null)return null;
+  let s=String(v).trim();if(!s)return null;
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1)}
+  if(S.numFmt==='eu')s=s.replace(/\./g,'').replace(/,/g,'.');
+  if(/cr\.?$/i.test(s)&&S.crNeg)neg=!neg;
+  s=s.replace(/(dr|cr)\.?$/i,'').replace(/rs\.?|inr|₹|,|\s/gi,'');
+  if(s.endsWith('-')){neg=!neg;s=s.slice(0,-1)}
+  if(!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s))return null;
+  const n=parseFloat(s);return neg?-n:n;
+}
+
+/* ============ State ============ */
+const S={fileName:'',hash:'',sheet:'',files:[],parts:[],delim:'auto',headerRow:1,headerRows:1,headers:[],headersPre:[],raw:[],rows:[],
+  opt:{skipTotals:true,totalWords:'total, grand total, sub total, subtotal, opening balance, closing balance, carried over, carried forward, brought forward, c/f, b/f',skipRepHdr:true,fill:[],unpivot:[],unpivotName:'Period',srcCol:true},
+  amtMode:'single',splitPos:'dr',map:{amount:'',credit:'',drcr:'',party:'',date:'',doc:'',vtype:'',cat:'',desc:'',gstin:'',pan:'',user:''},drcrNeg:'cr',dateFmt:'auto',numFmt:'in',filters:[],
+  abs:false,crNeg:false,mapped:false,log:{},view:'data',params:{},results:{},err:{}};
+const MAPF=[['amount','Amount',''],['credit','Credit amount',''],['drcr','Dr / Cr column',''],
+ ['party','Party / Vendor / Ledger','Needed for RSF, Single transactions and party-wise tests.'],
+ ['date','Date',''],['doc','Voucher / Invoice No.','Needed for the sequence gap test.'],['vtype','Voucher type','e.g. Payment, Journal, Sales. Useful for row filters.'],
+ ['cat','Category / Expense head',''],['desc','Narration / Description',''],
+ ['gstin','GSTIN','For the GSTIN / PAN format check.'],['pan','PAN','For the GSTIN / PAN format check.'],['user','Entered by / User','Who posted the entry, if the export has it.']];
+const GUESS_PRI={amount:[/^(invoice|bill|net|gross|total|txn|transaction)?\s*(amount|amt)\.?$/i,/invoice value|bill value|total value|gross value|net value|voucher amount/i,/amount|amt/i,/debit|\bdr\b|total|net|gross|value|taxable/i],
+  doc:[/voucher|vch/i,/invoice ?no|inv\.? ?no|bill ?no|doc(ument)? ?no|entry ?no/i,/ref|number|\bno\b/i]};
+const GUESS_EXC={amount:/date|balance|\bgst\b|cgst|sgst|igst|cess|tax amount|tds|discount|rate|qty|quantity|%|\bno\b|number/i,doc:/type|date/i,party:/date|amount|gstin|\bpan\b|\bno\.?$|number|invoice|\bcode\b|\bid$|type|group|head|category/i};
+const GUESS={amount:/amount|amt|value|debit|\bdr\b|total|net|gross|taxable/i,credit:/credit|\bcr\b/i,drcr:/^(dr\s*\/\s*cr|cr\s*\/\s*dr|drcr|d\s*\/\s*c|dc|debit\s*\/\s*credit|dr or cr|sign)$/i,
+  party:/party|vendor|supplier|customer|ledger|name|account|payee|beneficiary|remitter|particulars/i,date:/date|\bdt\b/i,doc:/voucher|vch|invoice|inv\.? ?no|doc|bill|ref|number|\bno\b/i,
+  vtype:/vch\.? ?type|voucher ?type|doc(ument)? ?type|txn ?type|transaction ?type|entry ?type/i,user:/user|entered ?by|created ?by|posted ?by|maker/i,
+  cat:/head|category|group|type|nature|gl/i,desc:/narration|desc|remark|memo/i,gstin:/gstin|gst ?no|gst ?number|gst ?reg|gst ?id/i,pan:/\bpan\b|pan ?no|pan ?number/i};
+
+/* ============ Load files ============ */
+function sniffDelim(t){const lines=t.split(/\r?\n/).filter(l=>l.trim()).slice(0,20);let best=',',bs=-1;
+  for(const d of [',',';','\t','|']){const c=lines.map(l=>l.split(d).length-1);const mn=Math.min(...c);const sc=mn>0?mn*10-(Math.max(...c)-mn):0;if(sc>bs){bs=sc;best=d}}return best}
+function parseDelimited(t,d){const out=[];let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"'&&f==='')q=true;else if(c===d){row.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);out.push(row);row=[];f=''}else f+=c}
+  if(f!==''||row.length){row.push(f);out.push(row)}return out}
+function guessHeaderRow(aoa){let best=0,bi=0;for(let i=0;i<Math.min(25,aoa.length);i++){const c=(aoa[i]||[]).filter(x=>typeof x==='string'&&x.trim()&&parseAmount(x)==null&&!parseDate(x)).length;if(c>best){best=c;bi=i}}return bi+1}
+function csvParts(f){const d=S.delim==='auto'?sniffDelim(f.text):S.delim;return[{file:f.name,sheet:'(text)',label:f.name,aoa:parseDelimited(f.text,d),off:0,on:true,fid:f.id,delimUsed:d}]}
+async function addFiles(list){
+  const first=!S.parts.length;
+  for(const f of list){try{
+    const buf=await f.arrayBuffer(),hash=await sha256(buf),id=Math.random().toString(36).slice(2,8);
+    if(/\.(csv|txt|tsv)$/i.test(f.name)){const text=new TextDecoder('utf-8').decode(buf).replace(/^﻿/,'');const fo={id,name:f.name,hash,kind:'csv',text};S.files.push(fo);S.parts.push(...csvParts(fo))}
+    else{const wb=XLSX.read(buf,{type:'array'});S.files.push({id,name:f.name,hash,kind:'xlsx'});
+      wb.SheetNames.forEach((sn,i)=>{const ws=wb.Sheets[sn];if(!ws['!ref'])return;S.parts.push({file:f.name,sheet:sn,label:f.name+' › '+sn,aoa:XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true,blankrows:true}),off:XLSX.utils.decode_range(ws['!ref']).s.r,on:i===0,fid:id})})}
+    toast('Loaded '+f.name)}catch(e){S.err.data='Could not read '+f.name+': '+e.message}}
+  if(first&&S.parts.length)S.headerRow=guessHeaderRow(S.parts[0].aoa);
+  buildRows(first)}
+function reparseCsv(){S.parts=S.parts.flatMap(p=>{const f=S.files.find(x=>x.id===p.fid);return f&&f.kind==='csv'?csvParts(f).map(n=>Object.assign(n,{on:p.on})):[p]})}
+function hdrNames(aoa){const hr=S.headerRow-1,top=(aoa[hr]||[]).map(x=>String(x??'').trim());if(S.headerRows!==2)return top;
+  const bot=(aoa[hr+1]||[]).map(x=>String(x??'').trim()),w=Math.max(top.length,bot.length),h=[];let last='';
+  for(let j=0;j<w;j++){let t=top[j]||'';if(t)last=t;else if(bot[j])t=last;h.push([t,bot[j]||''].filter(Boolean).join(' ').trim())}return h}
+function buildRows(guess){
+  const parts=S.parts.filter(p=>p.on),multi=parts.length>1,log={read:0,blank:0,hdr:0,tot:0,filled:0,unpiv:0};
+  const words=String(S.opt.totalWords||'').split(',').map(w=>w.trim().toLowerCase()).filter(Boolean);
+  const order=[],seenH=new Set(),all=[],start=S.headerRow+S.headerRows-1;
+  for(const p of parts){const aoa=p.aoa,raw=hdrNames(aoa);
+    const width=Math.max(raw.length,...aoa.slice(start,start+300).map(r=>r.length),0);const seen={},names=[];
+    for(let j=0;j<width;j++){let n=raw[j]||('Column '+(j+1));if(seen[n]){seen[n]++;n+=' ('+seen[n]+')'}else seen[n]=1;names.push(n);if(!seenH.has(n)){seenH.add(n);order.push(n)}}
+    const hl=names.map(n=>n.toLowerCase()),prev={};
+    for(let i=start;i<aoa.length;i++){const a=aoa[i]||[];log.read++;
+      if(!a.some(x=>x!==''&&x!=null)){log.blank++;continue}
+      if(S.opt.skipRepHdr){const ne=a.map((x,j)=>[String(x??'').trim().toLowerCase(),j]).filter(([x])=>x);if(ne.length>=2&&ne.filter(([x,j])=>x===hl[j]).length>=Math.ceil(ne.length*0.6)){log.hdr++;continue}}
+      if(S.opt.skipTotals&&words.length){const fst=a.filter(x=>String(x??'').trim()!=='').slice(0,3).map(x=>String(x).trim().toLowerCase());
+        if(fst.some(t=>parseAmount(t)==null&&words.some(w=>t===w||t.startsWith(w+' ')||t.startsWith(w+':')||t.startsWith(w+'.')||t.startsWith(w+'-')))){log.tot++;continue}}
+      const o={_xr:p.off+i+1,_src:p.label};
+      names.forEach((k,j)=>{let v=a[j]??'';if(S.opt.fill.includes(k)){if(v===''||v==null){if(prev[k]!==undefined&&prev[k]!==''){v=prev[k];log.filled++}}else prev[k]=v}o[k]=v});
+      all.push(o)}}
+  let headers=order.slice();if(multi&&S.opt.srcCol){headers.push('Source');all.forEach(o=>o.Source=o._src)}
+  S.headersPre=headers.slice();
+  const up=S.opt.unpivot.filter(c=>headers.includes(c));let rows=all;
+  if(up.length){const keep=headers.filter(h=>!up.includes(h)),nm=S.opt.unpivotName||'Period';rows=[];
+    for(const o of all)for(const c of up){const v=o[c];if(v===''||v==null)continue;const n={_xr:o._xr,_src:o._src};keep.forEach(k=>n[k]=o[k]);n[nm]=c;n.Value=v;rows.push(n);log.unpiv++}
+    headers=[...keep,nm,'Value']}
+  rows.forEach((o,i)=>o._r=i+1);
+  S.headers=headers;S.raw=rows;S.log=log;S.multi=multi;
+  S.fileName=[...new Set(parts.map(p=>p.file))].join(' + ');S.sheet=parts.map(p=>p.sheet).join(', ');S.hash=S.files.filter(f=>parts.some(p=>p.fid===f.id)).map(f=>f.name+': '+f.hash).join(' | ');
+  for(const k in S.map)if(S.map[k]&&!headers.includes(S.map[k]))S.map[k]='';
+  if(guess){const used=new Set();for(const k in S.map)S.map[k]='';
+    for(const k of ['gstin','pan','drcr','vtype','user','date','doc','amount','credit','party','cat','desc']){let hit='';
+      for(const pat of (GUESS_PRI[k]||[GUESS[k]])){hit=headers.find(x=>!used.has(x)&&pat.test(x)&&!(GUESS_EXC[k]&&GUESS_EXC[k].test(x)));if(hit)break}
+      S.map[k]=hit||'';if(hit)used.add(hit)}
+    if(S.map.credit&&!/debit|\bdr\b/i.test(S.map.amount))S.map.credit='';
+    if(up.length&&!S.map.amount)S.map.amount='Value';
+    S.amtMode=S.map.credit?'split':S.map.drcr?'ind':'single'}
+  S.mapped=false;S.results={};S.samp=null;S._byR=null;render()}
+function passFilters(o){for(const f of S.filters){if(!f.col)continue;const raw=o[f.col],v=String(raw??'').trim().toLowerCase(),vals=String(f.val||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);let ok=true;
+  switch(f.op){case 'eq':ok=vals.includes(v);break;case 'neq':ok=!vals.includes(v);break;case 'has':ok=vals.some(x=>v.includes(x));break;case 'nhas':ok=!vals.some(x=>v.includes(x));break;
+    case 'blank':ok=v==='';break;case 'nblank':ok=v!=='';break;case 'gte':{const a=parseAmount(raw),b=parseAmount(f.val);ok=a!=null&&b!=null&&a>=b;break}case 'lte':{const a=parseAmount(raw),b=parseAmount(f.val);ok=a!=null&&b!=null&&a<=b;break}}
+  if(!ok)return false}return true}
+function detectDF(){let a=0,b=0;const c=S.map.date;if(c)for(const o of S.raw){const m=String(o[c]??'').trim().match(/^(\d{1,2})[-\/. ](\d{1,2})[-\/. ](\d{2,4})\b/);if(m){if(+m[1]>12)a++;if(+m[2]>12)b++}}
+  S._dfAuto=b>a?'mdy':'dmy';S._dfEvid=[a,b];return S._dfAuto}
+function deriveRow(o){const m=S.map;let a=parseAmount(o[m.amount]);
+  if(S.amtMode==='split'){const c=m.credit?parseAmount(o[m.credit]):null;a=(a==null&&c==null)?null:(a||0)-(c||0);if(a!=null&&S.splitPos==='cr')a=-a}
+  if(S.amtMode==='ind'&&m.drcr&&a!=null){const ind=String(o[m.drcr]??'').trim().toLowerCase();a=Math.abs(a);if(S.drcrNeg==='cr'&&/^c/.test(ind))a=-a;if(S.drcrNeg==='dr'&&/^d/.test(ind))a=-a}
+  o._sAmt=a;o._amt=(a!=null&&S.abs)?Math.abs(a):a;const t=k=>m[k]?String(o[m[k]]??'').trim():'';
+  o._party=t('party');o._date=m.date?parseDate(o[m.date]):'';o._doc=t('doc');o._vtype=t('vtype');o._cat=t('cat');o._desc=t('desc');o._user=t('user');
+  o._gstin=m.gstin?String(o[m.gstin]??'').toUpperCase().replace(/[\s-]/g,''):'';o._pan=m.pan?String(o[m.pan]??'').toUpperCase().replace(/\s/g,''):'';return o}
+function applyMap(){
+  detectDF();
+  const mm=S.map;if(!mm.amount){S.err.data=S.amtMode==='split'?'Please choose the Debit amount column.':'Please choose the Amount column.';render();return}
+  if(S.amtMode==='split'&&!mm.credit){S.err.data='Please choose the Credit amount column, or pick "One amount column" if there is none.';render();return}
+  if(S.amtMode==='ind'&&!mm.drcr){S.err.data='Please choose the Dr / Cr column, or pick "One amount column" if there is none.';render();return}
+  let filt=0;const rows=[];for(const o of S.raw){deriveRow(o);if(!passFilters(o)){filt++;continue}rows.push(o)}
+  if(!rows.length){S.err.data='No rows are left after the row filters. Check the filters.';render();return}
+  S.rows=rows;S.log.filtered=filt;S.mapped=true;S.results={};S.samp=null;S._byR=null;S.err.data='';S.view='overview';render();toast('Mapping applied to '+fmt0(S.rows.length)+' rows')}
+const valid=()=>S.rows.filter(r=>r._amt!=null);
+function dataLogLines(){const L=S.log||{},parts=S.parts.filter(p=>p.on);const lines=[['Files and sheets combined',parts.map(p=>p.label).join('; ')],['Header row',S.headerRow+(S.headerRows===2?' (two header rows merged)':'')]];
+  lines.push(['Rows read',L.read],['Removed — blank rows',L.blank],['Removed — repeated header rows',L.hdr],['Removed — total / opening / closing rows',L.tot+(S.opt.skipTotals?' (keywords: '+S.opt.totalWords+')':'')],['Blank cells filled down',L.filled+(S.opt.fill.length?' ('+S.opt.fill.join(', ')+')':'')]);
+  if(S.opt.unpivot.length)lines.push(['Columns turned into rows',S.opt.unpivot.join(', ')+' → '+L.unpiv+' rows']);
+  lines.push(['Date format used',S.dateFmt==='auto'?(S._dfAuto==='mdy'?'Month / Day / Year (detected)':'Day / Month / Year (detected or assumed)'):DFMT[S.dateFmt]],['Row filters',S.filters.filter(f=>f.col).map(f=>f.col+' '+FOPS[f.op]+(['blank','nblank'].includes(f.op)?'':' '+f.val)).join('; ')||'None'],['Removed by row filters',L.filtered||0],['Number format',S.numFmt==='eu'?'1.234,56 (comma decimal)':'1,23,456.78 (Indian / international)']);
+  return lines}
+const FOPS={eq:'is any of',neq:'is none of',has:'contains any of',nhas:'contains none of',blank:'is blank',nblank:'is not blank',gte:'is at least',lte:'is at most'};
+const DFMT={auto:'Automatic — detected from the whole column',dmy:'Day / Month / Year',mdy:'Month / Day / Year',ymd:'Year / Month / Day'};
+
+/* ============ Mapping profiles ============ */
+function profGet(){try{return JSON.parse(localStorage.getItem('caat_profiles')||'{}')}catch(e){return{}}}
+function profSet(o){try{localStorage.setItem('caat_profiles',JSON.stringify(o));return true}catch(e){return false}}
+function profSnap(){return JSON.parse(JSON.stringify({amtMode:S.amtMode,splitPos:S.splitPos,headerRow:S.headerRow,headerRows:S.headerRows,delim:S.delim,opt:S.opt,map:S.map,drcrNeg:S.drcrNeg,dateFmt:S.dateFmt,numFmt:S.numFmt,filters:S.filters,abs:S.abs,crNeg:S.crNeg}))}
+function profApply(pr){if(!pr)return;Object.assign(S,{amtMode:pr.amtMode||(pr.map&&pr.map.credit?'split':pr.map&&pr.map.drcr?'ind':'single'),splitPos:pr.splitPos||'dr',headerRow:pr.headerRow||1,headerRows:pr.headerRows||1,drcrNeg:pr.drcrNeg||'cr',dateFmt:pr.dateFmt||'auto',numFmt:pr.numFmt||'in',filters:pr.filters||[],abs:!!pr.abs,crNeg:!!pr.crNeg});
+  S.opt=Object.assign({},S.opt,pr.opt||{});if(pr.delim&&pr.delim!==S.delim){S.delim=pr.delim;reparseCsv()}
+  buildRows(false);const miss=[];for(const k in S.map){const v=(pr.map||{})[k]||'';if(v&&!S.headers.includes(v))miss.push(v);S.map[k]=v&&S.headers.includes(v)?v:''}
+  if(miss.length)S.err.data='Profile applied. These columns were not found in this file: '+miss.join(', ')+'. Map them by hand.';else S.err.data='';render();toast('Profile applied')}
+
+/* ============ Data view ============ */
+function viewData(){
+  detectDF();const m=S.map;const F=(l,inner,w)=>`<label class="f" ${w?`style="min-width:${w}px"`:''}>${esc(l)}${inner}</label>`;
+  const cb=(id,on,l)=>`<label class="f" style="flex-direction:row;gap:7px;align-items:center;color:var(--ink);min-width:0"><input type="checkbox" id="${id}" ${on?'checked':''}>${l}</label>`;
+  let h=`<h1>Data &amp; Mapping</h1><p class="sub">Load one or more CSV or Excel files. The tool can combine monthly files or sheets, skip report totals and repeated headers, fill down blank cells, turn month-wise columns into rows, read Dr/Cr columns, and remember your settings as a profile. Nothing is uploaded anywhere.</p>`;
+  h+=`<div class="note"><b>Disclaimer.</b> ${esc(DISCLAIMER)}</div>`;
+  if(S.err.data)h+=`<div class="${/^Profile applied/.test(S.err.data)?'note':'err'}">${esc(S.err.data)}</div>`;
+  h+=`<div class="card"><h3>1. Files</h3><div class="drop" id="drop"><b>Drop one or more files here</b> or click to choose<br><span class="muted">.xlsx, .xls, .csv, .txt, .tsv · files or sheets with the same columns (for example 12 monthly ledgers) are combined into one population</span><input type="file" id="fi" multiple accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv" hidden></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="bDemo">Load demo data (synthetic expense payments)</button>${S.files.length?'<button class="btn" id="bClr">Remove all files</button>':''}
+    ${S.files.some(f=>f.kind==='csv')?F('Separator in text files',`<select id="sDelim">${[['auto','Detect automatically'],[',','Comma ,'],[';','Semicolon ;'],['\t','Tab'],['|','Pipe |']].map(([v,l])=>`<option value="${esc(v)}" ${S.delim===v?'selected':''}>${l}</option>`).join('')}</select>`):''}</div>`;
+  if(S.parts.length)h+=`<div class="tw" style="margin-top:12px;max-height:220px"><table><thead><tr><th>Use</th><th>File</th><th>Sheet</th><th class="r">Rows in sheet</th></tr></thead><tbody>${S.parts.map((p,i)=>`<tr><td><input type="checkbox" data-part="${i}" ${p.on?'checked':''}></td><td>${esc(p.file)}</td><td>${esc(p.sheet)}${p.delimUsed?' <span class="chip">separator '+(p.delimUsed==='\t'?'tab':esc(p.delimUsed))+'</span>':''}</td><td class="r">${fmt0(p.aoa.length)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="muted" style="margin-top:6px">Tick every sheet or file to combine. Columns are matched by heading name; a "Source" column records where each row came from.</div>`;
+  h+=`</div>`;
+  if(!S.parts.length){h+=footer();$('#main').innerHTML=h;bindData();return}
+  const p0=S.parts.find(p=>p.on)||S.parts[0],hr0=S.headerRow-1,hr1=hr0+S.headerRows-1;
+  h+=`<div class="card"><h3>2. Layout — where the headings are</h3><div class="row">${F('Heading row number',`<input type="number" id="sHdr" min="1" value="${S.headerRow}" style="width:100px">`)}
+    ${F('Heading rows',`<select id="sHdrN"><option value="1" ${S.headerRows===1?'selected':''}>One row</option><option value="2" ${S.headerRows===2?'selected':''}>Two rows (e.g. "Amount" over "Debit | Credit")</option></select>`)}
+    <span class="muted" style="padding-bottom:7px">Raw view of <b>${esc(p0.label)}</b> — heading row${S.headerRows===2?'s':''} highlighted. Click a row number to make it the heading row.</span></div>
+    <div class="tw" style="margin-top:10px;max-height:300px"><table><tbody>${p0.aoa.slice(0,Math.max(15,hr1+4)).map((r,i)=>`<tr style="${i>=hr0&&i<=hr1?'background:#e7f1fb;font-weight:600':''}"><td class="r" data-hr="${i+1}" style="cursor:pointer;color:var(--blue);width:40px">${p0.off+i+1}</td>${(r.length?r:['']).slice(0,20).map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  const L=S.log||{};
+  h+=`<div class="card"><h3>3. Clean-up rules</h3><div class="row" style="align-items:center">${cb('oTot',S.opt.skipTotals,'Skip total, sub-total, opening and closing balance rows — rows whose first cells start with:')}<input id="oWords" value="${esc(S.opt.totalWords)}" style="flex:1;min-width:300px"></div>
+    <div class="row" style="margin-top:8px">${cb('oRep',S.opt.skipRepHdr,'Skip heading rows repeated inside the data (page breaks in printed reports)')}${S.multi?cb('oSrc',S.opt.srcCol,'Add a "Source" column showing the file and sheet'):''}</div>
+    <div class="muted" style="margin:12px 0 4px"><b>Fill down blank cells</b> — for reports where the date, voucher number or party appears only on the first line of each voucher (Tally Day Book, SAP line items):</div>
+    <div class="cols">${S.headersPre.filter(x=>x!=='Source').map(x=>`<label><input type="checkbox" data-fill="${esc(x)}" ${S.opt.fill.includes(x)?'checked':''}>${esc(x)}</label>`).join('')}</div>
+    <div class="muted" style="margin:12px 0 4px"><b>Turn columns into rows</b> — for layouts with one column per month or per period (trial balance by month, budget sheets). Tick those columns; each becomes a row with a "${esc(S.opt.unpivotName)}" column and a "Value" column.</div>
+    <div class="cols">${S.headersPre.filter(x=>x!=='Source').map(x=>`<label><input type="checkbox" data-unp="${esc(x)}" ${S.opt.unpivot.includes(x)?'checked':''}>${esc(x)}</label>`).join('')}</div>
+    ${S.opt.unpivot.length?`<div class="row" style="margin-top:8px">${F('Name for the new column',`<input id="oUnpN" value="${esc(S.opt.unpivotName)}" style="width:160px">`)}</div>`:''}
+    <div class="help" style="margin:12px 0 0"><b>Result:</b> ${fmt0(L.read)} rows read · removed ${fmt0(L.blank)} blank, ${fmt0(L.hdr)} repeated headings, ${fmt0(L.tot)} total/balance rows · ${fmt0(L.filled)} blank cells filled down${S.opt.unpivot.length?' · '+fmt0(L.unpiv)+' rows created from columns':''} → <b>${fmt0(S.raw.length)} rows</b>, ${S.headers.length} columns.</div></div>`;
+  const colSel=(k,ph)=>`<select data-m="${k}"><option value="">${ph||'— choose —'}</option>${S.headers.map(x=>`<option ${m[k]===x?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
+  const am=S.amtMode,amOpt=(v,t,d)=>`<div class="opt ${am===v?'on':''}" data-am="${v}"><div class="ot">${t}</div><div class="od">${d}</div></div>`;
+  h+=`<style>.opt{border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;background:#fff;flex:1 1 220px}.opt:hover{border-color:#9fb8d6}.opt.on{border-color:var(--blue);background:var(--blue-l);box-shadow:0 0 0 1px var(--blue) inset}.opt .ot{font-weight:600;font-size:13.5px}.opt .od{font-size:12px;color:var(--mut);margin-top:3px}.opts{display:flex;gap:10px;flex-wrap:wrap}</style>
+  <div class="card"><h3>4. Map your columns</h3><div class="muted" style="margin-bottom:6px"><b>a) How are the amounts given in your file?</b></div><div class="opts">
+    ${amOpt('single','One amount column','Minus signs or brackets show negatives. Example: Amount = 12,500 or (4,000).')}
+    ${amOpt('split','Separate Debit and Credit columns','Each row has a value in one of the two columns.')}
+    ${amOpt('ind','One amount column + a Dr / Cr column','A second column says Dr or Cr for each amount (Tally, SAP style).')}</div>
+    <div class="row" style="margin-top:12px">${am==='split'?F('Debit amount column *',colSel('amount'))+F('Credit amount column *',colSel('credit'))+F('Show as positive',`<select id="sSplitPos"><option value="dr" ${S.splitPos==='dr'?'selected':''}>Debits (credits become negative)</option><option value="cr" ${S.splitPos==='cr'?'selected':''}>Credits (debits become negative)</option></select>`)
+      :am==='ind'?F('Amount column *',colSel('amount'))+F('Dr / Cr column *',colSel('drcr'))+F('Treat as negative',`<select id="sDrNeg"><option value="cr" ${S.drcrNeg==='cr'?'selected':''}>Cr (credits negative)</option><option value="dr" ${S.drcrNeg==='dr'?'selected':''}>Dr (debits negative)</option></select>`)
+      :F('Amount column *',colSel('amount'))}</div>
+    <div class="muted" style="margin:6px 0 0">${am==='split'?'Amount used in the tests = Debit − Credit'+(S.splitPos==='cr'?', shown with credits positive.':'.'):am==='ind'?'Amount used in the tests = the amount, negative where the Dr / Cr column says '+(S.drcrNeg==='cr'?'Cr':'Dr')+'.':'Amount used in the tests = the value in this column.'}</div>
+    <div class="muted" style="margin:16px 0 6px"><b>b) Other columns</b> — map what your file has; leave the rest as "not available".</div><div class="grid2">${MAPF.filter(([k])=>!['amount','credit','drcr'].includes(k)).map(([k,l,hint])=>`<label class="f">${esc(l)}<select data-m="${k}"><option value="">— not available —</option>${S.headers.map(x=>`<option ${m[k]===x?'selected':''}>${esc(x)}</option>`).join('')}</select>${hint?`<span style="font-size:11px">${esc(hint)}</span>`:''}</label>`).join('')}</div>
+    <div class="muted" style="margin:16px 0 6px"><b>c) Formats and options</b></div><div class="row">
+      ${F('Date format',`<select id="sDF">${Object.entries(DFMT).map(([v,l])=>`<option value="${v}" ${S.dateFmt===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`+(S.dateFmt==='auto'&&m.date?`<span style="font-size:11px">Detected: ${S._dfAuto==='mdy'?'Month / Day / Year':'Day / Month / Year'}${S._dfEvid[0]+S._dfEvid[1]===0?' (no date proves it either way — day first assumed; choose a format if the data is month first)':''}</span>`:''),260)}
+      ${F('Number format',`<select id="sNF"><option value="in" ${S.numFmt==='in'?'selected':''}>1,23,456.78 (Indian / international)</option><option value="eu" ${S.numFmt==='eu'?'selected':''}>1.234,56 (comma decimal)</option></select>`)}
+      ${cb('oAbs',S.abs,'Analyse absolute values (ignore sign)')}${am==='single'?cb('oCr',S.crNeg,'Treat amounts ending in "Cr" as negative'):''}</div>`;
+  if(m.amount){const smp=S.raw.slice(0,8).map(o=>deriveRow(Object.assign({},o)));
+    h+=`<div class="muted" style="margin:14px 0 4px"><b>Check:</b> how the tool reads the first rows with this mapping</div><div class="tw" style="max-height:250px"><table><thead><tr><th class="r">Row</th>${S.multi?'<th>Source</th>':''}${m.date?'<th>Date as in file</th><th>Date as read</th>':''}<th class="r">Amount as in file</th><th class="r">Amount as read</th>${m.party?'<th>Party</th>':''}${m.doc?'<th>Voucher</th>':''}</tr></thead><tbody>
+    ${smp.map(o=>`<tr><td class="r">${o._xr}</td>${S.multi?`<td>${esc(o._src)}</td>`:''}${m.date?`<td>${esc(o[m.date])}</td><td style="${o._date?'':'color:var(--red)'}">${o._date?dmy(o._date):'not read'}</td>`:''}<td class="r">${esc([o[m.amount],S.amtMode==='split'&&m.credit?o[m.credit]:'',S.amtMode==='ind'&&m.drcr?o[m.drcr]:''].filter(x=>x!==''&&x!=null).join(' | '))}</td><td class="r" style="${o._sAmt==null?'color:var(--red)':''}">${o._sAmt==null?'not read':fmt(o._sAmt)}</td>${m.party?`<td>${esc(o._party)}</td>`:''}${m.doc?`<td>${esc(o._doc)}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
+  h+=`</div>`;
+  h+=`<div class="card"><h3>5. Row filters <span class="muted" style="font-weight:400">(optional — keep only the rows you want to analyse)</span></h3>
+    ${S.filters.map((f,i)=>`<div class="row" style="margin-bottom:8px"><select data-fc="${i}"><option value="">— column —</option>${S.headers.map(x=>`<option ${f.col===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
+      <select data-fo="${i}">${Object.entries(FOPS).map(([v,l])=>`<option value="${v}" ${f.op===v?'selected':''}>${l}</option>`).join('')}</select>
+      ${['blank','nblank'].includes(f.op)?'':`<input data-fv="${i}" value="${esc(f.val||'')}" placeholder="${['gte','lte'].includes(f.op)?'amount':'values, comma separated'}" style="width:260px">`}<button class="btn sm" data-fx="${i}">Remove</button></div>`).join('')}
+    <button class="btn sm" id="bAddF">+ Add filter</button> <span class="muted">Example: Voucher type is any of "Payment, Journal" · Narration contains none of "reversal".</span></div>`;
+  const profs=profGet(),pn=Object.keys(profs);
+  h+=`<div class="card"><h3>6. Mapping profiles <span class="muted" style="font-weight:400">(save these settings for the next file in the same layout)</span></h3><div class="row">
+    ${F('Save current settings as',`<input id="pName" placeholder="e.g. Tally Day Book" style="width:200px">`)}<button class="btn" id="pSave">Save profile</button>
+    ${pn.length?F('Saved profiles',`<select id="pSel">${pn.map(n=>`<option>${esc(n)}</option>`).join('')}</select>`)+'<button class="btn" id="pLoad">Apply</button><button class="btn" id="pDel">Delete</button>':''}
+    <button class="btn" id="pExp">Copy profile (to share)</button><button class="btn" id="pImpT">Paste a profile</button></div>
+    <div id="pImpBox" style="display:none;margin-top:10px"><textarea id="pImp" rows="3" style="width:100%" placeholder="Paste a profile copied from this tool"></textarea><button class="btn sm" id="pImpGo" style="margin-top:6px">Apply pasted profile</button></div>
+    <div class="muted" style="margin-top:6px">Profiles are kept in this browser on this computer. Use "Copy profile" to share one with colleagues.</div></div>`;
+  h+=`<div class="card"><div class="row" style="align-items:center"><span class="muted">${fmt0(S.raw.length)} rows ready${S.filters.some(f=>f.col)?' before row filters':''}.</span><button class="btn p" id="bApply" style="margin-left:auto">Apply mapping &amp; continue →</button></div></div>`;
+  h+=footer();$('#main').innerHTML=h;bindData()}
+function bindData(){
+  const fi=$('#fi'),dr=$('#drop');dr.onclick=()=>fi.click();fi.onchange=()=>fi.files.length&&addFiles([...fi.files]);
+  dr.ondragover=e=>{e.preventDefault();dr.classList.add('hv')};dr.ondragleave=()=>dr.classList.remove('hv');
+  dr.ondrop=e=>{e.preventDefault();dr.classList.remove('hv');e.dataTransfer.files.length&&addFiles([...e.dataTransfer.files])};
+  $('#bDemo').onclick=demoData;const on=(id,ev,fn)=>{const e=$('#'+id);if(e)e[ev]=fn};
+  on('bClr','onclick',()=>{S.files=[];S.parts=[];S.raw=[];S.headers=[];S.headersPre=[];S.mapped=false;S.err.data='';render()});
+  on('sDelim','onchange',e=>{S.delim=e.target.value;reparseCsv();buildRows(false)});
+  document.querySelectorAll('[data-part]').forEach(c=>c.onchange=()=>{S.parts[+c.dataset.part].on=c.checked;if(!S.parts.some(p=>p.on)){c.checked=true;S.parts[+c.dataset.part].on=true;toast('Keep at least one sheet');return}buildRows(false)});
+  on('sHdr','onchange',e=>{S.headerRow=Math.max(1,+e.target.value||1);buildRows(true)});
+  on('sHdrN','onchange',e=>{S.headerRows=+e.target.value;buildRows(true)});
+  document.querySelectorAll('[data-hr]').forEach(td=>td.onclick=()=>{S.headerRow=+td.dataset.hr;buildRows(true)});
+  on('oTot','onchange',e=>{S.opt.skipTotals=e.target.checked;buildRows(false)});on('oWords','onchange',e=>{S.opt.totalWords=e.target.value;buildRows(false)});
+  on('oRep','onchange',e=>{S.opt.skipRepHdr=e.target.checked;buildRows(false)});on('oSrc','onchange',e=>{S.opt.srcCol=e.target.checked;buildRows(false)});
+  document.querySelectorAll('[data-fill]').forEach(c=>c.onchange=()=>{const k=c.dataset.fill;S.opt.fill=c.checked?[...S.opt.fill,k]:S.opt.fill.filter(x=>x!==k);buildRows(false)});
+  document.querySelectorAll('[data-unp]').forEach(c=>c.onchange=()=>{const k=c.dataset.unp;S.opt.unpivot=c.checked?[...S.opt.unpivot,k]:S.opt.unpivot.filter(x=>x!==k);buildRows(!S.map.amount||S.opt.unpivot.length===1&&c.checked)});
+  on('oUnpN','onchange',e=>{S.opt.unpivotName=e.target.value.trim()||'Period';buildRows(false)});
+  document.querySelectorAll('[data-m]').forEach(s=>s.onchange=()=>{S.map[s.dataset.m]=s.value;render()});
+  on('sDrNeg','onchange',e=>{S.drcrNeg=e.target.value;render()});on('sSplitPos','onchange',e=>{S.splitPos=e.target.value;render()});
+  document.querySelectorAll('[data-am]').forEach(d=>d.onclick=()=>{S.amtMode=d.dataset.am;render()});on('sDF','onchange',e=>{S.dateFmt=e.target.value;render()});on('sNF','onchange',e=>{S.numFmt=e.target.value;render()});
+  on('oAbs','onchange',e=>S.abs=e.target.checked);on('oCr','onchange',e=>{S.crNeg=e.target.checked;render()});
+  on('bAddF','onclick',()=>{S.filters.push({col:S.map.vtype||'',op:'eq',val:''});render()});
+  document.querySelectorAll('[data-fc]').forEach(e=>e.onchange=()=>{S.filters[+e.dataset.fc].col=e.value});
+  document.querySelectorAll('[data-fo]').forEach(e=>e.onchange=()=>{S.filters[+e.dataset.fo].op=e.value;render()});
+  document.querySelectorAll('[data-fv]').forEach(e=>e.onchange=()=>{S.filters[+e.dataset.fv].val=e.value});
+  document.querySelectorAll('[data-fx]').forEach(e=>e.onclick=()=>{S.filters.splice(+e.dataset.fx,1);render()});
+  on('pSave','onclick',()=>{const n=$('#pName').value.trim();if(!n){toast('Give the profile a name');return}const o=profGet();o[n]=profSnap();toast(profSet(o)?'Profile "'+n+'" saved':'This browser blocked saving; use Copy profile instead');render()});
+  on('pLoad','onclick',()=>profApply(profGet()[$('#pSel').value]));
+  on('pDel','onclick',()=>{const o=profGet();delete o[$('#pSel').value];profSet(o);render()});
+  on('pExp','onclick',()=>copyText(JSON.stringify({caatProfile:1,...profSnap()})));
+  on('pImpT','onclick',()=>{$('#pImpBox').style.display='block'});
+  on('pImpGo','onclick',()=>{try{profApply(JSON.parse($('#pImp').value))}catch(e){toast('That text is not a valid profile')}});
+  on('bApply','onclick',()=>{S.params={};applyMap()})}
+
+/* ============ Demo data ============ */
+function demoData(){
+  let seed=20252026;const rnd=()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+  const norm=()=>Math.sqrt(-2*Math.log(rnd()||1e-9))*Math.cos(2*Math.PI*rnd());
+  const vend=['Shree Balaji Traders','Ganesh Hardware Stores','Eastern Logistics Pvt Ltd','Kolkata Packaging Co','Sunrise Electricals','Bharat Stationery Mart','Annapurna Caterers','Metro Courier Services','Hindustan Chemicals','Rathi Steel Suppliers','Lakshmi Transport Co','Apex IT Solutions','Bengal Printing Works','Star Security Services','Om Sai Enterprises','Patel Engineering Works','Raj Tyres & Spares','Green Leaf Housekeeping','Modern Furniture House','City Telecom Services','Jain Plastic Industries','National Insurance Brokers','Nirmal Paints','Vinayak Fabrications','Agarwal Paper Mills','Delta Pumps & Motors','Royal Travels','Prime Advertising','Sharma Electrical Contractors','Kamdhenu Dairy Supplies'];
+  const heads={'Raw Materials':[9.6,1.1],'Freight Inward':[8.6,0.9],'Repairs & Maintenance':[8.9,1.2],'Printing & Stationery':[7.6,1.0],'Professional Fees':[10.2,1.0],'Travelling':[8.4,1.0],'Security Charges':[10.6,0.4],'Advertisement':[9.8,1.1],'Electricity & Power':[11.2,0.6],'Packing Materials':[9.2,1.0]};
+  const hk=Object.keys(heads);const vh={};vend.forEach((v,i)=>vh[v]=hk[i%hk.length]);
+  const rows=[];const start=Date.UTC(2025,3,1);
+  for(let i=0;i<2400;i++){const v=vend[Math.floor(Math.pow(rnd(),1.6)*vend.length)];const [mu,sg]=heads[vh[v]];
+    let a=Math.exp(mu+sg*norm());a=Math.round(a*100)/100;rows.push({v,h:vh[v],a,d:start+Math.floor(rnd()*365)*864e5})}
+  // planted exceptions
+  rows.push({v:'Om Sai Enterprises',h:'Repairs & Maintenance',a:1875000,d:Date.UTC(2026,2,30)}); // RSF + outlier, year-end
+  for(let i=0;i<6;i++)rows.push({v:'Prime Advertising',h:'Advertisement',a:49950,d:start+(40+i*45)*864e5}); // repeated odd amount below 50k
+  for(let i=0;i<5;i++)rows.push({v:'Vinayak Fabrications',h:'Repairs & Maintenance',a:9999,d:start+(20+i*60)*864e5});
+  [100000,250000,50000,500000,75000,200000,100000,300000].forEach((a,i)=>rows.push({v:vend[(i*7)%vend.length],h:'Professional Fees',a,d:start+(15+i*41)*864e5}));
+  rows.push({v:'Royal Travels',h:'Travelling',a:28000,d:Date.UTC(2025,8,12)},{v:'Royal Travels',h:'Travelling',a:26500,d:Date.UTC(2025,8,12)});
+  rows.push({v:'Annapurna Caterers',h:'Travelling',a:9800,d:Date.UTC(2025,10,3)},{v:'Annapurna Caterers',h:'Travelling',a:9650,d:Date.UTC(2025,10,3)});
+  ['Quick Fix Consultants','R K Associates','New Age Suppliers','Mahadev Trading','Speedy Movers'].forEach((v,i)=>rows.push({v,h:'Professional Fees',a:[148500,96400,212750,58900,174300][i],d:start+(70+i*50)*864e5}));
+  rows.sort((x,y)=>x.d-y.d);
+  // party master with GSTIN / PAN (a few planted errors)
+  const L='ABCDEFGHIJKLMNOPQRSTUVWXYZ',ini=n=>n.replace(/^(m\/s\.?|the)\s+/i,'')[0].toUpperCase();
+  const master={};[...vend,'Quick Fix Consultants','R K Associates','New Age Suppliers','Mahadev Trading','Speedy Movers'].forEach((v,i)=>{
+    const ty=/ltd|limited/i.test(v)?'C':'F';const pan=L[Math.floor(rnd()*26)]+L[Math.floor(rnd()*26)]+L[Math.floor(rnd()*26)]+ty+ini(v)+String(1000+Math.floor(rnd()*9000))+L[Math.floor(rnd()*26)];
+    const st=i%6===1?'07':i%7===2?'27':'19';const g0=st+pan+'1Z';master[v]={g:g0+gstCheck(g0+'0'),p:pan}});
+  const bad=(v,f)=>{master[v]=Object.assign({},master[v],f(master[v]))};
+  bad('Kolkata Packaging Co',m=>({g:m.g.slice(0,14)+(m.g[14]==='A'?'B':'A')}));
+  bad('Sunrise Electricals',m=>{const g0='45'+m.g.slice(2,14);return{g:g0+gstCheck(g0+'0')}});
+  bad('Metro Courier Services',m=>({p:m.p.slice(0,5)+'9999'+m.p[9]}));
+  bad('Om Sai Enterprises',()=>({g:master['Shree Balaji Traders'].g,p:master['Shree Balaji Traders'].p}));
+  bad('Quick Fix Consultants',()=>({g:'',p:''}));
+  bad('R K Associates',m=>({g:m.g.slice(0,14)}));
+  bad('New Age Suppliers',m=>{const p=m.p.slice(0,3)+'X'+m.p.slice(4);const g0='19'+p+'1Z';return{p,g:g0+gstCheck(g0+'0')}});
+  const out=[['Voucher No','Date','Party Name','GSTIN','PAN','Expense Head','Amount','Narration']];let no=1;
+  rows.forEach((r,i)=>{if([137,612,613,1408,2011].includes(i))no++;const d=new Date(r.d);
+    out.push(['PV/25-26/'+String(no++).padStart(4,'0'),String(d.getUTCDate()).padStart(2,'0')+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+d.getUTCFullYear(),r.v,master[r.v].g,master[r.v].p,r.h,r.a,'Being '+r.h.toLowerCase()+' bill of '+r.v])});
+  // duplicate payments (same party, amount, date; new voucher no.)
+  [210,890,1530,1999].forEach(i=>{const c=out[i].slice();c[0]='PV/25-26/'+String(no++).padStart(4,'0');out.push(c)});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'Payments');
+  const dn='Demo - Expense payments FY 2025-26 (synthetic)';S.files=[{id:'demo',name:dn,hash:'demo data',kind:'xlsx'}];S.parts=[{file:dn,sheet:'Payments',label:dn+' › Payments',aoa:out,off:0,on:true,fid:'demo'}];
+  Object.assign(S,{headerRow:1,headerRows:1,filters:[],dateFmt:'auto',numFmt:'in',abs:false,crNeg:false,drcrNeg:'cr'});S.opt.fill=[];S.opt.unpivot=[];S.err.data='';buildRows(false);
+  S.amtMode='single';S.map={amount:'Amount',credit:'',drcr:'',party:'Party Name',date:'Date',doc:'Voucher No',vtype:'',cat:'Expense Head',desc:'Narration',gstin:'GSTIN',pan:'PAN',user:''};S.params={};applyMap();
+}
+
+/* ============ Column definitions ============ */
+function txnCols(){const m=S.map,c=[{k:'_xr',h:'Row',t:'int'}];if(S.multi)c.push({k:'_src',h:'Source'});
+  if(m.date)c.push({k:'_date',h:'Date',t:'date'});if(m.doc)c.push({k:'_doc',h:m.doc});if(m.vtype)c.push({k:'_vtype',h:m.vtype});if(m.party)c.push({k:'_party',h:m.party});
+  if(m.cat)c.push({k:'_cat',h:m.cat});c.push({k:'_amt',h:'Amount',t:'amt'});if(m.desc)c.push({k:'_desc',h:m.desc});return c}
+const T={amt:1,int:1,num:1,pct:1};
+function cell(v,t){if(t==='amt')return fmt(v);if(t==='int')return fmt0(v);if(t==='pct')return pct(v);if(t==='date')return dmy(v);
+  if(t==='num')return v===Infinity?'∞':(v==null||isNaN(v)?'':Number(v).toFixed(2));return v??''}
+function xval(v,t){if(t==='amt')return v==null?'':Math.round(v*100)/100;if(t==='pct')return v==null?'':Math.round(v*1e6)/1e6;if(t==='date')return dmy(v);
+  if(t==='num')return v===Infinity?'∞':(v==null||isNaN(v)?'':Math.round(v*1e4)/1e4);return v??''}
+const LV=l=>({10000000:'Multiple of ₹1 crore',1000000:'Multiple of ₹10 lakh',100000:'Multiple of ₹1 lakh',10000:'Multiple of ₹10,000',1000:'Multiple of ₹1,000',100:'Multiple of ₹100'})[l];
+
+/* ============ Benford constants ============ */
+const BEN={first:{dom:[1,2,3,4,5,6,7,8,9],exp:d=>Math.log10(1+1/d),mad:[.006,.012,.015],chi:15.507,lab:'First digit'},
+  second:{dom:[0,1,2,3,4,5,6,7,8,9],exp:d=>{let s=0;for(let a=1;a<=9;a++)s+=Math.log10(1+1/(10*a+d));return s},mad:[.008,.010,.012],chi:16.919,lab:'Second digit'},
+  two:{dom:Array.from({length:90},(_,i)=>i+10),exp:d=>Math.log10(1+1/d),mad:[.0012,.0018,.0022],chi:112.022,lab:'First two digits'}};
+function digitOf(a,test){const s=Math.abs(a).toExponential(14);const d1=+s[0],d2=+s[2];return test==='first'?d1:test==='second'?d2:d1*10+d2}
+
+/* ============ GSTIN / PAN helpers ============ */
+const B36='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function gstCheck(g){let s=0;for(let i=0;i<14;i++){const v=B36.indexOf(g[i]);if(v<0)return '?';const p=v*(i%2?2:1);s+=Math.floor(p/36)+p%36}return B36[(36-s%36)%36]}
+const STATES={'01':'Jammu & Kashmir','02':'Himachal Pradesh','03':'Punjab','04':'Chandigarh','05':'Uttarakhand','06':'Haryana','07':'Delhi','08':'Rajasthan','09':'Uttar Pradesh','10':'Bihar','11':'Sikkim','12':'Arunachal Pradesh','13':'Nagaland','14':'Manipur','15':'Mizoram','16':'Tripura','17':'Meghalaya','18':'Assam','19':'West Bengal','20':'Jharkhand','21':'Odisha','22':'Chhattisgarh','23':'Madhya Pradesh','24':'Gujarat','25':'Daman & Diu (legacy)','26':'Dadra & Nagar Haveli and Daman & Diu','27':'Maharashtra','28':'Andhra Pradesh (legacy)','29':'Karnataka','30':'Goa','31':'Lakshadweep','32':'Kerala','33':'Tamil Nadu','34':'Puducherry','35':'Andaman & Nicobar Islands','36':'Telangana','37':'Andhra Pradesh','38':'Ladakh','97':'Other Territory','99':'Centre Jurisdiction'};
+const PANT={P:'Individual',C:'Company',H:'HUF',F:'Firm / LLP',A:'AOP',T:'Trust',B:'BOI',L:'Local authority',J:'Artificial juridical person',G:'Government'};
+const cleanName=n=>String(n||'').toLowerCase().replace(/^(m\/s\.?|messrs\.?|the|shri|smt\.?|mr\.?|mrs\.?|ms\.?|dr\.?)\s+/,'');
+const normName=n=>cleanName(n).replace(/\b(private|pvt|limited|ltd|llp|company|co|and|the|corporation|corp)\b|[^a-z0-9]/g,'');
+function gstinErrors(g){
+  if(!/^[0-9A-Z]{15}$/.test(g))return[[g.length!==15?'Length is '+g.length+' characters (should be 15)':'Contains characters other than A–Z and 0–9','High']];
+  const out=[],sc=g.slice(0,2);
+  if(!STATES[sc])out.push(['Invalid state code "'+sc+'"','High']);else if(sc==='25'||sc==='28')out.push(['Legacy state code '+sc+' — '+STATES[sc],'Low']);
+  if(!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(g))out.push(['Not in the normal taxpayer pattern — may be a TDS/TCS, UIN, NRTP or OIDAR registration; verify on the GST portal','Medium']);
+  else if(!PANT[g[5]])out.push(['PAN part of GSTIN has an invalid 4th character "'+g[5]+'"','High']);
+  const ck=gstCheck(g);if(ck!==g[14])out.push(['Check digit fails (expected '+ck+', found '+g[14]+') — typing error or non-genuine GSTIN','High']);
+  return out}
+function panErrors(p,party){
+  if(!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p))return[['Not a valid PAN pattern (5 letters, 4 digits, 1 letter)','High']];
+  if(!PANT[p[3]])return[['Invalid 4th character "'+p[3]+'" (holder type)','High']];
+  const out=[];const c=cleanName(party);
+  if(p[3]!=='P'&&c&&/[a-z]/.test(c[0])&&c[0].toUpperCase()!==p[4])out.push(['5th character "'+p[4]+'" does not match the first letter of the party name (indicative only)','Low']);
+  return out}
+const SEV={High:0,Medium:1,Low:2};
+const dayNum=s=>Math.round(Date.parse(s+'T00:00:00Z')/864e5);
+
+/* ============ Tests ============ */
+const TESTS=[
+{id:'rsf',name:'Relative Size Factor',needs:['party'],
+ help:'<b>What it finds:</b> for each party, the largest transaction divided by the second largest. A high ratio means one transaction is out of line with that party\'s normal pattern — a possible error, an unusual one-off, a wrong ledger posting or a fraudulent bill.<p><b>How to read:</b> RSF of 10 means the largest item is ten times the next. Look at flagged parties first, then open the transactions (click a row). <b>Useful for:</b> SA 240 (fraud risk), SA 520 (analytical procedures), vendor and customer ledger review.</p>',
+ params:[{id:'thr',l:'Flag when RSF is at least',t:'num',d:10},{id:'minN',l:'Minimum transactions per party',t:'num',d:2},{id:'only',l:'Show flagged parties only',t:'bool',d:false}],
+ run(p){const out=[];
+  for(const [k,arr] of groupBy(valid().filter(r=>r._party),r=>r._party)){if(arr.length<Math.max(2,p.minN))continue;
+    const v=arr.map(r=>Math.abs(r._amt)).sort((a,b)=>b-a),l=v[0],s=v[1];const rsf=s>0?l/s:(l>0?Infinity:0);
+    out.push({party:k,n:arr.length,total:sumBy(arr,r=>r._amt),largest:l,second:s,rsf,flag:rsf>=p.thr?'Flag':'',_rows:arr})}
+  out.sort((a,b)=>b.rsf-a.rsf);const fl=out.filter(x=>x.flag);
+  return{flag:fl.length,cards:[['Parties analysed',fmt0(out.length)],['Parties flagged (RSF ≥ '+p.thr+')',fmt0(fl.length),fl.length?'warn':'ok'],['Largest items of flagged parties',fmt(sumBy(fl,x=>x.largest))]],
+   tables:[{title:'Relative Size Factor by party',cols:[{k:'party',h:'Party'},{k:'n',h:'Txns',t:'int'},{k:'total',h:'Total value',t:'amt'},{k:'largest',h:'Largest',t:'amt'},{k:'second',h:'2nd largest',t:'amt'},{k:'rsf',h:'RSF',t:'num'},{k:'flag',h:'Result'}],
+    rows:p.only?fl:out,drill:x=>({title:'Transactions — '+x.party,rows:x._rows.slice().sort(byAmtDesc)})}]}}},
+
+{id:'gaps',name:'Check missing',needs:[],
+ help:'<b>What it finds:</b> (1) gaps in a voucher or invoice number series — numbers that should exist but are absent from the data; (2) duplicate numbers in the series; (3) blank cells in every column.<p><b>How to read:</b> each gap needs an explanation — cancelled voucher, voided invoice, or an entry kept out of the books. Series are split by prefix (e.g. PV/25-26/ and JV/25-26/ are checked separately). <b>Useful for:</b> completeness assertion (SA 315), GST invoice-series review, SA 240.</p>',
+ params:[{id:'col',l:'Document number column',t:'col',d:()=>S.map.doc},{id:'byPrefix',l:'Treat each prefix as a separate series',t:'bool',d:true},{id:'maxGap',l:'Gaps larger than this are a series break, not missing',t:'num',d:500}],
+ run(p){if(!p.col)throw new Error('Select the document number column.');
+  const ser=new Map();let blank=0,bad=0;
+  for(const r of S.rows){const v=String(r[p.col]??'').trim();if(!v){blank++;continue}const m=v.match(/^(.*?)(\d+)(\D*)$/);if(!m){bad++;continue}
+    const key=p.byPrefix?m[1]+'#'+m[3]:'(all numbers)';let s=ser.get(key);if(!s){s={nums:new Map(),w:0,lead:false,pre:m[1],suf:m[3]};ser.set(key,s)}
+    const n=parseInt(m[2],10);s.nums.set(n,(s.nums.get(n)||0)+1);s.w=Math.max(s.w,m[2].length);if(m[2].length>1&&m[2][0]==='0')s.lead=true}
+  const sumR=[],gapR=[],dupR=[];let tm=0,td=0;
+  for(const [k,s] of ser){const lab=x=>p.byPrefix?s.pre+(s.lead?String(x).padStart(s.w,'0'):x)+s.suf:x;
+    const ns=[...s.nums.keys()].sort((a,b)=>a-b);let miss=0,dup=0,br=0,cnt=0;
+    for(const [n,c] of s.nums){cnt+=c;if(c>1){dup+=c-1;dupR.push({series:k,no:lab(n),times:c})}}
+    for(let i=1;i<ns.length;i++){const d=ns[i]-ns[i-1]-1;if(d>0){if(d>p.maxGap){br++;continue}miss+=d;gapR.push({series:k,from:lab(ns[i-1]+1),to:lab(ns[i]-1),count:d})}}
+    tm+=miss;td+=dup;sumR.push({series:k,count:cnt,first:lab(ns[0]),last:lab(ns[ns.length-1]),missing:miss,dups:dup,breaks:br})}
+  sumR.sort((a,b)=>b.count-a.count);
+  const blk=S.headers.map(h=>{const b=S.rows.filter(r=>String(r[h]??'').trim()==='').length;return{col:h,blank:b,p:S.rows.length?b/S.rows.length:0}}).sort((a,b)=>b.blank-a.blank);
+  const cards=[['Series found',fmt0(ser.size)],['Missing numbers',fmt0(tm),tm?'warn':'ok'],['Duplicate numbers',fmt0(td),td?'warn':'ok'],['Blank / unreadable doc nos.',fmt0(blank)+' / '+fmt0(bad),blank||bad?'warn':'ok']];
+  return{flag:tm+td,cards,tables:[
+   {title:'Series summary',cols:[{k:'series',h:'Series (# = number)'},{k:'count',h:'Documents',t:'int'},{k:'first',h:'First'},{k:'last',h:'Last'},{k:'missing',h:'Missing',t:'int'},{k:'dups',h:'Duplicates',t:'int'},{k:'breaks',h:'Series breaks',t:'int'}],rows:sumR},
+   {title:'Missing numbers (gaps)',cols:[{k:'series',h:'Series'},{k:'from',h:'Missing from'},{k:'to',h:'Missing to'},{k:'count',h:'Count',t:'int'}],rows:gapR},
+   {title:'Duplicate document numbers',cols:[{k:'series',h:'Series'},{k:'no',h:'Document no.'},{k:'times',h:'Times used',t:'int'}],rows:dupR,
+    drill:x=>({title:'Rows with '+x.no,rows:S.rows.filter(r=>String(r[p.col]).trim()===String(x.no))})},
+   {title:'Blank cells by column',cols:[{k:'col',h:'Column'},{k:'blank',h:'Blank cells',t:'int'},{k:'p',h:'% of rows',t:'pct'}],rows:blk}]}}},
+
+{id:'dups',name:'Check duplicates',needs:[],
+ help:'<b>What it finds:</b> rows that share the same values in the columns you choose. Pick the columns that define a duplicate for your data — for example the same party, amount and date with a different voucher number is a classic duplicate payment.<p><b>How to read:</b> every group of two or more rows is listed together. "Excess value" is the value of the second and later rows in each group — the amount at risk if they are true duplicates. <b>Useful for:</b> duplicate payments, double booking of sales or purchase invoices, SA 240.</p>',
+ params:[{id:'keys',l:'Columns that must match',t:'cols',d:()=>[S.map.party,S.map.amount,S.map.date].filter(Boolean)}],
+ run(p){if(!p.keys.length)throw new Error('Tick at least one column.');const m=S.map;
+  const nv=(c,v)=>{if(c===m.amount||c===m.credit){const a=parseAmount(v);return a==null?'':a.toFixed(2)}if(c===m.date)return parseDate(v)||String(v);return String(v??'').trim().toLowerCase().replace(/\s+/g,' ')};
+  const g=new Map();
+  for(const r of S.rows){const parts=p.keys.map(c=>nv(c,r[c]));if(parts.every(x=>x===''))continue;const k=parts.join('\u0001');let a=g.get(k);if(!a){a=[];g.set(k,a)}a.push(r)}
+  const out=[];let gi=0,excess=0,grp=0;
+  for(const arr of g.values()){if(arr.length<2)continue;gi++;grp++;arr.forEach((r,i)=>{if(i>0)excess+=Math.abs(r._amt||0);out.push(Object.assign({},r,{_g:gi,_n:arr.length}))})}
+  return{flag:grp,cards:[['Duplicate groups',fmt0(grp),grp?'warn':'ok'],['Rows involved',fmt0(out.length)],['Excess value (2nd+ occurrences)',fmt(excess),excess?'warn':'ok'],['Matched on',p.keys.join(' + ')]],
+   tables:[{title:'Duplicate groups',cols:[{k:'_g',h:'Group',t:'int'},{k:'_n',h:'In group',t:'int'},...txnCols()],rows:out,noSort:true}]}}},
+
+{id:'round',name:'Round numbers',needs:[],
+ help:'<b>What it finds:</b> amounts that are exact multiples of ₹100, ₹1,000, ₹10,000, ₹1 lakh and so on. Genuine invoices carry taxes, freight and odd paisa; round figures often point to estimates, provisions, manual adjustments, advances or invented entries.<p><b>How to read:</b> compare the share of round amounts with what you would expect for this kind of ledger, and look hardest at large round items near the year end. <b>Useful for:</b> journal entry testing under SA 240, review of provisions and estimates.</p>',
+ params:[{id:'unit',l:'Smallest round unit to flag',t:'sel',d:'1000',o:[['100','₹100'],['1000','₹1,000'],['10000','₹10,000'],['100000','₹1 lakh']]},{id:'min',l:'Ignore amounts below',t:'num',d:1000}],
+ run(p){const levels=[10000000,1000000,100000,10000,1000,100].filter(l=>l>=+p.unit);let el=0,elv=0;const fl=[];
+  for(const r of valid()){const a=Math.abs(r._amt);if(a<p.min)continue;el++;elv+=a;if(Math.abs(a-Math.round(a))>0.004)continue;const ai=Math.round(a);const lv=levels.find(l=>ai%l===0);if(lv)fl.push(Object.assign({},r,{_lv:LV(lv),_lvn:lv}))}
+  fl.sort(byAmtDesc);const fv=sumBy(fl,r=>Math.abs(r._amt));
+  const lvT=levels.map(l=>{const a=fl.filter(r=>r._lvn===l);return{lv:LV(l),n:a.length,pn:el?a.length/el:0,v:sumBy(a,r=>Math.abs(r._amt)),pv:elv?sumBy(a,r=>Math.abs(r._amt))/elv:0,_rows:a}});
+  return{flag:fl.length,cards:[['Transactions tested',fmt0(el)],['Round amounts',fmt0(fl.length),fl.length?'warn':'ok'],['Share of transactions',pct(el?fl.length/el:0)],['Value of round amounts',fmt(fv)]],
+   tables:[{title:'By level of roundness (each item counted once, at its highest level)',cols:[{k:'lv',h:'Level'},{k:'n',h:'Count',t:'int'},{k:'pn',h:'% of count',t:'pct'},{k:'v',h:'Value',t:'amt'},{k:'pv',h:'% of value',t:'pct'}],rows:lvT,noSort:true,drill:x=>({title:x.lv,rows:x._rows})},
+    {title:'Round-amount transactions',cols:[{k:'_lv',h:'Level'},...txnCols()],rows:fl}]}}},
+
+{id:'odd',name:'Repetitive odd numbers',needs:[],
+ help:'<b>What it finds:</b> the same non-round amount appearing again and again — for example ₹49,950 or ₹9,999 several times. Repeated odd amounts can signal splitting of bills to stay under an approval limit, recurring fictitious claims, or a copied invoice.<p><b>How to read:</b> genuine repeats (rent, retainers, EMIs) are easy to explain; amounts just below an approval or TDS threshold deserve a closer look. Click a row to see every occurrence. <b>Useful for:</b> SA 240, expense and purchase review, limit-avoidance checks.</p>',
+ params:[{id:'freq',l:'Flag amounts occurring at least',t:'num',d:3},{id:'excl',l:'Treat as round (exclude) multiples of',t:'sel',d:'100',o:[['10','₹10'],['100','₹100'],['1000','₹1,000']]},{id:'min',l:'Ignore amounts below',t:'num',d:500},{id:'byParty',l:'Count repeats within the same party only',t:'bool',d:false}],
+ run(p){const g=new Map();const ex=Math.round(+p.excl*100);
+  for(const r of valid()){const a=Math.abs(r._amt);if(a<p.min)continue;const c=Math.round(a*100);if(c%ex===0)continue;const k=(p.byParty?r._party+'\u0001':'')+c;let x=g.get(k);if(!x){x=[];g.set(k,x)}x.push(r)}
+  const out=[];for(const [k,arr] of g){if(arr.length<p.freq)continue;const ps=[...new Set(arr.map(r=>r._party).filter(Boolean))];
+    out.push({amt:Math.abs(arr[0]._amt),n:arr.length,tot:sumBy(arr,r=>Math.abs(r._amt)),np:ps.length,names:ps.slice(0,3).join('; ')+(ps.length>3?' …':''),_rows:arr})}
+  out.sort((a,b)=>b.n-a.n||b.amt-a.amt);
+  return{flag:out.length,cards:[['Repeated odd amounts',fmt0(out.length),out.length?'warn':'ok'],['Transactions involved',fmt0(sumBy(out,x=>x.n))],['Value involved',fmt(sumBy(out,x=>x.tot))]],
+   tables:[{title:'Amounts repeated '+p.freq+' or more times',cols:[{k:'amt',h:'Amount',t:'amt'},{k:'n',h:'Occurrences',t:'int'},{k:'tot',h:'Total value',t:'amt'},{k:'np',h:'Parties',t:'int'},{k:'names',h:'Party names'}],rows:out,drill:x=>({title:'Occurrences of '+fmt(x.amt),rows:x._rows})}]}}},
+
+{id:'strat',name:'Classification & Stratification',needs:[],
+ help:'<b>What it shows:</b> how the population is spread across value bands (strata), across categories (expense head, ledger group) and across months. It tells you where the value sits and where the volume sits.<p><b>How to read:</b> a few high-value items often carry most of the value — test them in full and sample the rest. Months or categories that stand out need an explanation. <b>Useful for:</b> planning and stratified sampling under SA 530, analytical procedures under SA 520, cut-off review.</p>',
+ params:[{id:'b',l:'Band limits (comma separated)',t:'text',d:'10000, 50000, 100000, 500000, 1000000, 5000000'}],
+ run(p){const V=valid();const b=String(p.b).split(/[,;\s]+/).map(x=>parseAmount(x)).filter(x=>x!=null&&x>0).sort((a,c)=>a-c);
+  const tv=sumBy(V,r=>Math.abs(r._amt)),tn=V.length;const bands=[];
+  if(V.some(r=>r._amt<0))bands.push({lab:'Negative (below 0)',f:a=>a<0});
+  const lims=[0,...b];lims.forEach((lo,i)=>{const hi=lims[i+1];bands.push({lab:hi!=null?fmt0(lo)+' to below '+fmt0(hi):fmt0(lo)+' and above',f:a=>a>=lo&&(hi==null||a<hi)})});
+  const agg=(lab,arr)=>{const v=arr.map(r=>r._amt);return{lab,n:arr.length,pn:tn?arr.length/tn:0,v:sumBy(v,x=>x),pv:tv?sumBy(v,x=>Math.abs(x))/tv:0,min:arr.length?v.reduce((a,b)=>b<a?b:a,Infinity):null,max:arr.length?v.reduce((a,b)=>b>a?b:a,-Infinity):null,avg:arr.length?sumBy(v,x=>x)/arr.length:null,_rows:arr}};
+  const st=bands.map(bd=>agg(bd.lab,V.filter(r=>bd.f(r._amt))));
+  const cols=[{k:'lab',h:'Stratum'},{k:'n',h:'Count',t:'int'},{k:'pn',h:'% count',t:'pct'},{k:'v',h:'Value',t:'amt'},{k:'pv',h:'% value',t:'pct'},{k:'min',h:'Min',t:'amt'},{k:'max',h:'Max',t:'amt'},{k:'avg',h:'Average',t:'amt'}];
+  const dr=x=>({title:x.lab,rows:x._rows.slice().sort(byAmtDesc)});
+  const tables=[{title:'Stratification by value',cols,rows:st,noSort:true,drill:dr}];
+  const ck=S.map.cat?'_cat':(S.map.party?'_party':null);
+  if(ck){const c=[...groupBy(V,r=>r[ck]||'(blank)')].map(([k,a])=>agg(k,a)).sort((x,y)=>Math.abs(y.v)-Math.abs(x.v));
+    const cc=cols.slice();cc[0]={k:'lab',h:S.map.cat?'Category':'Party'};tables.push({title:'Classification by '+(S.map.cat||S.map.party),cols:cc,rows:c,drill:dr})}
+  if(S.map.date){const mm=[...groupBy(V.filter(r=>r._date),r=>r._date.slice(0,7))].sort((a,c)=>a[0]<c[0]?-1:1).map(([k,a])=>agg(new Date(k+'-01T00:00:00').toLocaleString('en-IN',{month:'short',year:'numeric'}),a));
+    const cm=cols.slice();cm[0]={k:'lab',h:'Month'};tables.push({title:'Monthly distribution',cols:cm,rows:mm,noSort:true,drill:dr})}
+  const top=st.filter(x=>x.n).sort((a,c)=>c.pv-a.pv)[0];
+  return{flag:null,cards:[['Transactions',fmt0(tn)],['Total value (absolute)',fmt(tv)],['Strata',fmt0(bands.length)],['Value concentrated in',top?top.lab+' ('+pct(top.pv)+')':'—']],
+   chart:barChart({labels:st.map(x=>x.lab.replace(' to below ','–').replace(' and above','+').replace('Negative (below 0)','<0')),series:[{name:'% of count',vals:st.map(x=>x.pn*100),c:'#00A651'},{name:'% of value',vals:st.map(x=>x.pv*100),c:'#0066CC'}],y:'%'}),tables}}},
+
+{id:'single',name:'Single transactions',needs:['party'],
+ help:'<b>What it finds:</b> parties with only one transaction in the whole period — one-time vendors, customers or ledgers. Fictitious vendors, accommodation entries and wrongly named accounts often show up this way.<p><b>How to read:</b> start with the largest single items. Check that the party exists (GSTIN, PAN, bank details), that goods or services were received, and that approval was proper. <b>Useful for:</b> vendor master review, SA 240, SA 550 (related parties).</p>',
+ params:[{id:'min',l:'Ignore amounts below',t:'num',d:0}],
+ run(p){const V=valid().filter(r=>r._party);const g=groupBy(V,r=>r._party);const out=[];for(const a of g.values())if(a.length===1&&Math.abs(a[0]._amt)>=p.min)out.push(a[0]);
+  out.sort(byAmtDesc);const tv=sumBy(V,r=>Math.abs(r._amt)),sv=sumBy(out,r=>Math.abs(r._amt));
+  return{flag:out.length,cards:[['Parties in data',fmt0(g.size)],['Single-transaction parties',fmt0(out.length),out.length?'warn':'ok'],['Their value',fmt(sv)],['Share of total value',pct(tv?sv/tv:0)]],
+   tables:[{title:'Parties with a single transaction',cols:txnCols(),rows:out}]}}},
+
+{id:'outlier',name:'Isolated outliers',needs:[],
+ help:'<b>What it finds:</b> transactions far away from the normal range — either overall, or within their own party or category (a ₹5 lakh bill is normal for steel but odd for stationery).<p><b>Methods:</b> <b>Z-score</b> measures distance from the average in standard deviations (3 is a common cut-off). <b>IQR</b> measures distance beyond the middle 50% of values (1.5 = mild, 3 = extreme) and is less disturbed by the outliers themselves. <b>Useful for:</b> key-item selection under SA 530, analytical procedures under SA 520.</p>',
+ params:[{id:'method',l:'Method',t:'sel',d:'iqr',o:[['iqr','IQR (robust)'],['z','Z-score']]},{id:'k',l:'Cut-off (Z: SDs, IQR: multiples)',t:'num',d:3},{id:'scope',l:'Compare each item with',t:'sel',d:'cat',o:[['all','Whole population'],['cat','Its category'],['party','Its party']]},{id:'minG',l:'Minimum items in a group',t:'num',d:8}],
+ run(p){const sc=p.scope==='cat'&&!S.map.cat?(S.map.party?'party':'all'):(p.scope==='party'&&!S.map.party?'all':p.scope);
+  const key=sc==='all'?()=> 'All':sc==='cat'?r=>r._cat||'(blank)':r=>r._party||'(blank)';
+  const out=[];let tested=0,ng=0,skip=0;
+  for(const [k,arr] of groupBy(valid(),key)){if(arr.length<p.minG){skip++;continue}ng++;tested+=arr.length;const v=arr.map(r=>r._amt);
+    if(p.method==='z'){const mu=sumBy(v,x=>x)/v.length;const sd=Math.sqrt(sumBy(v,x=>(x-mu)**2)/(v.length-1));if(!sd)continue;
+      for(const r of arr){const z=(r._amt-mu)/sd;if(Math.abs(z)>=p.k)out.push(Object.assign({},r,{_g:k,_c:mu,_s:sd,_sc:z,_d:z>0?'High':'Low'}))}}
+    else{const s=v.slice().sort((a,b)=>a-b);const q1=quant(s,.25),q3=quant(s,.75),iq=q3-q1,med=quant(s,.5);if(!iq)continue;
+      for(const r of arr){const x=r._amt;const sc=x>q3?(x-q3)/iq:x<q1?(x-q1)/iq:0;if(Math.abs(sc)>=p.k)out.push(Object.assign({},r,{_g:k,_c:med,_s:iq,_sc:sc,_d:sc>0?'High':'Low'}))}}}
+  out.sort((a,b)=>Math.abs(b._sc)-Math.abs(a._sc));
+  const z=p.method==='z';
+  return{flag:out.length,cards:[['Groups analysed',fmt0(ng)+(skip?' ('+skip+' too small)':'')],['Items tested',fmt0(tested)],['Outliers',fmt0(out.length),out.length?'warn':'ok'],['Value of outliers',fmt(sumBy(out,r=>Math.abs(r._amt)))]],
+   tables:[{title:'Isolated outliers ('+(z?'Z-score':'IQR')+', compared with '+({all:'whole population',cat:'category',party:'party'})[sc]+')',
+    cols:[{k:'_g',h:'Group'},{k:'_d',h:'Side'},{k:'_sc',h:z?'Z-score':'IQRs beyond',t:'num'},{k:'_c',h:z?'Group mean':'Group median',t:'amt'},{k:'_s',h:z?'Std deviation':'IQR',t:'amt'},...txnCols()],rows:out}]}}},
+
+{id:'benford',name:"Benford's Law",needs:[],
+ help:'<b>What it tests:</b> in many natural financial populations, the leading digit 1 appears about 30% of the time and 9 under 5%. Invented or manipulated figures usually break this pattern. The tool compares actual digit frequencies with Benford\'s expected frequencies.<p><b>How to read:</b> MAD (mean absolute deviation) gives the overall verdict using Nigrini\'s conformity ranges. Digits marked "Spike" occur significantly more often than expected (Z above 1.96) — click them to list the transactions. <b>Caution:</b> works best with 1,000+ naturally arising amounts; not suitable for assigned numbers, fixed fees, or data with built-in limits. <b>Useful for:</b> SA 240, journal entry testing, expense claims.</p>',
+ params:[{id:'test',l:'Test',t:'sel',d:'first',o:[['first','First digit'],['second','Second digit'],['two','First two digits']]},{id:'sign',l:'Amounts to include',t:'sel',d:'pos',o:[['pos','Positive amounts'],['neg','Negative amounts'],['abs','Both (absolute)']]},{id:'min',l:'Ignore amounts below',t:'num',d:10}],
+ run(p){const B=BEN[p.test];const pop=S.rows.filter(r=>{const a=r._sAmt;if(a==null||a===0)return false;if(p.sign==='pos'&&a<0)return false;if(p.sign==='neg'&&a>0)return false;return Math.abs(a)>=Math.max(p.min,p.test==='first'?1:10)});
+  const N=pop.length;if(!N)throw new Error('No amounts left to test with these settings.');
+  const cnt=new Map(B.dom.map(d=>[d,[]]));for(const r of pop)cnt.get(digitOf(r._sAmt,p.test))?.push(r);
+  let chi=0,mad=0;const rows=B.dom.map(d=>{const c=cnt.get(d).length,po=c/N,pe=B.exp(d),df=po-pe;const cc=1/(2*N);const zz=(Math.abs(df)>cc?Math.abs(df)-cc:Math.abs(df))/Math.sqrt(pe*(1-pe)/N);
+    chi+=(c-N*pe)**2/(N*pe);mad+=Math.abs(df);return{d,c,po,pe,df,z:zz,flag:zz>1.96?(df>0?'Spike':'Short'):'',_rows:cnt.get(d)}});
+  mad/=B.dom.length;const [a1,a2,a3]=B.mad;const conf=mad<=a1?['Close conformity','ok']:mad<=a2?['Acceptable conformity','ok']:mad<=a3?['Marginal conformity','warn']:['Nonconformity','bad'];
+  const spikes=rows.filter(r=>r.flag==='Spike');
+  const res={flag:conf[1]==='ok'?0:spikes.length||1,cards:[['Amounts tested',fmt0(N),N<500?'warn':''],['MAD',mad.toFixed(4)],['Verdict (Nigrini MAD)',conf[0],conf[1]],['Chi-square (5% critical)',chi.toFixed(2)+' ('+B.chi+')',chi>B.chi?'warn':'ok'],['Digits with spikes',spikes.length?spikes.map(r=>r.d).join(', '):'None',spikes.length?'warn':'ok']],
+   chart:barChart({labels:B.dom.map(String),series:[{name:'Actual %',vals:rows.map(r=>r.po*100),c:'#0066CC'}],line:{name:'Benford expected %',vals:rows.map(r=>r.pe*100),c:'#E8590C'},y:'%'}),
+   tables:[{title:B.lab+' test — click a digit to see its transactions',cols:[{k:'d',h:'Digit',t:'int'},{k:'c',h:'Count',t:'int'},{k:'po',h:'Actual %',t:'pct'},{k:'pe',h:'Expected %',t:'pct'},{k:'df',h:'Difference',t:'pct'},{k:'z',h:'Z-statistic',t:'num'},{k:'flag',h:'Result'}],rows,noSort:true,
+    drill:x=>({title:'Amounts with '+B.lab.toLowerCase()+' '+x.d,rows:x._rows.slice().sort(byAmtDesc)})}],
+   notes:[]};
+  if(N<500)res.notes.push('Only '+fmt0(N)+' amounts are being tested. Benford results are reliable mainly for larger populations (1,000+). Treat the verdict as indicative.');
+  if(chi>B.chi&&N>5000)res.notes.push('With large data sets the chi-square test rejects conformity very easily; rely more on MAD.');
+  return res}},
+
+{id:'idchk',name:'GSTIN / PAN format check',needs:[],needsAny:['gstin','pan'],
+ help:'<b>What it finds:</b> GSTINs and PANs in the data that cannot be genuine or do not agree with each other — wrong length, invalid state code, wrong holder-type character, a failed GSTIN check digit, a PAN that differs from the PAN inside the GSTIN, and one GSTIN or PAN used for different party names.<p><b>How to read:</b> "High" items need action — confirm the registration on the GST portal or the income-tax e-filing portal and correct the master. A failed check digit almost always means a typing error or a made-up number. Shared GSTINs across different names can point to fictitious vendors. <b>Useful for:</b> input tax credit risk, vendor master review, TDS compliance, SA 240 and SA 550.</p>',
+ params:[{id:'low',l:'Show low-severity (indicative) items',t:'bool',d:true}],
+ run(p){const m=S.map,R=S.rows,iss=[];const gM=new Map(),pM=new Map();let gB=0,pB=0;
+  for(const r of R){if(m.gstin){if(!r._gstin)gB++;else{let a=gM.get(r._gstin);if(!a){a=[];gM.set(r._gstin,a)}a.push(r)}}
+    if(m.pan){if(!r._pan)pB++;else{let a=pM.get(r._pan);if(!a){a=[];pM.set(r._pan,a)}a.push(r)}}}
+  const names=rows=>[...new Set(rows.map(r=>r._party).filter(Boolean))];
+  const add=(type,id,rows,issue,sev)=>{const nm=names(rows);iss.push({type,id,party:nm.slice(0,3).join('; ')+(nm.length>3?' …':''),issue,sev,n:rows.length,_rows:rows})};
+  let gBad=0,pBad=0;
+  for(const [g,rows] of gM){const e=gstinErrors(g);if(e.some(x=>x[1]==='High'))gBad++;e.forEach(x=>add('GSTIN',g,rows,x[0],x[1]));
+    if(m.pan&&g.length===15)for(const pn of new Set(rows.map(r=>r._pan).filter(Boolean)))if(pn!==g.slice(2,12))add('GSTIN',g,rows.filter(r=>r._pan===pn),'PAN inside GSTIN ('+g.slice(2,12)+') differs from PAN column ('+pn+')','High');
+    if(m.party){const nn=new Set(rows.map(r=>normName(r._party)).filter(Boolean));if(nn.size>1)add('GSTIN',g,rows,'Same GSTIN used for '+nn.size+' different party names','High')}}
+  for(const [pn,rows] of pM){const e=panErrors(pn,rows[0]._party);if(e.some(x=>x[1]==='High'))pBad++;e.forEach(x=>add('PAN',pn,rows,x[0],x[1]));
+    if(m.party){const nn=new Set(rows.map(r=>normName(r._party)).filter(Boolean));if(nn.size>1)add('PAN',pn,rows,'Same PAN used for '+nn.size+' different party names','Medium')}}
+  if(m.party&&m.gstin)for(const [pt,rows] of groupBy(R.filter(r=>r._party&&r._gstin),r=>normName(r._party))){const gs=new Set(rows.map(r=>r._gstin));if(gs.size>1)add('Party',rows[0]._party,rows,'Party has '+gs.size+' GSTINs — confirm they are separate state registrations of the same PAN','Low')}
+  let blankParties=[];if(m.party&&m.gstin){for(const [pt,rows] of groupBy(R.filter(r=>r._party),r=>r._party))if(rows.every(r=>!r._gstin))blankParties.push({party:pt,n:rows.length,v:sumBy(rows,r=>Math.abs(r._amt||0)),_rows:rows});blankParties.sort((a,b)=>b.v-a.v)}
+  const shown=iss.filter(x=>p.low||x.sev!=='Low').sort((a,b)=>SEV[a.sev]-SEV[b.sev]||b.n-a.n);
+  const hi=iss.filter(x=>x.sev==='High').length,md=iss.filter(x=>x.sev==='Medium').length;
+  const cards=[];if(m.gstin)cards.push(['Unique GSTINs (invalid)',fmt0(gM.size)+' ('+fmt0(gBad)+')',gBad?'bad':'ok'],['Rows without GSTIN',fmt0(gB),gB?'warn':'ok']);
+  if(m.pan)cards.push(['Unique PANs (invalid)',fmt0(pM.size)+' ('+fmt0(pBad)+')',pBad?'bad':'ok']);
+  cards.push(['High / medium issues',fmt0(hi)+' / '+fmt0(md),hi?'bad':md?'warn':'ok']);
+  const tables=[{title:'Exceptions (click to see the rows)',cols:[{k:'sev',h:'Severity'},{k:'type',h:'Type'},{k:'id',h:'GSTIN / PAN / Party'},{k:'party',h:'Party name(s)'},{k:'issue',h:'Issue'},{k:'n',h:'Rows',t:'int'}],rows:shown,drill:x=>({title:x.id,rows:x._rows})}];
+  if(blankParties.length)tables.push({title:'Parties with no GSTIN in any row (check if unregistered, composition or exempt)',cols:[{k:'party',h:'Party'},{k:'n',h:'Txns',t:'int'},{k:'v',h:'Value',t:'amt'}],rows:blankParties,drill:x=>({title:x.party,rows:x._rows})});
+  if(m.gstin){const st=[...groupBy([...gM.keys()],g=>g.slice(0,2))].map(([c,a])=>({c,s:STATES[c]||'Invalid code',n:a.length})).sort((a,b)=>b.n-a.n);tables.push({title:'GSTINs by state',cols:[{k:'c',h:'Code'},{k:'s',h:'State / UT'},{k:'n',h:'GSTINs',t:'int'}],rows:st})}
+  const panSrc=m.pan?[...pM.keys()]:[...gM.keys()].filter(g=>g.length===15).map(g=>g.slice(2,12));
+  const ty=[...groupBy(panSrc,x=>x[3])].map(([c,a])=>({c,s:PANT[c]||'Invalid',n:a.length})).sort((a,b)=>b.n-a.n);
+  tables.push({title:'PAN holder types (4th character)',cols:[{k:'c',h:'Code'},{k:'s',h:'Holder type'},{k:'n',h:'Count',t:'int'}],rows:ty});
+  return{flag:hi+md,cards,tables}}},
+
+{id:'thresh',name:'Entries just under a threshold',needs:[],
+ help:'<b>What it finds:</b> (1) amounts sitting just below a limit — for example ₹49,500 to ₹49,999 against a ₹50,000 approval limit; (2) a "cliff" where many items fall just below a limit but few just above it; (3) possible splitting — two or more items to the same party within a few days, each below the limit but together crossing it.<p><b>Which limits:</b> enter the limits that matter for the entity and the period — internal approval or delegation limits, purchase-committee limits, cash payment and cash receipt limits under the Income-tax law, the e-way bill value, TDS thresholds. Check the current statutory figures before relying on them. <b>Useful for:</b> SA 240 (management override, bill splitting), SA 330 tests of controls, tax compliance reviews.</p>',
+ params:[{id:'th',l:'Limits to test (comma separated)',t:'text',d:'10000, 50000, 100000, 200000, 500000'},{id:'band',l:'"Just below" means within (%)',t:'num',d:5},{id:'split',l:'Look for split transactions',t:'bool',d:true},{id:'win',l:'Split window (days; 0 = same day)',t:'num',d:0},{id:'part',l:'In split check, ignore items below (% of limit)',t:'num',d:40}],
+ run(p){const T=[...new Set(String(p.th).split(/[,;\s]+/).map(x=>parseAmount(x)).filter(x=>x>0))].sort((a,b)=>b-a);if(!T.length)throw new Error('Enter at least one limit.');
+  const band=Math.min(Math.max(+p.band||5,0.1),50)/100,V=valid();const sumT=[],below=[],splits=[],used=new Set();const notes=[];
+  for(const t of T){const lo=t*(1-band),hi=t*(1+band);
+    const bl=V.filter(r=>{const a=Math.abs(r._amt);return a>=lo&&a<t}),ab=V.filter(r=>{const a=Math.abs(r._amt);return a>=t&&a<hi});
+    const ratio=ab.length?bl.length/ab.length:(bl.length?Infinity:null);
+    sumT.push({t,nb:bl.length,na:ab.length,ratio,vb:sumBy(bl,r=>Math.abs(r._amt)),flag:bl.length>=3&&(ratio===Infinity||ratio>=2)?'Flag':'',_rows:bl});
+    bl.forEach(r=>below.push(Object.assign({},r,{_t:t,_gap:t-Math.abs(r._amt)})));
+    if(p.split&&S.map.party&&S.map.date){
+      const cand=V.filter(r=>r._party&&r._date&&Math.abs(r._amt)<t&&Math.abs(r._amt)>=t*(+p.part||0)/100&&!used.has(r));
+      for(const [pt,arr] of groupBy(cand,r=>r._party)){if(arr.length<2)continue;arr.sort((a,b)=>a._date<b._date?-1:a._date>b._date?1:0);
+        let i=0;while(i<arr.length){const d0=dayNum(arr[i]._date);let j=i,s=0;const cl=[];while(j<arr.length&&dayNum(arr[j]._date)-d0<=p.win){cl.push(arr[j]);s+=Math.abs(arr[j]._amt);j++}
+          if(cl.length>=2&&s>=t){cl.forEach(r=>used.add(r));splits.push({t,party:pt,from:cl[0]._date,to:cl[cl.length-1]._date,n:cl.length,tot:s,mp:cl.reduce((a,r)=>Math.min(a,Math.abs(r._amt)),Infinity)/t,_rows:cl});i=j}else i++}}}}
+  if(p.split&&!(S.map.party&&S.map.date))notes.push('Split-transaction check needs both the Party and Date columns mapped.');
+  below.sort((a,b)=>a._gap/a._t-b._gap/b._t);splits.sort((a,b)=>b.mp-a.mp);
+  const fl=sumT.filter(x=>x.flag).length;
+  return{flag:fl+splits.length,notes,cards:[['Limits tested',T.map(fmt0).join(', ')],['Items just below a limit',fmt0(below.length),below.length?'warn':'ok'],['Limits showing a "cliff"',fmt0(fl),fl?'warn':'ok'],['Possible split transactions',fmt0(splits.length),splits.length?'bad':'ok']],
+   tables:[{title:'Limit-wise profile (within '+(band*100)+'% below and above each limit)',cols:[{k:'t',h:'Limit',t:'amt'},{k:'nb',h:'Just below',t:'int'},{k:'na',h:'Just above',t:'int'},{k:'ratio',h:'Below ÷ above',t:'num'},{k:'vb',h:'Value just below',t:'amt'},{k:'flag',h:'Result'}],rows:sumT,noSort:true,drill:x=>({title:'Just below '+fmt(x.t),rows:x._rows.slice().sort(byAmtDesc)})},
+    {title:'Possible split transactions — each item below the limit, together at or above it (most suspicious first)',cols:[{k:'t',h:'Limit',t:'amt'},{k:'party',h:'Party'},{k:'from',h:'From',t:'date'},{k:'to',h:'To',t:'date'},{k:'n',h:'Items',t:'int'},{k:'tot',h:'Combined value',t:'amt'},{k:'mp',h:'Smallest part (% of limit)',t:'pct'}],rows:splits,drill:x=>({title:x.party+' — '+dmy(x.from),rows:x._rows})},
+    {title:'Items just below a limit (closest first)',cols:[{k:'_t',h:'Limit',t:'amt'},{k:'_gap',h:'Short by',t:'amt'},...txnCols()],rows:below}]}}}
+];
+const TBYID=Object.fromEntries(TESTS.map(t=>[t.id,t]));
+
+/* ============ Chart (SVG) ============ */
+function barChart({labels,series,line,y}){
+  const W=Math.max(720,labels.length*14+80),H=270,L=48,R=12,Tp=28,Bt=labels.length>12?62:44;const n=labels.length;
+  const all=[...series.flatMap(s=>s.vals),...(line?line.vals:[])];const mx=Math.max(...all,1)*1.12;
+  const gw=(W-L-R)/n,bw=gw*0.72/series.length;const yy=v=>Tp+(H-Tp-Bt)*(1-v/mx);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${Math.min(W,720)}px;font:11px Segoe UI,system-ui,sans-serif">`;
+  for(let i=0;i<=4;i++){const v=mx*i/4,yv=yy(v);s+=`<line x1="${L}" x2="${W-R}" y1="${yv}" y2="${yv}" stroke="#e4e7eb"/><text x="${L-6}" y="${yv+4}" text-anchor="end" fill="#616e7c">${v.toFixed(v<10?1:0)}${y||''}</text>`}
+  const every=n>40?5:1;
+  labels.forEach((lb,i)=>{const x0=L+gw*i+gw*0.14;series.forEach((se,j)=>{const v=se.vals[i]||0;s+=`<rect x="${x0+j*bw}" y="${yy(v)}" width="${Math.max(1,bw-1)}" height="${H-Bt-yy(v)}" fill="${se.c}" rx="1.5"><title>${esc(lb)}: ${v.toFixed(2)}${y||''}</title></rect>`});
+    if(i%every===0){const cx=L+gw*i+gw/2;s+=labels.length>12&&n<=40?`<text transform="translate(${cx},${H-Bt+12}) rotate(-35)" text-anchor="end" fill="#3e4c59">${esc(lb)}</text>`:`<text x="${cx}" y="${H-Bt+15}" text-anchor="middle" fill="#3e4c59">${esc(lb)}</text>`}});
+  if(line){const pts=line.vals.map((v,i)=>`${L+gw*i+gw/2},${yy(v)}`).join(' ');s+=`<polyline points="${pts}" fill="none" stroke="${line.c}" stroke-width="2"/>`;
+    if(n<=40)line.vals.forEach((v,i)=>s+=`<circle cx="${L+gw*i+gw/2}" cy="${yy(v)}" r="3" fill="${line.c}"/>`)}
+  let lx=L;const leg=[...series.map(x=>[x.name,x.c,'r']),...(line?[[line.name,line.c,'l']]:[])];
+  leg.forEach(([nm,c,t])=>{s+=t==='r'?`<rect x="${lx}" y="8" width="11" height="11" fill="${c}" rx="2"/>`:`<line x1="${lx}" x2="${lx+12}" y1="13.5" y2="13.5" stroke="${c}" stroke-width="2.5"/>`;s+=`<text x="${lx+16}" y="18" fill="#1f2933">${esc(nm)}</text>`;lx+=nm.length*6.4+36});
+  return s+'</svg>';
+}
+
+/* ============ Table rendering ============ */
+const MAXR=500;
+function renderTable(host,tb){
+  const st=tb._st||(tb._st={q:'',sk:null,sd:1});
+  let rows=tb.rows;
+  if(st.q){const q=st.q.toLowerCase();rows=rows.filter(r=>tb.cols.some(c=>String(cell(r[c.k],c.t)).toLowerCase().includes(q)))}
+  if(st.sk!=null){const c=tb.cols.find(x=>x.k===st.sk);rows=rows.slice().sort((a,b)=>{let x=a[st.sk],y=b[st.sk];if(T[c.t]){x=+x||0;y=+y||0;return(x-y)*st.sd}return String(x??'').localeCompare(String(y??''))*st.sd})}
+  const id='t'+Math.random().toString(36).slice(2,8);
+  let h=`<div class="tbar"><h4>${esc(tb.title)} <span class="chip">${fmt0(rows.length)} rows</span></h4><input placeholder="Search in table…" value="${esc(st.q)}" data-q><button class="btn sm" data-copy>Copy table</button></div>`;
+  if(!tb.rows.length){host.innerHTML=h+'<div class="muted" style="padding:6px 2px 10px">No items found.</div>';bindT();return}
+  h+=`<div class="tw"><table><thead><tr>${tb.cols.map(c=>`<th class="${T[c.t]?'r':''}" data-k="${esc(c.k)}">${esc(c.h)}${st.sk===c.k?(st.sd>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>`;
+  rows.slice(0,MAXR).forEach((r,i)=>{h+=`<tr class="${tb.drill?'ck':''}" data-i="${i}">${tb.cols.map(c=>{let v=cell(r[c.k],c.t);if((c.h==='Result'||c.h==='Severity')&&v)v=`<span class="chip ${v==='Short'||v==='Low'?'':v==='High'?'bad':'warn'}">${esc(v)}</span>`;else v=esc(v);return`<td class="${T[c.t]?'r':''}" title="${T[c.t]?'':esc(cell(r[c.k],c.t))}">${v}</td>`}).join('')}</tr>`});
+  h+='</tbody></table></div>';
+  if(rows.length>MAXR)h+=`<div class="muted" style="margin-top:6px">Showing the first ${MAXR} of ${fmt0(rows.length)} rows. Export working papers to get every row.</div>`;
+  h+=`<div data-drill style="margin-top:12px"></div>`;
+  host.innerHTML=h;bindT();
+  function bindT(){
+    const qi=host.querySelector('[data-q]');if(qi)qi.oninput=e=>{st.q=e.target.value;const pos=e.target.selectionStart;renderTable(host,tb);const n=host.querySelector('[data-q]');n.focus();n.setSelectionRange(pos,pos)};
+    const cp=host.querySelector('[data-copy]');if(cp)cp.onclick=()=>copyText(tsv(tb.cols,rows));
+    host.querySelectorAll('th').forEach(th=>th.onclick=()=>{if(tb.noSort)return;const k=th.dataset.k;if(st.sk===k)st.sd=-st.sd;else{st.sk=k;st.sd=T[(tb.cols.find(c=>c.k===k)||{}).t]?-1:1}renderTable(host,tb)});
+    if(tb.drill)host.querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{host.querySelectorAll('tr.sel').forEach(x=>x.classList.remove('sel'));tr.classList.add('sel');
+      const d=tb.drill(rows[+tr.dataset.i]);const dh=host.querySelector('[data-drill]');renderTable(dh,{title:'↳ '+d.title,cols:d.cols||txnCols(),rows:d.rows});dh.scrollIntoView({behavior:'smooth',block:'nearest'})});
+  }
+}
+const tsv=(cols,rows)=>[cols.map(c=>c.h).join('\t'),...rows.map(r=>cols.map(c=>String(xval(r[c.k],c.t)).replace(/[\t\n]/g,' ')).join('\t'))].join('\n');
+async function copyText(t){try{await navigator.clipboard.writeText(t);toast('Copied — paste into Excel')}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');toast('Copied — paste into Excel')}catch(_){toast('Copy was blocked by the browser')}a.remove()}}
+
+/* ============ Params ============ */
+function getParams(t){if(!S.params[t.id]){const p={};t.params.forEach(x=>p[x.id]=typeof x.d==='function'?x.d():x.d);S.params[t.id]=p}return S.params[t.id]}
+function paramForm(t){const p=getParams(t);
+  return t.params.map(x=>{const v=p[x.id];
+    if(x.t==='num')return`<label class="f">${esc(x.l)}<input type="number" data-p="${x.id}" value="${esc(v)}" step="any"></label>`;
+    if(x.t==='text')return`<label class="f" style="min-width:320px">${esc(x.l)}<input data-p="${x.id}" value="${esc(v)}"></label>`;
+    if(x.t==='bool')return`<label class="f" style="flex-direction:row;align-items:center;gap:7px;color:var(--ink);padding-bottom:6px"><input type="checkbox" data-p="${x.id}" ${v?'checked':''}>${esc(x.l)}</label>`;
+    if(x.t==='sel')return`<label class="f">${esc(x.l)}<select data-p="${x.id}">${x.o.map(([a,b])=>`<option value="${a}" ${String(v)===a?'selected':''}>${esc(b)}</option>`).join('')}</select></label>`;
+    if(x.t==='col')return`<label class="f">${esc(x.l)}<select data-p="${x.id}"><option value="">— select —</option>${S.headers.map(h=>`<option ${h===v?'selected':''}>${esc(h)}</option>`).join('')}</select></label>`;
+    if(x.t==='cols'){const m=S.map;const pre=[['Same document no.',[m.doc]],['Party + amount + date',[m.party,m.amount,m.date]],['Party + amount',[m.party,m.amount]],['Amount + date',[m.amount,m.date]],['Entire row',S.headers]].filter(([,c])=>c.every(Boolean));
+      return`<div style="flex:1 1 100%"><div class="muted" style="margin-bottom:4px">${esc(x.l)} — quick presets: ${pre.map(([n],i)=>`<button class="btn sm" data-pre="${i}">${esc(n)}</button>`).join(' ')}</div><div class="cols">${S.headers.map(h=>`<label><input type="checkbox" data-pc="${esc(h)}" ${v.includes(h)?'checked':''}>${esc(h)}</label>`).join('')}</div></div>`}
+  }).join('')}
+function readParams(t){const p=getParams(t);
+  t.params.forEach(x=>{if(x.t==='cols'){p[x.id]=[...document.querySelectorAll('[data-pc]')].filter(e=>e.checked).map(e=>e.dataset.pc);return}
+    const e=document.querySelector(`[data-p="${x.id}"]`);if(!e)return;p[x.id]=x.t==='num'?(+e.value||0):x.t==='bool'?e.checked:e.value});return p}
+function paramText(t,p){return t.params.map(x=>{let v=p[x.id];if(x.t==='bool')v=v?'Yes':'No';if(x.t==='sel')v=(x.o.find(o=>o[0]===String(v))||[,v])[1];if(Array.isArray(v))v=v.join(' + ');return x.l+': '+v}).join(' | ')}
+
+function runTest(t,quiet){
+  if(t.needsAny&&!t.needsAny.some(n=>S.map[n])){S.err[t.id]='This test needs at least one of these columns: '+t.needsAny.map(n=>MAPF.find(f=>f[0]===n)[1]).join(' or ')+'. Map it under Data & Mapping.';delete S.results[t.id];return}
+  const miss=t.needs.filter(n=>!S.map[n]);
+  if(miss.length){S.err[t.id]='This test needs the '+miss.map(n=>MAPF.find(f=>f[0]===n)[1].replace(' *','')).join(', ')+' column. Map it under Data & Mapping.';delete S.results[t.id];return}
+  try{const p=getParams(t);const r=t.run(p);r.params=paramText(t,p);r.at=new Date();S.results[t.id]=r;S.err[t.id]=''}
+  catch(e){S.err[t.id]=e.message||String(e);delete S.results[t.id]}
+}
+
+/* ============ Views ============ */
+function render(){renderNav();const v=S.view;
+  if(v==='data')viewData();else if(!S.mapped){S.view='data';viewData()}else if(v==='overview')viewOverview();else if(v==='sampling')viewSampling();else viewTest(TBYID[v]);}
+function renderNav(){
+  let h=`<div class="sec">Setup</div><a data-v="data" class="${S.view==='data'?'on':''}"><span class="n">⇪</span>Data &amp; Mapping</a>`;
+  h+=`<a data-v="overview" class="${S.view==='overview'?'on':''}"><span class="n">▦</span>Overview &amp; Run all</a><div class="sec">CAAT tests</div>`;
+  TESTS.forEach((t,i)=>{const r=S.results[t.id];const dot=r?(r.flag==null?'<span class="dot">done</span>':`<span class="dot ${r.flag?'warn':'ok'}">${r.flag?fmt0(r.flag):'✓'}</span>`):'';
+    h+=`<a data-v="${t.id}" class="${S.view===t.id?'on':''}"><span class="n">${i+1}</span>${esc(t.name)}${dot}</a>`});
+  const sr=S.samp&&S.samp.res;h+=`<div class="sec">Sampling</div><a data-v="sampling" class="${S.view==='sampling'?'on':''}"><span class="n">◎</span>Audit Sampling${sr?`<span class="dot ok">${fmt0(sr.items.length)}</span>`:''}</a>`;
+  $('#nav').innerHTML=h;
+  $('#nav').querySelectorAll('a').forEach(a=>a.onclick=()=>{if(a.dataset.v!=='data'&&!S.mapped){toast('Load data and apply mapping first');return}S.view=a.dataset.v;render();window.scrollTo(0,0)});
+}
+function viewOverview(){
+  const R=S.rows,V=valid(),m=S.map;const pos=V.filter(r=>r._sAmt>0),neg=V.filter(r=>r._sAmt<0);
+  const ds=R.map(r=>r._date).filter(Boolean).sort();const parties=new Set(R.map(r=>r._party).filter(Boolean));
+  const unp=R.length-V.length,und=m.date?R.length-ds.length:0;
+  let h=`<h1>Overview</h1><p class="sub">${esc(S.fileName)}${S.sheet?' · sheet '+esc(S.sheet):''} — profile of the data, then run all tests in one click.</p>`;
+  h+=`<div class="cards">${[['Rows loaded',fmt0(R.length)],['Amounts read',fmt0(V.length),unp?'warn':'ok'],['Unreadable / blank amounts',fmt0(unp),unp?'warn':'ok'],['Total (net)',fmt(sumBy(V,r=>r._sAmt))],
+    ['Positive items',fmt0(pos.length)+' · '+fmt(sumBy(pos,r=>r._sAmt))],['Negative items',fmt0(neg.length)+' · '+fmt(sumBy(neg,r=>r._sAmt))],
+    ['Largest / smallest',V.length?fmt(V.reduce((a,r)=>r._amt>a?r._amt:a,-Infinity))+' / '+fmt(V.reduce((a,r)=>r._amt<a?r._amt:a,Infinity)):'—'],
+    ...(m.date?[['Date range',ds.length?dmy(ds[0])+' to '+dmy(ds[ds.length-1]):'—'],['Unreadable dates',fmt0(und),und?'warn':'ok']]:[]),
+    ...(m.party?[['Distinct parties',fmt0(parties.size)]]:[])].map(kpi).join('')}</div>`;
+  h+=`<div class="card"><div class="row" style="align-items:center"><h3 style="margin:0">Run all tests with default settings</h3><button class="btn p" id="bAll" style="margin-left:auto">▶ Run all tests</button></div>
+    <p class="muted" style="margin:6px 0 12px">Defaults are a sensible starting point. Open any test to change its thresholds and run it again.</p><div class="dash">`;
+  TESTS.forEach((t,i)=>{const r=S.results[t.id],e=S.err[t.id];let v='Not run',tone='';
+    if(e){v='Needs attention';tone='bad'}else if(r){if(r.flag==null){v='Done';tone='ok'}else{v=r.flag?fmt0(r.flag)+' item'+(r.flag>1?'s':'')+' to review':'Nothing flagged';tone=r.flag?'warn':'ok'}}
+    h+=`<div class="kpi ${tone}" data-go="${t.id}"><div class="l">${i+1}. ${esc(t.name)}</div><div class="v" style="font-size:15px">${esc(v)}</div>${e?`<div class="muted">${esc(e)}</div>`:r?`<div class="muted">${esc(r.cards[1]?r.cards[1][0]+': '+r.cards[1][1]:'')}</div>`:''}</div>`});
+  h+=`</div></div>`+footer();$('#main').innerHTML=h;
+  $('#bAll').onclick=()=>{TESTS.forEach(t=>runTest(t,true));render();toast('All tests run')};
+  document.querySelectorAll('[data-go]').forEach(d=>d.onclick=()=>{S.view=d.dataset.go;render();window.scrollTo(0,0)});
+}
+function kpi([l,v,tone]){return`<div class="kpi ${tone||''}"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div></div>`}
+function viewTest(t){
+  const i=TESTS.indexOf(t);const r=S.results[t.id],e=S.err[t.id];
+  let h=`<h1>${i+1}. ${esc(t.name)}</h1><p class="sub">${esc(S.fileName)}</p><div class="help">${t.help}</div>`;
+  h+=`<div class="card"><h3>Settings</h3><div class="row">${paramForm(t)}<div style="margin-left:auto;display:flex;gap:8px"><button class="btn p" id="bRun">▶ Run test</button>${r?'<button class="btn" id="bX1">Export this test</button>':''}</div></div></div>`;
+  if(e)h+=`<div class="err">${esc(e)}</div>`;
+  if(r){(r.notes||[]).forEach(n=>h+=`<div class="note">${esc(n)}</div>`);
+    h+=`<div class="cards">${r.cards.map(kpi).join('')}</div>`;
+    if(r.chart)h+=`<div class="card chart">${r.chart}</div>`;
+    r.tables.forEach((tb,j)=>h+=`<div class="card" id="tb${j}"></div>`);
+    h+=`<p class="muted">Run on ${r.at.toLocaleString('en-IN')} · ${esc(r.params)}</p>`}
+  h+=footer();$('#main').innerHTML=h;
+  if(r)r.tables.forEach((tb,j)=>renderTable($('#tb'+j),tb));
+  document.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{const m=S.map;const pre=[[m.doc],[m.party,m.amount,m.date],[m.party,m.amount],[m.amount,m.date],S.headers].filter(c=>c.every(Boolean))[+b.dataset.pre];
+    document.querySelectorAll('[data-pc]').forEach(c=>c.checked=pre.includes(c.dataset.pc))});
+  $('#bRun').onclick=()=>{readParams(t);runTest(t);render()};
+  if($('#bX1'))$('#bX1').onclick=()=>exportWB([t.id]);
+}
+function footer(){return`<footer><b>Disclaimer:</b> ${esc(DISCLAIMER)} Runs fully in the browser; source data never leaves this computer.</footer>`}
+
+/* ============ Audit Sampling (SA 530) ============ */
+function mulberry(a){a=a>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const EFT={80:1.3,85:1.4,90:1.5,95:1.6,99:1.9};
+function efFor(cl){const c=Math.round(cl*100);let f=1.3;for(const k of [80,85,90,95,99])if(c>=k)f=EFT[k];return f}
+function poisCdf(k,l){let t=Math.exp(-l),s=t;for(let i=1;i<=k;i++){t*=l/i;s+=t}return s}
+function poisUL(k,cl){let lo=0,hi=300;for(let i=0;i<120;i++){const m=(lo+hi)/2;if(poisCdf(k,m)>1-cl)lo=m;else hi=m}return hi}
+function binCdf(k,n,p){if(p<=0)return 1;if(p>=1)return k>=n?1:0;let t=Math.pow(1-p,n),s=t;for(let i=1;i<=k;i++){t*=(n-i+1)/i*p/(1-p);s+=t}return s}
+const newSeed=()=>{try{const a=new Uint32Array(1);crypto.getRandomValues(a);return 100000000+a[0]%900000000}catch(e){return Math.floor(Math.random()*9e8)+1e8}};
+function SP_DEF(){return{src:'all',srcTest:'',sign:'all',amtMin:'',amtMax:'',dFrom:'',dTo:'',cat:'',party:'',noZero:true,
+  keyOn:true,keyAmt:'',keyTests:[],
+  sizeMode:'mus',n:25,cl:95,keyFollow:true,useSeed:true,tm:'',em:0,ef:'',tdr:5,edr:0,interval:'',
+  method:'mus',seed:newSeed(),order:'file',purpose:'details',qRisk:'moderate',qMethod:'mus',freq:'daily',fRisk:'lower',sBasis:'value',sBands:(S.params.strat&&S.params.strat.b)||'10000, 50000, 100000, 500000, 1000000',sAlloc:'value',sMin:2,sCustom:'',proj:'ratio'}}
+const SIA5={annual:[1,1,'Annual'],quarterly:[2,2,'Quarterly (incl. period-end, i.e. 1+1)'],monthly:[2,3,'Monthly'],weekly:[5,8,'Weekly'],daily:[15,25,'Daily'],multi:[25,40,'Many times a day (recurring manual control)']};
+const QCL={low:90,moderate:95,high:98};
+function fyOf(d){const y=+d.slice(0,4),m=+d.slice(5,7);return m>=4?y:y-1}
+function perKey(f){return d=>{if(f==='monthly')return d.slice(0,7);if(f==='daily')return d;if(f==='annual')return 'FY'+fyOf(d);
+  if(f==='quarterly'){const m=+d.slice(5,7);return fyOf(d)+'-Q'+(Math.floor(((m+8)%12)/3)+1)}
+  const t=Date.parse(d+'T00:00:00Z'),wd=(new Date(t).getUTCDay()+6)%7;return new Date(t-wd*864e5).toISOString().slice(0,10)}}
+function perLabel(f,k){const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],fy=y=>'FY '+y+'-'+String((+y+1)%100).padStart(2,'0');
+  if(f==='monthly')return MN[+k.slice(5,7)-1]+' '+k.slice(0,4);if(f==='daily')return dmy(k);if(f==='weekly')return 'Week starting '+dmy(k);if(f==='annual')return fy(k.slice(2));
+  const y=+k.slice(0,4),q=+k.slice(-1);return 'Q'+q+' '+fy(y)+' ('+['Apr–Jun','Jul–Sep','Oct–Dec','Jan–Mar'][q-1]+')'}
+function spApplySimple(p){
+  if(p.purpose==='controls'){const n=SIA5[p.freq][p.fRisk==='higher'?1:0];Object.assign(p,{sizeMode:'manual',n,keyOn:false,method:p.freq==='multi'?'random':'period'})}
+  else Object.assign(p,{sizeMode:'mus',cl:QCL[p.qRisk],ef:'',keyOn:true,keyAmt:p.tm,method:p.qMethod,sAlloc:'value',sBasis:'value',sMin:2,proj:'ratio'})}
+function rowsOfResult(r){const byR=S._byR||(S._byR=new Map(S.rows.map(x=>[x._r,x])));const m=new Map();
+  for(const tb of r.tables)for(const row of tb.rows){if(row._rows)row._rows.forEach(x=>m.set(x._r,x));else if(row._r!=null){const o=byR.get(row._r);if(o)m.set(o._r,o)}}
+  return[...m.values()]}
+function spPopulation(p){
+  let base;if(p.src==='test'){const r=S.results[p.srcTest];if(!r)throw new Error('Choose a test that has been run, or use All transactions.');base=rowsOfResult(r).filter(x=>x._amt!=null)}else base=valid();
+  const lo=p.amtMin===''?null:+p.amtMin,hi=p.amtMax===''?null:+p.amtMax,q=String(p.party||'').trim().toLowerCase();
+  return base.filter(r=>{const a=r._amt;if(p.noZero&&a===0)return false;if(p.sign==='pos'&&a<0)return false;if(p.sign==='neg'&&a>=0)return false;
+    if(lo!=null&&a<lo)return false;if(hi!=null&&a>hi)return false;if(p.dFrom&&(!r._date||r._date<p.dFrom))return false;if(p.dTo&&(!r._date||r._date>p.dTo))return false;
+    if(p.cat&&r._cat!==p.cat)return false;if(q&&!r._party.toLowerCase().includes(q))return false;return true}).sort((a,b)=>a._r-b._r)}
+function spSize(p,V,N,cl){
+  if(p.sizeMode==='sia5'){const n=SIA5[p.freq][p.fRisk==='higher'?1:0];return{n,txt:'SIA 5 frequency table minimum for a '+SIA5[p.freq][2].toLowerCase()+' control with '+p.fRisk+' risk of failure: '+n+(p.freq==='quarterly'?' (period-end quarter + 1)':'')}}
+  if(p.sizeMode==='manual'){const n=Math.round(+p.n||0);if(n<1)throw new Error('Enter a sample size of at least 1.');return{n,txt:'Sample size set by the auditor: '+n}}
+  if(p.sizeMode==='interval'){const J=+p.interval;if(!(J>0))throw new Error('Enter the sampling interval.');return{n:Math.ceil(V/J),J,txt:'Sampling interval of ₹'+fmt(J)+' set by the auditor → about '+Math.ceil(V/J)+' selections'}}
+  if(p.sizeMode==='mus'){const tm=+p.tm,em=+p.em||0;if(!(tm>0))throw new Error('Enter tolerable misstatement for the size calculation.');
+    const rf=poisUL(0,cl),ef=+p.ef||efFor(cl),d=tm-em*ef;if(d<=0)throw new Error('Expected misstatement × expansion factor must be less than tolerable misstatement.');
+    const n=Math.ceil(V*rf/d);return{n,rf,ef,txt:`n = (V × RF) ÷ (TM − EM × EF) = (${fmt(V)} × ${rf.toFixed(2)}) ÷ (${fmt(tm)} − ${fmt(em)} × ${ef}) = ${fmt0(n)}`}}
+  if(p.sizeMode==='attr'){const t=(+p.tdr||0)/100,e=(+p.edr||0)/100;if(!(t>0&&t<1))throw new Error('Enter a tolerable deviation rate between 0 and 100%.');if(e>=t)throw new Error('Expected deviation rate must be below the tolerable rate.');
+    for(let n=1;n<=5000;n++){const k=e>0?Math.ceil(n*e):0;if(binCdf(k,n,t)<=1-cl)return{n,txt:`Attribute sample: confidence ${+(cl*100).toFixed(2)}%, tolerable deviation ${p.tdr}%, expected deviation ${p.edr}% → n = ${n}, allowing up to ${k} deviation(s) (binomial)`}}
+    throw new Error('Sample size would exceed 5,000 — widen the tolerable rate.')}
+}
+function allocate(n,w,caps,min){const W=w.reduce((a,b)=>a+b,0);const raw=w.map(x=>W?n*x/W:0);const base=raw.map(Math.floor);let rem=n-base.reduce((a,b)=>a+b,0);
+  raw.map((x,i)=>[x-Math.floor(x),i]).sort((a,b)=>b[0]-a[0]).forEach(([,i])=>{if(rem>0){base[i]++;rem--}});
+  return base.map((b,i)=>Math.min(caps[i],Math.max(b,Math.min(min,caps[i]))))}
+const x_abs=r=>r._isP?r._pv:Math.abs(r._amt);
+function spRun(){
+  const p=S.samp.p,out={notes:[]};const cl=Math.min(Math.max(+p.cl||95,50),99.9)/100;out.cl=cl;
+  const pop=spPopulation(p);if(!pop.length)throw new Error('The population is empty — check the filters.');
+  const key=spKeys(p,pop);
+  const sp=pop.filter(r=>!key.has(r)),N=sp.length,V=sumBy(sp,r=>Math.abs(r._amt));
+  const calc=N?spSize(p,V,N,cl):{n:0,txt:'All items are key items; nothing left to sample.'};
+  let nPlan=calc.n;if(nPlan>N){out.notes.push('The size worked out ('+fmt0(nPlan)+') is more than the items left to sample ('+fmt0(N)+'), so every item is selected.');nPlan=N}
+  const seedUsed=p.useSeed===false?newSeed():(+p.seed||1);p._seedUsed=seedUsed;
+  const rng=mulberry(seedUsed),sel=new Map();let J=null,start=null,strata=null;
+  const ordered=()=>{const a=sp.slice();if(p.order==='date')a.sort((x,y)=>(x._date||'').localeCompare(y._date||'')||x._r-y._r);
+    else if(p.order==='doc')a.sort((x,y)=>String(x._doc).localeCompare(String(y._doc),undefined,{numeric:true})||x._r-y._r);
+    else if(p.order==='amt')a.sort((x,y)=>Math.abs(y._amt)-Math.abs(x._amt)||x._r-y._r);return a};
+  const shuffleTake=(arr,k,tag)=>{const a=arr.slice();for(let i=0;i<k;i++){const j=i+Math.floor(rng()*(a.length-i));[a[i],a[j]]=[a[j],a[i]];sel.set(a[i],Object.assign({seq:i+1},tag(i)))}};
+  if(nPlan>0){
+    if(p.method==='random')shuffleTake(sp,nPlan,i=>({how:'Simple random — draw '+(i+1)}));
+    else if(p.method==='systematic'){const a=ordered();J=a.length/nPlan;start=rng()*J;
+      for(let k=0;k<nPlan;k++){const idx=Math.floor(start+k*J);if(a[idx]&&!sel.has(a[idx]))sel.set(a[idx],{seq:k+1,how:'Systematic — item '+fmt0(idx+1)+' of '+fmt0(a.length)})}}
+    else if(p.method==='mus'){if(!(V>0))throw new Error('The sampling population has no value to sample.');const a=ordered();J=calc.J||V/nPlan;start=rng()*J;let cum=0,pt=start,seq=0;
+      for(const r of a){const v=Math.abs(r._amt);let hits=0,first=null;while(pt<cum+v){hits++;if(first==null)first=pt;pt+=J}cum+=v;
+        if(hits){seq++;sel.set(r,{seq,hits,how:'MUS — selection point ₹'+fmt(first)+(hits>1?' ('+hits+' hits)':'')})}}
+      if(sp.some(r=>r._amt<0))out.notes.push('Negative items were sampled at their absolute value. MUS is designed to test overstatement; consider testing negative items separately.')}
+    else if(p.method==='period'){const dated=sp.filter(r=>r._date);if(!dated.length)throw new Error('Selecting periods needs the Date column to be mapped.');
+      const f=p.freq==='multi'?'daily':p.freq,g=[...groupBy(dated,r=>perKey(f)(r._date))].sort((a,b)=>a[0]<b[0]?-1:1);let picks=[];
+      if(f==='annual')picks=[g.length-1];
+      else{const want=Math.min(nPlan,g.length);if(nPlan>g.length)out.notes.push('Only '+g.length+' '+f+' periods are present in the data, so all of them are selected.');
+        let idx=g.map((_,i)=>i);if(f==='quarterly'){picks.push(idx.pop())}
+        for(let i=0;picks.length<want&&i<idx.length;i++){const j=i+Math.floor(rng()*(idx.length-i));[idx[i],idx[j]]=[idx[j],idx[i]];picks.push(idx[i])}}
+      picks.sort((a,b)=>a-b);out.periods=picks.map(i=>({key:g[i][0],lab:perLabel(f,g[i][0]),rows:g[i][1],end:f==='quarterly'&&i===g.length-1}));out.freq=f}
+    else if(p.method==='strat'){
+      let groups;
+      if(p.sBasis==='cat'){const ck=S.map.cat?'_cat':'_party';groups=[...groupBy(sp,r=>r[ck]||'(blank)')].map(([k,a])=>({lab:k,rows:a})).sort((a,b)=>sumBy(b.rows,r=>Math.abs(r._amt))-sumBy(a.rows,r=>Math.abs(r._amt)))}
+      else{const b=String(p.sBands).split(/[,;\s]+/).map(x=>parseAmount(x)).filter(x=>x!=null&&x>0).sort((x,y)=>x-y);const lims=[0,...b];groups=[];
+        if(sp.some(r=>r._amt<0))groups.push({lab:'Negative (below 0)',rows:sp.filter(r=>r._amt<0)});
+        lims.forEach((lo,i)=>{const hi=lims[i+1];groups.push({lab:hi!=null?fmt0(lo)+' to below '+fmt0(hi):fmt0(lo)+' and above',rows:sp.filter(r=>r._amt>=lo&&(hi==null||r._amt<hi))})})}
+      groups=groups.filter(g=>g.rows.length);const caps=groups.map(g=>g.rows.length);let al;
+      if(p.sAlloc==='custom'){al=String(p.sCustom).split(/[,;\s]+/).filter(Boolean).map(x=>Math.max(0,Math.round(+x||0)));
+        if(al.length!==groups.length)throw new Error('Custom sizes: enter '+groups.length+' numbers, one for each stratum in the order shown ('+groups.map(g=>g.lab).join(' | ')+').');
+        al=al.map((x,i)=>Math.min(x,caps[i]))}
+      else{const w=groups.map(g=>p.sAlloc==='count'?g.rows.length:p.sAlloc==='equal'?1:sumBy(g.rows,r=>Math.abs(r._amt)));al=allocate(nPlan,w,caps,Math.max(0,+p.sMin||0))}
+      strata=groups.map((g,i)=>{const a=g.rows.slice();for(let k=0;k<al[i];k++){const j=k+Math.floor(rng()*(a.length-k));[a[k],a[j]]=[a[j],a[k]];sel.set(a[k],{seq:k+1,how:'Stratified random — draw '+(k+1)+' of '+al[i],stratum:g.lab})}
+        return{lab:g.lab,N:g.rows.length,V:sumBy(g.rows,r=>Math.abs(r._amt)),n:al[i],nv:sumBy(a.slice(0,al[i]),r=>Math.abs(r._amt)),_rows:g.rows}});
+      const tot=al.reduce((a,b)=>a+b,0);if(tot!==nPlan)out.notes.push('Total selected across strata is '+tot+' (planned '+nPlan+') because of the minimum per stratum, custom sizes or small strata.')}
+  }
+  const items=[];key.forEach((how,r)=>items.push(Object.assign({},r,{_how:how,_type:'Key',_st:''})));
+  sel.forEach((v,r)=>items.push(Object.assign({},r,{_how:v.how,_type:'Sample',_st:v.stratum||'',_hits:v.hits||0})));
+  if(out.periods)out.periods.forEach((pp,i)=>items.push({_r:'P'+pp.key,_type:'Sample',_how:pp.end?'Period-end quarter (always tested)':(out.freq==='annual'?'Year-end instance':'Random period'),_period:pp.lab,_pn:pp.rows.length,_pv:sumBy(pp.rows,r=>Math.abs(r._amt)),_amt:sumBy(pp.rows,r=>r._amt),_rows:pp.rows,_isP:true}));
+  items.sort((a,b)=>(a._type===b._type?0:a._type==='Key'?-1:1)||(a._isP?String(a._r).localeCompare(String(b._r)):a._r-b._r));items.forEach((x,i)=>x._sno=i+1);
+  const kv=sumBy([...key.keys()],r=>Math.abs(r._amt)),pv=sumBy(pop,r=>Math.abs(r._amt)),sv=sumBy(items.filter(x=>x._type==='Sample'),r=>x_abs(r));out.purpose=p.purpose;out.mode=p.mode;
+  Object.assign(out,{method:p.method,pop:{n:pop.length,v:pv},key:{n:key.size,v:kv},sp:{n:N,v:V},nPlan:calc.n,calcTxt:calc.txt,J,start,strata,items,sv,at:new Date(),seed:seedUsed,useSeed:p.useSeed!==false,
+    plan:spPlan(p,calc),_spRows:sp});
+  return out}
+const SPM={period:'Random periods (for periodic controls)',random:'Simple random selection',systematic:'Systematic selection (fixed interval, random start)',mus:'Monetary unit sampling (value-weighted)',strat:'Stratified random selection'};
+const SPS={sia5:'Frequency table (SIA 5)',manual:'Set by the auditor',mus:'Calculated — monetary (MUS formula)',attr:'Calculated — tests of controls (attribute)',interval:'Fixed sampling interval'};
+function spPlan(p,calc){const L0=[['Purpose',p.purpose==='controls'?'Tests of controls (deviations)':'Tests of details (misstatements)']];
+  if(p.sizeMode==='sia5')L0.push(['Basis of sample size','Frequency table (SIA 5, Appendix 4) — '+SIA5[p.freq][2]+' control, '+(p.fRisk==='higher'?'higher':'lower')+' risk of failure: minimum '+SIA5[p.freq][p.fRisk==='higher'?1:0]]);
+  if(p.sizeMode==='mus'&&QCL[p.qRisk]===+p.cl)L0.push(['Assessed risk of material misstatement',{low:'Low → 90% confidence',moderate:'Moderate → 95% confidence',high:'High → 98% confidence'}[p.qRisk]+' (recommended level; change it if your firm\'s methodology differs)']);
+  if(p.method==='period')L0.push(['Periods',SIA5[p.freq]?SIA5[p.freq][2]:p.freq]);
+  const L=[...L0,['Population source',p.src==='test'?'Exceptions from '+(TBYID[p.srcTest]||{}).name:'All transactions'],['Amounts included',{all:'All',pos:'Positive only',neg:'Negative only'}[p.sign]]];
+  if(p.amtMin!==''||p.amtMax!=='')L.push(['Amount range',(p.amtMin===''?'no lower limit':fmt(+p.amtMin))+' to '+(p.amtMax===''?'no upper limit':fmt(+p.amtMax))]);
+  if(p.dFrom||p.dTo)L.push(['Date range',(dmy(p.dFrom)||'start')+' to '+(dmy(p.dTo)||'end')]);if(p.cat)L.push(['Category',p.cat]);if(p.party)L.push(['Party name contains',p.party]);
+  L.push(['Zero amounts',p.noZero?'Excluded':'Included'],['Key items by amount',p.keyOn&&+p.keyAmt>0?'At or above ₹'+fmt(+p.keyAmt):'Not used'],['Key items from test exceptions',p.keyTests.map(id=>TBYID[id].name).join(', ')||'None'],
+    ['Sample size basis',SPS[p.sizeMode]],['Size working',calc.txt],['Confidence level',p.cl+'%']);
+  if(+p.tm)L.push(['Tolerable misstatement','₹'+fmt(+p.tm)]);if(p.sizeMode==='mus')L.push(['Expected misstatement','₹'+fmt(+p.em||0)]);
+  L.push(['Selection method',SPM[p.method]]);if(p.method==='systematic'||p.method==='mus')L.push(['Population order',{file:'As in the file',date:'By date',doc:'By document number',amt:'By amount, largest first'}[p.order]]);
+  if(p.method==='strat')L.push(['Stratified on',p.sBasis==='cat'?'Category':'Value bands: '+p.sBands],['Allocation',{value:'Proportional to value',count:'Proportional to count',equal:'Equal per stratum',custom:'Custom: '+p.sCustom}[p.sAlloc]],['Minimum per stratum',String(p.sMin)]);
+  if(p.method!=='mus')L.push(['Projection method',p.proj==='diff'?'Difference (mean per item)':'Ratio']);
+  L.push(['Seed setting',p.useSeed===false?'Off — a new random seed is drawn each time the sample is selected':'On — fixed seed number set by the auditor'],['Seed number used',String(p._seedUsed??p.seed)+(p.useSeed===false?' (recorded so the selection can still be re-performed)':'')]);
+  if(p.purpose==='controls'){const drop=new Set(['Tolerable misstatement','Expected misstatement','Projection method','Key items by amount','Key items from test exceptions']);if(p.sizeMode==='sia5'){drop.add('Confidence level');drop.add('Size working');drop.add('Sample size basis')}return L.filter(([k])=>!drop.has(k))}
+  return L}
+
+function spEval(){
+  if(S.samp&&S.samp.res&&S.samp.res.purpose==='controls')return null;
+  const R=S.samp&&S.samp.res,A=S.samp?S.samp.audit:{},p=S.samp.p;if(!R)return null;
+  const has=x=>A[x._r]!==undefined&&String(A[x._r]).trim()!==''&&parseAmount(A[x._r])!=null;
+  const d=x=>x._amt-parseAmount(A[x._r]);
+  const tested=R.items.filter(has);if(!tested.length)return null;
+  const keyT=tested.filter(x=>x._type==='Key'),smp=R.items.filter(x=>x._type==='Sample'),smpT=tested.filter(x=>x._type==='Sample');
+  const keyMis=sumBy(keyT,d);const ev={keyMis,nKey:keyT.length,nKeyAll:R.items.length-smp.length,nS:smpT.length,nSAll:smp.length,rows:[],notes:[]};
+  const cl=R.cl;
+  if(R.method==='mus'){const J=R.J,rf=poisUL(0,cl);let top=0,under=0;const tts=[];
+    for(const x of smpT){const b=Math.abs(x._amt),dd=d(x)*(x._amt<0?-1:1);
+      if(b>=J){top+=dd;ev.rows.push({x,dd,t:null,pm:dd,note:'Item ≥ interval — actual misstatement'});continue}
+      const t=b?dd/b:0,pm=t*J;ev.rows.push({x,dd,t,pm,note:''});if(t>0)tts.push({t,pm});else if(t<0)under+=pm}
+    tts.sort((a,b)=>b.t-a.t);let inc=0;tts.forEach((o,i)=>{inc+=o.pm*((poisUL(i+1,cl)-poisUL(i,cl))-1)});
+    const bp=rf*J,projO=sumBy(tts,o=>o.pm);Object.assign(ev,{bp,inc,top,under,proj:projO+top+under,uml:bp+projO+inc+top,rf,J});
+  }else{
+    const projOf=(items,Nh,Vh)=>{const t=items.filter(has);if(!t.length)return null;const sd=sumBy(t,d);if(p.proj==='diff')return sd/t.length*Nh;const sb=sumBy(t,x=>x._amt);return sb?sd/sb*Vh:0};
+    if(R.method==='strat'){let tot=0;ev.strata=[];for(const s of R.strata){const its=smp.filter(x=>x._st===s.lab);const vh=sumBy(s._rows,r=>r._amt);const pj=projOf(its,s.N,vh);
+        ev.strata.push({lab:s.lab,n:its.length,t:its.filter(has).length,mis:sumBy(its.filter(has),d),proj:pj});if(pj!=null)tot+=pj}ev.proj=tot}
+    else{ev.proj=projOf(smp,R.sp.n,sumBy(spPopulationRows(R),r=>r._amt))||0}
+    for(const x of smpT)ev.rows.push({x,dd:d(x),t:null,pm:null,note:''})}
+  for(const x of keyT)ev.rows.unshift({x,dd:d(x),t:null,pm:d(x),note:'Key item — actual misstatement'});
+  ev.total=(ev.proj||0)+keyMis;
+  if(ev.nS<ev.nSAll)ev.notes.push(fmt0(ev.nSAll-ev.nS)+' of '+fmt0(ev.nSAll)+' sample items have no audited value yet. SA 530 expects every selected item to be tested; the projection below uses only the items tested so far.');
+  if(ev.nKey<ev.nKeyAll)ev.notes.push(fmt0(ev.nKeyAll-ev.nKey)+' key items have no audited value yet.');
+  const tm=+p.tm;ev.tm=tm||null;const cmp=R.method==='mus'?ev.uml:ev.total;
+  if(tm>0){if(cmp<tm)ev.concl=[(R.method==='mus'?'Upper misstatement limit':'Projected misstatement')+' of ₹'+fmt(cmp)+' is below tolerable misstatement of ₹'+fmt(tm)+'. Subject to qualitative factors, the sample supports the recorded amount.','ok'];
+    else ev.concl=[(R.method==='mus'?'Upper misstatement limit':'Projected misstatement')+' of ₹'+fmt(cmp)+' is at or above tolerable misstatement of ₹'+fmt(tm)+'. Consider asking management to investigate, extending the testing, or adjusting the accounts (SA 530, SA 450).','bad'];
+    if(R.method!=='mus'&&cmp<tm&&cmp>=0.5*tm)ev.notes.push('No statistical upper limit is worked out for this method. Projected misstatement is more than half of tolerable misstatement, which may indicate unacceptable sampling risk.')}
+  return ev}
+function spPopulationRows(R){return R._spRows||[]}
+
+function spKeys(p,pop){const popSet=new Set(pop),key=new Map();
+  if(p.keyOn&&+p.keyAmt>0)for(const r of pop)if(Math.abs(r._amt)>=+p.keyAmt)key.set(r,'Key item — at or above ₹'+fmt0(+p.keyAmt));
+  for(const id of p.keyTests){const r=S.results[id];if(!r)continue;for(const x of rowsOfResult(r))if(popSet.has(x)&&!key.has(x))key.set(x,'Key item — exception in '+TBYID[id].name)}
+  return key}
+function spPreview(p){try{const pop=spPopulation(p);if(!pop.length)return{err:'The population is empty — check the filters.'};const key=spKeys(p,pop),sp=pop.filter(r=>!key.has(r));
+  const V=sumBy(sp,r=>Math.abs(r._amt)),cl=Math.min(Math.max(+p.cl||95,50),99.9)/100;const c=sp.length?spSize(p,V,sp.length,cl):{n:0,txt:''};
+  let n=Math.min(c.n,sp.length),unit='items';if(p.method==='period'){const f=p.freq==='multi'?'daily':p.freq;const np=new Set(sp.filter(r=>r._date).map(r=>perKey(f)(r._date))).size;n=f==='annual'?1:Math.min(c.n,np);unit={monthly:'months',weekly:'weeks',daily:'days',quarterly:'quarters',annual:'year-end'}[f]||'periods'}
+  return{pop:pop.length,pv:sumBy(pop,r=>Math.abs(r._amt)),k:key.size,kv:sumBy([...key.keys()],r=>Math.abs(r._amt)),n,unit,txt:c.txt,cap:c.n>sp.length}}catch(e){return{err:e.message}}}
+const SP_METHODS={
+  mus:['Monetary unit sampling','Bigger amounts are more likely to be picked; any item above the interval is certain to be picked. Best for checking that a balance or expense is not overstated.'],
+  random:['Simple random','Every item has the same chance. Good for fairly even populations and for tests of controls.'],
+  systematic:['Systematic','Every k-th item after a random start, in the order you choose. Easy to explain and re-perform.'],
+  strat:['Stratified random','Split into value bands or categories, then random within each. Best when a few large items sit among many small ones.'],
+  period:['Random periods','Pick whole days, weeks, months or quarters from the dates in the data. For controls that run on a schedule (daily cash count, monthly reconciliation).']};
+function viewSampling(){
+  if(!S.samp)S.samp={p:SP_DEF(),res:null,audit:{},err:''};const p=S.samp.p,m=S.map,R=S.samp.res,ctl=p.purpose==='controls';
+  const testsRun=TESTS.filter(t=>S.results[t.id]&&t.id!=='strat');
+  const cats=m.cat?[...new Set(S.rows.map(r=>r._cat).filter(Boolean))].sort():[];
+  const sel=(k,o)=>`<select data-sp="${k}">${o.map(([v,l])=>`<option value="${esc(v)}" ${String(p[k])===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  const num=(k,ph,w)=>`<input type="number" step="any" data-sp="${k}" value="${esc(p[k])}" placeholder="${esc(ph||'')}" style="width:${w||140}px">`;
+  const txt=(k,ph,w)=>`<input data-sp="${k}" value="${esc(p[k])}" placeholder="${esc(ph||'')}" style="width:${w||200}px">`;
+  const chk=(k,l)=>`<label class="f" style="flex-direction:row;align-items:center;gap:7px;color:var(--ink);padding-bottom:6px;min-width:0"><input type="checkbox" data-sp="${k}" ${p[k]?'checked':''}>${l}</label>`;
+  const F=(l,inner,hint)=>`<label class="f" style="min-width:0">${esc(l)}${inner}${hint?`<span style="font-size:11px">${hint}</span>`:''}</label>`;
+  const pick=(k,v,title,desc,rec)=>`<div class="opt ${String(p[k])===v?'on':''}" data-pick="${k}:${v}"><div class="ot">${esc(title)}${rec?' <span class="chip ok">recommended</span>':''}</div>${desc?`<div class="od">${desc}</div>`:''}</div>`;
+  const seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button class="${String(p[k])===v?'on':''}" data-pick="${k}:${v}">${esc(l)}</button>`).join('')}</div>`;
+  let h=`<style>.opt{border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;background:#fff;flex:1 1 220px}.opt:hover{border-color:#9fb8d6}.opt.on{border-color:var(--blue);background:var(--blue-l);box-shadow:0 0 0 1px var(--blue) inset}.opt .ot{font-weight:600;font-size:13.5px}.opt .od{font-size:12px;color:var(--mut);margin-top:3px}
+    .opts{display:flex;gap:10px;flex-wrap:wrap}.seg{display:inline-flex;border:1px solid #cbd2d9;border-radius:7px;overflow:hidden}.seg button{font:inherit;font-size:13px;border:0;background:#fff;padding:6px 14px;cursor:pointer;border-right:1px solid #cbd2d9}.seg button:last-child{border-right:0}.seg button.on{background:var(--blue);color:#fff}
+    details.more{margin-top:10px}details.more summary{cursor:pointer;color:var(--blue);font-size:12.5px}details.more>div{margin-top:10px}.stepn{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;margin-right:8px}
+    .pv{display:flex;gap:18px;flex-wrap:wrap;background:#f0f6fd;border:1px solid #cfe0f5;border-radius:9px;padding:10px 14px;margin-top:12px}.pv div{font-size:12px;color:var(--mut)}.pv b{display:block;font-size:17px;color:var(--ink)}</style>
+  <h1>Audit Sampling (SA 530)</h1><p class="sub">${esc(S.fileName)} — answer each step in plain words. Every value starts at a recommended setting and you can change any of it. The sample size updates as you go.</p>`;
+  h+=`<div class="card"><h3><span class="stepn">1</span>What are you testing?</h3><div class="opts">${pick('purpose','details','Amounts — tests of details','Are the recorded amounts right? Find misstatements and project them to the population.')}${pick('purpose','controls','A control — tests of controls','Did a control operate (approval, reconciliation, review)? Count deviations.')}</div></div>`;
+  h+=`<div class="card"><h3><span class="stepn">2</span>Which items make up the population?</h3><div class="row">${F('Take items from',sel('src',[['all','All transactions'],['test','Exceptions found by a test']]))}
+    ${p.src==='test'?F('Test',sel('srcTest',[['','— select a test that has been run —'],...testsRun.map(t=>[t.id,t.name])])):''}
+    ${F('Amounts',sel('sign',[['all','All'],['pos','Positive only'],['neg','Negative only']]))}${F('Amount from',num('amtMin','no limit',130))}${F('Amount to',num('amtMax','no limit',130))}</div>
+    <details class="more" ${p.dFrom||p.dTo||p.cat||p.party?'open':''}><summary>More filters — dates, category, party</summary><div class="row">
+    ${m.date?F('Date from',`<input type="date" data-sp="dFrom" value="${esc(p.dFrom)}">`)+F('Date to',`<input type="date" data-sp="dTo" value="${esc(p.dTo)}">`):''}
+    ${cats.length?F('Category',sel('cat',[['','All categories'],...cats.map(c=>[c,c])])):''}${m.party?F('Party name contains',txt('party','any party',170)):''}${chk('noZero','Leave out zero amounts')}</div></details></div>`;
+  h+=`<div class="card"><h3><span class="stepn">3</span>Which items will you check in full?</h3>
+    ${ctl?'<div class="muted" style="margin-bottom:8px">Usually not needed when testing a control. Open "Set key items" only if some items must be checked whatever the sample.</div>':'<div class="muted" style="margin-bottom:8px">Key items are checked 100% and kept out of the sample. Recommended: every item at or above tolerable misstatement.</div>'}
+    <details class="more" ${ctl&&!p.keyOn?'':'open'}><summary>Set key items</summary><div><div class="row">${chk('keyOn','Check every item at or above')}${F('Amount (₹)',num('keyAmt','= tolerable misstatement',200),p.keyFollow&&!ctl?'Follows tolerable misstatement until you change it.':'')}</div>
+    ${testsRun.length?`<div class="muted" style="margin:10px 0 4px">Also check in full the exceptions found by:</div><div class="cols">${testsRun.map(t=>`<label><input type="checkbox" data-spk="${t.id}" ${p.keyTests.includes(t.id)?'checked':''}>${esc(t.name)}</label>`).join('')}</div>`:'<div class="muted" style="margin-top:6px">Run the CAAT tests first if you want their exceptions checked in full.</div>'}</div></details></div>`;
+  h+=`<div class="card"><h3><span class="stepn">4</span>How many items?</h3><div class="opts">`;
+  if(!ctl)h+=pick('sizeMode','mus','Based on risk','Work it out from risk and tolerable misstatement (monetary formula, risk-based confidence levels).',true)+pick('sizeMode','manual','My own number','Firm policy or judgement.')+pick('sizeMode','interval','Fixed interval','One pick every ₹ X (monetary unit sampling).');
+  else h+=pick('sizeMode','sia5','Frequency table','Minimum size by how often the control runs and its risk of failure.',true)+pick('sizeMode','attr','Statistical formula','From confidence level, tolerable and expected deviation rates.')+pick('sizeMode','manual','My own number','Firm policy or judgement.');
+  h+=`</div><div style="margin-top:14px">`;
+  const sz=p.sizeMode;
+  if(sz==='mus'){h+=`<div class="row" style="align-items:flex-end">${F('Risk of material misstatement',seg('qRisk',[['low','Low'],['moderate','Moderate'],['high','High']]))}${F('Tolerable misstatement (₹)',num('tm','performance materiality',190))}${F('Expected misstatement (₹)',num('em','0',150))}</div>
+    <div class="muted" style="margin-top:6px">Low → 90%, moderate → 95%, high → 98% confidence — commonly used levels; open "Fine-tune" to set your own.</div>
+    <details class="more"><summary>Fine-tune — confidence level, expansion factor</summary><div class="row">${F('Confidence level (%)',num('cl','95',100),'Changing this overrides the risk setting.')}${F('Expansion factor',num('ef','auto '+efFor((+p.cl||95)/100),110),'Blank = standard table.')}</div></details>`}
+  else if(sz==='sia5'){const ni=p.fRisk==='higher'?1:0;h+=`<div class="row" style="align-items:flex-end">${F('How often does the control run?',sel('freq',Object.entries(SIA5).map(([k,v])=>[k,v[2]])))}${F('Risk of the control failing',seg('fRisk',[['lower','Lower'],['higher','Higher']]))}</div>
+    <details class="more"><summary>See the SIA 5 table</summary><div class="tw" style="max-width:600px"><table><thead><tr><th>Frequency of control</th><th class="r">Lower risk</th><th class="r">Higher risk</th></tr></thead><tbody>${Object.entries(SIA5).map(([k,v])=>`<tr><td>${esc(v[2])}</td>${[0,1].map(j=>`<td class="r" style="${k===p.freq&&j===ni?'background:#e7f1fb;font-weight:700':''}">${k==='quarterly'?'1 + 1':v[j]}</td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="muted" style="margin-top:6px">Minimum sample sizes by control frequency, as set out in SIA 5, Sampling (Appendix 4). "+1" = the period-end instance is always tested.</div></details>`}
+  else if(sz==='attr')h+=`<div class="row">${F('Confidence level (%)',num('cl','95',100))}${F('Tolerable deviation rate (%)',num('tdr','5',110))}${F('Expected deviation rate (%)',num('edr','0',110))}</div><div class="muted" style="margin-top:6px">Binomial method; reproduces the AICPA attribute tables (e.g. 95%, 5%, 0% → 59).</div>`;
+  else if(sz==='manual')h+=`<div class="row">${F(p.method==='period'?'Number of periods':'Sample size',num('n','',110))}${!ctl?F('Tolerable misstatement (₹) — to judge the result',num('tm','performance materiality',220))+F('Confidence level (%)',num('cl','95',100)):''}</div>`;
+  else if(sz==='interval')h+=`<div class="row">${F('Interval (₹)',num('interval','',150))}${F('Tolerable misstatement (₹) — to judge the result',num('tm','',220))}${F('Confidence level (%)',num('cl','95',100))}</div>`;
+  h+=`<div id="spPv"></div></div></div>`;
+  h+=`<div class="card"><h3><span class="stepn">5</span>How should the items be picked?</h3><div class="opts">${(ctl?['period','random','systematic']:['mus','random','systematic','strat']).map(k=>pick('method',k,SP_METHODS[k][0],SP_METHODS[k][1],ctl?(k===(p.freq==='multi'?'random':'period')):k==='mus')).join('')}</div>
+    <div class="row" style="margin-top:12px">
+    ${p.method==='systematic'||p.method==='mus'?F('Go through the items in this order',sel('order',[['file','As in the file'],['date','By date'],['doc','By document number'],['amt','By amount, largest first']])):''}
+    ${p.method==='period'&&p.sizeMode==='sia5'?`<div class="muted" style="align-self:center">Periods follow the control frequency chosen in step 4: <b>${esc(SIA5[p.freq][2])}</b>.</div>`:''}
+    ${p.method==='period'&&p.sizeMode!=='sia5'?F('Period',sel('freq',[['daily','Days'],['weekly','Weeks'],['monthly','Months'],['quarterly','Quarters (period-end + random)'],['annual','Year-end only'],['multi','Days (control runs many times a day)']])):''}
+    ${p.method==='strat'?F('Split by',seg('sBasis',[['value','Value bands'],['cat',m.cat?'Category':'Party']]))+(p.sBasis==='value'?F('Band limits (₹, comma separated)',txt('sBands','',280)):'')+F('Share the sample',sel('sAlloc',[['value','By value'],['count','By number of items'],['equal','Equally'],['custom','My own size for each band']]))+(p.sAlloc==='custom'?F('Sizes, in band order',txt('sCustom','e.g. 10, 8, 5, 3',180)):F('At least per band',num('sMin','2',80))):''}</div>
+    <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);align-items:center">${chk('useSeed','<b>Use a seed number</b>')}
+      ${p.useSeed!==false?F('Seed number',num('seed','',140))+'<button class="btn" id="spSeed" style="align-self:flex-end">New seed</button><span class="muted" style="flex:1 1 300px">The same file, settings and seed number always pick the same items, so a reviewer can re-perform the selection.</span>'
+        :'<span class="muted" style="flex:1 1 300px">Off: a new random seed is drawn each time you click "Select sample", so each run picks a different sample. The seed used is still recorded in the sampling plan.</span>'}</div>
+    ${!ctl&&p.method!=='mus'?`<details class="more"><summary>More options — projection method</summary><div class="row">${F('Project misstatements by',sel('proj',[['ratio','Ratio (misstatement ÷ book value)'],['diff','Difference (average per item)']]))}</div></details>`:''}</div>`;
+  h+=`<div class="card" style="display:flex;align-items:center;gap:12px"><span class="muted">Every choice above is recorded in the sampling plan and on the working paper.</span><button class="btn p" id="spGo" style="margin-left:auto;padding:9px 22px;font-size:14px">▶ Select sample</button></div>`;
+  if(S.samp.err)h+=`<div class="err">${esc(S.samp.err)}</div>`;
+  if(R){(R.notes||[]).forEach(n=>h+=`<div class="note">${esc(n)}</div>`);
+    h+=`<h2 style="font-size:17px;margin:22px 0 10px">Selected sample</h2><div class="cards">${[['Population',fmt0(R.pop.n)+' items · ₹'+fmt(R.pop.v)],['Key items (100%)',fmt0(R.key.n)+' · ₹'+fmt(R.key.v),R.key.n?'warn':''],['Left to sample',fmt0(R.sp.n)+' · ₹'+fmt(R.sp.v)],
+      ['Sample size (planned / selected)',fmt0(R.nPlan)+' / '+fmt0(R.items.length-R.key.n)+(R.periods?' periods':'')],['Total items to test',fmt0(R.items.length)],['Value covered',pct(R.pop.v?(R.key.v+R.sv)/R.pop.v:0)],
+      ...(R.J?[[R.method==='mus'?'Sampling interval (₹)':'Interval (items)',R.method==='mus'?fmt(R.J):R.J.toFixed(2)],[R.method==='mus'?'Random start (₹)':'Random start (item)',R.method==='mus'?fmt(R.start):(R.start+1).toFixed(2)]]:[]),[R.useSeed?'Seed number':'Seed number (drawn for this run)',String(R.seed)]].map(kpi).join('')}</div>
+      <div class="card"><h3>Sampling plan</h3><div class="tw" style="max-height:none"><table><tbody>${R.plan.map(([a,b])=>`<tr><td style="width:240px;color:var(--mut)">${esc(a)}</td><td style="white-space:normal">${esc(b)}</td></tr>`).join('')}</tbody></table></div></div>`;
+    if(R.strata)h+=`<div class="card" id="spStrata"></div>`;h+=`<div class="card" id="spList"></div><div id="spEval"></div>`}
+  h+=footer();$('#main').innerHTML=h;spPv();
+  document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=ev=>{ev.preventDefault();spRead();const [k,v]=b.dataset.pick.split(':');spSet(k,v);viewSampling()});
+  document.querySelectorAll('[data-sp]').forEach(e=>e.onchange=()=>{const k=e.dataset.sp,before=p[k];spRead();spHook(k,before);if(e.tagName==='SELECT'||e.type==='checkbox')viewSampling();else{const ka=document.querySelector('[data-sp="keyAmt"]');if(ka&&k==='tm'&&p.keyFollow)ka.value=p.keyAmt;spPv()}});
+  document.querySelectorAll('[data-spk]').forEach(e=>e.onchange=()=>{spRead();spPv()});
+  const sb=$('#spSeed');if(sb)sb.onclick=()=>{spRead();p.seed=newSeed();viewSampling()};
+  $('#spGo').onclick=()=>{spRead();try{S.samp.res=spRun();S.samp.err='';toast('Sample selected')}catch(e){S.samp.err=e.message;S.samp.res=null}renderNav();viewSampling();setTimeout(()=>{const t=document.querySelector('h2');if(t)t.scrollIntoView({behavior:'smooth'})},50)};
+  if(R){if(R.strata)renderTable($('#spStrata'),{title:'Strata and allocation',cols:[{k:'lab',h:'Stratum'},{k:'N',h:'Items',t:'int'},{k:'V',h:'Value',t:'amt'},{k:'n',h:'Sample size',t:'int'},{k:'nv',h:'Sample value',t:'amt'}],rows:R.strata,noSort:true,drill:x=>({title:x.lab,rows:x._rows})});
+    if(R.purpose==='controls')spListCtl();else spList();spRenderEval()}}
+function spSet(k,v){const p=S.samp.p;p[k]=v;
+  if(k==='purpose'){if(v==='controls'){Object.assign(p,{sizeMode:'sia5',keyOn:false,keyTests:[],method:p.freq==='multi'?'random':'period'})}else Object.assign(p,{sizeMode:'mus',keyOn:true,method:'mus',cl:QCL[p.qRisk]})}
+  if(k==='qRisk')p.cl=QCL[v];
+  if(k==='sizeMode'&&v==='interval')p.method='mus';
+  if(k==='method'&&v!=='mus'&&p.sizeMode==='interval')p.sizeMode='manual'}
+function spHook(k,before){const p=S.samp.p;
+  if(k==='tm'&&p.keyFollow)p.keyAmt=p.tm;if(k==='keyAmt')p.keyFollow=false;
+  if(k==='freq'&&p.purpose==='controls'&&p.sizeMode==='sia5')p.method=p.freq==='multi'?'random':'period';
+  if(k==='cl'){const q=Object.keys(QCL).find(x=>QCL[x]===+p.cl);if(q)p.qRisk=q}}
+function spPv(){const host=$('#spPv');if(!host)return;const v=spPreview(S.samp.p);
+  host.innerHTML=v.err?`<div class="note" style="margin-top:12px">${esc(v.err)}</div>`:`<div class="pv"><div>Population<b>${fmt0(v.pop)}</b>₹${fmt(v.pv)}</div><div>Key items (checked in full)<b>${fmt0(v.k)}</b>₹${fmt(v.kv)}</div><div>Sample<b>${fmt0(v.n)} ${v.unit==='items'?'':esc(v.unit)}</b>${v.cap?'all remaining items':'to be picked'}</div><div>Total to test<b>${v.unit==='items'?fmt0(v.n+v.k):fmt0(v.n)+' '+esc(v.unit)+(v.k?' + '+fmt0(v.k):'')}</b>&nbsp;</div><div style="flex:1 1 300px">How the size is worked out<span style="display:block;color:var(--ink);font-size:12.5px;margin-top:2px">${esc(v.txt||'—')}</span></div></div>`}
+function spRead(){const p=S.samp.p;document.querySelectorAll('[data-sp]').forEach(e=>{const k=e.dataset.sp;p[k]=e.type==='checkbox'?e.checked:e.value});
+  p.keyTests=[...document.querySelectorAll('[data-spk]')].filter(e=>e.checked).map(e=>e.dataset.spk);if(p.seed===''||isNaN(+p.seed))p.seed=newSeed()}
+
+function spList(){const R=S.samp.res,A=S.samp.audit,cols=txnCols().filter(c=>c.k!=='_desc'),host=$('#spList');
+  let h=`<div class="tbar"><h4>Items to test <span class="chip">${fmt0(R.items.length)}</span></h4><button class="btn sm" id="spAgree">Fill blanks with book value</button><button class="btn sm" id="spClear">Clear audited values</button><button class="btn sm" id="spCopy">Copy list</button></div>
+  <div class="muted" style="margin-bottom:8px">Enter the audited (correct) value for each item after vouching. Leave the book value if the item is correct. You can also paste two columns from Excel — S.No. and Audited value — in the box below the table.</div>
+  <div class="tw"><table><thead><tr><th class="r">S.No.</th><th>Type</th><th>Selection basis</th>${R.method==='strat'?'<th>Stratum</th>':''}${cols.map(c=>`<th class="${T[c.t]?'r':''}">${esc(c.h)}</th>`).join('')}<th class="r">Audited value</th><th class="r">Misstatement</th></tr></thead><tbody>`;
+  R.items.forEach(x=>{const av=A[x._r]??'',a=parseAmount(av),d=String(av).trim()!==''&&a!=null?x._amt-a:null;
+    h+=`<tr><td class="r">${x._sno}</td><td>${x._type==='Key'?'<span class="chip warn">Key</span>':'Sample'}</td><td title="${esc(x._how)}">${esc(x._how)}</td>${R.method==='strat'?`<td>${esc(x._st)}</td>`:''}${cols.map(c=>`<td class="${T[c.t]?'r':''}">${esc(cell(x[c.k],c.t))}</td>`).join('')}
+    <td class="r"><input data-av="${x._r}" value="${esc(av)}" placeholder="${esc(fmt(x._amt))}" style="width:130px;text-align:right"></td><td class="r" data-dv="${x._r}" style="${d?'color:var(--red);font-weight:600':''}">${d==null?'':fmt(d)}</td></tr>`});
+  h+=`</tbody></table></div><div class="row" style="margin-top:10px"><textarea id="spPaste" rows="3" style="flex:1;min-width:280px" placeholder="Paste from Excel: S.No. [tab] Audited value — one item per line"></textarea><button class="btn" id="spPasteGo">Apply pasted values</button></div>`;
+  host.innerHTML=h;
+  host.querySelectorAll('[data-av]').forEach(inp=>inp.onchange=()=>{const r=+inp.dataset.av;A[r]=inp.value;const x=R.items.find(i=>i._r===r);const a=parseAmount(inp.value);const d=inp.value.trim()!==''&&a!=null?x._amt-a:null;
+    const td=host.querySelector(`[data-dv="${r}"]`);td.textContent=d==null?'':fmt(d);td.style.cssText=d?'color:var(--red);font-weight:600':'';spRenderEval()});
+  $('#spAgree').onclick=()=>{R.items.forEach(x=>{if(A[x._r]===undefined||String(A[x._r]).trim()==='')A[x._r]=String(Math.round(x._amt*100)/100)});spList();spRenderEval()};
+  $('#spClear').onclick=()=>{S.samp.audit={};spList();spRenderEval()};
+  $('#spCopy').onclick=()=>copyText(tsv(spCols(),R.items.map(spRowOut)));
+  $('#spPasteGo').onclick=()=>{let k=0;$('#spPaste').value.split(/\r?\n/).forEach(line=>{let c=line.split('\t');if(c.length<2)c=line.trim().split(/\s+/);const sn=parseInt(c[0],10),it=R.items.find(i=>i._sno===sn);if(it&&parseAmount(c[1])!=null){A[it._r]=c[1].trim();k++}});toast(k+' audited values applied');spList();spRenderEval()};
+}
+function spListCtl(){const R=S.samp.res,host=$('#spList');S.samp.dev=S.samp.dev||{};S.samp.rem=S.samp.rem||{};const D=S.samp.dev,M=S.samp.rem;
+  const per=!!R.periods,cols=per?[]:txnCols().filter(c=>c.k!=='_desc');
+  let h=`<div class="tbar"><h4>Items to test <span class="chip">${fmt0(R.items.length)}</span></h4><button class="btn sm" id="spAllOk">Mark untested as "operated"</button><button class="btn sm" id="spClearC">Clear results</button><button class="btn sm" id="spCopy">Copy list</button></div>
+  <div class="muted" style="margin-bottom:8px">${per?'For each selected period, check that the control operated (for example, the reconciliation was prepared and reviewed). Click a period to see its transactions.':'For each selected item, check that the control operated (for example, approval by the right person before payment).'} Record the result below.</div>
+  <div class="tw"><table><thead><tr><th class="r">S.No.</th><th>Selection basis</th>${per?'<th>Period</th><th class="r">Transactions</th><th class="r">Value</th>':cols.map(c=>`<th class="${T[c.t]?'r':''}">${esc(c.h)}</th>`).join('')}<th>Result</th><th>Remarks / evidence seen</th></tr></thead><tbody>`;
+  R.items.forEach((x,i)=>{const k=String(x._r),v=D[k]||'';h+=`<tr data-i="${i}" class="${per?'ck':''}"><td class="r">${x._sno}</td><td>${esc(x._how)}</td>${per?`<td>${esc(x._period)}</td><td class="r">${fmt0(x._pn)}</td><td class="r">${fmt(x._pv)}</td>`:cols.map(c=>`<td class="${T[c.t]?'r':''}">${esc(cell(x[c.k],c.t))}</td>`).join('')}
+    <td><select data-dev="${esc(k)}"><option value="" ${!v?'selected':''}>Not yet tested</option><option value="ok" ${v==='ok'?'selected':''}>Operated</option><option value="dev" ${v==='dev'?'selected':''}>Deviation</option></select></td><td><input data-rem="${esc(k)}" value="${esc(M[k]||'')}" style="width:220px"></td></tr>`});
+  h+=`</tbody></table></div><div data-drill style="margin-top:12px"></div>`;host.innerHTML=h;
+  host.querySelectorAll('[data-dev]').forEach(e=>{e.onclick=ev=>ev.stopPropagation();e.onchange=()=>{D[e.dataset.dev]=e.value;spRenderEval()}});
+  host.querySelectorAll('[data-rem]').forEach(e=>{e.onclick=ev=>ev.stopPropagation();e.onchange=()=>{M[e.dataset.rem]=e.value}});
+  if(per)host.querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{const x=R.items[+tr.dataset.i];renderTable(host.querySelector('[data-drill]'),{title:'↳ Transactions in '+x._period,cols:txnCols(),rows:x._rows})});
+  $('#spAllOk').onclick=()=>{R.items.forEach(x=>{if(!D[String(x._r)])D[String(x._r)]='ok'});spListCtl();spRenderEval()};
+  $('#spClearC').onclick=()=>{S.samp.dev={};spListCtl();spRenderEval()};
+  $('#spCopy').onclick=()=>copyText(tsv(spCols(),R.items.map(spRowOut)))}
+function ctlEval(){const R=S.samp.res,p=S.samp.p,D=S.samp.dev||{};const all=R.items.length,t=R.items.filter(x=>D[String(x._r)]),dev=t.filter(x=>D[String(x._r)]==='dev').length;if(!t.length)return null;
+  const ev={ctl:true,n:t.length,all,dev,rate:dev/t.length,notes:[]};if(t.length<all)ev.notes.push(fmt0(all-t.length)+' of '+fmt0(all)+' selected items are not yet tested.');
+  if(p.sizeMode==='attr'){const cl=R.cl,tdr=(+p.tdr||0)/100;let lo=0,hi=1;for(let i=0;i<80;i++){const m=(lo+hi)/2;if(binCdf(dev,t.length,m)>1-cl)lo=m;else hi=m}ev.udl=hi;ev.tdr=tdr;
+    ev.concl=hi<=tdr?['Upper deviation limit of '+pct(hi)+' (at '+(cl*100)+'% confidence) is within the tolerable deviation rate of '+pct(tdr)+'. The sample supports reliance on the control as planned.','ok']:['Upper deviation limit of '+pct(hi)+' (at '+(cl*100)+'% confidence) exceeds the tolerable deviation rate of '+pct(tdr)+'. The control cannot be relied on as planned; revise the risk assessment and extend substantive work (SA 330, SA 265).','bad']}
+  else ev.concl=dev===0?['No deviations in the '+fmt0(t.length)+' items tested. The sample supports reliance on the control as planned.','ok']:['Deviations found: '+dev+' of '+fmt0(t.length)+' ('+pct(dev/t.length)+'). The minimum sample sizes assume no deviations, so the control cannot be relied on as planned unless the deviation is shown to be an isolated exception. Consider extending the sample or testing a compensating control, and revise the risk assessment (SA 330, SA 265).','bad'];
+  return ev}
+function spCols(){const R=S.samp.res;if(R.purpose==='controls')return[{k:'_sno',h:'S.No.',t:'int'},{k:'_how',h:'Selection basis'},...(R.periods?[{k:'_period',h:'Period'},{k:'_pn',h:'Transactions',t:'int'},{k:'_pv',h:'Value',t:'amt'}]:txnCols()),{k:'_res',h:'Result'},{k:'_rem',h:'Remarks / evidence seen'}];return[{k:'_sno',h:'S.No.',t:'int'},{k:'_type',h:'Type'},{k:'_how',h:'Selection basis'},...(R.method==='strat'?[{k:'_st',h:'Stratum'}]:[]),...txnCols(),{k:'_av',h:'Audited value',t:'amt'},{k:'_mis',h:'Misstatement',t:'amt'},{k:'_rem',h:'Remarks / evidence seen'}]}
+function spRowOut(x){if(S.samp.res.purpose==='controls'){const k=String(x._r),D=S.samp.dev||{},M=S.samp.rem||{};return Object.assign({},x,{_res:{ok:'Operated',dev:'Deviation'}[D[k]]||'',_rem:M[k]||''})}const A=S.samp.audit,a=parseAmount(A[x._r]),has=A[x._r]!==undefined&&String(A[x._r]).trim()!==''&&a!=null;return Object.assign({},x,{_av:has?a:null,_mis:has?x._amt-a:null,_rem:''})}
+function spRenderEval(){const host=$('#spEval');if(!host)return;const R=S.samp.res;
+  if(R.purpose==='controls'){const ev=ctlEval();S.samp.ev=ev;if(!ev){host.innerHTML=`<div class="card"><h3>Evaluation</h3><div class="muted">Record the result of each item above. The evaluation appears here as you go.</div></div>`;return}
+    let h=`<div class="card"><h3>Evaluation of results</h3>`;ev.notes.forEach(n=>h+=`<div class="note">${esc(n)}</div>`);
+    h+=`<div class="cards">${[['Items tested',fmt0(ev.n)+' of '+fmt0(ev.all)],['Deviations',fmt0(ev.dev),ev.dev?'bad':'ok'],['Sample deviation rate',pct(ev.rate)],...(ev.udl!=null?[['Upper deviation limit',pct(ev.udl),ev.udl>ev.tdr?'bad':'ok'],['Tolerable deviation rate',pct(ev.tdr)]]:[])].map(kpi).join('')}</div>
+      <div class="${ev.concl[1]==='ok'?'help':'err'}"><b>Indicated result:</b> ${esc(ev.concl[0])}</div><p class="muted" style="margin-top:8px">For tests of controls, the deviation rate found in the sample is itself the projected rate for the population.</p></div>`;host.innerHTML=h;return}
+  const ev=spEval();
+  if(!ev){host.innerHTML=`<div class="card"><h3>Evaluation</h3><div class="muted">Enter audited values in the table above. The projection of misstatements to the population appears here as you go.</div></div>`;return}
+  let h=`<div class="card"><h3>Evaluation of results</h3>`;ev.notes.forEach(n=>h+=`<div class="note">${esc(n)}</div>`);
+  const c=[['Items tested',fmt0(ev.nKey+ev.nS)+' of '+fmt0(ev.nKeyAll+ev.nSAll)],['Actual misstatement in key items',fmt(ev.keyMis),ev.keyMis?'warn':'ok']];
+  if(R.method==='mus'){c.push(['Projected misstatement (sample)',fmt(ev.proj),ev.proj?'warn':'ok'],['Basic precision (RF × interval)',fmt(ev.bp)],['Incremental allowance',fmt(ev.inc)],['Upper misstatement limit (sample)',fmt(ev.uml),ev.tm&&ev.uml>=ev.tm?'bad':''],['Understatements found (projected)',fmt(ev.under)])}
+  else c.push(['Projected misstatement (sample)',fmt(ev.proj),ev.proj?'warn':'ok']);
+  c.push(['Total: key items + projection',fmt(ev.total),ev.total?'warn':'ok'],['Tolerable misstatement',ev.tm?fmt(ev.tm):'Not entered']);
+  h+=`<div class="cards">${c.map(kpi).join('')}</div>`;
+  if(ev.concl)h+=`<div class="${ev.concl[1]==='ok'?'help':'err'}" style="margin-bottom:12px"><b>Indicated result:</b> ${esc(ev.concl[0])}</div>`;else h+=`<div class="muted" style="margin-bottom:12px">Enter tolerable misstatement in step 4 to compare the result.</div>`;
+  if(R.method==='mus')h+=`<div class="muted" style="margin-bottom:10px">Upper misstatement limit = basic precision + projected overstatements (taintings × interval) + incremental allowance for each ranked tainting + actual misstatement in items at or above the interval. Key items are added separately, at their actual misstatement. Confidence ${(R.cl*100).toFixed(1)}%.</div>`;
+  h+=`<div id="spEvT"></div>${ev.strata?'<div id="spEvS" style="margin-top:12px"></div>':''}</div>`;host.innerHTML=h;
+  const rows=ev.rows.filter(o=>Math.abs(o.dd)>0.004).map(o=>Object.assign({},o.x,{_dd:o.dd,_t:o.t,_pm:o.pm,_note:o.note}));
+  renderTable($('#spEvT'),{title:'Misstatements found',cols:[{k:'_sno',h:'S.No.',t:'int'},{k:'_type',h:'Type'},...txnCols(),{k:'_dd',h:'Misstatement',t:'amt'},...(R.method==='mus'?[{k:'_t',h:'Tainting',t:'pct'},{k:'_pm',h:'Projected',t:'amt'}]:[]),{k:'_note',h:'Note'}],rows});
+  if(ev.strata)renderTable($('#spEvS'),{title:'Projection by stratum',cols:[{k:'lab',h:'Stratum'},{k:'n',h:'Sample',t:'int'},{k:'t',h:'Tested',t:'int'},{k:'mis',h:'Misstatement found',t:'amt'},{k:'proj',h:'Projected to stratum',t:'amt'}],rows:ev.strata,noSort:true});
+  S.samp.ev=ev}
+function spRowsLeft(R){const keys=new Set(R.items.filter(x=>x._type==='Key').map(x=>x._r));try{return spPopulation(S.samp.p).filter(r=>!keys.has(r._r))}catch(e){return[]}}
+function spExport(wb){const R=S.samp&&S.samp.res;if(!R)return;
+  const a=[['Audit sampling plan (SA 530)'],[],...R.plan,[],['Population',R.pop.n+' items',Math.round(R.pop.v*100)/100],['Key items',R.key.n+' items',Math.round(R.key.v*100)/100],['Left to sample',R.sp.n+' items',Math.round(R.sp.v*100)/100],['Sample size planned',R.nPlan],['Items selected (incl. key items)',R.items.length]];
+  if(R.J)a.push([R.method==='mus'?'Sampling interval (₹)':'Interval (items)',Math.round(R.J*100)/100],[R.method==='mus'?'Random start (₹)':'Random start',Math.round(R.start*100)/100]);
+  if(R.strata){a.push([],['Stratum','Items','Value','Sample size','Sample value']);R.strata.forEach(s=>a.push([s.lab,s.N,Math.round(s.V*100)/100,s.n,Math.round(s.nv*100)/100]))}
+  if(R.purpose==='controls'){const e=ctlEval();if(e){a.push([],['Evaluation'],['Items tested',e.n],['Deviations',e.dev],['Sample deviation rate',Math.round(e.rate*1e4)/1e4]);if(e.udl!=null)a.push(['Upper deviation limit',Math.round(e.udl*1e4)/1e4],['Tolerable deviation rate',e.tdr]);a.push(['Indicated result',e.concl[0]])}}
+  const ev=R.purpose==='controls'?null:spEval();if(ev){a.push([],['Evaluation'],['Items tested',ev.nKey+ev.nS],['Actual misstatement in key items',Math.round(ev.keyMis*100)/100],['Projected misstatement (sample)',Math.round(ev.proj*100)/100]);
+    if(R.method==='mus')a.push(['Basic precision',Math.round(ev.bp*100)/100],['Incremental allowance',Math.round(ev.inc*100)/100],['Upper misstatement limit (sample)',Math.round(ev.uml*100)/100]);
+    a.push(['Total (key items + projection)',Math.round(ev.total*100)/100],['Tolerable misstatement',ev.tm||''],['Indicated result',ev.concl?ev.concl[0]:'']);ev.notes.forEach(n=>a.push(['Note',n]))}
+  const w1=XLSX.utils.aoa_to_sheet(a);w1['!cols']=[{wch:34},{wch:90},{wch:18}];XLSX.utils.book_append_sheet(wb,w1,'Sampling plan');
+  const cols=spCols();const b=[cols.map(c=>c.h),...R.items.map(spRowOut).map(x=>cols.map(c=>xval(x[c.k],c.t)))];
+  const w2=XLSX.utils.aoa_to_sheet(b);w2['!cols']=cols.map(()=>({wch:16}));XLSX.utils.book_append_sheet(wb,w2,'Sample')}
+
+/* ============ Export ============ */
+function exportWB(ids){
+  ids=ids||TESTS.map(t=>t.id).filter(id=>S.results[id]);
+  const hasS=!!(S.samp&&S.samp.res);if(!ids.length&&!hasS){toast('Run at least one test or select a sample first');return}
+  const wb=XLSX.utils.book_new();const now=new Date();
+  const info=[['CAAT Tools — Data analytics working paper'],['Disclaimer: '+DISCLAIMER],[],['Entity',$('#eEnt').value],['Period',$('#ePer').value],['Prepared by',$('#ePrep').value],['Date of preparation',now.toLocaleString('en-IN')],
+    ['Source file',S.fileName],['Sheet',S.sheet],['Records analysed',S.rows.length],['Amounts read',valid().length],['SHA-256 of source file',S.hash],
+    ...dataLogLines(),['Amounts',S.amtMode==='split'?'Debit = '+S.map.amount+'; Credit = '+S.map.credit+'; amount = Debit − Credit'+(S.splitPos==='cr'?' (credits shown positive)':''):S.amtMode==='ind'?'Amount = '+S.map.amount+'; Dr/Cr column = '+S.map.drcr+'; '+(S.drcrNeg==='cr'?'Cr':'Dr')+' treated as negative':'Amount = '+S.map.amount],
+    ['Other columns',MAPF.filter(([k])=>S.map[k]&&!['amount','credit','drcr'].includes(k)).map(([k,l])=>l+' = '+S.map[k]).join('; ')],['Absolute values',S.abs?'Yes':'No'],[],['Test','Key result','Parameters','Reviewed by / remarks']];
+  ids.forEach(id=>{const r=S.results[id];info.push([TBYID[id].name,r.cards.map(c=>c[0]+': '+c[1]).join(' | '),r.params,''])});
+  const ws0=XLSX.utils.aoa_to_sheet(info);ws0['!cols']=[{wch:28},{wch:70},{wch:60},{wch:30}];XLSX.utils.book_append_sheet(wb,ws0,'Summary');
+  const used=new Set(['Summary']);
+  ids.forEach(id=>{const t=TBYID[id],r=S.results[id];const a=[[t.name],['Parameters: '+r.params],[]];r.cards.forEach(c=>a.push([c[0],c[1]]));a.push([]);
+    r.tables.forEach(tb=>{a.push([tb.title]);a.push(tb.cols.map(c=>c.h));tb.rows.forEach(x=>a.push(tb.cols.map(c=>xval(x[c.k],c.t))));a.push([])});
+    let nm=t.name.replace(/[\\\/\?\*\[\]:']/g,'').slice(0,31);while(used.has(nm))nm=nm.slice(0,28)+'_'+used.size;used.add(nm);
+    const ws=XLSX.utils.aoa_to_sheet(a);ws['!cols']=Array(12).fill({wch:16});XLSX.utils.book_append_sheet(wb,ws,nm)});
+  if(hasS&&(arguments[0]===undefined))spExport(wb);
+  const fn='CAAT_'+(($('#eEnt').value||'Analysis').replace(/[^\w]+/g,'_'))+'_'+now.toISOString().slice(0,10)+'.xlsx';
+  try{XLSX.writeFile(wb,fn);toast('Working papers exported: '+fn)}catch(e){toast('Download blocked here — use the offline copy of the tool')}
+}
+$('#bExport').onclick=()=>exportWB();
+['eEnt','ePer','ePrep'].forEach(id=>{try{const v=localStorage.getItem('caat_'+id);if(v)$('#'+id).value=v}catch(e){}$('#'+id).oninput=e=>{try{localStorage.setItem('caat_'+id,e.target.value)}catch(_){}}});
+/* Desktop (Electron) bridge — inactive in a normal browser */
+if(window.caatDesktop){try{
+  caatDesktop.onOpenFiles(list=>{S.view='data';addFiles(list.map(f=>new File([f.data],f.name)))});
+  caatDesktop.onNavigate(v=>{if(v==='data'||S.mapped){S.view=v;render();window.scrollTo(0,0)}else toast('Load data and apply mapping first')});
+  caatDesktop.onExport(()=>exportWB());
+}catch(e){}}
+render();
+</script>
+<script src="caat-bridge.js"></script>
+</body>
+</html>

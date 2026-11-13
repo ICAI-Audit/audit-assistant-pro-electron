@@ -226,7 +226,8 @@ function initializeDatabaseSchema(db) {
     '07_rule_engine_tables.sql',
     '08_template_system_tables.sql',
     '09_tax_audit_tables.sql',
-    '10_fsg_tables.sql'
+    '10_fsg_tables.sql',
+    '11_caat_tables.sql'
   ];
 
   safeLog(`   Executing ${schemaFiles.length} schema files...`);
