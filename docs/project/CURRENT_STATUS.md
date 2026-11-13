@@ -1,5 +1,9 @@
 # Current status
 
+## RSF published to GitHub (13 November 2026)
+
+Owner explicitly authorised push. Implementation commit b842642 is published on origin/RSF, and local RSF tracks it. Only the reviewed source/docs/mapping-master changes are new; older tracked data artifacts are unchanged from already-published main. No new client TB/database files, merge, release or unrelated fixes. App health HTTP 200 confirmed. Publication details and remaining issues are in the latest handoff.
+
 ## T-029 owner-confirmed RSF commit (13 November 2026)
 
 Owner said "so proceed" after the review and explanation of the 76 existing typecheck diagnostics, authorising the scoped T-023 through T-028 commit. This record is included in that commit on RSF; obtain its ID with git log -1. Fresh fetch still has origin/main at base/source 26d3b9f; no merge needed. Preserve documented financial gaps and existing typecheck debt. No unrelated error fixes, push, release or branch switch authorised. Integration 210/210, desktop 81/81 and documentation/diff checks passed in the reviewed tree; app HTTP 200 and responding Electron processes rechecked. Explicit reviewed source/docs/master-workbook staging excludes client uploads and database files. See RSF_PRE_COMMIT_REVIEW.md and RSF_COMMIT_MESSAGE.txt for full scope and limitations. Continue on RSF after commit.
