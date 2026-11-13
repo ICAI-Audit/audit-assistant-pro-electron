@@ -1,6 +1,5 @@
 import { ConsolidationContext } from '../../utils/consolidationSelection'
-import React, { useState, useEffect, useRef, useContext } from 'react'
-import { buildFsSnapshotPayload } from '../../utils/fsSnapshot'
+import React, { useState, useEffect, useContext } from 'react'
 import * as XLSX from 'xlsx-js-style'
 import { useFinancials, useConsolidatedFinancials, fetchFinancialsData, fmtINR, DENOMINATIONS } from '../../hooks/useFinancials'
 import { unsplitSaleLine } from '../../utils/revenueLines'
@@ -11,7 +10,9 @@ import BranchModeBar from '../shared/BranchModeBar'
 import PYModeSelect from '../shared/PYModeSelect'
 import { FormatRefButton, SCHEDULE3_SECTIONS } from '../shared/FormatReference'
 import { consolidatedPeriodOf } from '../../utils/consolidatedPeriod'
+import { resolveConsolidationSelection } from '../../utils/consolidationSelection'
 import { fsgApi } from '../../api.js'
+import { useFirmSettings } from '@/hooks/useFirmSettings'
 
 export default function GenerateFinancials({
   entity, activeTB, prevTB, activeRsId, numFormat = 'as_is', onNumFormatChange,
@@ -50,6 +51,7 @@ export default function GenerateFinancials({
 
   const [auditors, setAuditors]             = useState([])
   const [globalAuditors, setGlobalAuditors] = useState([])
+  const { firmSettings } = useFirmSettings()
   const [signatories, setSignatories]       = useState([])
   // Keyed 'e:<id>' (this auditee) or 'g:<id>' (firm master) — the two sources
   // have independent id sequences, so a bare id would be ambiguous.
@@ -64,18 +66,14 @@ export default function GenerateFinancials({
   // Place/Date of signing — asked once in the export-confirmation modal and
   // reused for both Excel and PDF (and every export kind), so they never
   // drift out of sync between the two output formats.
-  // Place of signing is the same for almost every engagement, so it is
-  // pre-filled rather than retyped each time. The last value used is remembered,
-  // so changing it for one client makes that the new default instead of
-  // reverting. Falls back to the firm's own place on a fresh install.
-  const DEFAULT_SIGN_PLACE = 'Siliguri'
-  const [signPlace, setSignPlace] = useState(() => {
-    try { return localStorage.getItem('fsg.signPlace') || DEFAULT_SIGN_PLACE }
-    catch (_) { return DEFAULT_SIGN_PLACE }
-  })
-  useEffect(() => {
-    try { if (signPlace.trim()) localStorage.setItem('fsg.signPlace', signPlace.trim()) } catch (_) {}
-  }, [signPlace])
+  // Use VERA's Settings/Admin Settings firm profile. An export override belongs
+  // only to this auditor/client/year in this mounted screen, never to all clients.
+  // The old global fsg.signPlace preference is intentionally no longer read.
+  const signingContext = `${entity?.id}:${singleTBForExport?.entity_period_id ?? activeTB?.entity_period_id}:${selectedAuditorKey}`
+  const [placeOverride, setPlaceOverride] = useState(null)
+  const signPlace = placeOverride?.context === signingContext
+    ? placeOverride.value : (firmSettings?.place || '').trim()
+  const setSignPlace = value => setPlaceOverride({ context: signingContext, value })
   const [signDate, setSignDate]             = useState(() => new Date().toISOString().slice(0, 10))
   // Final copy: once the Financial Year is marked Final its Place and Date of Signing are the ones saved in the database
   // (and the year is locked); the boxes below then show them and cannot be edited.
@@ -92,49 +90,6 @@ export default function GenerateFinancials({
   const isFinal = !!finalInfo
   const effSignPlace = isFinal ? finalInfo.place : signPlace
   const effSignDate = isFinal ? finalInfo.date : signDate
-  // Snapshot of the finalised figures for Cloudtail MCA (the DR / MCA forms tool): published when the CA marks the year Final at export,
-  // and on demand from the Cloudtail card below.
-  const publishNext = useRef(false)
-  const [snapshotMsg, setSnapshotMsg] = useState('')
-  const [snapshots, setSnapshots] = useState([])
-  const [publishing, setPublishing] = useState(false)
-  const isCompany = parseInt(entity?.constitution) === 3 && !isBranchEntity
-  const refreshSnapshots = () => {
-    if (!epId) { setSnapshots([]); return }
-    fsgApi?.listFsSnapshots?.(epId).then(l => setSnapshots(l || [])).catch(() => setSnapshots([]))
-  }
-  const publishSnapshot = async (data, noteDetailsMap) => {
-    // the Financial Year's own dates (Master), not the text of the Trial Balance's period
-    const eps = await (fsgApi?.listEntityPeriods?.(entity.id).catch(() => []) || [])
-    const ep = (eps || []).find(e => e.id === epId)
-    const payload = buildFsSnapshotPayload({
-      entity, activeTB: singleTBForExport, data, periodInfo: ep ? { year_label: ep.year_label, date_from: ep.date_from, date_till: ep.date_till } : null, auditor: selectedAuditor, signatories: chosenSignatories,
-      signPlace: effSignPlace, signDate: effSignDate, noteDetailsMap, denomination: numFormat,
-    })
-    const res = await fsgApi.publishFsSnapshot(entity.id, epId, payload)
-    setSnapshotMsg(`Published to Cloudtail: snapshot version ${res.version} of ${payload.period.year_label || 'this year'}.`)
-    refreshSnapshots()
-    return res
-  }
-  const publishSnapshotIfAsked = async (data, noteDetailsMap) => {
-    if (!publishNext.current) return
-    publishNext.current = false
-    try { await publishSnapshot(data, noteDetailsMap) }
-    catch (err) { setSnapshotMsg(`Error: the figures could not be published to Cloudtail (${err.message || err}). The export itself is not affected - publish again from the Cloudtail card.`) }
-  }
-  const publishNow = async () => {
-    if (!singleTBForExport?.id || !epId) return
-    setPublishing(true); setSnapshotMsg('')
-    try {
-      const data = await fetchFinancialsData(singleTBForExport, prevTB, entity, activeRsId)
-      if (!data) throw new Error('No financial data available.')
-      const ndList = await (fsgApi?.listNoteDetails(singleTBForExport?.id).catch(() => []) || [])
-      const noteDetailsMap = mapSavedRowsToLiveNotes(ndList, Object.values(data.notes || {}), parsedNoteData)
-      await publishSnapshot(data, noteDetailsMap)
-    } catch (err) { setSnapshotMsg(`Error: ${err.message || 'Could not publish.'}`) }
-    finally { setPublishing(false) }
-  }
-  useEffect(() => { refreshSnapshots() }, [epId])
   const [sigRefreshTick, setSigRefreshTick] = useState(0)
   const [levelFormat, setLevelFormat]       = useState([])
 
@@ -274,7 +229,6 @@ export default function GenerateFinancials({
       const noteDisclosureMap = mapSavedRowsToLiveNotes(ndiscList, liveNotes, n => n.text)
       // Manual custom face lines (e.g. Tax Expense "+ Add Line", non-corp only)
       data.manualTaxLines = await (fsgApi?.listManualFaceLines(singleTBForExport?.id, 'tax-expense-noncorp').catch(() => []) || [])
-      await publishSnapshotIfAsked(data, noteDetailsMap)
       const wb = buildFinancialsWorkbook({
         entity, activeTB: singleTBForExport, prevTB, data, levelFormat,
         auditor: selectedAuditor, signatories: chosenSignatories,
@@ -299,7 +253,6 @@ export default function GenerateFinancials({
       const ndiscList = await (fsgApi?.listNoteDisclosures(singleTBForExport?.id).catch(() => []) || [])
       const noteDisclosureMap = mapSavedRowsToLiveNotes(ndiscList, liveNotes, n => n.text)
       data.manualTaxLines = await (fsgApi?.listManualFaceLines(singleTBForExport?.id, 'tax-expense-noncorp').catch(() => []) || [])
-      await publishSnapshotIfAsked(data, noteDetailsMap)
       const docOpts = {
         entity, activeTB: singleTBForExport, prevTB, data,
         auditor: selectedAuditor, signatories: chosenSignatories,
@@ -367,7 +320,8 @@ export default function GenerateFinancials({
   const runColExcelExport = async (denom) => {
     setStatus(''); setExportingColExcel(true)
     try {
-      const branchTBsData = await fsgApi?.getBranchTBsData(entity.id)
+      const selection = await resolveConsolidationSelection(entity.id, consCtx?.entityPeriodId ?? activeTB?.entity_period_id)
+      const branchTBsData = await fsgApi?.getBranchTBsData(entity.id, selection.cyIds)
       if (!branchTBsData?.length) throw new Error('No branch Trial Balances found. Please upload and map TBs for each branch first.')
       // the Auditee's General Notes (Significant Accounting Policies ...), as the Consolidated statements carry them
       const gdata = await fetchFinancialsData({ id: '__consolidated__', entity_id: entity.id, entity_period_id: consCtx?.entityPeriodId ?? activeTB?.entity_period_id }, null, entity, activeRsId).catch(() => null)
@@ -382,7 +336,8 @@ export default function GenerateFinancials({
   const runColPDFExport = async (denom) => {
     setStatus(''); setExportingColPDF(true)
     try {
-      const branchTBsData = await fsgApi?.getBranchTBsData(entity.id)
+      const selection = await resolveConsolidationSelection(entity.id, consCtx?.entityPeriodId ?? activeTB?.entity_period_id)
+      const branchTBsData = await fsgApi?.getBranchTBsData(entity.id, selection.cyIds)
       if (!branchTBsData?.length) throw new Error('No branch Trial Balances found. Please upload and map TBs for each branch first.')
       const entityNDList = await (fsgApi?.listEntityNoteDetails(entity.id).catch(() => []) || [])
       const noteDetailsMap = {}
@@ -740,31 +695,6 @@ export default function GenerateFinancials({
         </div>
       )}
 
-      {/* Cloudtail MCA: the finalised figures, published as a snapshot (Companies) */}
-      {isCompany && epId && (
-        <div className="rounded border border-gray-200 bg-white px-4 py-3 flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-[260px]">
-            <div className="text-sm font-semibold text-gray-800">Cloudtail MCA - publish figures</div>
-            <div className="text-xs text-gray-500">
-              Cloudtail (Directors' Report, AOC-4, MGT-7) takes every figure from a snapshot of these statements, never from the Trial Balance.
-              Ticking Final when you generate the PDF / Excel publishes one automatically; publish again here after any later change.
-              {snapshots.length > 0
-                ? <span> Last published: version {snapshots[0].version}, {new Date(snapshots[0].created_at).toLocaleString('en-GB')} (v{snapshots[0].app_version || '?'}).</span>
-                : <span> Nothing published yet for this year.</span>}
-            </div>
-          </div>
-          <button onClick={publishNow} disabled={publishing || !singleFinancials.data}
-            className="py-2 px-4 rounded text-white text-sm font-medium transition disabled:opacity-40" style={{ background: 'var(--color-primary)' }}>
-            {publishing ? 'Publishing...' : 'Publish to Cloudtail'}
-          </button>
-        </div>
-      )}
-      {snapshotMsg && (
-        <div className={`text-sm rounded px-3 py-2 border ${snapshotMsg.startsWith('Error') ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
-          {snapshotMsg}
-        </div>
-      )}
-
       {/* Denomination + Place/Date confirmation modal — shared by every export
           kind (single/consolidated × Excel/PDF) so Place & Date are asked
           exactly once and stay identical across both output formats. */}
@@ -797,10 +727,10 @@ export default function GenerateFinancials({
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Place</label>
+                    <label htmlFor="fsg-signing-place" className="block text-xs text-gray-500 mb-1">Signing Place</label>
                     <input
-                      type="text" value={effSignPlace} disabled={isFinal} onChange={e => setSignPlace(e.target.value)}
-                      placeholder="e.g. Siliguri"
+                      id="fsg-signing-place" type="text" value={effSignPlace} disabled={isFinal} onChange={e => setSignPlace(e.target.value)}
+                      placeholder="Enter signing place"
                       className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
                     />
                   </div>
@@ -846,8 +776,6 @@ export default function GenerateFinancials({
                     try { await fsgApi.finaliseEntityPeriod(epId, signPlace.trim(), signDate) }
                     catch (err) { setPendingExport(null); setStatus(`Error: ${err.message || 'Could not mark the Financial Year Final.'}`); return }
                     setMarkFinal(false)
-                    // marking the year Final also publishes its figures to Cloudtail (single-entity exports of a Company)
-                    if (isCompany && ['excel', 'pdf'].includes(pendingExport)) publishNext.current = true
                   }
                   onNumFormatChange?.(confirmDenom)
                   const kind = pendingExport

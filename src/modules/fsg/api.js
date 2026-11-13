@@ -142,8 +142,10 @@ export const fsgApi = {
 
   // Financial Statements
   getFinancialData:          (tbId)       => call('financials:getData', tbId),
+  getMissingAlie:            (tbId)       => call('financials:getMissingAlie', tbId),
+  getConsolidatedMissingAlie:(entityId, tbIds) => call('financials:getConsolidatedMissingAlie', entityId, tbIds),
   getConsolidatedData:       (entityId, tbIds) => call('financials:getConsolidatedData', entityId, tbIds),
-  getBranchTBsData:          (entityId)   => call('financials:getBranchTBsData', entityId),
+  getBranchTBsData:          (entityId, tbIds = null) => call('financials:getBranchTBsData', entityId, tbIds),
   renderPDF:                 (html)       => call('financials:renderPDF', html),
   getAppVersion:             ()           => call('app:getVersion'),
 
@@ -166,6 +168,8 @@ export const fsgApi = {
 
   // Note Details (supplementary data for each financial statement note)
   getNoteDetails:       (tbId, noteNum, noteTitle)   => call('noteDetails:get', tbId, noteNum, noteTitle),
+  listInvestments:      (scope) => call('investments:list', scope),
+  saveInvestments:      (scope) => call('investments:save', scope),
   saveNoteDetails:      (data)                       => call('noteDetails:save', data),
   listNoteDetails:      (tbId)                       => call('noteDetails:listByTB', tbId),
   getItrDetails:        (tbId)                       => call('itrDetails:get', tbId),
@@ -211,9 +215,6 @@ export const fsgApi = {
   getTaxComputation:     (entityId, entityPeriodId)  => call('taxComputation:get', entityId, entityPeriodId),
   saveTaxComputation:    (entityId, entityPeriodId, data) => call('taxComputation:save', entityId, entityPeriodId, data),
 
-  // Snapshots of the finalised statements for Cloudtail MCA (fs_snapshots)
-  publishFsSnapshot:     (entityId, entityPeriodId, payload) => call('fsSnapshot:publish', entityId, entityPeriodId, payload),
-  listFsSnapshots:       (entityPeriodId)      => call('fsSnapshot:list', entityPeriodId),
 
   // PPE (Property, Plant & Equipment)
   getPPELedgers:         (entityId, entityPeriodId)  => call('getPPELedgers', entityId, entityPeriodId),

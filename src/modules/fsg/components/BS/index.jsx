@@ -1,6 +1,8 @@
+import { statementDates, statementColumnLabels } from '../../utils/statementDates'
 import React, { useState } from 'react'
 import { useFinancials, fmtINR } from '../../hooks/useFinancials'
 import { fixFilterWith } from '../../utils/fixTargets'
+import MissingAlieWarning from '../shared/MissingAlieWarning'
 import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
@@ -359,10 +361,10 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
             {/* Top-level uncategorised — ALIE = E&L but L1 unidentifiable */}
             {(Math.abs(elUncatTop.total) > 0.005 || Math.abs(elUncatTop.prevTotal) > 0.005) && (
               <>
-                <BsRow bold label="Uncategorised Liabilities"
+                <BsRow bold label="Uncategorised Equity and Liabilities"
                   total={elUncatTop.total} prevTotal={elUncatTop.prevTotal}
                   tbId={tbId} getRemark={getRemark} onRemarkSaved={onRemarkSaved} />
-                <BsRow alpha="—" label="Uncategorised Liabilities"
+                <BsRow alpha="—" label="Uncategorised Equity and Liabilities"
                   noteNum={elUncatTop.lines[0]?.noteNum}
                   total={elUncatTop.total} prevTotal={elUncatTop.prevTotal}
                   sub indent={1} red
@@ -453,9 +455,8 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
   const [manualPyOn, setManualPyOn] = useState(false)
 
   const isCompany = parseInt(entity?.constitution) === 3
-  const cyLabel   = 'Current Year'
-  const pyLabel   = 'Previous Year'
-  const subtitle  = activeTB?.period ? `Balance Sheet as at ${activeTB.period}` : 'Balance Sheet'
+  const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB)
+  const subtitle  = statementDates(activeTB).cy ? `Balance Sheet as at ${statementDates(activeTB).cy}` : 'Balance Sheet'
   // Previous Year not required for this Financial Year (PYModeSelect): nothing to pick or type, and - when the CA
   // asked for it - no Previous Year column ('hide-py' hides every .py-col below).
   const pyOff = !!data?.pyMode && data.pyMode !== 'required'
@@ -494,6 +495,7 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                 <p className="text-xs text-gray-400 mt-0.5">(Amount in ₹)</p>
               </div>
 
+              <MissingAlieWarning report={data.missingAlie} onFix={openFix} tbId={activeTB?.id} />
               {/* Column headers */}
               <table className="w-full text-xs mb-2 table-fixed">
                 <colgroup>
@@ -538,6 +540,7 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                 />
               )}
 
+              <MissingAlieWarning report={data.missingAlie} position="bottom" />
               <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-400 flex justify-between">
                 <span>The accompanying notes form an integral part of the financial statements.</span>
                 <span>Click note numbers to navigate.</span>

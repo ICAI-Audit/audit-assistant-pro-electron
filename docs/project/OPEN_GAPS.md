@@ -4,6 +4,7 @@ Reviewed source `cc5c04729604fba7d05240a07f24682e0644665c`. Gaps below remain do
 
 | Gap | Area | Affected modules | Evidence or limit | Disposition |
 | --- | --- | --- | --- | --- |
+| GAP-18 | Non-corporate profit transfer without an equity target | Financial Statement Review (F-007/F-009) | T-024 synthetic tests: constitutions 1/2 with all equity-side ledgers unresolved have no classified owners'/partners' heading for the existing P&L transfer; a balanced source TB can retain a BS difference equal to the untransferred profit/loss. Classified-equity fixtures reconcile. | [T-024 evidence and limits](T024_LEVEL1_FALLBACKS.md); owner review before a separate financial-rule change. No balancing plug or universal guarantee. |
 | GAP-01 | Missing declared tables | M-06, M-13 | engagement_tb_classification and ifc_clause_library are absent from sqlite/schema; latest VS Code report says their callers fail. | T-017; record intended model and migration before a separate implementation task. |
 | GAP-02 | UI-to-persistence verification | M-01 to M-17 | Most module workflows have source code but no complete saved/reopened renderer UAT. Latest security tests are IPC-level. | Module acceptance cases; owner selects release-critical paths. |
 | GAP-03 | Prototype misstatements | M-11 | Sample data and non-persisting Add behaviour drive the screen. | T-006 and RV-11. |

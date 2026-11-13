@@ -6,6 +6,7 @@ import { createHash } from 'crypto'
 import { query, runInTransaction } from '../db/client.js'
 import { tryClaimMigration } from '../db/schema.js'
 import { assetPath } from '../paths.js'
+import { ensureLevel1Fallbacks, PRE_FALLBACK_WORKBOOK_HASH, FALLBACK_WORKBOOK_HASH } from '../db/level1-fallbacks.js'
 
 // Primary mapping file: Mapping_v2.xlsx, bundled with VERA in
 // electron/fsg/assets/ (see paths.js).
@@ -81,6 +82,17 @@ export async function seedDefaultMapping() {
 
   if (usingMaintainedMapping) {
     const fileHash = createHash('sha256').update(readFileBytes(SOURCE_MAPPING)).digest('hex')
+    // This exact workbook revision adds only the five T-024 terminal rows.
+    // Preserve existing master IDs and all ledger mappings on an old install.
+    if (fileHash === FALLBACK_WORKBOOK_HASH && existing.length) {
+      const { rows: oldSeed } = await query('SELECT key FROM schema_migrations WHERE key = $1', [`mapping_seed:${PRE_FALLBACK_WORKBOOK_HASH}`])
+      if (oldSeed.length) {
+        const { rows: newSeed } = await query('SELECT key FROM schema_migrations WHERE key = $1', [`mapping_seed:${fileHash}`])
+        const result = await ensureLevel1Fallbacks({ seedHash: newSeed.length ? null : fileHash })
+        if (result.backupPath) console.log('T-024 mapping backup:', result.backupPath)
+        return existing[0].id
+      }
+    }
     const claimed = await tryClaimMigration(`mapping_seed:${fileHash}`)
     if (!claimed) {
       // This exact file content has already been seeded (by this client on a

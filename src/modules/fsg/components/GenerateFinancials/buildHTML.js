@@ -1,3 +1,4 @@
+import { statementDates, statementColumnLabels, noteColumnLabels, datedPeriodLabel } from '../../utils/statementDates'
 import { fmtINR as _fmtINRRaw, fmtDenom, DENOMINATIONS, processRows, displayAmt } from '../../hooks/useFinancials'
 import { netCreditPurchasesWorking } from '../../utils/ratios'
 import { auditorForDenomination } from '../../utils/signingRules'
@@ -24,6 +25,9 @@ import { EXPENSE_LINES, corpFaceTail, TAX_SECTION_RX } from '../../utils/plStruc
 // Annexures UI and the Excel exporter.
 import { getSubnoteGroups, UNCLASSIFIED_LABEL, plNoteLines, bsNoteFallbackLines, subnoteGroupFigures, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
 import { CASH_BANK_ITEMS } from '../Notes/CashBankDetailsForm'
+import { investmentKind, investmentTables } from '../../utils/investments'
+import { missingAlieHTML, missingAlieLedgerHTML } from '../../utils/missingAlieExport'
+import { buildMissingAlieReport } from '../../utils/missingAlie'
 import { printedDisclosures, disclosureParagraphs } from '../../utils/shareCapitalDisclosures'
 import { scaleRatioAmounts } from '../../utils/ratioTable'
 import { buildCashFlow } from '../../utils/cashFlow'
@@ -181,7 +185,8 @@ function compactSignFooter(entity, auditor, signatories, { enabled = true, signP
 // always render the identical structure, numbering, and zero-value
 // uncategorised suppression.
 function buildBSPage(entity, activeTB, prevTB, data, auditor, signatories, signPlace = '', signDate = '') {
-  const cyYE = yearEnd(activeTB?.period)
+  const cyYE = statementDates(activeTB).cy
+  const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB)
   const isCompany = parseInt(entity?.constitution) === 3
 
   const lineRow = (label, noteNum, total, prevTotal) => `<tr>
@@ -269,13 +274,14 @@ function buildBSPage(entity, activeTB, prevTB, data, auditor, signatories, signP
     <div class="print-page compact-page">
       <div class="page-body">
         ${pageHeader(entity, 'Balance Sheet', `as at ${esc(cyYE)}`)}
+        ${missingAlieHTML(data.missingAlie)}
         <table class="fs-table compact-table">
           <thead>
             <tr>
               <th style="width:52%"></th>
               <th style="width:8%" class="center">Note</th>
-              <th style="width:20%" class="right">Current Year</th>
-              <th style="width:20%" class="right" data-py-col>Previous Year</th>
+              <th style="width:20%" class="right">${esc(cyLabel)}</th>
+              <th style="width:20%" class="right" data-py-col>${esc(pyLabel)}</th>
             </tr>
           </thead>
           <tbody>
@@ -287,6 +293,7 @@ function buildBSPage(entity, activeTB, prevTB, data, auditor, signatories, signP
         ${Math.abs(totalEL - totalAssets) > 1 ? `
           <div class="note-text">Balance Sheet difference: ${fmtINR(Math.abs(totalEL - totalAssets))}.</div>
         ` : ''}
+        ${missingAlieHTML(data.missingAlie)}
         <div class="footer-text">The accompanying notes form an integral part of the financial statements.</div>
       </div>
       ${compactSignFooter(entity, auditor, signatories, { enabled: true, signPlace, signDate })}
@@ -421,8 +428,7 @@ function buildCFSPage(entity, activeTB, data, auditor, signatories, signPlace = 
 }
 
 function buildPLPage(entity, activeTB, prevTB, data, auditor, signatories, signPlace = '', signDate = '') {
-  const cyLabel = 'Current Year'
-  const pyLabel = 'Previous Year'
+  const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB, 'pl')
   const constitution = entity?.constitution
   const title = constitution === 1 ? 'Profit and Loss Account' : 'Statement of Profit and Loss'
 
@@ -433,7 +439,8 @@ function buildPLPage(entity, activeTB, prevTB, data, auditor, signatories, signP
     return `
       <div class="print-page compact-page">
         <div class="page-body">
-          ${pageHeader(entity, title, `for the year ended ${esc(yearEnd(activeTB?.period || ''))}`)}
+          ${pageHeader(entity, title, `for the year ended ${esc(statementDates(activeTB).cy)}`)}
+          ${missingAlieHTML(data.missingAlie)}
           <table class="fs-table compact-table">
             <thead>
               <tr>
@@ -445,6 +452,7 @@ function buildPLPage(entity, activeTB, prevTB, data, auditor, signatories, signP
             </thead>
             <tbody>${body}</tbody>
           </table>
+          ${missingAlieHTML(data.missingAlie)}
           <div class="footer-text">The accompanying notes form an integral part of the financial statements.</div>
         </div>
         ${compactSignFooter(entity, auditor, signatories, { enabled: true, signPlace, signDate })}
@@ -741,7 +749,8 @@ function buildPLPage(entity, activeTB, prevTB, data, auditor, signatories, signP
   return `
     <div class="print-page compact-page">
       <div class="page-body">
-        ${pageHeader(entity, title, `for the year ended ${esc(yearEnd(activeTB?.period || ''))}`)}
+        ${pageHeader(entity, title, `for the year ended ${esc(statementDates(activeTB).cy)}`)}
+        ${missingAlieHTML(data.missingAlie)}
         <table class="fs-table compact-table">
           <thead>
             <tr>
@@ -753,6 +762,7 @@ function buildPLPage(entity, activeTB, prevTB, data, auditor, signatories, signP
           </thead>
           <tbody>${body}</tbody>
         </table>
+        ${missingAlieHTML(data.missingAlie)}
         <div class="footer-text">The accompanying notes form an integral part of the financial statements.</div>
       </div>
       ${compactSignFooter(entity, auditor, signatories, { enabled: true, signPlace, signDate })}
@@ -1551,7 +1561,7 @@ function closingOfAcct(f) {
   const n = (v) => parseFloat(v) || 0
   return n(f?.opening) + n(f?.introduced) + n(f?.remuneration) + n(f?.interest) - n(f?.withdrawals) + n(f?.shareOfProfit)
 }
-function renderAcctRoundTable(rows, py, { openLabel, closeLabel, partyLabel, showAgreedContribution = false, isSingleOwner = false }) {
+function renderAcctRoundTable(rows, py, { openLabel, closeLabel, partyLabel, showAgreedContribution = false, isSingleOwner = false, pyLabel = 'Previous Year' }) {
   const num = (v) => parseFloat(v) || 0
   // Always 2 decimals, even for a whole number (34 -> "34.00") — matches the
   // formatting every other figure on the statements uses (fmtINR).
@@ -1612,7 +1622,7 @@ function renderAcctRoundTable(rows, py, { openLabel, closeLabel, partyLabel, sho
     <td style="${td}">${fmtN(sumClosing())}</td>
   </tr>`
   html += `<tr style="background:#f3f4f6;">
-    <td style="${tdl}font-weight:bold;" colspan="${leadingCols}">Previous Year (PY)</td>
+    <td style="${tdl}font-weight:bold;" colspan="${leadingCols}">${esc(pyLabel)}</td>
     <td style="${td}">${fmtN(num(py?.opening))}</td>
     <td style="${td}">${fmtN(num(py?.introduced))}</td>
     ${isSingleOwner ? '' : `<td style="${td}">${fmtN(num(py?.remuneration))}</td>`}
@@ -1636,10 +1646,10 @@ function renderOwnersCapitalDetails(details, noteNum, cyLabel, pyLabel, cyTotal,
 
   if (details.variant === 'llp') {
     html += `<p style="font-weight:bold;font-size:9pt;margin:2mm 0 1mm;">${noteNum}(a) Partners Contribution Account</p>`
-    html += renderAcctRoundTable(details.rows.map(r => ({ name: r.name, agreedContribution: r.agreedContribution, ...r.contrib })), details.pyContrib, { openLabel, closeLabel, partyLabel, showAgreedContribution: true })
+    html += renderAcctRoundTable(details.rows.map(r => ({ name: r.name, agreedContribution: r.agreedContribution, ...r.contrib })), details.pyContrib, { openLabel, closeLabel, partyLabel, pyLabel, showAgreedContribution: true })
 
     html += `<p style="font-weight:bold;font-size:9pt;margin:3mm 0 1mm;">${noteNum}(b) Partners Current Account</p>`
-    html += renderAcctRoundTable(details.rows.map(r => ({ name: r.name, ...r.current })), details.pyCurrent, { openLabel, closeLabel, partyLabel, showAgreedContribution: false })
+    html += renderAcctRoundTable(details.rows.map(r => ({ name: r.name, ...r.current })), details.pyCurrent, { openLabel, closeLabel, partyLabel, pyLabel, showAgreedContribution: false })
 
     if (cyTotal != null) {
       const formCY = details.rows.reduce((s, r) => s + closingOfAcct(r.contrib) + closingOfAcct(r.current), 0)
@@ -1653,7 +1663,7 @@ function renderOwnersCapitalDetails(details, noteNum, cyLabel, pyLabel, cyTotal,
       }
     }
   } else {
-    html += renderAcctRoundTable(details.rows, details.py, { openLabel, closeLabel, partyLabel, showAgreedContribution: false, isSingleOwner: !!details.isSingleOwner })
+    html += renderAcctRoundTable(details.rows, details.py, { openLabel, closeLabel, partyLabel, pyLabel, showAgreedContribution: false, isSingleOwner: !!details.isSingleOwner })
 
     if (cyTotal != null) {
       const formCY = details.rows.reduce((s, r) => s + closingOfAcct(r), 0)
@@ -1814,7 +1824,7 @@ function renderLongTermBorrowingsDetails(details, noteNum, cyLabel, pyLabel) {
 // form's own "Default behavior" copy already promises exactly this). The
 // form itself has a single Amount field per item (no separate CY/PY), so
 // that's the only figure there is to gate on.
-function renderCashBankDetails(details, noteNum) {
+function renderCashBankDetails(details, noteNum, cyLabel = 'Current Year', pyLabel = 'Previous Year') {
   if (!details?.items) return ''
   const num = (v) => parseFloat(v) || 0
   const hasCY = CASH_BANK_ITEMS.some(item => num(details.items[item.key]?.amount) !== 0)
@@ -1840,8 +1850,8 @@ function renderCashBankDetails(details, noteNum) {
   html += `<thead><tr>
     <th style="${thl}width:6%;white-space:nowrap;">Sl No.</th>
     <th style="${thl}">Particulars</th>
-    <th style="${th}">${hasPY ? 'Amount (CY)' : 'Amount'}</th>
-    ${hasPY ? `<th style="${th}">Amount (PY)</th>` : ''}
+    <th style="${th}">${esc(cyLabel)}</th>
+    ${hasPY ? `<th style="${th}">${esc(pyLabel)}</th>` : ''}
     <th style="${thl}">Remarks</th>
   </tr></thead><tbody>`
   for (const item of CASH_BANK_ITEMS) {
@@ -1976,7 +1986,7 @@ function renderShortTermBorrowingsDetails(details, noteNum, cyLabel, pyLabel) {
 }
 
 // ── Trade Payables / Receivables ageing schedule (Schedule III) ───────────────
-function renderAgeingSchedule(details, noteTitle) {
+function renderAgeingSchedule(details, noteTitle, cyLabel = 'Current Year', pyLabel = 'Previous Year') {
   const t = (noteTitle || '').toLowerCase()
   const isTP = t.includes('trade payable')
   // TP saves under details.ageing (combined with MSME); TR saves at top level
@@ -2029,8 +2039,8 @@ function renderAgeingSchedule(details, noteTitle) {
     return html
   }
 
-  const cyHtml = buildPeriod(ag.cy, 'Current Year')
-  const pyHtml = buildPeriod(ag.py, 'Previous Year')
+  const cyHtml = buildPeriod(ag.cy, cyLabel)
+  const pyHtml = buildPeriod(ag.py, pyLabel)
   if (!cyHtml && !pyHtml) return ''
   return `<div style="margin:2mm 0 4mm;">${cyHtml}${pyHtml}</div>`
 }
@@ -2124,7 +2134,7 @@ function renderChangesInInventoryDetails(details, noteNum, cyLabel, pyLabel) {
 // Sourced from note.itBlockSummaryData (attached in useFinancials.js), NOT
 // from noteDetailsMap, so it's called directly from buildNotesPages below
 // rather than through the renderNoteDetails() title dispatcher.
-function renderITBlockSummaryTable(blocks, pyTotals, wip) {
+function renderITBlockSummaryTable(blocks, pyTotals, wip, pyLabel = 'Previous Year') {
   if (!blocks || !blocks.length) return ''
   const num = (v) => parseFloat(v) || 0
   const fmtN = fmtINR  // module-level, denomination-scaled — see _DENOM_KEY at the top of this file
@@ -2177,7 +2187,7 @@ function renderITBlockSummaryTable(blocks, pyTotals, wip) {
     const tdlPy = 'border:1px solid #ccc;padding:2pt 5pt;font-size:8pt;font-style:italic;color:#666;'
     const tdrPy = 'border:1px solid #ccc;padding:2pt 5pt;font-size:8pt;text-align:right;font-variant-numeric:tabular-nums;color:#666;'
     html += `<tr>
-      <td style="${tdlPy}">Previous Year</td>
+      <td style="${tdlPy}">${esc(pyLabel)}</td>
       <td style="${tdrPy}"></td>
       <td style="${tdrPy}">${fmtN(num(pyTotals.openingWDV))}</td>
       <td style="${tdrPy}">${fmtN(num(pyTotals.addBefore180) + num(pyTotals.addAfter180))}</td>
@@ -2211,7 +2221,7 @@ function renderITBlockSummaryTable(blocks, pyTotals, wip) {
       <td style="${tdrTot}">${fmtN(wipCapital + wipIntangible)}</td>
     </tr>
     <tr>
-      <td style="${tdlWip}font-style:italic;color:#666;">Previous Year (Work in Progress)</td>
+      <td style="${tdlWip}font-style:italic;color:#666;">${esc(pyLabel)} (Work in Progress)</td>
       <td style="${tdrWip}"></td><td style="${tdrWip}"></td><td style="${tdrWip}"></td><td style="${tdrWip}"></td><td style="${tdrWip}"></td>
       <td style="${tdrWip}font-style:italic;color:#666;">${fmtN(wipPY)}</td>
     </tr>
@@ -2221,7 +2231,7 @@ function renderITBlockSummaryTable(blocks, pyTotals, wip) {
       <td style="${tdrTot}">${fmtN(totals.closingWDV + wipCapital + wipIntangible)}</td>
     </tr>
     <tr>
-      <td style="${tdlWip}font-style:italic;color:#666;">Previous Year</td>
+      <td style="${tdlWip}font-style:italic;color:#666;">${esc(pyLabel)}</td>
       <td style="${tdrWip}"></td><td style="${tdrWip}"></td><td style="${tdrWip}"></td><td style="${tdrWip}"></td><td style="${tdrWip}"></td>
       <td style="${tdrWip}font-style:italic;color:#666;">${fmtN((pyTotals ? num(pyTotals.closingWDV) : 0) + wipPY)}</td>
     </tr>`
@@ -2237,7 +2247,7 @@ function renderITBlockSummaryTable(blocks, pyTotals, wip) {
 // rather than through the renderNoteDetails() title dispatcher. Mirrors the
 // exact Gross Block / Depreciation / Net Block column groups shown on the
 // live Dep (Comp) screen, plus a Trial-Balance reconciliation footer.
-function renderCompScheduleTable(categoryRows, tbCY, tbPY, pyTotals) {
+function renderCompScheduleTable(categoryRows, tbCY, tbPY, pyTotals, pyLabel = 'Previous Year') {
   if (!categoryRows || !categoryRows.length) return ''
   const num = (v) => parseFloat(v) || 0
   const fmtN = fmtINR  // module-level, denomination-scaled — see _DENOM_KEY at the top of this file
@@ -2301,7 +2311,7 @@ function renderCompScheduleTable(categoryRows, tbCY, tbPY, pyTotals) {
     const tdlPy = 'border:1px solid #ccc;padding:2pt 4pt;font-size:7.5pt;font-style:italic;color:#666;'
     const tdrPy = 'border:1px solid #ccc;padding:2pt 4pt;font-size:7.5pt;text-align:right;font-variant-numeric:tabular-nums;color:#666;'
     html += `<tr>
-      <td style="${tdlPy}">Previous Year</td>
+      <td style="${tdlPy}">${esc(pyLabel)}</td>
       <td style="${tdrPy}">${fmtN(num(pyTotals.grossOpen))}</td>
       <td style="${tdrPy}">${fmtN(num(pyTotals.additions))}</td>
       <td style="${tdrPy}">${fmtN(num(pyTotals.deductions))}</td>
@@ -2376,8 +2386,8 @@ function renderNoteDetails(noteTitle, details, noteNum, cyLabel, pyLabel, cyTota
   if (t.includes('share capital')) return renderShareCapitalDetails(details, noteNum, cyLabel, pyLabel, cyTotal, pyTotal, isCompany)
   if (t.includes('long-term borrow') || t.includes('long term borrow')) return renderLongTermBorrowingsDetails(details, noteNum, cyLabel, pyLabel)
   if (t.includes('short-term borrow') || t.includes('short term borrow')) return renderShortTermBorrowingsDetails(details, noteNum, cyLabel, pyLabel)
-  if (t.includes('cash') && t.includes('bank')) return renderCashBankDetails(details, noteNum)
-  if ((t.includes('trade payable') || t.includes('trade receivable')) && isCompany) return renderAgeingSchedule(details, noteTitle)
+  if (t.includes('cash') && t.includes('bank')) return renderCashBankDetails(details, noteNum, cyLabel, pyLabel)
+  if ((t.includes('trade payable') || t.includes('trade receivable')) && isCompany) return renderAgeingSchedule(details, noteTitle, cyLabel, pyLabel)
   if (t.includes("owners' capital") || t.includes('owners capital') || t.includes("partners' capital") || t.includes('partners capital')) {
     return renderOwnersCapitalDetails(details, noteNum, cyLabel, pyLabel, cyTotal, pyTotal, periodStartStr, periodEndStr)
   }
@@ -2407,9 +2417,7 @@ function buildNotesPages(entity, activeTB, auditor, signatories, signNotes = fal
   return (data) => {
     const isCompany = parseInt(entity?.constitution) === 3
     const isNonCorp12 = [1, 2].includes(parseInt(entity?.constitution))
-    const header = pageHeader(entity, 'Notes to Financial Statements', `for the year ended ${esc(yearEnd(activeTB?.period || ''))}`)
-    const cyLabel = 'Current Year'
-    const pyLabel = 'Previous Year'
+    const header = pageHeader(entity, 'Notes to Financial Statements', `for the year ended ${esc(statementDates(activeTB).cy)}`)
     const periodStartStr = yearStart(activeTB?.period || '')
     const periodEndStr = yearEnd(activeTB?.period || '')
 
@@ -2443,8 +2451,14 @@ function buildNotesPages(entity, activeTB, auditor, signatories, signNotes = fal
     const allNotes = data.activeNotes || Object.values(data.notes || {})
     const blocks = []
     for (const note of allNotes) {
+      const periodLabels = noteColumnLabels(activeTB, prevTB, note)
+      const { cy: cyLabel, py: pyLabel } = periodLabels
       const t = (note.title || '').toLowerCase()
       const details = noteDetailsMap[note.num]
+      const invKind = investmentKind(note.title)
+      const invTables = invKind ? investmentTables(note.investmentDetails, invKind, fmtINR).map(t => ({ ...t, headers: t.headers.map(h => datedPeriodLabel(h, periodLabels)) })) : []
+      const invBlocks = invTables.map(t => flowBlock(t.rows.length <= 8 ? 'atomic' : 'children', `<div data-flow-children class="fill-details"><h4 data-flow-title>${esc(t.title)}</h4><table style="width:100%;table-layout:fixed;border-collapse:collapse"><thead><tr>${t.headers.map(h => `<th style="border:1px solid #aaa;padding:4px;overflow-wrap:anywhere">${esc(h)}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r => `<tr>${r.map(v => `<td style="border:1px solid #aaa;padding:4px;overflow-wrap:anywhere">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`, { contdTitle: `Note ${note.num}: ${note.title}` }))
+      const invWarnings = invKind && note.investmentIssues?.length ? `<div><strong>Investment disclosures need review</strong><ul>${note.investmentIssues.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>` : ''
       // For notes with filled form details (Share Capital, LTB, Owners'/Partners'
       // Capital Account), the detail tables carry the breakdown instead of the
       // auto-derived Level 3 rows.
@@ -2456,8 +2470,8 @@ function buildNotesPages(entity, activeTB, auditor, signatories, signNotes = fal
       // below 10pt — and only a table too wide for the page at 10pt does.
       const partsBlock = (html, cls = '') => (html ? flowBlock('children', `<div data-flow-children${cls ? ` class="${cls}"` : ''}>${html}</div>`, { contdTitle: `Note ${note.num}: ${note.displayTitle || note.title || ''}` }) : '')
       const disclosureHtml = renderDisclosure(noteDisclosureMap[note.num])
-      const depScheduleHtml = renderITBlockSummaryTable(note.itBlockSummaryData, note.itBlockSummaryPyTotals, note.itWip)
-        + renderCompScheduleTable(note.compScheduleData, note.compScheduleTbCY, note.compScheduleTbPY, note.compSchedulePyTotals)
+      const depScheduleHtml = renderITBlockSummaryTable(note.itBlockSummaryData, note.itBlockSummaryPyTotals, note.itWip, pyLabel)
+        + renderCompScheduleTable(note.compScheduleData, note.compScheduleTbCY, note.compScheduleTbPY, note.compSchedulePyTotals, pyLabel)
       // PPE note: the IT Act Block-wise WDV Summary or the Dep (Comp)
       // category-level schedule (whichever is opted in — mutually exclusive by
       // construction) supersedes the plain "Property, Plant & Equipment /
@@ -2484,6 +2498,7 @@ function buildNotesPages(entity, activeTB, auditor, signatories, signNotes = fal
         blocks.push(partsBlock(depScheduleHtml, 'fill-details'))
       }
       blocks.push(partsBlock(disclosureHtml))
+      if (invKind) blocks.push(partsBlock(invWarnings, 'fill-details'), ...invBlocks)
     }
     const notesSection = flowSection(header, compactSignFooter(entity, auditor, signatories, { enabled: signNotes, signPlace, signDate }), blocks.filter(Boolean))
     const generalLast = data.generalNotes?.position === 'last'
@@ -2504,9 +2519,11 @@ function buildNotesPages(entity, activeTB, auditor, signatories, signNotes = fal
 function buildAnnexuresPages(entity, activeTB, data, auditor, signatories, signAnnex = false, prevTB = null, signPlace = '', signDate = '') {
   const hasSeparatePYTB = !!prevTB?.id
   const blocks = []
+  if (missingAlieLedgerHTML(data.missingAlie)) blocks.push(flowBlock('children', `<div data-flow-children>${missingAlieHTML(data.missingAlie)}${missingAlieLedgerHTML(data.missingAlie)}</div>`))
   const notes = data.activeNotes || Object.values(data.notes)
 
   for (const note of notes) {
+    const periodLabels = noteColumnLabels(activeTB, prevTB, note)
     const isZeroRow = r => Math.abs(rowAmt(r, 'closing_balance')) < 0.005 && Math.abs(rowAmt(r, 'opening_balance')) < 0.005
     const shown = annexureDisplayLabels(note)   // print text only - the grouping above keeps the real labels
     const groups = getSubnoteGroups(note, data.levelFormat)
@@ -2605,10 +2622,10 @@ function buildAnnexuresPages(entity, activeTB, data, auditor, signatories, signA
               <th style="width:${showBlockCol ? 12 : 15}%">Sub-note</th>
               ${showBlockCol ? `<th style="width:11%">IT Block</th>` : ''}
               <th style="width:${showBlockCol ? 3 : 4}%">Code</th>
-              <th style="width:${showBlockCol ? 13.5 : 14}%" class="right">CY Ledger</th>
-              <th style="width:${showBlockCol ? 13.5 : 14}%" class="right">CY Sub-note Total</th>
-              <th style="width:${showBlockCol ? 13.5 : 14}%" class="right" data-py-col>PY Ledger</th>
-              <th style="width:${showBlockCol ? 13.5 : 14}%" class="right" data-py-col>PY Sub-note Total</th>
+              <th style="width:${showBlockCol ? 13.5 : 14}%" class="right">${esc(periodLabels.cy)} - Ledger</th>
+              <th style="width:${showBlockCol ? 13.5 : 14}%" class="right">${esc(periodLabels.cy)} - Sub-note Total</th>
+              <th style="width:${showBlockCol ? 13.5 : 14}%" class="right" data-py-col>${esc(periodLabels.py)} - Ledger</th>
+              <th style="width:${showBlockCol ? 13.5 : 14}%" class="right" data-py-col>${esc(periodLabels.py)} - Sub-note Total</th>
             </tr>
           </thead>
           <tbody>${body}</tbody>
@@ -2633,14 +2650,14 @@ function buildAnnexuresPages(entity, activeTB, data, auditor, signatories, signA
       <div class="note-block">
         <div class="note-title" data-flow-title>Workings of Ratios — Net Credit Purchases</div>
         <table class="fs-table annex-table">
-          <thead><tr><th style="width:60%">Particulars</th><th class="right" style="width:20%">Current Year</th><th class="right" style="width:20%" data-py-col>Previous Year</th></tr></thead>
+          <thead><tr><th style="width:60%">Particulars</th><th class="right" style="width:20%">${esc(statementColumnLabels(activeTB, prevTB, 'pl').cy)}</th><th class="right" style="width:20%" data-py-col>${esc(statementColumnLabels(activeTB, prevTB, 'pl').py)}</th></tr></thead>
           <tbody>${trs}${tail}</tbody>
         </table>
         <div style="font-size:9pt;margin-top:2mm;">Net Credit Purchases is taken as the total of the above Profit &amp; Loss captions; cash purchases and purchase returns are not separately identified. Trade Payables Turnover Ratio = Net Credit Purchases / Average Trade Payables.</div>
       </div>`, { keepNext: false }))
   }
   return flowSection(
-    pageHeader(entity, 'Annexures — Ledger Details', `for the year ended ${esc(yearEnd(activeTB?.period || ''))}`),
+    pageHeader(entity, 'Annexures — Ledger Details', `for the year ended ${esc(statementDates(activeTB).cy)}`),
     compactSignFooter(entity, auditor, signatories, { enabled: signAnnex, signPlace, signDate }),
     blocks,
   )
@@ -2976,11 +2993,13 @@ export function buildFinancialsHTML({ entity, activeTB, prevTB, data, auditor: a
 export function buildColumnarHTML({ entity, branchTBsData, auditor: auditorGiven, signatories, denomination = 'as_is', noteDetailsMap = {}, generalNotes = null, signPlace = '', signDate = '' }) {
   _DENOM_KEY = denomination
   const auditor = auditorForDenomination(entity, auditorGiven, denomination)
+  const alieReport = buildMissingAlieReport(branchTBsData.flatMap(b => b.missingAlieRows || []))
 
   const branches = branchTBsData.map(b => ({
     branchName: b.branchName || `Branch ${b.tbId}`,
     period: b.period || '',
     data: processRows(b.rows, null, entity?.constitution, [], entity?.business_type),
+    missingAlie: buildMissingAlieReport(b.missingAlieRows || []),
   }))
 
   const constitution = entity?.constitution
@@ -3047,6 +3066,7 @@ export function buildColumnarHTML({ entity, branchTBsData, auditor: auditorGiven
     return `<div class="print-page compact-page">
       <div class="page-body">
         ${pageHeader(entity, 'Balance Sheet — Branch-wise Columnar', '')}
+        ${missingAlieHTML(alieReport)}
         <table class="fs-table compact-table">
           <thead><tr><th style="width:${100 - (N+1)*colPct}%">Particulars</th>${brHdrs}<th class="right total-col" style="width:${colPct}%">Total</th></tr></thead>
           <tbody>
@@ -3055,6 +3075,7 @@ export function buildColumnarHTML({ entity, branchTBsData, auditor: auditorGiven
             ${renderBSSection('ASSETS', 'ASSETS')}
           </tbody>
         </table>
+        ${missingAlieHTML(alieReport)}
         <div class="footer-text">Branch-wise columnar Balance Sheet — figures before inter-branch eliminations.</div>
       </div>
       ${compactSignFooter(entity, auditor, signatories, { enabled: true })}
@@ -3107,6 +3128,7 @@ export function buildColumnarHTML({ entity, branchTBsData, auditor: auditorGiven
     return `<div class="print-page compact-page">
       <div class="page-body">
         ${pageHeader(entity, title + ' — Branch-wise Columnar', '')}
+        ${missingAlieHTML(alieReport)}
         <table class="fs-table compact-table">
           <thead><tr><th style="width:${100 - (N+1)*colPct}%">Particulars</th>${brHdrs}<th class="right total-col" style="width:${colPct}%">Total</th></tr></thead>
           <tbody>
@@ -3121,6 +3143,7 @@ export function buildColumnarHTML({ entity, branchTBsData, auditor: auditorGiven
             <tr class="total-row"><td>Profit / (Loss) for the Year</td>${branches.map(br => `<td class="right">${fmtINR(totPAT(br))}</td>`).join('')}<td class="right total-col">${fmtINR(gPAT)}</td></tr>
           </tbody>
         </table>
+        ${missingAlieHTML(alieReport)}
         <div class="footer-text">Branch-wise columnar P&amp;L — figures before inter-branch eliminations.</div>
       </div>
       ${compactSignFooter(entity, auditor, signatories, { enabled: true })}
@@ -3148,8 +3171,8 @@ export function buildColumnarHTML({ entity, branchTBsData, auditor: auditorGiven
   function buildBranchAnnexures() {
     return branches.map(br => {
       const allNotes = Object.values(br.data.notes || {}).filter(n => n.rows?.length)
-      if (!allNotes.length) return ''
-      let noteBlocks = ''
+      if (!allNotes.length && !missingAlieLedgerHTML(br.missingAlie)) return ''
+      let noteBlocks = missingAlieHTML(br.missingAlie) + missingAlieLedgerHTML(br.missingAlie)
       for (const note of allNotes) {
         const l3map = new Map()
         for (const r of note.rows) {

@@ -138,6 +138,7 @@ export default function AdminSettings() {
     no_of_partners: number | null;
     firm_registration_no: string;
     address: string;
+    place: string;
   }
   const [firmSettings, setFirmSettings] = useState<FirmSettings>({
     firm_name: '',
@@ -146,6 +147,7 @@ export default function AdminSettings() {
     no_of_partners: null,
     firm_registration_no: '',
     address: '',
+    place: '',
   });
   const [loadingFirm, setLoadingFirm] = useState(true);
   const [savingFirm, setSavingFirm] = useState(false);
@@ -256,6 +258,7 @@ export default function AdminSettings() {
           no_of_partners: data.no_of_partners,
           firm_registration_no: data.firm_registration_no || '',
           address: data.address || '',
+          place: data.place || '',
         });
       }
     } catch (error) {
@@ -283,6 +286,7 @@ export default function AdminSettings() {
             no_of_partners: firmSettings.no_of_partners,
             firm_registration_no: firmSettings.firm_registration_no || null,
             address: firmSettings.address || null,
+            place: firmSettings.place.trim() || null,
           })
           .eq('id', firmSettings.id)
           .execute();
@@ -297,6 +301,7 @@ export default function AdminSettings() {
             no_of_partners: firmSettings.no_of_partners,
             firm_registration_no: firmSettings.firm_registration_no || null,
             address: firmSettings.address || null,
+            place: firmSettings.place.trim() || null,
             created_by: user?.id || 'system',
           })
           .select()
@@ -679,6 +684,13 @@ export default function AdminSettings() {
                         onChange={(e) => setFirmSettings(prev => ({ ...prev, firm_registration_no: e.target.value }))}
                         placeholder="XXXXXXX"
                       />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="admin-firm-place">Place</Label>
+                      <Input id="admin-firm-place" value={firmSettings.place}
+                        onChange={(e) => setFirmSettings(prev => ({ ...prev, place: e.target.value }))}
+                        placeholder="City / town of the firm" />
+                      <p className="text-sm text-muted-foreground">Default signing place for financial statements; editable when generating financials.</p>
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="firm_address">Firm Address (for letterhead footer)</Label>

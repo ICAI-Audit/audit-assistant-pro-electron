@@ -1,5 +1,11 @@
 # Data model and persistence
 
+Retired feature storage, 13 November 2026:
+
+T-028 removes the Cloudtail MCA publishing feature and all live snapshot publish/list handlers. The fs_snapshots table and previously saved records are intentionally retained for data preservation; this change performs no migration, table drop or historical rewrite. References below to active snapshot publication are historical and superseded by this note and the current Financial Statement Review record.
+
+T-025 addition, 11 November 2026: investment disclosures reuse existing JSON note stores with reserved titles `Investment disclosure FY <entityPeriodId> <current|noncurrent>` and note numbers `-3000000 - 2 * entityPeriodId - (current ? 1 : 0)`. Real TBs use `note_details`; consolidated views use `entity_note_details`. The explicit year-scoped `investments:list/save` channels enforce permissions, TB/year association, source ledger membership and lock/final state. Generic note writes cannot target this namespace. No table/column migration or existing-data rewrite; see [T025 contract](T025_INVESTMENT_DISCLOSURES.md).
+
 ## Detailed field reference
 
 The [schema field catalogue](SCHEMA_FIELD_CATALOG.md) records 78 declared tables and 1,055 columns from the nine SQL files reviewed on 30 October 2026; it predates T-019 (39 tables added in 10_fsg_tables.sql, 6 legacy tables removed from 05_trial_balance_tables.sql) and has not been regenerated. The [caller catalogue](PERSISTENCE_CALLER_CATALOG.md) supplies literal targets and source paths; the [tax field catalogue](TAX_AUDIT_FIELD_CATALOG.md) covers configured clause/field objects with lexical extraction limits. These references are source facts, not a claim that installed databases match every UI/type model. T-017 records missing engagement_tb_classification and ifc_clause_library declarations.
@@ -32,6 +38,8 @@ IDs are commonly text. Some objects and arrays cross IPC and are JSON-serialised
 Auth stores password hashes with bcrypt. The active process tracks the signed-in user in memory. React's remembered email and selected engagement are convenience state, not authority to read records. Inspect each payload's engagement_id and ownership, including indirect links through procedure or report IDs.
 
 ## Required contract for a changed field
+
+T-023 adds nullable TEXT `firm_settings.place` for the firm's default financial-statement signing place, edited in both VERA firm settings screens. Existing rows receive NULL through a backup-before-ALTER startup migration; no identity or financial balance changes. Per-export edits do not write the profile. Contract, provenance and recovery evidence: [T023_FIRM_SIGNING_PLACE.md](T023_FIRM_SIGNING_PLACE.md).
 
 Document field name and type, nullability and default, owning table, foreign key, user meaning, source, units and sign, permitted values, read and write paths, validation, migration, and tests. For financial amounts state whether the number is source signed value, debit/credit movement, display magnitude, or scaled presentation. Do not apply display scaling to stored source balances.
 
