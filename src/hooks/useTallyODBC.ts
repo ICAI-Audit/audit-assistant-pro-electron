@@ -2,49 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { TallyMonthWiseLine } from "@/contexts/TallyContext";
 
-      // Extend the Window interface to include electronAPI
-declare global {
-  interface Window {
-    electronAPI: {
-      odbcCheckConnection: () => Promise<{ success: boolean; isConnected?: boolean; error?: string }>;
-      odbcTestConnection: (port?: string) => Promise<{ success: boolean; error?: string; driver?: string; sampleData?: any }>;
-      odbcFetchTrialBalance: (fromDate?: string, toDate?: string) => Promise<{ success: boolean; error?: string; data?: any[]; companyName?: string }>;
-      odbcFetchMonthWise: (fyStartYear: number, targetMonth: string) => Promise<{ success: boolean; error?: string; data?: { plLines: TallyMonthWiseLine[]; bsLines: TallyMonthWiseLine[]; months: string[]; fyStartYear: number; targetMonth: string } }>;
-      odbcDisconnect: () => Promise<{ success: boolean; error?: string }>;
-      // Opening Balance Matching methods
-      odbcFetchOldTallyLedgers: () => Promise<{ success: boolean; error?: string; data?: any[] }>;
-      odbcFetchNewTallyLedgers: () => Promise<{ success: boolean; error?: string; data?: any[] }>;
-      odbcCompareOpeningBalances: (data: { oldData: any[]; newData: any[] }) => Promise<{
-        success: boolean;
-        error?: string;
-        comparison?: {
-          balanceMismatches: any[];
-          nameMismatches: any[];
-        };
-        xml?: string;
-      }>;
-      // Month wise and GST methods
-      odbcFetchMonthWiseData: (data: { fyStartYear: number; targetMonth: string }) => Promise<{
-        success: boolean;
-        error?: string;
-        lines?: any[];
-        months?: string[];
-      }>;
-      odbcFetchGSTNotFeeded: () => Promise<{
-        success: boolean;
-        error?: string;
-        lines?: any[];
-      }>;
-      // Stock Items methods
-      odbcFetchStockItems: () => Promise<{
-        success: boolean;
-        error?: string;
-        items?: any[];
-      }>;
-    };
-  }
-}
-
 interface TallyCompanyInfo {
   companyName: string;
   financialYear: string;

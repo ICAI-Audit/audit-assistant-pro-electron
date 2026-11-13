@@ -8,6 +8,7 @@ declare global {
           buffer: ArrayBuffer;
           mimeType?: string;
           showSaveDialog?: boolean;
+          fileExtension?: 'docx' | 'csv';
         }) => Promise<string | null>;
       };
       gstzen: {
@@ -17,11 +18,34 @@ declare global {
         generateOtp: (requestData: any, token: string) => Promise<any>;
         establishSession: (requestData: any, token: string) => Promise<any>;
         request: (endpoint: string, method: string, data: any, token: string) => Promise<any>;
+        validateGstins?: (gstinList: string, token: string) => Promise<any>;
+        createGstin?: (gstinData: { gstin: string; name: string; taxpayer_type: 'REGULAR' | 'COMPOSITION' | 'ISD' }, token: string) => Promise<any>;
+      };
+      gstinLookup: {
+        fetchDetails: (payload: { gstin: string; consentConfirmed: boolean }) => Promise<{
+          success: boolean;
+          error?: string;
+          data?: {
+            valid: boolean;
+            name: string;
+            taxpayerType:
+              | 'REGULAR'
+              | 'ISD'
+              | 'TCS'
+              | 'TDS'
+              | 'NON_RESIDENT'
+              | 'UN_BODIES'
+              | 'TAX_RETURN_PREPARER'
+              | 'TEMPORARY_ID'
+              | null;
+            message: string | null;
+          };
+        }>;
       };
       // ODBC methods
       odbcCheckConnection: () => Promise<{ success: boolean; isConnected?: boolean; error?: string }>;
       odbcTestConnection: (port?: string) => Promise<{ success: boolean; error?: string; driver?: string; sampleData?: any }>;
-      odbcFetchTrialBalance: () => Promise<{ success: boolean; error?: string; data?: any[] }>;
+      odbcFetchTrialBalance: (fromDate?: string, toDate?: string) => Promise<{ success: boolean; error?: string; data?: any[]; companyName?: string }>;
       odbcFetchMonthWise: (fyStartYear: number, targetMonth: string) => Promise<{ success: boolean; error?: string; data?: { plLines: any[]; bsLines: any[]; months: string[]; fyStartYear: number; targetMonth: string } }>;
       odbcDisconnect: () => Promise<{ success: boolean; error?: string }>;
       // Opening Balance Matching methods
@@ -47,6 +71,11 @@ declare global {
         success: boolean;
         error?: string;
         lines?: any[];
+      }>;
+      odbcFetchStockItems: () => Promise<{
+        success: boolean;
+        error?: string;
+        items?: any[];
       }>;
       // Financial Statement Review (FSG) module: fsg:* channels only
       fsg?: {

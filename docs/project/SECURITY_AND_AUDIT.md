@@ -28,6 +28,7 @@ This record is code-grounded verification against active Electron handlers. It i
 | Locked/approved evidence writes | Requires explicit product-approved transition policy | Assigned manager writes to locked/approved records still observed as allowed | Policy unresolved |
 | Export while logged out | Requires explicit export authorization policy | Export currently succeeds to local downloads path | Policy unresolved |
 | Profile isolation during tests | Must not touch real user profile | Harness verifies temporary profile before main import; only synthetic data used | Enforced in harness |
+| Consented GSTIN lookup | Require authenticated app session, explicit consent, local GSTIN validation and fixed destination | `gstin:lookup-details` checks the current authenticated renderer and `consentConfirmed`; helper validates length/structure/state/checksum, uses only the fixed e-waybill endpoint, and sends only the GSTIN. Spreadsheet bytes and invalid rows stay local | Enforced in code and unit tests; valid-provider response, terms/rate limits, and durable consent audit are unverified |
 
 ## Implemented backend controls
 
@@ -40,6 +41,7 @@ This record is code-grounded verification against active Electron handlers. It i
 - Canonical evidence ownership: a path must be inside its own engagement folder, unique and immutable; handlers accept only a single matching record.
 - Prospective-row validation on update and upsert; upsert now requires explicit conflict columns and no longer uses `OR REPLACE`.
 - Authorization coverage review against all `.from('<table>')` callers added `engagement_trial_balance_header`, `engagement_trial_balance_lines`, `engagement_tb_classification` (parent-scoped) and read-only `ifc_clause_library`.
+- GSTIN details lookup is exposed through one fixed IPC method. The renderer must send an explicit consent flag; the main process rechecks the GSTIN and does not accept a URL or arbitrary request payload from the renderer. The UI checkbox is not a durable/cryptographic consent record, and the general untrusted-renderer/frame limitation above still applies.
 
 ## Financial Statement Review channels (T-019)
 
