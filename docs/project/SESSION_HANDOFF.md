@@ -1,5 +1,14 @@
 # Latest session handoff
 
+## T-030 main pull status on login (13 November 2026)
+
+- Requested outcome: fetch the latest Git, bring local `main` current, and update the login label so users can identify the pulled changes. Selected task T-030; affected feature F-001. Binding constraint: preserve the pre-existing modified `package-lock.json` and untracked `ICAI-VERA-Context-Pack/` and `ICAI-VERA-Documentation-Review/`.
+- Started on `main` at `26d3b9f37a9f3aadd8b3d5bf456538e195a60a67`. `git fetch origin` succeeded; `origin/main` was six commits ahead, with PR #109 (CAAT Tools) and PR #110 (Financial Statement Review / RSF updates). `git merge --ff-only origin/main` fast-forwarded to `99324eaad35f7ed9ad7cc8a543d223414a09bd0c`. Remote changes did not modify `package-lock.json`; existing local/untracked work was preserved.
+- Shared login/header label now says `Repository sync: origin/main (13 November 2026)` and `Update: CAAT Tools (PR #109) + FSG/RSF updates (PR #110)`. Tooltip continues to report source branch, build-time commit and the tracked-local-change flag. It is static build metadata, not live polling or proof that other installations have updated.
+- Checks passed: `npx --no-install vitest run src/lib/buildInfoLabel.test.ts` (5/5); `npx --no-install eslint src/config/buildMessage.ts src/lib/buildInfoLabel.test.ts`; `npm run build` (4,153 modules); exact label strings found in the generated renderer bundle; `npm run docs:inventory` (32 routes, 11 schema files, 10 test files; reviewed, no content diff); `npm run docs:check` (31 required documents/links/adapters/inventory); `git diff --check`. Build emitted Browserslist, mixed-import and large-chunk warnings.
+- Not established: Electron visual fit/tooltip on the actual login screen, packaging/release, and update status of any other installed build. Existing repo-wide typecheck/lint baselines were not rerun. No installer build or client-data operation was performed.
+- At this handoff draft stage, the commit and push have not yet occurred. The user explicitly authorized publishing these changes on 13 November 2026. First executable next step: commit the six reviewed paths and push to `origin/main`, then record the resulting commit and remote status here.
+
 ## RSF GitHub publication authorised and completed (13 November 2026)
 
 - Owner explicitly instructed "push the commit to github", superseding prior no-push instructions for the reviewed branch. Branch RSF; implementation commit `b842642620e6885ee61aafdecd0919dccf5f8145`; source/base `26d3b9f37a9f3aadd8b3d5bf456538e195a60a67`. Fresh git fetch origin succeeded. Verified clean working tree, exact implementation commit, one commit beyond origin/main and source/base already an ancestor of origin/main. No merge, force push, history rewrite or application change.

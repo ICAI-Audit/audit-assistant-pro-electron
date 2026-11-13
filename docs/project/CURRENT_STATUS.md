@@ -1,5 +1,11 @@
 # Current status
 
+## T-030 main pull status on login (13 November 2026)
+
+- `main` was fast-forwarded from `26d3b9f` to the fetched `origin/main` at `99324ea` (6 commits; PR #109 CAAT Tools and PR #110 FSG/RSF updates). The existing `package-lock.json` modification and untracked documentation packs were preserved.
+- The shared login/header label identifies the snapshot as `origin/main` synced 13 November 2026 and names PRs #109/#110. Its tooltip reports the build-time branch, commit and tracked-local-change flag. This is static build information, not a live GitHub check and not evidence that other installed builds have updated.
+- Selected task: T-030; affected feature: F-001 (shared login/header build label). See [handoff](SESSION_HANDOFF.md#t-030-main-pull-status-on-login-13-november-2026) for validation and limits.
+
 ## RSF published to GitHub (13 November 2026)
 
 Owner explicitly authorised push. Implementation commit b842642 is published on origin/RSF, and local RSF tracks it. Only the reviewed source/docs/mapping-master changes are new; older tracked data artifacts are unchanged from already-published main. No new client TB/database files, merge, release or unrelated fixes. App health HTTP 200 confirmed. Publication details and remaining issues are in the latest handoff.
