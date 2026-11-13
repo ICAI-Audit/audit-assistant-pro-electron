@@ -270,3 +270,11 @@
 
 /* "Previous Year figures: Not required - column left out" (PYModeSelect): every Previous Year cell, header and <col> of a statement screen carries .py-col */
 .fsg-root .hide-py .py-col { display: none; }
+
+/* Reporting-date headings wrap locally despite VERA global table nowrap. */
+.fsg-root th.fsg-dated-heading {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  vertical-align: bottom;
+}

@@ -1,4 +1,6 @@
+import { noteColumnLabels, statementColumnLabels } from '../../utils/statementDates'
 import React, { useState, useRef, useEffect } from 'react'
+import MissingAlieWarning from '../shared/MissingAlieWarning'
 import { netCreditPurchasesWorking } from '../../utils/ratios'
 import { useFinancials, fmtINR, displayAmt } from '../../hooks/useFinancials'
 import PYTBSelector from '../shared/PYTBSelector'
@@ -107,7 +109,8 @@ function isAbnormalForAlie(displayAmount) {
   return Math.abs(displayAmount) >= 0.005 && displayAmount < 0
 }
 
-function TradeReconTable({ title, bookRows, normalNoteTitle, reclassNoteTitle, reclassSign, tbId, getRemark, onRemarkSaved, hasSeparatePYTB, showZero }) {
+function TradeReconTable({ activeTB, prevTB, title, bookRows, normalNoteTitle, reclassNoteTitle, reclassSign, tbId, getRemark, onRemarkSaved, hasSeparatePYTB, showZero }) {
+  const labels = statementColumnLabels(activeTB, prevTB, 'bs')
   const [expanded, setExpanded] = useState(false)
   // "As per Books" always uses the natural convention of the ORIGINAL group
   // (Payables = credit-positive, Receivables = debit-positive), via the RAW
@@ -161,8 +164,8 @@ function TradeReconTable({ title, bookRows, normalNoteTitle, reclassNoteTitle, r
           <span className="font-bold text-blue-800 text-sm uppercase tracking-wide">{title}</span>
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-blue-700" title="Current Year total">CY {fmtINR(bookTotal)}</span>
-          <span className="text-xs font-mono text-gray-500" title="Previous Year total">PY {bookTotalPY === null ? '—' : fmtINR(bookTotalPY)}</span>
+          <span className="text-xs font-mono text-blue-700" title={labels.cy}>CY {fmtINR(bookTotal)}</span>
+          <span className="text-xs font-mono text-gray-500" title={labels.py}>PY {bookTotalPY === null ? '—' : fmtINR(bookTotalPY)}</span>
           <span className="text-xs text-gray-400">{visibleRows.length} of {bookRows.length} ledger{bookRows.length !== 1 ? 's' : ''}</span>
           <button className="text-xs text-gray-400" onClick={() => setExpanded(e => !e)}>{expanded ? 'collapse' : 'expand'}</button>
         </div>
@@ -180,10 +183,10 @@ function TradeReconTable({ title, bookRows, normalNoteTitle, reclassNoteTitle, r
                 <tr className="bg-blue-800 text-white">
                   <th className="py-1.5 px-3 text-left font-semibold">Code</th>
                   <th className="py-1.5 px-3 text-left font-semibold">Ledger Name</th>
-                  <th className="py-1.5 px-2 text-right font-semibold">As per Books ({normalNoteTitle}) CY</th>
-                  <th className="py-1.5 px-3 text-left font-semibold">As per BS (CY)</th>
-                  <th className="py-1.5 px-2 text-right font-semibold">As per Books PY</th>
-                  <th className="py-1.5 px-3 text-left font-semibold">As per BS (PY)</th>
+                  <th className="fsg-dated-heading py-1.5 px-2 text-right font-semibold">As per Books ({normalNoteTitle}) - {labels.cy}</th>
+                  <th className="fsg-dated-heading py-1.5 px-3 text-left font-semibold">As per BS - {labels.cy}</th>
+                  <th className="fsg-dated-heading py-1.5 px-2 text-right font-semibold">As per Books - {labels.py}</th>
+                  <th className="fsg-dated-heading py-1.5 px-3 text-left font-semibold">As per BS - {labels.py}</th>
                   <th className="py-1.5 px-2 text-left font-semibold">Remark</th>
                 </tr>
               </thead>
@@ -248,7 +251,8 @@ function TradeReconTable({ title, bookRows, normalNoteTitle, reclassNoteTitle, r
 
 // The working behind "Net Credit Purchases" of the Trade Payables Turnover Ratio (General Notes), kept here with the other workings
 // rather than on the face of the Notes.
-function NetCreditPurchasesWorking({ data }) {
+function NetCreditPurchasesWorking({ data, activeTB, prevTB }) {
+  const periodLabels = statementColumnLabels(activeTB, prevTB, 'pl')
   const w = netCreditPurchasesWorking(data)
   if (!w) return null
   const fmt = (n) => (Math.abs(n) < 0.005 ? '-' : fmtINR(n))
@@ -261,8 +265,8 @@ function NetCreditPurchasesWorking({ data }) {
         <thead>
           <tr className="border-b-2 border-blue-800">
             <th className="text-left py-1.5 font-semibold text-blue-900 w-[60%]">Particulars</th>
-            <th className="text-right py-1.5 font-semibold text-blue-900 pr-2">Current Year</th>
-            <th className="text-right py-1.5 font-semibold text-blue-900 pr-2">Previous Year</th>
+            <th className="fsg-dated-heading text-right py-1.5 font-semibold text-blue-900 pr-2">{periodLabels.cy}</th>
+            <th className="fsg-dated-heading text-right py-1.5 font-semibold text-blue-900 pr-2">{periodLabels.py}</th>
           </tr>
         </thead>
         <tbody>
@@ -295,7 +299,7 @@ function NetCreditPurchasesWorking({ data }) {
   )
 }
 
-function TradePayablesReceivablesReconciliation({ data, tbId, getRemark, onRemarkSaved, hasSeparatePYTB, showZero }) {
+function TradePayablesReceivablesReconciliation({ activeTB, prevTB, data, tbId, getRemark, onRemarkSaved, hasSeparatePYTB, showZero }) {
   const notes = Object.values(data.notes || {})
   const payablesNote = notes.find(n => !n.isPL && /^trade\s+payables?$/i.test(n.title || ''))
   const receivablesNote = notes.find(n => !n.isPL && /^trade\s+receivables?$/i.test(n.title || ''))
@@ -315,11 +319,11 @@ function TradePayablesReceivablesReconciliation({ data, tbId, getRemark, onRemar
     <div className="mt-8">
       <h3 className="font-bold text-blue-900 text-base mb-1 uppercase tracking-wide border-t-2 border-blue-800 pt-4">Reconciliation</h3>
       <p className="text-xs text-gray-400 mb-4">Books vs Balance Sheet placement for Trade Payables and Trade Receivables, Current Year and Previous Year alike.</p>
-      <TradeReconTable title="Trade Payables — Books vs Balance Sheet Reconciliation"
+      <TradeReconTable activeTB={activeTB} prevTB={prevTB} title="Trade Payables — Books vs Balance Sheet Reconciliation"
         bookRows={payablesBookRows} normalNoteTitle="Trade Payables" reclassNoteTitle="Short-term Loans and Advances (Advance to Suppliers)"
         reclassSign={1} tbId={tbId} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
         hasSeparatePYTB={hasSeparatePYTB} showZero={showZero} />
-      <TradeReconTable title="Trade Receivables — Books vs Balance Sheet Reconciliation"
+      <TradeReconTable activeTB={activeTB} prevTB={prevTB} title="Trade Receivables — Books vs Balance Sheet Reconciliation"
         bookRows={receivablesBookRows} normalNoteTitle="Trade Receivables" reclassNoteTitle="Other Current Liabilities (Advance from Customers)"
         reclassSign={-1} tbId={tbId} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
         hasSeparatePYTB={hasSeparatePYTB} showZero={showZero} />
@@ -327,7 +331,8 @@ function TradePayablesReceivablesReconciliation({ data, tbId, getRemark, onRemar
   )
 }
 
-function NoteAnnexure({ note, tbId, getRemark, onRemarkSaved, showZero = false, onFix, jumpTarget, onJumpHandled, hasSeparatePYTB = false, prevMapL3 = null, prevRowsByLedger = null, showBranchCol = false, levelFormat = [] }) {
+function NoteAnnexure({ note, activeTB, prevTB, tbId, getRemark, onRemarkSaved, showZero = false, onFix, jumpTarget, onJumpHandled, hasSeparatePYTB = false, prevMapL3 = null, prevRowsByLedger = null, showBranchCol = false, levelFormat = [] }) {
+  const periodLabels = noteColumnLabels(activeTB, prevTB, note)
   const [expanded, setExpanded] = useState(false)
   const blockRef = useRef(null)
   const isZeroRow = (r) => {
@@ -380,9 +385,9 @@ function NoteAnnexure({ note, tbId, getRemark, onRemarkSaved, showZero = false, 
           Note {note.num}: {note.displayTitle || note.title}
         </span>
         <span className="w-[11%]" />
-        <span className="w-[11%] text-right text-xs font-mono font-semibold text-blue-800" title="Current Year total">{fmtINR(note.total)}</span>
+        <span className="w-[11%] text-right text-xs font-mono font-semibold text-blue-800" title={periodLabels.cy}>{fmtINR(note.total)}</span>
         <span className="w-[11%]" />
-        <span className="w-[11%] text-right text-xs font-mono font-semibold text-gray-600" title="Previous Year total">{fmtINR(note.prevTotal)}</span>
+        <span className="w-[11%] text-right text-xs font-mono font-semibold text-gray-600" title={periodLabels.py}>{fmtINR(note.prevTotal)}</span>
         <span className="w-[10%] flex items-center justify-end gap-2 pl-2">
           {(note.title || '').toLowerCase().includes('uncategorised') && onFix && (
             <button
@@ -397,7 +402,7 @@ function NoteAnnexure({ note, tbId, getRemark, onRemarkSaved, showZero = false, 
         </span>
       </button>
       {expanded && (
-        <table className="w-full text-xs">
+        <table className="w-full text-xs table-fixed" style={{ overflowWrap: 'anywhere' }}>
           <thead>
             <tr className="bg-blue-50 border-b border-blue-200">
               <th className="text-left py-1 px-4 font-semibold text-blue-900 w-[22%]">Ledger Name</th>
@@ -405,10 +410,10 @@ function NoteAnnexure({ note, tbId, getRemark, onRemarkSaved, showZero = false, 
               <th className="text-left py-1 px-3 font-semibold text-blue-900 w-[16%]">Sub-note</th>
               {showBlockCol && <th className="text-left py-1 px-3 font-semibold text-blue-900 w-[13%]">IT Block</th>}
               <th className="text-left py-1 px-2 font-semibold text-blue-900 w-[8%]">Code</th>
-              <th className="text-right py-1 px-3 font-semibold text-blue-900 w-[11%]">CY Ledger</th>
-              <th className="text-right py-1 px-3 font-semibold text-blue-900 w-[11%]">CY Sub-note Total</th>
-              <th className="text-right py-1 px-3 font-semibold text-blue-900 w-[11%]">PY Ledger</th>
-              <th className="text-right py-1 px-3 font-semibold text-blue-900 w-[11%]">PY Sub-note Total</th>
+              <th className="fsg-dated-heading text-right py-1 px-3 font-semibold text-blue-900 w-[11%]">{periodLabels.cy} - Ledger</th>
+              <th className="fsg-dated-heading text-right py-1 px-3 font-semibold text-blue-900 w-[11%]">{periodLabels.cy} - Sub-note Total</th>
+              <th className="fsg-dated-heading text-right py-1 px-3 font-semibold text-blue-900 w-[11%]">{periodLabels.py} - Ledger</th>
+              <th className="fsg-dated-heading text-right py-1 px-3 font-semibold text-blue-900 w-[11%]">{periodLabels.py} - Sub-note Total</th>
               <th className="text-left py-1 px-2 font-semibold text-blue-900 w-[10%]">Remark</th>
             </tr>
           </thead>
@@ -564,6 +569,7 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
           {data && (
             <>
               <h3 className="font-bold text-blue-800 text-sm mb-3 uppercase tracking-wide">Detailed Annexures by Note</h3>
+              <MissingAlieWarning report={data.missingAlie} onFix={openFix} tbId={activeTB?.id} />
               <p className="text-xs text-gray-400 mb-4">Each note with its individual ledger details, amounts, and classification.</p>
 
               {noteList.length === 0 && (
@@ -573,7 +579,7 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
               )}
 
               {noteList.map(note => (
-                <NoteAnnexure key={note.num} note={note} showZero={showZero}
+                <NoteAnnexure activeTB={activeTB} prevTB={prevTB} key={note.num} note={note} showZero={showZero}
                   tbId={activeTB?.id} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
                   onFix={openFix} jumpTarget={jumpTarget} onJumpHandled={onJumpHandled}
                   hasSeparatePYTB={!!prevTB?.id} prevMapL3={data.prevMapL3} prevRowsByLedger={data.prevRowsByLedger}
@@ -584,10 +590,10 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
                 <div className="text-xs text-gray-400 text-right mt-4">All figures derived from Mapped Trial Balance</div>
               )}
 
-              <TradePayablesReceivablesReconciliation data={data} tbId={activeTB?.id} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
+              <TradePayablesReceivablesReconciliation activeTB={activeTB} prevTB={prevTB} data={data} tbId={activeTB?.id} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
                 hasSeparatePYTB={!!prevTB?.id} showZero={showZero} />
 
-              <NetCreditPurchasesWorking data={data} />
+              <NetCreditPurchasesWorking activeTB={activeTB} prevTB={prevTB} data={data} />
             </>
           )}
         </div>

@@ -55,10 +55,13 @@ export function createNoteStore(query = dbQuery) {
 
   // `existing` — the row find() already returned for this note, when the
   // caller looked it up first (e.g. to merge into it); omit to look it up here.
-  async function save(table, scopeId, noteNum, noteTitle, valueToStore, existing) {
+  async function save(table, scopeId, noteNum, noteTitle, valueToStore, existing, investmentWrite = false) {
     const { scope, value } = TABLES[table]
     const title = String(noteTitle ?? '').trim()
     const key = noteTitleKey(title)
+    if (!investmentWrite && (key.startsWith('investmentdisclosurefy') || Number(noteNum) <= -3000000)) {
+      throw new Error('Investment disclosures must be saved through the year-scoped investment form.')
+    }
     const row = existing === undefined ? await find(table, scopeId, noteNum, title) : existing
     if (key && Number(noteNum) > 0) {
       await query(

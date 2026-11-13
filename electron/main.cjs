@@ -13,6 +13,7 @@ const {
 } = require('./sqlite-authorization.cjs');
 const crypto = require('crypto');
 const fs = require('fs');
+const { ensureFirmPlace } = require('./firm-place-migration.cjs');
 let Database;
 let bcrypt;
 
@@ -80,6 +81,8 @@ function getSqliteDb() {
         // This is idempotent (uses CREATE TABLE IF NOT EXISTS)
         // DO NOT wrap in try-catch - we want this to fail loudly if there's a problem
         initializeDatabaseSchema(sqliteDb);
+        const firmPlaceBackup = ensureFirmPlace(sqliteDb, path.join(userDataPath, 'backups'));
+        if (firmPlaceBackup) safeLog('Firm Place upgrade backup:', firmPlaceBackup);
         runAuditReportSetupSchemaMigration(sqliteDb);
         runAuditReportMainContentSchemaMigration(sqliteDb);
         runEngagementLetterTemplateTypeMigration(sqliteDb);
