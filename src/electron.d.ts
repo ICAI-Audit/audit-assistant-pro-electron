@@ -2,6 +2,12 @@ declare global {
   interface Window {
     electronAPI: {
       platform: string;
+      permanentFile: {
+        request: (payload: import('./modules/permanent-file/types').PermanentFileRequest) => Promise<
+          { success: true; data: import('./modules/permanent-file/types').PermanentFileData }
+          | { success: false; error: string }
+        >;
+      };
       app?: {
         exportFile: (payload: {
           defaultFilename: string;

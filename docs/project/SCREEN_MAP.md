@@ -6,6 +6,7 @@ Generated from src/App.tsx by npm run docs:inventory. This maps route declaratio
 | --- | --- | --- |
 | /auth | Auth | public |
 | /select-engagement | SelectEngagement | ProtectedRoute |
+| /permanent-file | PermanentFile | ProtectedEngagementRoute |
 | / | Dashboard | ProtectedEngagementRoute |
 | /engagements | Engagements | ProtectedRoute |
 | /financial-statement-review | FinancialStatementReview | ProtectedEngagementRoute |

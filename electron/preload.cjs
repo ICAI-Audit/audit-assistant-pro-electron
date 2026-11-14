@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sqliteAuth: (payload) => ipcRenderer.invoke('sqlite-auth', payload),
   sqliteGetCurrentUser: () => ipcRenderer.invoke('sqlite-get-current-user'),
   sqliteQuery: (payload) => ipcRenderer.invoke('sqlite-query', payload),
+  permanentFile: {
+    request: (payload) => ipcRenderer.invoke('permanent-file:request', payload),
+  },
   saveFile: async ({ bucket, path, buffer, mimeType }) => {
     const result = await ipcRenderer.invoke('file-save', { bucket, path, buffer, mimeType });
     if (!result?.success) {
@@ -174,4 +177,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 // Log when preload script is loaded
 console.log('Preload script loaded');
-
