@@ -55,14 +55,32 @@ export default {
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
+          soft: "hsl(var(--success-soft))",
+          ink: "hsl(var(--success-ink))",
         },
         warning: {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
+          soft: "hsl(var(--warning-soft))",
+          ink: "hsl(var(--warning-ink))",
         },
         info: {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
+          soft: "hsl(var(--info-soft))",
+          ink: "hsl(var(--info-ink))",
+        },
+        danger: {
+          soft: "hsl(var(--danger-soft))",
+          ink: "hsl(var(--danger-ink))",
+        },
+        neutral: {
+          soft: "hsl(var(--neutral-soft))",
+          ink: "hsl(var(--neutral-ink))",
+        },
+        violet: {
+          soft: "hsl(var(--violet-soft))",
+          ink: "hsl(var(--violet-ink))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
@@ -74,6 +92,9 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+      },
+      fontSize: {
+        "body-sm": ["13px", "20px"],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -97,12 +118,17 @@ export default {
           from: { transform: "translateX(-100%)", opacity: "0" },
           to: { transform: "translateX(0)", opacity: "1" },
         },
+        "progress-indeterminate": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(250%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         "slide-in-left": "slide-in-left 0.3s ease-out",
+        "progress-indeterminate": "progress-indeterminate 1.2s ease-in-out infinite",
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
