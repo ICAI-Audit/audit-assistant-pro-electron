@@ -1289,20 +1289,14 @@ function registerIpcHandlers() {
 
   ipcMain.handle('app:exportFile', async (event, payload) => {
     try {
-      const { defaultFilename, buffer, showSaveDialog = true } = payload || {};
-      const safeFilename = String(defaultFilename || 'export.docx')
-        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-        .replace(/\s+/g, '_');
-      const filename = safeFilename.toLowerCase().endsWith('.docx') ? safeFilename : `${safeFilename}.docx`;
+      const { buffer, showSaveDialog = true } = payload || {};
+      const { resolveExportFileOptions } = require('./export-file-options.cjs');
       const downloadsPath = app.getPath('downloads');
-      let filePath = path.join(downloadsPath, filename);
+      const fileOptions = resolveExportFileOptions(payload, downloadsPath);
+      let filePath = fileOptions.defaultPath;
 
       if (showSaveDialog) {
-        const result = await dialog.showSaveDialog({
-          title: 'Export Word Document',
-          defaultPath: filePath,
-          filters: [{ name: 'Word Document', extensions: ['docx'] }],
-        });
+        const result = await dialog.showSaveDialog(fileOptions);
 
         if (result.canceled || !result.filePath) {
           return { success: false, canceled: true };
@@ -2581,3 +2575,6 @@ ipcMain.handle('gstzen-api-request', async (event, { endpoint, method, data, tok
   safeLog(`[IPC] gstzen-api-request: ${method} ${endpoint}`);
   return handleApiRequest(endpoint, method, data, token);
 });
+
+const { createGstinLookupHandler } = require('./gstin-lookup.cjs');
+ipcMain.handle('gstin:lookup-details', createGstinLookupHandler({ getAuthenticatedUserId }));

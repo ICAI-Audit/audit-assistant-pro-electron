@@ -109,8 +109,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return true;
   },
   app: {
-    exportFile: async ({ defaultFilename, buffer, mimeType, showSaveDialog }) => {
-      const result = await ipcRenderer.invoke('app:exportFile', { defaultFilename, buffer, mimeType, showSaveDialog });
+    exportFile: async ({ defaultFilename, buffer, mimeType, showSaveDialog, fileExtension }) => {
+      const result = await ipcRenderer.invoke('app:exportFile', { defaultFilename, buffer, mimeType, showSaveDialog, fileExtension });
       if (!result?.success) {
         if (result?.canceled) return null;
         throw new Error(result?.error || 'File export failed');
@@ -124,6 +124,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     establishSession: (data, token) => ipcRenderer.invoke('gstzen-establish-session', { data, token }),
     downloadGstr1: (data, token) => ipcRenderer.invoke('gstzen-download-gstr1', { data, token }),
     request: (endpoint, method, data, token) => ipcRenderer.invoke('gstzen-api-request', { endpoint, method, data, token }),
+  },
+  gstinLookup: {
+    fetchDetails: (payload) => ipcRenderer.invoke('gstin:lookup-details', payload),
   },
   // Auto-updater API, consumed by useAutoUpdater hook
   updater: updaterApi,

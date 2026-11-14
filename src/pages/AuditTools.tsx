@@ -5,6 +5,7 @@ import PdfToolsMount from "@/components/pdf-tools/PdfToolsMount";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -16,9 +17,15 @@ import { useEngagement } from "@/contexts/EngagementContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTallyODBC } from "@/hooks/useTallyODBC";
 import { cn } from "@/lib/utils";
-import { formatGstinInput, getGstinValidationError } from "@/lib/gstinValidation";
+import {
+  formatGstinInput,
+  getGstinTaxpayerType,
+  getGstinValidationError,
+  GSTIN_TAXPAYER_TYPE_LABELS,
+  type GstinTaxpayerType,
+} from "@/lib/gstinValidation";
+import { createVerifiedGstinCsv, parseGstinSpreadsheet, type InvalidGstinRow } from "@/lib/gstinSpreadsheet";
 import { getSQLiteClient } from "@/integrations/sqlite/client";
-import { gstzenApi } from "@/services/gstzen-api";
 
 const db = getSQLiteClient();
 
@@ -125,6 +132,13 @@ const ToolCard = ({ title, description, icon, status = "available", onClick }: T
 };
 
 type ConnectionMode = "odbc" | "excel";
+type GstinBulkLookupResult = {
+  gstin: string;
+  name: string;
+  taxpayerType: GstinTaxpayerType | "";
+  valid: boolean;
+  message: string | null;
+};
 
 const TallyTools = () => {
   const navigate = useNavigate();
@@ -2403,7 +2417,17 @@ const GSTTools = () => {
   const [gstinDialogOpen, setGstinDialogOpen] = useState(false);
   const [gstinInput, setGstinInput] = useState("");
   const [gstinName, setGstinName] = useState("");
-  const [taxpayerType, setTaxpayerType] = useState<"REGULAR" | "COMPOSITION" | "ISD">("REGULAR");
+  const [taxpayerType, setTaxpayerType] = useState<GstinTaxpayerType | "">("");
+  const [gstinLookupConsent, setGstinLookupConsent] = useState(false);
+  const [isFetchingGstinDetails, setIsFetchingGstinDetails] = useState(false);
+  const [gstinLookupMessage, setGstinLookupMessage] = useState<string | null>(null);
+  const [bulkGstinFile, setBulkGstinFile] = useState<File | null>(null);
+  const [bulkInvalidGstins, setBulkInvalidGstins] = useState<InvalidGstinRow[]>([]);
+  const [bulkDuplicateCount, setBulkDuplicateCount] = useState(0);
+  const [bulkLookupResults, setBulkLookupResults] = useState<GstinBulkLookupResult[]>([]);
+  const [bulkLookupProgress, setBulkLookupProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [isBulkLookupRunning, setIsBulkLookupRunning] = useState(false);
+  const cancelBulkLookupRef = useRef(false);
   const [gstins, setGstins] = useState<{ id: string; gstin: string; created_at: string }[]>([]);
   const [isLoadingGstins, setIsLoadingGstins] = useState(false);
   const [isSavingGstin, setIsSavingGstin] = useState(false);
@@ -2455,7 +2479,264 @@ const GSTTools = () => {
       });
       return;
     }
+    setGstinInput("");
+    setGstinName("");
+    setTaxpayerType("");
+    setGstinLookupConsent(false);
+    setGstinLookupMessage(null);
+    setBulkGstinFile(null);
+    setBulkInvalidGstins([]);
+    setBulkDuplicateCount(0);
+    setBulkLookupResults([]);
     setGstinDialogOpen(true);
+  };
+
+  const handleFetchGstinDetails = async () => {
+    const normalized = formatGstinInput(gstinInput);
+    if (!gstinLookupConsent) {
+      toast({ title: "Consent required", description: "Confirm the internet lookup statement before fetching GSTIN details." });
+      return;
+    }
+    const validationError = getGstinValidationError(normalized);
+    if (validationError) {
+      toast({ title: "Invalid GSTIN", description: validationError, variant: "destructive" });
+      return;
+    }
+
+    setIsFetchingGstinDetails(true);
+    setGstinLookupMessage(null);
+    try {
+      const response = await window.electronAPI.gstinLookup.fetchDetails({
+        gstin: normalized,
+        consentConfirmed: true,
+      });
+      if (!response.success || !response.data) throw new Error(response.error || "GSTIN details could not be fetched.");
+      if (!response.data.valid) {
+        const message = "Local structure/checksum validation passed, but e-waybill.in did not confirm this GSTIN. No verified taxpayer details were returned.";
+        setGstinLookupMessage(message);
+        toast({ title: "GSTIN not confirmed by provider", description: message, variant: "destructive" });
+        return;
+      }
+
+      setGstinName(response.data.name);
+      if (response.data.taxpayerType) setTaxpayerType(response.data.taxpayerType);
+      if (!response.data.name) {
+        setGstinLookupMessage("Lookup completed, but the service did not return a taxpayer name. You can enter it manually.");
+        toast({ title: "Name not returned", description: "The lookup service did not return a taxpayer name. You can enter it manually." });
+      } else {
+        setGstinLookupMessage("Taxpayer name fetched; registration type derived from the GSTIN.");
+        toast({ title: "GSTIN details fetched", description: "Taxpayer name and registration type are ready to review." });
+      }
+    } catch (error) {
+      setGstinLookupMessage(error instanceof Error ? error.message : "GSTIN details could not be fetched.");
+      toast({
+        title: "GSTIN lookup failed",
+        description: error instanceof Error ? error.message : "Check your internet connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetchingGstinDetails(false);
+    }
+  };
+
+  const handleDownloadGstinTemplate = async () => {
+    const exportFile = window.electronAPI.app?.exportFile;
+    if (!exportFile) {
+      toast({ title: "Template download unavailable", description: "The Electron save dialog is not available." });
+      return;
+    }
+
+    try {
+      const buffer = new TextEncoder().encode("\uFEFFGSTIN\r\n").buffer as ArrayBuffer;
+      const savedPath = await exportFile({
+        defaultFilename: "GSTIN_Template.csv",
+        buffer,
+        mimeType: "text/csv;charset=utf-8",
+        fileExtension: "csv",
+        showSaveDialog: true,
+      });
+      if (savedPath) toast({ title: "Template downloaded", description: savedPath });
+    } catch (error) {
+      toast({
+        title: "Template download failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadVerifiedGstins = async () => {
+    const verifiedRows = bulkLookupResults.filter((result) => result.valid);
+    if (verifiedRows.length === 0) {
+      toast({ title: "No verified GSTINs", description: "Only provider-confirmed GSTINs are included in this download." });
+      return;
+    }
+
+    const exportFile = window.electronAPI.app?.exportFile;
+    if (!exportFile) {
+      toast({ title: "Download unavailable", description: "The Electron save dialog is not available." });
+      return;
+    }
+
+    try {
+      const csv = createVerifiedGstinCsv(verifiedRows.map((result) => ({
+        gstin: result.gstin,
+        name: result.name,
+        taxpayerType: result.taxpayerType ? GSTIN_TAXPAYER_TYPE_LABELS[result.taxpayerType] : "",
+      })));
+      const buffer = new TextEncoder().encode(`\uFEFF${csv}`).buffer as ArrayBuffer;
+      const savedPath = await exportFile({
+        defaultFilename: "Verified_GSTINs.csv",
+        buffer,
+        mimeType: "text/csv;charset=utf-8",
+        fileExtension: "csv",
+        showSaveDialog: true,
+      });
+      if (savedPath) toast({ title: "Verified GSTINs downloaded", description: savedPath });
+    } catch (error) {
+      toast({
+        title: "Verified GSTIN download failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkGstinLookup = async () => {
+    if (!gstinLookupConsent) {
+      toast({ title: "Consent required", description: "Confirm the internet lookup statement before fetching GSTIN details." });
+      return;
+    }
+    if (!bulkGstinFile) {
+      toast({ title: "Spreadsheet required", description: "Choose a CSV, XLS, or XLSX file first." });
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = parseGstinSpreadsheet(await bulkGstinFile.arrayBuffer());
+    } catch (error) {
+      toast({
+        title: "Spreadsheet could not be read",
+        description: error instanceof Error ? error.message : "Choose a supported spreadsheet with GSTIN in cell A1.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setBulkInvalidGstins(parsed.invalidGstins);
+    setBulkDuplicateCount(parsed.duplicateCount);
+    setBulkLookupResults([]);
+    if (parsed.invalidGstins.length > 0) {
+      toast({
+        title: "Invalid GSTINs excluded",
+        description: `${parsed.invalidGstins.length} invalid GSTIN${parsed.invalidGstins.length === 1 ? " was" : "s were"} not sent to the API.`,
+        variant: "destructive",
+      });
+    }
+    if (parsed.validGstins.length === 0) {
+      setBulkLookupProgress(null);
+      if (parsed.invalidGstins.length === 0) {
+        toast({ title: "No GSTINs found", description: "Enter GSTIN values below the GSTIN header." });
+      }
+      return;
+    }
+
+    setIsBulkLookupRunning(true);
+    cancelBulkLookupRef.current = false;
+    setBulkLookupProgress({ completed: 0, total: parsed.validGstins.length });
+    const results: GstinBulkLookupResult[] = [];
+    try {
+      for (const gstin of parsed.validGstins) {
+        if (cancelBulkLookupRef.current) break;
+        try {
+          const response = await window.electronAPI.gstinLookup.fetchDetails({
+            gstin,
+            consentConfirmed: true,
+          });
+          if (!response.success || !response.data) {
+            results.push({ gstin, name: "", taxpayerType: "", valid: false, message: response.error || "Lookup failed." });
+          } else {
+            results.push({
+              gstin,
+              name: response.data.name,
+              taxpayerType: getGstinTaxpayerType(gstin) || "",
+              valid: response.data.valid,
+              message: response.data.message,
+            });
+          }
+        } catch (error) {
+          results.push({
+            gstin,
+            name: "",
+            taxpayerType: "",
+            valid: false,
+            message: error instanceof Error ? error.message : "Lookup failed.",
+          });
+        }
+        setBulkLookupResults([...results]);
+        setBulkLookupProgress({ completed: results.length, total: parsed.validGstins.length });
+      }
+
+      const confirmedCount = results.filter((result) => result.valid).length;
+      toast({
+        title: cancelBulkLookupRef.current ? "Bulk lookup stopped" : "Bulk lookup complete",
+        description: cancelBulkLookupRef.current
+          ? `Stopped after ${results.length} of ${parsed.validGstins.length} lookups. The current request was allowed to finish.`
+          : `Lookup confirmed ${confirmedCount} of ${results.length} structurally valid GSTINs.`,
+      });
+    } finally {
+      setIsBulkLookupRunning(false);
+    }
+  };
+
+  const handleSaveBulkGstins = async () => {
+    if (!clientId || !user?.id) {
+      toast({ title: "Login required", description: "Sign in and select a client before saving GSTINs.", variant: "destructive" });
+      return;
+    }
+
+    const existingGstins = new Set(gstins.map((item) => formatGstinInput(item.gstin)));
+    const saveableResults = bulkLookupResults.filter(
+      (result) => result.valid && result.name.trim() && result.taxpayerType && !existingGstins.has(result.gstin)
+    );
+    if (saveableResults.length === 0) {
+      toast({
+        title: "No complete GSTIN details to save",
+        description: "Confirmed rows need a taxpayer name and a valid GSTIN-derived type.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingGstin(true);
+    try {
+      const { data, error } = await db
+        .from("client_gstins")
+        .insert(saveableResults.map((result) => ({
+          client_id: clientId,
+          gstin: result.gstin,
+          name: result.name.trim(),
+          taxpayer_type: result.taxpayerType,
+          created_by: user.id,
+        })))
+        .select("id, gstin, created_at");
+      if (error) throw error;
+
+      setGstins((current) => [...(data || []), ...current]);
+      toast({ title: "GSTINs saved", description: `Saved ${data?.length || 0} GSTINs to this client locally.` });
+      setBulkLookupResults([]);
+      setBulkInvalidGstins([]);
+      setBulkGstinFile(null);
+    } catch (error) {
+      toast({
+        title: "Could not save GSTINs",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingGstin(false);
+    }
   };
 
   const handleAddGstin = async () => {
@@ -2500,35 +2781,12 @@ const GSTTools = () => {
       return;
     }
 
+    if (!taxpayerType) {
+      toast({ title: "Taxpayer type required", description: "Select a type or fetch it from the lookup service." });
+      return;
+    }
     setIsSavingGstin(true);
     try {
-      // Step 1: Create in GSTZen backend using /api/create-gstin/
-      // This API validates the GSTIN internally
-      const createResponse = await gstzenApi.createGstin({
-        gstin: normalized,
-        name: name,
-        taxpayer_type: taxpayerType,
-      });
-
-      if (!createResponse.success || !createResponse.data) {
-        throw new Error(createResponse.error || "Failed to create GSTIN in GSTZen");
-      }
-
-      const responseData = createResponse.data;
-
-      // Check if creation was successful
-      if (responseData.status !== 1) {
-        const errorMsg = responseData.message || "Failed to create GSTIN";
-        if (errorMsg.includes("exceeded") || errorMsg.includes("limit")) {
-          throw new Error(errorMsg);
-        } else if (errorMsg.includes("not a valid GSTIN")) {
-          throw new Error("Invalid GSTIN. Please check the GSTIN number.");
-        } else {
-          throw new Error(errorMsg);
-        }
-      }
-
-      // Step 2: Create in Supabase (engagement-specific) only if GSTZen creation succeeded
       const { data, error } = await db
         .from("client_gstins")
         .insert({
@@ -2546,11 +2804,11 @@ const GSTTools = () => {
       setGstins((prev) => [data, ...prev]);
       setGstinInput("");
       setGstinName("");
-      setTaxpayerType("REGULAR");
+      setTaxpayerType("");
       setGstinDialogOpen(false);
       toast({
         title: "GST number added",
-        description: `${normalized} linked to ${currentEngagement?.client_name || "client"} and added to GSTZen account.`,
+        description: `${normalized} saved locally for ${currentEngagement?.client_name || "this client"}.`,
       });
     } catch (error) {
       console.error("Error adding GSTIN:", error);
@@ -2655,34 +2913,6 @@ const GSTTools = () => {
 
   return (
     <div className="space-y-6">
-      <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-        <AlertDescription className="text-amber-800 dark:text-amber-200">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-medium mb-1">GST Portal Integration</p>
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                To use GST tools, you'll need to authenticate with the GST portal using your credentials or API access.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-white dark:bg-gray-800 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/30 shrink-0"
-              onClick={() =>
-                toast({
-                  title: "GST Authentication",
-                  description: "GST portal authentication will be available soon",
-                })
-              }
-            >
-              <Unplug className="h-4 w-4 mr-2" />
-              Authenticate
-            </Button>
-          </div>
-        </AlertDescription>
-      </Alert>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <ToolCard
           title="GST Number Master"
@@ -2724,8 +2954,12 @@ const GSTTools = () => {
         />
       </div>
 
-      <Dialog open={gstinDialogOpen} onOpenChange={setGstinDialogOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={gstinDialogOpen} onOpenChange={(open) => {
+        if (!open && (isFetchingGstinDetails || isBulkLookupRunning || isSavingGstin)) return;
+        setGstinDialogOpen(open);
+        if (!open) setGstinLookupConsent(false);
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>GST Number Master</DialogTitle>
             <DialogDescription>
@@ -2736,15 +2970,32 @@ const GSTTools = () => {
             <div className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="gstin-input">GSTIN *</Label>
-                <Input
-                  id="gstin-input"
-                  value={gstinInput}
-                  onChange={(e) => setGstinInput(formatGstinInput(e.target.value))}
-                  placeholder="Enter GSTIN (15 characters)"
-                  maxLength={15}
-                  className="font-mono"
-                  disabled={isSavingGstin}
-                />
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <Input
+                    id="gstin-input"
+                    value={gstinInput}
+                    onChange={(e) => {
+                      const normalized = formatGstinInput(e.target.value);
+                      setGstinInput(normalized);
+                      setGstinName("");
+                      setTaxpayerType(getGstinTaxpayerType(normalized) || "");
+                      setGstinLookupMessage(null);
+                    }}
+                    placeholder="Enter GSTIN (15 characters)"
+                    maxLength={15}
+                    className="font-mono"
+                    disabled={isSavingGstin || isFetchingGstinDetails}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleFetchGstinDetails}
+                    disabled={!gstinLookupConsent || !gstinInput.trim() || isFetchingGstinDetails || isSavingGstin}
+                  >
+                    {isFetchingGstinDetails ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                    {isFetchingGstinDetails ? "Fetching details..." : "Fetch taxpayer details"}
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2759,26 +3010,37 @@ const GSTTools = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="taxpayer-type">Taxpayer Type *</Label>
-                <Select
-                  value={taxpayerType}
-                  onValueChange={(value) => setTaxpayerType(value as "REGULAR" | "COMPOSITION" | "ISD")}
-                  disabled={isSavingGstin}
-                >
-                  <SelectTrigger id="taxpayer-type">
-                    <SelectValue placeholder="Select taxpayer type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="REGULAR">Regular Tax Payer</SelectItem>
-                    <SelectItem value="COMPOSITION">Composition Tax Payer</SelectItem>
-                    <SelectItem value="ISD">Input Service Distributor</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="taxpayer-type">Taxpayer/Registration Type *</Label>
+                <Input
+                  id="taxpayer-type"
+                  value={taxpayerType ? GSTIN_TAXPAYER_TYPE_LABELS[taxpayerType] : ""}
+                  placeholder=""
+                  readOnly
+                />
               </div>
             </div>
 
+            {gstinLookupMessage && <p className="text-sm text-muted-foreground" role="status">{gstinLookupMessage}</p>}
+
+            <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="gstin-lookup-consent"
+                  checked={gstinLookupConsent}
+                  onCheckedChange={(checked) => setGstinLookupConsent(checked === true)}
+                  disabled={isFetchingGstinDetails || isBulkLookupRunning}
+                />
+                <Label htmlFor="gstin-lookup-consent" className="text-sm font-normal leading-5">
+                  I hereby confirm and agree to the use of an API over the internet for fetching and retrieving GSTIN-related details and information, as required for the intended purpose.
+                </Label>
+              </div>
+              <p className="pl-6 text-xs text-muted-foreground">
+                Only GSTINs that pass local structure and checksum checks are sent to API.
+              </p>
+            </div>
+
             <div className="flex justify-end">
-              <Button onClick={handleAddGstin} disabled={isSavingGstin}>
+              <Button onClick={handleAddGstin} disabled={isSavingGstin || isFetchingGstinDetails}>
                 {isSavingGstin ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
@@ -2788,8 +3050,117 @@ const GSTTools = () => {
               </Button>
             </div>
 
-            <div className="text-xs text-muted-foreground">
-              GST numbers saved here will only appear for this client. The GSTIN will be validated and created in your GSTZen account.
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label htmlFor="bulk-gstin-file">Bulk GSTIN file</Label>
+                  <p className="text-xs text-muted-foreground">CSV, XLS, or XLSX. The first worksheet must have GSTIN in cell A1, with GSTINs in column A from row 2 onward.</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={handleDownloadGstinTemplate}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download CSV template
+                </Button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <Input
+                  id="bulk-gstin-file"
+                  type="file"
+                  accept=".csv,.xls,.xlsx"
+                  onChange={(event) => {
+                    setBulkGstinFile(event.target.files?.[0] || null);
+                    setBulkInvalidGstins([]);
+                    setBulkDuplicateCount(0);
+                    setBulkLookupResults([]);
+                    setBulkLookupProgress(null);
+                  }}
+                  disabled={isBulkLookupRunning || isSavingGstin}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBulkGstinLookup}
+                  disabled={!bulkGstinFile || !gstinLookupConsent || isBulkLookupRunning || isSavingGstin}
+                >
+                  {isBulkLookupRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+                  Validate and fetch
+                </Button>
+              </div>
+              {isBulkLookupRunning && (
+                <Button type="button" variant="outline" onClick={() => { cancelBulkLookupRef.current = true; }}>
+                  Stop after current lookup
+                </Button>
+              )}
+              {bulkLookupProgress && (
+                <p className="text-sm text-muted-foreground" role="status">
+                  Fetching details: {bulkLookupProgress.completed} of {bulkLookupProgress.total}
+                </p>
+              )}
+              {bulkDuplicateCount > 0 && (
+                <p className="text-sm text-muted-foreground">Skipped {bulkDuplicateCount} duplicate GSTIN row{bulkDuplicateCount === 1 ? "" : "s"}.</p>
+              )}
+              {bulkInvalidGstins.length > 0 && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    <p className="font-medium">These GSTINs are invalid and were not sent to the API:</p>
+                    <ul className="mt-1 list-disc pl-5">
+                      {bulkInvalidGstins.map((item, index) => <li key={`${item.gstin}-${index}`}><span className="font-mono">{item.gstin}</span>: {item.error}</li>)}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+              {bulkLookupResults.length > 0 && (
+                <div className="space-y-2">
+                  <div className="max-h-64 space-y-2 overflow-y-auto">
+                    {bulkLookupResults.map((result, index) => (
+                      <div key={result.gstin} className={`rounded-md border p-3 ${result.valid ? "" : "border-red-300 bg-red-50/50"}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-mono text-sm">{result.gstin}</span>
+                          <span className={`text-xs ${result.valid ? "text-green-700" : "text-red-700"}`}>
+                            {result.valid ? "Lookup confirmed" : "Not confirmed"}
+                          </span>
+                        </div>
+                        {result.valid && (
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label htmlFor={`bulk-gstin-name-${index}`}>Taxpayer name</Label>
+                              <Input
+                                id={`bulk-gstin-name-${index}`}
+                                value={result.name}
+                                onChange={(event) => setBulkLookupResults((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor={`bulk-gstin-type-${index}`}>Taxpayer/registration type</Label>
+                              <Input
+                                id={`bulk-gstin-type-${index}`}
+                                value={result.taxpayerType ? GSTIN_TAXPAYER_TYPE_LABELS[result.taxpayerType] : ""}
+                                readOnly
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {result.message && <p className="mt-2 text-xs text-muted-foreground">{result.message}</p>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleDownloadVerifiedGstins}
+                      disabled={!bulkLookupResults.some((result) => result.valid) || isBulkLookupRunning || isSavingGstin}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download verified GSTINs
+                    </Button>
+                    <Button type="button" onClick={handleSaveBulkGstins} disabled={isSavingGstin || isBulkLookupRunning}>
+                      {isSavingGstin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FilePlus className="mr-2 h-4 w-4" />}
+                      Save complete GSTINs locally
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">Saved GST numbers appear only for this client. Saving is local and does not call GSTZen.</p>
             </div>
 
             {isLoadingGstins ? (
