@@ -2397,6 +2397,28 @@ function createWindow() {
     mainWindow.show();
   });
 
+  // PDF Tools "Save to computer" lets the user pick a folder. Chromium treats some folders as
+  // restricted and, with no listener here, the pick never answers and no later save window can
+  // open until the application restarts. Answer every request: the user's own Desktop, Documents
+  // and Downloads folders are accepted; any other restricted folder (Windows, Program Files, the
+  // profile root, AppData) is refused, and the screen then asks for another folder.
+  const fileAccessSession = mainWindow.webContents.session;
+  if (fileAccessSession.listenerCount('file-system-access-restricted') === 0) {
+    fileAccessSession.on('file-system-access-restricted', (_event, details, callback) => {
+      let allowed = false;
+      try {
+        const picked = path.resolve(String(details && details.path ? details.path : '')).toLowerCase();
+        allowed = ['desktop', 'documents', 'downloads'].some((name) => {
+          const base = path.resolve(app.getPath(name)).toLowerCase();
+          return picked === base || picked.startsWith(base + path.sep);
+        });
+      } catch (error) {
+        allowed = false;
+      }
+      callback(allowed ? 'allow' : 'deny');
+    });
+  }
+
   // Load the app
   if (isDev) {
     // In development, load from Vite dev server

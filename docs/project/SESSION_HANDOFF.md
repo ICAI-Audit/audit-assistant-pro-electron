@@ -1,5 +1,82 @@
 # Latest session handoff
 
+## T-031 PDF Tools phase 1 (14 November 2026)
+
+- Agent: Claude Code with sub-agents (one implementer and one reviewer per task, a whole-branch review and three re-reviews). Approval source: the lead's instructions of 13 November 2026. Task T-031, feature F-030. Workflow files used: this file, `CURRENT_STATUS.md`, `NEXT_TASKS.md` and `TESTING.md`, after the startup records.
+- Requested outcome: phase 1 of PDF Tools as in [PDF_TOOLS.md](PDF_TOOLS.md) (revision 3): merge, split, delete pages, compress, page numbers, images to PDF, PDF to images, password-protected input, and results saved to the computer, to the Evidence Vault, or to a working paper.
+- Branch `feat/pdf-tools`. Started from `main` at `26d3b9f37a9f3aadd8b3d5bf456538e195a60a67`; fast-forwarded to `main` at `8ee2107` (CAAT Tools PR #109 and other work) with the working tree kept. The work is committed on branch `feat/pdf-tools` (base `main` at `8ee2107`) as three commits, `feat(T-031): add PDF Tools organise, numbering and image conversion`, `test(T-031): add PDF Tools application test` and `docs(T-031): record PDF Tools phase 1 design, status and inventory`, and the branch is pushed to `origin` (see `git log origin/feat/pdf-tools`). No pull request has been opened and nothing is merged to `main`. The owner gave the go-ahead to commit and push on 14 November 2026 after the folder-save defect was fixed and re-verified. The owner's own re-test of the fixed folder save and the rest of the hand-check list (single-file Save As including cancel, drag and drop, another PDF reader, real scans and Office exports, the destinations) have not been reported back and are still to be confirmed. Not owner-accepted; no UAT.
+- Not built: phases 2 and 3.
+
+### What was built
+
+- UI in `src/components/pdf-tools/`: `PdfToolsMount.tsx` (lazy load, waiting message, error boundary), `PdfTools.tsx` (screen), `FileList.tsx`, `PagePanel.tsx`, `ToolBar.tsx`, `dialogs/` (one dialog per tool, three destination dialogs and shared frames), `runTool.ts` (the run pipeline, no React), `destinations.ts` (Evidence Vault, working paper, computer saves, activity entries), the working list (`useWorkingList.ts`, `engagementWatch.ts`, `contextGuard.ts`), page rendering (`pdfRenderer.ts`, `docOpener.ts`, `renderQueue.ts`), saving (`saveToComputer.ts`, `savePlan.ts`) and intake (`intake.ts`, `intakeRunner.ts`, `vaultBytes.ts`).
+- PDF operations as plain functions in `src/lib/pdf-tools/`: `organise.ts` and `pageCopy.ts` (merge, split, delete), `formFields.ts`, `compress.ts`, `pageNumbers.ts`, `imagesToPdf.ts`, `unlock.ts`, `inspect.ts`, `provenance.ts`, `pageList.ts`, `fileNames.ts`, `workingList.ts` (300 MB limit, 150 MB warning, session check), `activity.ts`, `resultNames.ts`, `hash.ts`. Tests sit beside each file; `testPdf.ts` and `testLeakPdf.ts` generate test PDFs, so no binary fixture is committed.
+- `scripts/sync-pdfjs-assets.mjs` copies the `pdfjs-dist` worker files into `public/pdf-tools/pdfjs/`. `scripts/test-pdf-tools-ui.cjs` and `scripts/pdf-tools-electron-entry.cjs` are the application test.
+- Edited: `src/pages/AuditTools.tsx` (the inline `PDFTools` component and the `pdf-lib` import removed; one import and one mount line added), `package.json` and `package-lock.json` (two dependencies and one script), `docs/project/PDF_TOOLS.md`, and the project records. Not changed: `electron/` apart from the one block in `electron/main.cjs`, `sqlite/`, `src/App.tsx`, `src/contexts/EngagementContext.tsx`, `src/index.css`.
+
+### Changed paths
+
+Modified: `package.json` (+3), `package-lock.json` (+52), `src/pages/AuditTools.tsx` (+2/-712), `electron/main.cjs` (one block of about 20 lines, by owner decision of 14 November 2026), and the project records under `docs/project/`. New: `src/lib/pdf-tools/`, `src/components/pdf-tools/`, `public/pdf-tools/pdfjs/` (195 files), `scripts/sync-pdfjs-assets.mjs`, `scripts/test-pdf-tools-ui.cjs`, `scripts/pdf-tools-electron-entry.cjs`, `docs/project/PDF_TOOLS.md`. `Vera Tools Meeting.docx` is untracked and is not part of this work: never stage it. PDF_TOOLS.md is the design record; the build plan is not part of the repository by owner decision.
+
+### How to run the tests
+
+Work from the upper-case path `C:\Users\ASUS\Desktop\audit-assistant-pro-electron`; on this machine vitest collects tests only from that spelling, and every file fails from the lower-case `c:\` path.
+
+- Unit tests: `npx vitest run src/lib src/components/pdf-tools`
+- Type check: `npx tsc -p tsconfig.app.json --noEmit` (baseline 76 diagnostics; none under `pdf-tools`)
+- Lint: `npx eslint src/components/pdf-tools src/lib/pdf-tools`
+- Application test: `npm run test:pdf-tools-ui` (32 checks; builds first; real application, temporary profile). Against a packaged build: `PDF_TOOLS_TEST_APP=<path to win-unpacked\ICAI-VERA.exe> node scripts/test-pdf-tools-ui.cjs`.
+- Existing checks: `node --test scripts/test-t003-authorization.cjs`; `npm run test:native`; `npm run docs:inventory` then `npm run docs:check`.
+- Before any Electron command, unset `ELECTRON_RUN_AS_NODE` in the shell. When it is set, Electron starts as plain Node and the tests fail for a reason unrelated to the code.
+
+### Exact checks and outcomes (14 November 2026)
+
+Environment: Windows; Node 24.15.0 and npm 11.12.1 on the build machine, not the pinned 24.12.0 / 11.6.2. Installs used `npx -y npm@11.6.2`; the checks above ran on a clean copy installed that way, so they were not run on the pinned Node 24.12.0.
+
+| Check | Result |
+| --- | --- |
+| `npx -y npm@11.6.2 ci --dry-run` | Passed: lockfile in sync. A full clean `npx -y npm@11.6.2 ci` also succeeded in a scratch copy. |
+| `npx vitest run src/lib/pdf-tools src/components/pdf-tools` | Passed: 43 files, 892 tests. |
+| `npx vitest run src/lib`, first run | **Failed**: 3 files failed, 2 tests and one set-up hook timed out (an unlock test, a 300-page timing test, a compress set-up). Each reported about 1,640 s for work that takes seconds, and another process on the machine stalled for 600 s in the same window. Assessed as a machine-wide pause (sleep or freeze) of about 27 minutes, not a code failure; this is an assessment, not proven. |
+| `npx vitest run src/lib`, two runs straight after | Passed both times: 24 files, 527 tests (21 s and 27 s). |
+| `npx vitest run src/components/pdf-tools` | Passed: 29 files, 410 tests. |
+| `npx tsc -p tsconfig.app.json --noEmit` | 76 diagnostics, the existing baseline; none in the new folders. |
+| ESLint on `src/lib/pdf-tools`, `src/components/pdf-tools` and the three new scripts | Clean (exit 0). |
+| `node --test scripts/test-t003-authorization.cjs` | Passed: 26/26. |
+| `npm run test:native` (after unsetting `ELECTRON_RUN_AS_NODE`) | Passed (Electron 40.9.1). |
+| `npm run test:pdf-tools-ui` (production build, isolated profile, synthetic data) | Passed: 32/32 (64 s). |
+| Windows package (`npm run electron:build:win`), scratch copy only | Built (exit 0); not installed, not published. |
+| `PDF_TOOLS_TEST_APP=<unpacked exe> node scripts/test-pdf-tools-ui.cjs` | Passed: 31 checks, 1 skipped (the download fallback, which needs the test's entry script). |
+
+- Failed and not-run items: the first `src/lib` run failed as described above and is recorded as a failed run; it passed twice straight after, so the cause is assessed as the machine pause, which was not reproduced or proven. Not run by anyone: the native save and folder dialogs through the application screen (including cancel and the "name (2).pdf" numbering; Desktop, Documents and Downloads themselves were verified only with the real folder window in a probe); drag and drop; a screen-reader pass; results in Acrobat or another reader (compared in pdf.js only); real Word, Excel and scanner files; the largest sizes (a 300 MB list, 500 pages, 200 images); the installed package; owner UAT.
+- Finding, 14 November 2026: during the owner's own hand check, saving three files to a folder failed with "A save window is already open". With the real Electron 40.9.1 folder window the cause was reproduced: when the chosen folder is one that Chromium treats as restricted (Desktop, Documents or Downloads themselves, the profile root, AppData, Windows, Program Files), Electron raises the session event `file-system-access-restricted`. `electron/main.cjs` had no listener, so the pick never answered, the folder window stayed active internally and every later save failed until the application was restarted. A folder inside Desktop worked. Fix, by the owner's decision of the same day (asked explicitly; the owner chose to edit `electron/main.cjs`): one block (the one beginning `const fileAccessSession`, about 20 lines) accepts the user's own Desktop, Documents and Downloads folders and anything inside them, and refuses any other restricted folder, so the pick ends as "no folder" and the screen shows the quiet note "Nothing was saved - No folder was chosen. Windows and program folders cannot be used for saving; choose another folder, such as Desktop or Documents." (`FOLDER_NOT_CHOSEN` in `src/components/pdf-tools/savePlan.ts`). Verified with the real folder window by running the exact listener code in a throw-away Electron window: Desktop itself returned a folder, write permission was granted and a file was written; an AppData folder ended the pick at once with a cancel-type error and no hang. Not yet verified: the same through the full application screen (owner hand check), and the single-file Save As window into those folders (expected to be unaffected, because only the folder itself is restricted, not files inside). The automated tests did not catch this because they replace the native windows with stand-ins; it was found by hand after automated verification had passed.
+- After the `electron/main.cjs` change: re-run on the clean copy the same day: `npx vitest run src/lib` 24 files / 527 passed; `src/components/pdf-tools` 29 files / 410 passed (PDF Tools 892 in all); TypeScript 76 diagnostics, none in the new folders; ESLint clean; `node --test scripts/test-t003-authorization.cjs` 26/26; `npm run test:native` passed; `npm run test:pdf-tools-ui` 32/32. The Windows package was not rebuilt after this change, so the packaged-build run (31/31, 1 skipped) predates it.
+- The Windows package was built in a scratch copy only; it was not installed or published.
+
+### Split and Delete pages: what is and is not guaranteed
+
+`src/lib/pdf-tools/pageCopy.ts` copies only what the kept pages use (its header comment states the promise). It is not redaction. Resources are trimmed per page by a byte search for resource names; when a page cannot be read with certainty its resources are kept whole and the result is marked "May hold left-out pages' images" (`sharedResourcesKept`). Dropped: links to left-out pages, article threads, a reply's link to a removed comment, signature fields as fields. Carried: form fields of kept pages. Do not weaken the keep rule: a wrongly dropped resource corrupts evidence. Known limits: PDF_TOOLS.md sections 5.3 and 11.
+
+### Found outside this feature, not changed
+
+Listed in [PDF_TOOLS.md section 12](PDF_TOOLS.md#12-outside-this-feature-for-the-owner) and summarised as GAP-19 and GAP-20 in `OPEN_GAPS.md`.
+
+### What the next person must not do
+
+- Do not run `npm install` on this branch. It rewrites hundreds of unrelated lockfile lines and prunes `node_modules`. Add a dependency by hand (one line in `package.json`, the matching lines in `package-lock.json`) and check it with `npx -y npm@11.6.2 ci`. The installed npm 11.12.1 rejects even the committed lockfile in `npm ci`; the pinned 11.6.2 accepts it.
+- Do not run vitest from the lower-case `c:\` path, or Electron commands with `ELECTRON_RUN_AS_NODE` set.
+- Do not edit `src/contexts/EngagementContext.tsx` to make list clearing instant without asking the owner; the owner decided against it on 13 November 2026.
+- Do not remove the "Soon" buttons for tools that are not built (owner decision T-022).
+- Do not hand-merge `package-lock.json`, `inventory.json` or `SCREEN_MAP.md` at rebase; regenerate them (PDF_TOOLS.md section 10).
+- Do not mark UAT accepted, and do not describe the save windows or the installed package as verified until someone has run them.
+- Do not use `@cantoo/pdf-lib` beyond unlocking; its two post-load fixes (restore the trailer `/Info` link; remove the leftover security dictionary) use calls below its documented API and are locked in by tests. The fallback is `@neslinesli93/qpdf-wasm` 0.3.0 (PDF_TOOLS.md section 8).
+- Do not stage `Vera Tools Meeting.docx`.
+
+### First executable next step
+
+The owner's hand check from section 9 of [PDF_TOOLS.md](PDF_TOOLS.md) (listed in `NEXT_TASKS.md`, T-031): unset `ELECTRON_RUN_AS_NODE`, run `npm run electron:dev`, sign in with synthetic data and work through the list; record the result here. Then decide on opening a pull request to `main`. Then owner UAT.
+
+
 ## T-030 main pull status on login (13 November 2026)
 
 - Requested outcome: fetch the latest Git, bring local `main` current, and update the login label so users can identify the pulled changes. Selected task T-030; affected feature F-001. Binding constraint: preserve the pre-existing modified `package-lock.json` and untracked `ICAI-VERA-Context-Pack/` and `ICAI-VERA-Documentation-Review/`.

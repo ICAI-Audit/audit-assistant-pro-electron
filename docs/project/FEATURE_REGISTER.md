@@ -1,5 +1,9 @@
 # Feature register
 
+## F-030 PDF Tools update (14 November 2026)
+
+PDF Tools phase 1 (F-030, task T-031) is implemented and committed on `feat/pdf-tools` (base `8ee2107`), pushed to `origin`, and replaces the inline PDF tab in VERA Tools. No pull request is open, nothing is merged, and it is not owner-accepted. See [PDF_TOOLS.md](PDF_TOOLS.md) for the design, known limits and the application problems found on the way, [CURRENT_STATUS.md](CURRENT_STATUS.md#t-031-pdf-tools-phase-1-14-november-2026) for results and [SESSION_HANDOFF.md](SESSION_HANDOFF.md#t-031-pdf-tools-phase-1-14-november-2026) for the handoff.
+
 ## F-001 startup build label update (13 November 2026)
 
 After fast-forwarding local `main` to `origin/main` at `99324ea`, the shared login/header label identifies the pulled snapshot date and PR #109 CAAT Tools / PR #110 FSG and RSF updates. Published on `origin/main` in `bf0b5bf`. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests pass; desktop visual fit and owner UAT are not established. See [T-030 status](CURRENT_STATUS.md#t-030-main-pull-status-on-login-13-november-2026).
@@ -42,7 +46,7 @@ F-009 update, 11 November 2026: [T-025 investment disclosures](T025_INVESTMENT_D
 
 Reviewed for documentation on 30 October 2026 at source commit cc5c04729604fba7d05240a07f24682e0644665c. This is an implementation and coverage register, not certification of audit compliance.
 
-See the [complete module coverage](MODULE_COVERAGE_MATRIX.md) and [detailed specification index](MODULE_INDEX.md). Each of the 28 features maps to a module; code facts, reported tests and owner acceptance remain separate.
+See the [complete module coverage](MODULE_COVERAGE_MATRIX.md) and [detailed specification index](MODULE_INDEX.md). Each of the 28 features F-001 to F-028 maps to a module (F-029 CAAT Tools and F-030 PDF Tools have their own design documents); code facts, reported tests and owner acceptance remain separate.
 
 ## Status vocabulary
 
@@ -90,6 +94,7 @@ PR #108 is merged: shared GSTIN normalization/validation is used by GST master/b
 | F-027 | AI grounded guidance and anomaly detection | Supplied AI blueprint; no verified provider and RAG execution path in reviewed runtime | Not established; scope decision and evaluation needed before implementation |
 | F-028 | Shared session knowledge and repeatable workflows | AGENTS.md; CLAUDE.md; .github/copilot-instructions.md; docs/project | Documentation implemented in this change; structural checks recorded in CURRENT_STATUS.md; actual IDE loading requires per-client smoke test |
 | F-029 | CAAT Tools: data analytics tests and SA 530 sampling (T-024) | src/pages/CaatTools.tsx; public/caat; sqlite/schema/11_caat_tables.sql | Owner-tested tool embedded with per-engagement saving; automated verified with synthetic data (`npm run test:caat-ui` 29/29, including restore after restart and a 150,000-row ledger); owner UAT with real ledgers pending. See [CAAT_TOOLS.md](CAAT_TOOLS.md) |
+| F-030 | PDF Tools (VERA Tools tab "PDF Tools", T-031): merge, split, delete pages, compress, page numbers, images to PDF, PDF to images, password-protected input; save to computer, Evidence Vault and working-paper destinations; activity-log entry for each send | src/components/pdf-tools; src/lib/pdf-tools; scripts/sync-pdfjs-assets.mjs; scripts/test-pdf-tools-ui.cjs; scripts/pdf-tools-electron-entry.cjs; public/pdf-tools/pdfjs; src/pages/AuditTools.tsx (mount only); docs/project/PDF_TOOLS.md | Phase 1 implemented, committed and pushed on `feat/pdf-tools`; no pull request, not merged, no owner acceptance. Automated verified on synthetic data (14 November 2026): 43 test files / 892 tests in the two PDF Tools folders; `npm run test:pdf-tools-ui` 32/32; same test 31/31 with 1 skipped against an unpacked Windows package built in a scratch copy. Not established: native save and folder dialogs, drag and drop, screen-reader pass, results in Acrobat or another reader (pdf.js only), real Word/Excel/scanner files, largest sizes, installed package, owner UAT. Split and Delete pages copy only what kept pages use but are not a redaction tool. Phases 2 (Redact, Bookmarks) and 3 (PDF to Excel/Word, OCR, Review) are designed only. Limits: PDF_TOOLS.md section 11 |
 
 ## Coverage limits
 
