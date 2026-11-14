@@ -1,5 +1,28 @@
 # Current status
 
+## T-032 Permanent File UI refresh (14 November 2026)
+
+- Visual and accessibility refresh of the Permanent File screen on branch `feature/permanent-file-ui-refresh` (commits `b76febd` to `6b8a0b3` plus the evidence commit), no change to IPC, data model, permissions or validation rules. Client Details has a read-only view and one edit form; the ownership and document tables use a scoped table component (fixes the header overlap caused by the global `table th/td` rules); both dialogs share a `Modal` with dirty-form guard and focus return; upload uses a drag-and-drop dropzone with the same 25 MiB rule. Evidence, limits and before/after captures: [docs/ui-refresh](../ui-refresh/README.md).
+- Verified: capture harness 20/20; axe shows no violations in Permanent File content (three remain in the shared header and build label, unchanged from the baseline); Vitest 24/24 for the module and label tests; the six Permanent File `node --test` suites 33/33; native smoke test; scoped ESLint clean; `tsc` 61 diagnostic lines, none in changed files. Not done: screen-reader pass, owner UAT, real desktop profile, Lighthouse. Cards are stacked at every width and tables scroll sideways below about 700 px of content width.
+
+
+## T-032 Permanent File integration (14 November 2026)
+
+- UI refactor follow-up is **partial**: ownership entry, year-end comparison, document upload and metadata editing now open dialogs; a sandboxed PDF/image preview path, compact client summary, scoped typography and neutral header badge were added. Changing a PAN with nonmatching linked registrations is blocked in the Permanent File master handler, superseding the immediately previous user decision. Selective, record-preserving unlink remains unavailable, so some clients cannot change their PAN in this screen until reconciliation is implemented. No desktop preview/layout UAT was performed. See [handoff](SESSION_HANDOFF.md#t-032-modal-and-validation-follow-up).
+- Client-master follow-up: assigned managers or above can edit the shared master in Permanent File; name changes update linked engagement names transactionally. A valid PAN separates matching registrations from those requiring reconciliation, and no existing GSTIN is deleted. The user approved saving PAN despite mismatches and requested a selectable, record-preserving unlink; the latter is **not implemented** because `client_gstins.client_id` is non-null and shared with GST and tax workflows. Other client/GST write paths do not enforce this PAN policy. See the [latest handoff](SESSION_HANDOFF.md#t-032-client-master-and-gstin-reconciliation-follow-up).
+- User-requested layout and integrity follow-up is **partial**: module date inputs and main-process date writes/comparisons now reject future dates, including expiry dates; existing future-dated values are not migrated and cannot be resaved unchanged. The entity ID and raw uploader/history identifiers are hidden in the updated main register, while client identifiers and original document references remain unchanged in storage. Ownership and document lists are tabular and use add/edit entry points; legacy details remain editable to avoid data loss. Human-readable engagement names replace IDs in filters. PAN/constitution/GSTIN enforcement, DIN/DPIN and shareholding fields, fully structured branches, document preview and complete history editing are not implemented. Do not treat this partial work as fulfilling the full request.
+- At the user's request, combined the uncommitted Permanent File implementation from the separate `permanent-file` worktree into the original `feature/resume-previous-work` checkout, based on PR #112 merge `6e5da5e`. The user's existing staged PR #112 changes and stashes were preserved. The separate worktree remains as a safety copy; the combined changes have not been committed or pushed.
+- Permanent File remains a partial, unaccepted feature. Its sidebar entry, client-scoped documents, supplemental entity fields, effective-dated history, metadata filters and draft exports are present; complete core client editing, audit history, export inspection, UI verification and backup/restore remain open. SQLite-only backups do not include document files. See [handoff](SESSION_HANDOFF.md#t-032-combining-permanent-file-into-the-original-checkout-14-november-2026).
+- Locally recorded `origin/main` is at `b835def`, a later startup-label commit; it was not fetched, merged or reset in this integration. The staged PR #112 startup label was retained as requested.
+
+## Electron runtime recovery (14 November 2026)
+
+- The Electron binary was missing after the scripts-disabled install; Electron's bundled installer restored 40.10.6. `npm run postinstall` rebuilt the native modules, and `npm run test:native` passed with synthetic data. Full application startup and UI remain unverified; see [handoff](SESSION_HANDOFF.md#electron-runtime-recovery-14-november-2026).
+
+## Dependency recovery (14 November 2026)
+
+- `@cantoo/pdf-lib@2.11.1` is installed and `npm run build` passed on `feature/resume-previous-work`. The requested npm install left the manifest and lockfile unchanged but changed 453 installed packages, reported 57 audit vulnerabilities, and skipped lifecycle scripts; native runtime remains unverified. See [handoff](SESSION_HANDOFF.md#dependency-recovery-on-pr-112-branch-14-november-2026).
+
 ## T-032 sync latest main and refresh startup label (14 November 2026)
 
 - Selected task: T-032; affected feature F-001 (startup build label), plus merged features F-030 (PDF Tools) and F-023 (GSTIN lookup/bulk).

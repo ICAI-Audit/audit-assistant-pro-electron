@@ -1,5 +1,15 @@
 # Feature register
 
+## F-031 Permanent File (T-032)
+
+UI refresh (14 November 2026): new visual layer, unified Client Details edit mode, scoped tables, shared modal and dropzone; no change to data, IPC or permissions. Automated capture and axe evidence only, no owner acceptance: see [docs/ui-refresh](../ui-refresh/README.md) and the [handoff](SESSION_HANDOFF.md#t-032-permanent-file-ui-refresh-14-november-2026).
+
+The latest UI pass is partial, not the requested complete redesign. Dialogs and limited PDF/image preview were added, and Permanent File PAN changes are blocked by unmatched GSTINs. Structured DIN/DPIN and shareholding entry, complete master edit workflow, cross-application GSTIN checks, record-preserving unlink and desktop visual verification remain open. See [handoff](SESSION_HANDOFF.md#t-032-modal-and-validation-follow-up).
+
+Client master editing and PAN-based GSTIN display separation are implemented for the Permanent File path, not across the whole application. Unmatched registrations remain stored and linked, and the requested record-preserving unlink is outstanding. PAN holder-type checks cover the explicitly requested C, F, P, H and T examples; other holder types need a sourced policy. The client master has no new correction audit trail. See [handoff](SESSION_HANDOFF.md#t-032-client-master-and-gstin-reconciliation-follow-up).
+
+The original checkout now includes the uncommitted Permanent File work alongside the PR #112 changes. The implementation is partial and is not owner-accepted: see [current status](CURRENT_STATUS.md#t-032-permanent-file-integration-14-november-2026) and [handoff](SESSION_HANDOFF.md#t-032-combining-permanent-file-into-the-original-checkout-14-november-2026) for the current scope and remaining checks.
+
 ## F-001 startup build label update (14 November 2026)
 
 After fast-forwarding local `main` to `origin/main` at `6e5da5e`, the shared login/header label identifies the 14 November snapshot and PR #111 PDF Tools / PR #112 GSTIN lookup and bulk validation. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests and build validation are recorded in [T-032 status](CURRENT_STATUS.md#t-032-sync-latest-main-and-refresh-startup-label-14-november-2026).
