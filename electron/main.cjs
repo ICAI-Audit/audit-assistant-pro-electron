@@ -2324,6 +2324,32 @@ function registerIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // Ledger Analysis (VERA Tools > Ledger Analysis): read-only export of ledger masters, groups and the
+  // day book from Tally's HTTP XML server. Requires a signed-in user; nothing is written to Tally.
+  const ledgerAnalysisTally = require('./ledger-analysis/tally-xml.cjs');
+  ipcMain.handle('ledger-analysis:tally-companies', async (event, { host, port } = {}) => {
+    try {
+      if (!getAuthenticatedUserId(event)) return { success: false, error: 'Sign in first.' };
+      const companies = await ledgerAnalysisTally.fetchCompanies(host, port);
+      return { success: true, companies };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+  ipcMain.handle('ledger-analysis:tally-fetch', async (event, payload = {}) => {
+    try {
+      if (!getAuthenticatedUserId(event)) return { success: false, error: 'Sign in first.' };
+      const data = await ledgerAnalysisTally.fetchAll(payload, (p) => {
+        try { if (!event.sender.isDestroyed()) event.sender.send('ledger-analysis:progress', p); } catch (_) { /* window closed */ }
+      });
+      safeLog(`Ledger Analysis: fetched ${data.ledgers.length} ledgers, ${data.groups.length} groups, ${data.lines.length} day book lines`);
+      return { success: true, data };
+    } catch (error) {
+      safeLog('Ledger Analysis Tally fetch error:', error.message);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 function createWindow() {

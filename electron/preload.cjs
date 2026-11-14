@@ -159,6 +159,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   odbcFetchGSTNotFeeded: () => ipcRenderer.invoke('odbc-fetch-gst-not-feeded'),
   // Stock Items methods
   odbcFetchStockItems: () => ipcRenderer.invoke('odbc-fetch-stock-items'),
+  // Ledger Analysis - read-only Tally HTTP XML export (masters + day book)
+  ledgerAnalysis: {
+    tallyCompanies: (opts) => ipcRenderer.invoke('ledger-analysis:tally-companies', opts),
+    tallyFetch: (opts) => ipcRenderer.invoke('ledger-analysis:tally-fetch', opts),
+    onProgress: (cb) => {
+      const listener = (_event, p) => cb(p);
+      ipcRenderer.on('ledger-analysis:progress', listener);
+      return () => ipcRenderer.removeListener('ledger-analysis:progress', listener);
+    },
+  },
   // Financial Statement Review (FSG) module. Every fsg:* channel is checked in
   // the main process (electron/fsg/authorization.js); this bridge only limits
   // the renderer to that channel family.

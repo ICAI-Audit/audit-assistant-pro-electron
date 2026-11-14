@@ -887,6 +887,34 @@ async function testHarness(t) {
     assert.deepEqual([...fs.readFileSync(exportedPath)], [84, 51, 45, 69]);
   });
 
+  await t.test('ledger analysis Tally handlers require a signed-in user (T-033)', async () => {
+    // Placed at the end of the run: the app's startup sign-out (AuthContext) has long happened by then.
+    // A free port with nothing listening: a call that passes the sign-in check reaches the Tally client
+    // and fails to connect, so the test never needs (or touches) a real Tally.
+    const closedPort = await getFreePort();
+    const opts = `{ host: '127.0.0.1', port: ${closedPort}, from: '2025-04-01', to: '2025-04-30', includeDayBook: true }`;
+    const callBoth = (signIn) => evaluate(`(async () => {
+      const api = globalThis.electronAPI;
+      ${signIn ? `await api.sqliteAuth({ action: 'login', email: ${JSON.stringify(staffEmail)}, password: ${JSON.stringify(password)} });`
+        : "await api.sqliteAuth({ action: 'logout' });"}
+      return { companies: await api.ledgerAnalysis.tallyCompanies(${opts}), fetch: await api.ledgerAnalysis.tallyFetch(${opts}) };
+    })()`);
+
+    const out = await callBoth(false);
+    console.log(`[T003 ${out.companies.success || out.fetch.success ? 'ALLOWED' : 'DENIED'}] ledger-analysis handlers signed out; expected=deny; result=${JSON.stringify(out)}`);
+    assert.deepEqual(out.companies, { success: false, error: 'Sign in first.' });
+    assert.deepEqual(out.fetch, { success: false, error: 'Sign in first.' });
+
+    const inn = await callBoth(true);
+    console.log(`[T003 ALLOWED-TO-TALLY] ledger-analysis handlers signed in as staff; expected=reach Tally client; result=${JSON.stringify(inn)}`);
+    for (const r of [inn.companies, inn.fetch]) {
+      assert.equal(r.success, false);
+      assert.notEqual(r.error, 'Sign in first.');
+      assert.match(r.error, /Nothing is listening/);
+    }
+    await evaluate('globalThis.electronAPI.sqliteAuth({ action: "logout" })');
+  });
+
   await t.test('test profile remains isolated', async () => {
     assert.ok(stdout.includes('T003_PROFILE_ISOLATED'));
     assert.ok(path.resolve(databasePath).startsWith(path.resolve(profilePath) + path.sep));
