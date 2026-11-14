@@ -12,6 +12,13 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        // Soft semantic pills with AA-safe ink (see --*-soft / --*-ink tokens)
+        success: "border-success/25 bg-success-soft text-success-ink",
+        warning: "border-warning/30 bg-warning-soft text-warning-ink",
+        info: "border-info/25 bg-info-soft text-info-ink",
+        danger: "border-destructive/25 bg-danger-soft text-danger-ink",
+        neutral: "border-border bg-neutral-soft text-neutral-ink",
+        violet: "border-violet-ink/20 bg-violet-soft text-violet-ink",
       },
     },
     defaultVariants: {
