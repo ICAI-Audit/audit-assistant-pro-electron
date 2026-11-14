@@ -21,7 +21,7 @@ function DataTable({ label, minWidth = 0, className, children, ...props }: DataT
       aria-label={label}
       tabIndex={0}
       className={cn(
-        "relative max-h-[28rem] overflow-auto rounded-lg border bg-card ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "relative max-h-[70vh] overflow-auto rounded-lg border bg-card ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className,
       )}
       {...props}
@@ -39,7 +39,7 @@ const Th = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTab
       ref={ref}
       scope={scope}
       className={cn(
-        "sticky top-0 z-10 border-b bg-muted text-left align-middle font-semibold uppercase tracking-wider text-muted-foreground !whitespace-nowrap !px-3 !py-2.5 !text-[11px]",
+        "sticky top-0 z-10 border-b bg-muted text-left align-middle font-semibold uppercase tracking-wider text-subtle !whitespace-nowrap !px-3 !py-2.5 !text-[11px]",
         className,
       )}
       {...props}

@@ -29,12 +29,12 @@ function SectionCardHeader({ title, description, meta, actions, divider = true, 
         className,
       )}
     >
-      <div className="min-w-0 flex-1 space-y-1">
+      <div className="min-w-0 flex-1 basis-[14rem] space-y-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
           {meta}
         </div>
-        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        {description && <p className="text-xs text-subtle">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>

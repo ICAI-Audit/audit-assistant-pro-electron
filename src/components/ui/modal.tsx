@@ -11,7 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 const SIZES = {
   sm: "max-w-[440px]",
@@ -60,7 +61,7 @@ function Modal({ open, onOpenChange, title, description, children, footer, size 
         <DialogContent
           overlayClassName="bg-slate-900/50 backdrop-blur-[2px]"
           className={cn(
-            "flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:rounded-xl",
+            "flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-xl bg-card p-0 sm:rounded-xl",
             SIZES[size],
             className,
           )}
@@ -129,7 +130,7 @@ interface ModalFooterProps {
 function ModalFooter({ note, children }: ModalFooterProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t bg-muted/40 px-6 py-4">
-      <p className="min-w-0 flex-1 text-xs text-muted-foreground" aria-live="polite">
+      <p className="min-w-0 flex-1 basis-[12rem] text-xs text-subtle" aria-live="polite">
         {note}
       </p>
       <div className="flex items-center justify-end gap-2">{children}</div>
@@ -137,4 +138,15 @@ function ModalFooter({ note, children }: ModalFooterProps) {
   );
 }
 
-export { Modal, ModalFooter };
+/** Cancel button that goes through the same dirty-form check as Esc and the close icon. */
+function ModalCancel({ children = "Cancel", disabled }: { children?: React.ReactNode; disabled?: boolean }) {
+  return (
+    <DialogClose asChild>
+      <Button type="button" variant="outline" disabled={disabled}>
+        {children}
+      </Button>
+    </DialogClose>
+  );
+}
+
+export { Modal, ModalFooter, ModalCancel };

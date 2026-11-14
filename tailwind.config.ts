@@ -82,6 +82,7 @@ export default {
           soft: "hsl(var(--violet-soft))",
           ink: "hsl(var(--violet-ink))",
         },
+        subtle: "hsl(var(--subtle))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

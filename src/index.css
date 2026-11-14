@@ -59,6 +59,9 @@
     --violet-soft: 262 80% 95%;
     --violet-ink: 262 55% 35%;
 
+    /* Secondary text that stays AA on both the page and muted surfaces */
+    --subtle: 215 16% 38%;
+
     /* Risk level colors */
     --risk-high: 0 72% 51%;
     --risk-medium: 38 92% 50%;

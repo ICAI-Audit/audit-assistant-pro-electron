@@ -34,7 +34,7 @@ export function Field({ label, required, optional, hint, error, className, child
             *
           </span>
         )}
-        {optional && <span className="ml-1 font-normal text-muted-foreground">(optional)</span>}
+        {optional && <span className="ml-1 font-normal text-subtle">(optional)</span>}
       </label>
       {children({
         id,
@@ -48,7 +48,7 @@ export function Field({ label, required, optional, hint, error, className, child
         </p>
       ) : (
         hint && (
-          <p id={messageId} className="text-xs text-muted-foreground">
+          <p id={messageId} className="text-xs text-subtle">
             {hint}
           </p>
         )
