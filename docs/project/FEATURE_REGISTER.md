@@ -1,8 +1,52 @@
 # Feature register
 
+## F-030 PDF Tools update (14 November 2026)
+
+PDF Tools phase 1 (F-030, task T-031) is implemented and committed on `feat/pdf-tools` (base `8ee2107`), pushed to `origin`, and replaces the inline PDF tab in VERA Tools. No pull request is open, nothing is merged, and it is not owner-accepted. See [PDF_TOOLS.md](PDF_TOOLS.md) for the design, known limits and the application problems found on the way, [CURRENT_STATUS.md](CURRENT_STATUS.md#t-031-pdf-tools-phase-1-14-november-2026) for results and [SESSION_HANDOFF.md](SESSION_HANDOFF.md#t-031-pdf-tools-phase-1-14-november-2026) for the handoff.
+
+## F-001 startup build label update (13 November 2026)
+
+After fast-forwarding local `main` to `origin/main` at `99324ea`, the shared login/header label identifies the pulled snapshot date and PR #109 CAAT Tools / PR #110 FSG and RSF updates. Published on `origin/main` in `bf0b5bf`. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests pass; desktop visual fit and owner UAT are not established. See [T-030 status](CURRENT_STATUS.md#t-030-main-pull-status-on-login-13-november-2026).
+
+F-007/F-009, 13 November 2026: owner confirmed the reviewed T-023 through T-028 source commit on RSF after typecheck-debt disclosure. No further feature changes or UAT acceptance; known gaps remain. Full scope and validation: [RSF review](RSF_PRE_COMMIT_REVIEW.md).
+
+F-007/F-009 pre-commit verification, 13 November 2026:
+
+T-029 reviewed pending T-023?T-028 together: fresh integration 210/210, desktop 81/81 and no new TS diagnostic signatures relative to HEAD (76 existing errors remain). No new feature behaviour or UAT acceptance. Known-ALIE status omissions, GAP-18 and older tracked data-artifact disposition remain explicit in [the review](RSF_PRE_COMMIT_REVIEW.md). Commit awaits owner confirmation.
+
+F-009 updates, 13 November 2026:
+
+T-027 dated headings now extend to underlying Notes/Annexures on screen and normal PDF/Excel, including per-note BS/P&L basis, selected comparative dates and relevant disclosure tables. Opening/Closing movement captions and stored fields/calculations remain unchanged. T-028 removes the owner-identified Cloudtail MCA publishing feature end to end: controls, automatic publish, renderer API and backend channels/implementation. Historical snapshot records/table remain preserved. Integration 210/210 and desktop 81/81 passed, including production build and FSG-scoped date-heading wrapping; owner UAT pending.
+
+F-007/F-009 owner rollback, 12 November 2026:
+
+T-026 provisional ALIE MISSING liability placement is removed at the owner's explicit instruction. Unresolved amounts remain in warnings/review lists and are excluded pending proper classification; generation remains available with an incompleteness/unbalanced warning. Nil filtering and PY stock-input exclusion are retained. Earlier provisional-head descriptions below are historical. Source balances, existing saved snapshots and client data remain unchanged; new exports/snapshots no longer allocate diagnostic amounts. Integration 201/201, desktop 77/77 and build/docs checks passed; owner UAT pending.
+
+F-007/F-009 fix, 12 November 2026:
+
+T-026 excludes Stock-form comparative disclosure rows (`Stock Entry PY`) from missing ALIE detection and its provisional liability head. This corrects the owner screenshot false positive for PY Opening Stock / PY Closing Stock. It preserves saved stock, ordinary imported stock-ledger checks, current stock mappings and financial stock calculations. Integration 201/201 and desktop 77/77 passed, including build/restart and stock-preservation checks; owner UAT pending.
+
+F-007/F-009 wording follow-up, 12 November 2026:
+
+T-026 missing-ALIE notices now explain missing ledger classification, actual provisional debit/credit sign and the next correction step without assuming P&L. Ledger names/balances are visible directly below the screen notice. Shared PDF/Excel notices and exception captions are aligned; source/status/math are unchanged. Owner approved this correction in the conversation. Integration 197/197, desktop 76/76 and build/docs checks passed; owner UAT pending.
+
+F-009 update, 12 November 2026: T-027 dated statement columns
+
+BS and P&L screens and normal PDF/Excel now derive reporting-date titles/columns from the selected TB period. BS uses **As at**; P&L uses **For the year ended**. FY 2025-26 produces 31 March 2026 and comparative 31 March 2025. Explicit comparative/custom reporting dates take precedence over a preceding-year fallback. Integration 190/190 and desktop 75/75 passed, with screen/PDF visual checks; owner UAT pending. No source amounts/calculations changed.
+
+F-007/F-009 follow-up, 12 November 2026:
+
+T-026 now provisionally includes missing-ALIE signed net balances under **ALIE MISSING** on the BS Equity and Liabilities side, preserving source data and mandatory notices. Fully nil items remain in Mapping without financial warnings; comparative-only balances affect PY only. Integration 171/171 and desktop 73/73 passed. [Contract](T026_MISSING_ALIE_WARNINGS.md). This supersedes the warning-only presentation below; wider unresolved-status/profit-transfer gaps remain open.
+
+F-007/F-009 update, 12 November 2026: [T-026 missing-ALIE warnings](T026_MISSING_ALIE_WARNINGS.md) implements the owner's first requested part: non-blocking red bold beginning/end BS/P&L notices, source-item counts and gross debit/credit/net closing figures, scope-correct comparatives, correction links and ledger-wise exceptions in screen/PDF/Excel plus snapshot evidence. Integration 147/147 passed. The separate known-ALIE unresolved-status omission and GAP-18 are not fixed by this part. Owner UAT remains pending.
+
+F-007/F-009 finding, 11 November 2026: T-026 source diagnosis confirms unresolved statuses (`unmapped`, `conflict`, `discrepancy`) are excluded from the single-TB, consolidated and branch financial-data queries, independently of fallback category availability. Owner clarified that values must remain under the last trusted hierarchy/appropriate uncategorised heading pending rectification. Implementation and reconciliation tests are outstanding; see [diagnosis](SESSION_HANDOFF.md#t-026-diagnosis-unresolved-ledger-inclusion-11-november-2026). No behavior change or acceptance claimed by this finding.
+
+F-009 update, 11 November 2026: [T-025 investment disclosures](T025_INVESTMENT_DISCLOSURES.md) adds current/non-current investment Fill Details, mapped sub-classification ledger selection, securities and partnership disclosures, main-process year/lock validation, financial PDF/Excel, snapshots and consolidated Fill Details workbook support. Integration 121/121 and UI 61/61 passed; actual PDF text and reopened Excel checked. Division I professional review and owner UAT remain pending. Other modules are outside this task.
+
 Reviewed for documentation on 30 October 2026 at source commit cc5c04729604fba7d05240a07f24682e0644665c. This is an implementation and coverage register, not certification of audit compliance.
 
-See the [complete module coverage](MODULE_COVERAGE_MATRIX.md) and [detailed specification index](MODULE_INDEX.md). Each of the 28 features maps to a module; code facts, reported tests and owner acceptance remain separate.
+See the [complete module coverage](MODULE_COVERAGE_MATRIX.md) and [detailed specification index](MODULE_INDEX.md). Each of the 28 features F-001 to F-028 maps to a module (F-029 CAAT Tools and F-030 PDF Tools have their own design documents); code facts, reported tests and owner acceptance remain separate.
 
 ## Status vocabulary
 
@@ -49,7 +93,13 @@ PR #108 is merged: shared GSTIN normalization/validation is used by GST master/b
 | F-026 | Backup and restore of the complete audit file | Database/file/localStorage stores identified in architecture | Not established; define consistent backup, restoration and failure recovery before claiming recoverability |
 | F-027 | AI grounded guidance and anomaly detection | Supplied AI blueprint; no verified provider and RAG execution path in reviewed runtime | Not established; scope decision and evaluation needed before implementation |
 | F-028 | Shared session knowledge and repeatable workflows | AGENTS.md; CLAUDE.md; .github/copilot-instructions.md; docs/project | Documentation implemented in this change; structural checks recorded in CURRENT_STATUS.md; actual IDE loading requires per-client smoke test |
+| F-029 | CAAT Tools: data analytics tests and SA 530 sampling (T-024) | src/pages/CaatTools.tsx; public/caat; sqlite/schema/11_caat_tables.sql | Owner-tested tool embedded with per-engagement saving; automated verified with synthetic data (`npm run test:caat-ui` 29/29, including restore after restart and a 150,000-row ledger); owner UAT with real ledgers pending. See [CAAT_TOOLS.md](CAAT_TOOLS.md) |
+| F-030 | PDF Tools (VERA Tools tab "PDF Tools", T-031): merge, split, delete pages, compress, page numbers, images to PDF, PDF to images, password-protected input; save to computer, Evidence Vault and working-paper destinations; activity-log entry for each send | src/components/pdf-tools; src/lib/pdf-tools; scripts/sync-pdfjs-assets.mjs; scripts/test-pdf-tools-ui.cjs; scripts/pdf-tools-electron-entry.cjs; public/pdf-tools/pdfjs; src/pages/AuditTools.tsx (mount only); docs/project/PDF_TOOLS.md | Phase 1 implemented, committed and pushed on `feat/pdf-tools`; no pull request, not merged, no owner acceptance. Automated verified on synthetic data (14 November 2026): 43 test files / 892 tests in the two PDF Tools folders; `npm run test:pdf-tools-ui` 32/32; same test 31/31 with 1 skipped against an unpacked Windows package built in a scratch copy. Not established: native save and folder dialogs, drag and drop, screen-reader pass, results in Acrobat or another reader (pdf.js only), real Word/Excel/scanner files, largest sizes, installed package, owner UAT. Split and Delete pages copy only what kept pages use but are not a redaction tool. Phases 2 (Redact, Bookmarks) and 3 (PDF to Excel/Word, OCR, Review) are designed only. Limits: PDF_TOOLS.md section 11 |
 
 ## Coverage limits
+
+F-007/F-009 update, 10 November 2026: [T-024](T024_LEVEL1_FALLBACKS.md) adds the five requested known-ALIE Level 1 fallback categories, master-linked low-confidence classification and canonical BS display/export labels, with an additive backup-backed upgrade. Integration 93/93, UI 54/54 and build passed, including actual PDF text/reopened Excel synthetic content checks. The unresolved non-corporate equity/profit-transfer case is recorded as GAP-18; no universal balancing or owner-acceptance claim.
+
+F-002/F-009 update, 10 November 2026: [T-023](T023_FIRM_SIGNING_PLACE.md) adds the nullable Firm Place in VERA Settings/Admin Settings and uses it as the editable Financial Statement Review signing default. Existing finalised signing records remain authoritative. FSG integration and upgrade/recovery checks passed 60/60; UI results are recorded in [current status](CURRENT_STATUS.md). Owner UAT and exported-file inspection remain pending.
 
 The original Phase I also requests searchable audit checklist and MRL formats and line-item workpaper linkage. Programmes, templates and evidence exist, but their exact coverage against those original requirements is not established. T-005 now has a documented trace and gap register prepared for owner review; this does not mean these capabilities are implemented or accepted. The tax guidance PDFs supplied in this conversation were not audited clause by clause during this documentation review.

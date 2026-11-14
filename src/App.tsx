@@ -34,6 +34,7 @@ import Feedback from "./pages/Feedback";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminSettings from "./pages/AdminSettings";
 import AuditTools from "./pages/AuditTools";
+import CaatTools from "./pages/CaatTools";
 import AuditReport from "./pages/AuditReport";
 import TaxAudit from "./pages/TaxAudit";
 import ComplianceApplicability from "./pages/ComplianceApplicability";
@@ -255,6 +256,16 @@ const App = () => (
                         <AuditTools />
                       </MainLayout>
                     </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/caat-tools"
+                  element={
+                    <ProtectedEngagementRoute>
+                      <MainLayout fullBleed>
+                        <CaatTools />
+                      </MainLayout>
+                    </ProtectedEngagementRoute>
                   }
                 />
                 <Route

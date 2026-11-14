@@ -12,6 +12,7 @@
 import { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from '../components/Notes/TradePayablesDisclosureForm'
 import { TR_AGEING_ROWS, TR_AGEING_BUCKETS } from '../components/Notes/TradeReceivablesAgingForm'
 import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolve } from './tradeReceivablesNonCorp'
+import { INVESTMENT_REGISTRY } from './investmentWorkbook'
 
 const num = (v) => parseFloat(v) || 0
 // An entry's match(title, constitution) may also depend on the Auditee's constitution
@@ -41,6 +42,7 @@ function excelSerialToISODate(v) {
 }
 
 export const FILL_DETAILS_REGISTRY = [
+  ...INVESTMENT_REGISTRY,
   // "Cost of Materials Consumed" and "Changes in Inventories" are
   // deliberately NOT here — they're auto-computed from the Stock tab's
   // category entries (see utils/inventorySplit.js), not independently

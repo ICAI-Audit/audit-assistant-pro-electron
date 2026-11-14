@@ -13,6 +13,7 @@ const {
 } = require('./sqlite-authorization.cjs');
 const crypto = require('crypto');
 const fs = require('fs');
+const { ensureFirmPlace } = require('./firm-place-migration.cjs');
 let Database;
 let bcrypt;
 
@@ -80,6 +81,8 @@ function getSqliteDb() {
         // This is idempotent (uses CREATE TABLE IF NOT EXISTS)
         // DO NOT wrap in try-catch - we want this to fail loudly if there's a problem
         initializeDatabaseSchema(sqliteDb);
+        const firmPlaceBackup = ensureFirmPlace(sqliteDb, path.join(userDataPath, 'backups'));
+        if (firmPlaceBackup) safeLog('Firm Place upgrade backup:', firmPlaceBackup);
         runAuditReportSetupSchemaMigration(sqliteDb);
         runAuditReportMainContentSchemaMigration(sqliteDb);
         runEngagementLetterTemplateTypeMigration(sqliteDb);
@@ -223,7 +226,8 @@ function initializeDatabaseSchema(db) {
     '07_rule_engine_tables.sql',
     '08_template_system_tables.sql',
     '09_tax_audit_tables.sql',
-    '10_fsg_tables.sql'
+    '10_fsg_tables.sql',
+    '11_caat_tables.sql'
   ];
 
   safeLog(`   Executing ${schemaFiles.length} schema files...`);
@@ -2386,6 +2390,28 @@ function createWindow() {
     mainWindow.maximize();
     mainWindow.show();
   });
+
+  // PDF Tools "Save to computer" lets the user pick a folder. Chromium treats some folders as
+  // restricted and, with no listener here, the pick never answers and no later save window can
+  // open until the application restarts. Answer every request: the user's own Desktop, Documents
+  // and Downloads folders are accepted; any other restricted folder (Windows, Program Files, the
+  // profile root, AppData) is refused, and the screen then asks for another folder.
+  const fileAccessSession = mainWindow.webContents.session;
+  if (fileAccessSession.listenerCount('file-system-access-restricted') === 0) {
+    fileAccessSession.on('file-system-access-restricted', (_event, details, callback) => {
+      let allowed = false;
+      try {
+        const picked = path.resolve(String(details && details.path ? details.path : '')).toLowerCase();
+        allowed = ['desktop', 'documents', 'downloads'].some((name) => {
+          const base = path.resolve(app.getPath(name)).toLowerCase();
+          return picked === base || picked.startsWith(base + path.sep);
+        });
+      } catch (error) {
+        allowed = false;
+      }
+      callback(allowed ? 'allow' : 'deny');
+    });
+  }
 
   // Load the app
   if (isDev) {

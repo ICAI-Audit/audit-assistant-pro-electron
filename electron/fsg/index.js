@@ -12,6 +12,7 @@
 //      its FSG entity (the client) and entity period (the financial year).
 
 import { attachDatabase, query, runInTransaction } from './db/client.js'
+import { ensureLevel1Fallbacks } from './db/level1-fallbacks.js'
 import { ensureSchema } from './db/schema.js'
 import { migrateMappingV3Captions, migrateMappingV3CaptionsPass2 } from './db/mapping-v3-migration.js'
 import { seedDefaultMapping, ensureStockCategories } from './services/excel.js'
@@ -30,7 +31,7 @@ import { registerPPEHandlers } from './ipc/ppe.js'
 import { registerRatioHandlers } from './ipc/ratio.js'
 import { registerGeneralNotesHandlers } from './ipc/general-notes.js'
 import { registerCfsHandlers } from './ipc/cfs.js'
-import { registerFsSnapshotHandlers } from './ipc/fs-snapshot.js'
+import { registerInvestmentHandlers } from './ipc/investments.js'
 import { summarizeEngagement } from './engagement-summary.js'
 import { AuthorizationError, CHANNEL_POLICY, authorizeCall, createPathGuard, filterResult } from './authorization.js'
 
@@ -196,6 +197,8 @@ export async function initFsg({ db, ipcMain, getAuthorizedSession, isTrustedRend
   // FSG start-up data routines, in FSG_Bharat's order.
   await ensureSchema()
   await seedDefaultMapping()
+  const fallbackUpgrade = await ensureLevel1Fallbacks()
+  if (fallbackUpgrade.backupPath) log(`[FSG] T-024 mapping backup: ${fallbackUpgrade.backupPath}`)
   await ensureStockCategories()
   await migrateMappingV3Captions()
   await migrateMappingV3CaptionsPass2()
@@ -215,7 +218,7 @@ export async function initFsg({ db, ipcMain, getAuthorizedSession, isTrustedRend
   registerRatioHandlers()
   registerGeneralNotesHandlers()
   registerCfsHandlers()
-  registerFsSnapshotHandlers()
+  registerInvestmentHandlers()
 
   const handlers = getRegisteredHandlers()
   const missingPolicy = [...handlers.keys()].filter((channel) => !CHANNEL_POLICY[channel])

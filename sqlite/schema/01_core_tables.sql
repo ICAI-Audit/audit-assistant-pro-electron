@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS firm_settings (
     firm_registration_no TEXT,
     constitution TEXT,
     address TEXT,
+    place TEXT,
     icai_unique_sl_no TEXT,
     no_of_partners INTEGER,
     created_by TEXT DEFAULT 'system',

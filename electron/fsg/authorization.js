@@ -93,6 +93,8 @@ export const CHANNEL_POLICY = {
   // Entity periods (financial years)
   'entityPeriod:list': { access: 'auth', scopes: [R('entity')] },
   'entityPeriod:get': { access: 'auth', scopes: [R('entityPeriod')] },
+  'investments:list': { access: 'auth', scopes: [R('entityPeriod', 0, { prop: 'entityPeriodId' }), R('tb', 0, { prop: 'tbId', optional: true })] },
+  'investments:save': { access: 'auth', write: true, scopes: [R('entityPeriod', 0, { prop: 'entityPeriodId' }), R('tb', 0, { prop: 'tbId', optional: true })] },
   'entityPeriod:setPrevTB': { access: 'auth', write: true, scopes: [R('entityPeriod'), R('tb', 1, { optional: true, readOnly: true })] },
   'entityPeriod:setPYMode': { access: 'auth', write: true, scopes: [R('entityPeriod')] },
   'entityPeriod:lock': { access: 'auth', write: true, scopes: [R('entityPeriod')] },
@@ -158,8 +160,10 @@ export const CHANNEL_POLICY = {
 
   // Statements
   'financials:getData': { access: 'auth', scopes: [R('tb')] },
+  'financials:getMissingAlie': { access: 'auth', scopes: [R('tb')] },
+  'financials:getConsolidatedMissingAlie': { access: 'auth', scopes: [R('entity'), R('tb', 1, { many: true, optional: true })] },
   'financials:getConsolidatedData': { access: 'auth', scopes: [R('entity'), R('tb', 1, { many: true, optional: true })] },
-  'financials:getBranchTBsData': { access: 'auth', scopes: [R('entity')] },
+  'financials:getBranchTBsData': { access: 'auth', scopes: [R('entity'), R('tb', 1, { many: true, optional: true })] },
 
   // Auditors and signatories of an entity
   'auditor:list': { access: 'auth', scopes: [R('entity')] },
@@ -248,8 +252,6 @@ export const CHANNEL_POLICY = {
   'getPPELedgers': { access: 'auth', scopes: [R('entity'), R('entityPeriod', 1)] },
   'savePPELedgers': { access: 'auth', write: true, scopes: [R('entity'), R('entityPeriod', 1)] },
   'deletePPELedger': { access: 'auth', write: true, scopes: [R('ppeLedger')] },
-  'fsSnapshot:publish': { access: 'auth', write: true, scopes: [R('entity'), R('entityPeriod', 1)] },
-  'fsSnapshot:list': { access: 'auth', scopes: [R('entityPeriod')] },
 }
 
 for (const [channel, reason] of Object.entries(DISABLED_IN_VERA)) {

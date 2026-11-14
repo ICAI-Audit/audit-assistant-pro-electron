@@ -28,10 +28,9 @@ describe('build information label', () => {
     expect(html).not.toMatch(/latest|up to date|new commits/i);
   });
 
-  it('identifies the merged GSTIN update on the startup label', () => {
-    expect(html).toContain('Code baseline: 11 November 2026');
-    expect(html).toContain('Update: GSTIN normalization and validation (PR #108)');
-    expect(html).not.toContain('Initial developer handover');
+  it('identifies the latest pulled main updates on the startup label', () => {
+    expect(html).toContain('Repository sync: origin/main (13 November 2026)');
+    expect(html).toContain('Update: CAAT Tools (PR #109) + FSG/RSF updates (PR #110)');
     expect(buildDetailLines()).toContain('Source branch: main');
   });
 

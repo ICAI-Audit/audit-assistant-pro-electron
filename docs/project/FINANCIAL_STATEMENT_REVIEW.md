@@ -1,5 +1,25 @@
 # Financial Statement Review (T-019)
 
+Owner additions, 13 November 2026:
+
+T-027 now covers BS/P&L-related Notes and ledger Annexures, including applicable supporting disclosure/ageing tables. BS headings use As at, P&L headings For the year ended, with the same selected CY/PY dates as the faces. Shared Excel sheets repeat the proper dated headings per note, preserving existing formula column positions. Opening/Closing movement meanings remain. This supersedes the earlier face-only scope below. T-028 removes Cloudtail MCA publication UI, automatic publication on final PDF/Excel generation, API/IPC policies and snapshot publishing/serialization code. Existing fs_snapshots table/records are retained for data preservation but have no current feature handlers; finalisation/signing/normal exports remain. No client data is sent to Git or any external service by this work.
+
+Owner rollback, 12 November 2026:
+
+T-026 no longer places missing-ALIE amounts on the BS liability side. They remain excluded pending classification and are shown in warnings/review lists only. Generation remains available and warnings disclose possible incomplete/unbalanced statements. This supersedes earlier provisional ALIE MISSING head descriptions below; PY stock-disclosure exclusion, nil filtering, dated headings and other FSG work remain in place.
+
+Owner addition, 12 November 2026: T-027 reporting-date headings
+
+The BS and P&L screens and normal PDF/Excel use actual year-end dates in titles and current/comparative column headers, derived by `statementDates.js`. BS uses **As at** and P&L **For the year ended**. FY short labels assume April-March; explicit reporting dates retain their actual month/day. Selected comparative dates take precedence; opening/manual PY uses the preceding year end. Missing or invalid dates fall back to generic headings. Branch columnar exports keep branch-name columns; Notes and cash-flow headings are outside this change. Financial figures and saved periods are unchanged.
+
+Owner follow-up, 12 November 2026:
+
+Missing-ALIE balances are now provisionally included on the BS Equity and Liabilities side under **ALIE MISSING**, signed credits less debits, while red bold warnings remain. Per-period nil filtering excludes fully nil items from statement notices. This supersedes the no-allocation/no-financial-total-change description below; source balances and classifications remain unchanged. [Current T-026 contract](T026_MISSING_ALIE_WARNINGS.md).
+
+Later addition, 12 November 2026: [T-026 missing-ALIE warnings](T026_MISSING_ALIE_WARNINGS.md) derives missing classifications directly from source TB ledgers, including missing mapping rows. It keeps generation available and prints red bold item counts/debit/credit/net notices at both ends of BS/P&L, with ledger-wise screen/annexure/export details and saved snapshot evidence. It neither guesses unknown financial-statement sides nor alters source/financial totals. The remaining known-ALIE conflict/discrepancy inclusion and profit-transfer issue are separately outstanding.
+
+Later addition, 11 November 2026: [T-025 investment disclosures](T025_INVESTMENT_DISCLOSURES.md) introduces current/non-current investment Fill Details, restricted mapped-ledger tables, Schedule III Division I disclosures, securities and partnership schedules, year/branch/consolidated persistence and aligned PDF/Excel/workbook output. Current investments omit trade/other grouping. Investment details never change source balances or supply a balancing entry. The task contract records exact inputs, statutory sources, draft warnings, automated evidence and pending professional review.
+
 Authoritative record of the replacement of the former Financial Review screen with the FSG_Bharat financial statement generator, ported from PostgreSQL to ICAI VERA's SQLite database. It supersedes the financial-statement parts of [M-06](modules/M-06.md) and [M-07](modules/M-07.md) for current behaviour; those specifications are kept as the historical record of the removed screen.
 
 ## Request and decisions
@@ -44,6 +64,10 @@ The FSG workflow, unchanged from FSG_Bharat except where noted:
 Start-up order: VERA schema files → existing migrations → legacy-table cleanup → FSG data routines (default mapping seed from `Mapping_v2.xlsx` when its hash changes, stock categories, mapping caption migrations, mapping patches, one-time repairs) → channel registration → window. A start-up failure of the module is reported on the screen through `fsg:status` and does not stop VERA.
 
 ## Data model
+
+### Known-ALIE Level 1 fallback update (T-024, 10 November 2026)
+
+The workbook LevelFormat sheet now has 684 data rows (679 original plus five requested terminal fallback categories). Map1/2/3 remain 273/239/313. A known ALIE without a Map1 match links to its constitution's terminal fallback master row, retaining low confidence and blank Levels 2-7. Existing mappings are not automatically remapped. The known old workbook receives additive master additions with a backup, preserving existing identifiers and overrides. Full [contract, upgrade behavior and validation limits](T024_LEVEL1_FALLBACKS.md). This prevents the tested category omissions; it does not guarantee a balanced or correctly classified statement. GAP-18 records the non-corporate all-fallback equity/profit-transfer limitation.
 
 ### VERA ↔ FSG mapping
 
@@ -122,6 +146,8 @@ FSG_Bharat had no users. In VERA every `fsg:*` call requires an authenticated, a
 - **Kept, because other modules use them:** `trial_balance_lines` and `useTrialBalance` (Audit Report setup, admin data integrity), `engagement_trial_balance_*` (dashboard, T-003 test), and the Tally ODBC handlers, `useTallyODBC` and `TallyContext` (VERA Tools). The tax-audit source chips keep their stored key `financial_review` and now open Financial Statement Review.
 
 ## Differences from FSG_Bharat
+
+T-023 (10 November 2026): signing place now defaults from `firm_settings.place`, entered in VERA Settings/Admin Settings → Firm, and remains editable in Generate Financials before finalisation. The former hard-coded Siliguri/global last-used default is superseded. See the [field, upgrade and acceptance contract](T023_FIRM_SIGNING_PLACE.md). Finalised years retain their stored signing place.
 
 - No PostgreSQL connection form, no cross-PC start-up lock, no multiple windows or pop-outs. The Settings button now opens Tools: the FSG data export and the format reference.
 - Fs snapshots are kept locally. FSG_Bharat's external reader (Cloudtail MCA) read them from the shared server and cannot do so here. `created_by` remains the operating-system user name.

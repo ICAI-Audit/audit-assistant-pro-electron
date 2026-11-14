@@ -1212,7 +1212,7 @@ Documentation snapshot: 30 October 2026. Reviewed source: `cc5c04729604fba7d0524
 
 ### Purpose and current boundary
 
-Offer auxiliary analysis and utilities. AuditTools has Tally, GST, MCA, income-tax, PDF and analytics tabs. A named card or external-link tool is not automatically a working calculation or a persisted audit workpaper.
+Offer auxiliary analysis and utilities. AuditTools has Tally, GST, MCA, income-tax, PDF and analytics tabs. A named card or external-link tool is not automatically a working calculation or a persisted audit workpaper. The PDF tab is the PDF Tools feature (F-030, [PDF_TOOLS.md](PDF_TOOLS.md)), a separate component.
 
 ### Source paths
 
@@ -1238,7 +1238,7 @@ This is the business-oriented field contract from inspected source models and pa
 | --- | --- | --- |
 | Temporary/permanent differences, tax rate and timing assumptions | DeferredTaxCalculator and deferred-tax types | AS-22 label is observed; recognition/recoverability and rate correctness require professional validation. |
 | Financial numerators, denominators and period values | RatioAnalysisCalculator | Formula choices, zero denominators, negative figures and scaling require review. |
-| Files, total pages, page range, split mode, specific pages | AuditTools PDF utility state | Range/every/specific split states exist; validate bounds, output integrity and unsupported/corrupt inputs. |
+| PDF Tools working list, page lists, compression level, page-number options, image margin, passwords | `src/components/pdf-tools` (memory only; the list is cleared on engagement change and sign-out; passwords are never stored) | Page lists are checked against the page count; unsupported, corrupt and protected files are refused with the file name; see PDF_TOOLS.md |
 | TB dates, target month, connection mode and ODBC port | Tally tool state/hooks | Requires live supported Tally configuration; see M-06. |
 | GSTIN, taxpayer type, CIN and PAN tool inputs | AuditTools state | Lookup/check tools are not independent verification of regulatory status or completeness. |
 
@@ -1252,7 +1252,7 @@ This is the business-oriented field contract from inspected source models and pa
 
 ### Outputs
 
-Calculated or processed outputs where wired, PDF operations and selected external/native tool results. Persistent calculator history is not generally established.
+Calculated or processed outputs where wired, PDF operations and selected external/native tool results. Persistent calculator history is not generally established. (PDF Tools results are held in memory until saved or sent to a destination)
 
 ### Verification and gaps
 

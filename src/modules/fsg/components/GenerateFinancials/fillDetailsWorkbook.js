@@ -195,6 +195,7 @@ export function parseFillDetailsWorkbook(wb, { constitution = null } = {}) {
       const data = entry.fromRows(dataRows)
       results.push({ noteNum, noteTitle, data })
     } catch (e) {
+      if (entry.key.startsWith('investments-')) throw new Error(`Invalid investment sheet "${sheetName}": ${e.message}`)
       console.error(`Failed to parse Fill Details sheet "${sheetName}":`, e)
     }
   }
