@@ -1,5 +1,13 @@
 # Current status
 
+## T-033 Ledger Analysis on branch ledger-analysis (14 November 2026)
+
+- Selected task: T-033; new feature F-031 (Ledger Analysis); F-008 VERA Tools path replaced; F-029 overlaps in part.
+- Branch `ledger-analysis` from `main` at `b835def`, built step by step from an owner-tested local copy. Ledger Analysis is the first and default VERA Tools tab; the Tally Tools tab, its component and the hooks `useTallyODBC` / `useOpeningBalanceMatching` were removed (Opening Balance Matching dropped with the owner's agreement).
+- Live check on the owner's TallyPrime test company: day book vs TB agreed for all 767 ledgers checked after two fetch fixes (collection instead of the one-day Day Book report; non-accounting voucher types left out). No database or schema change; results are not persisted.
+- New finding T-034: the T-003 authorization test is timing-dependent on unchanged `main` (3 of 4 runs failed); not fixed.
+- Validation and remaining limits: [latest handoff](SESSION_HANDOFF.md#t-033-ledger-analysis-on-branch-ledger-analysis-14-november-2026).
+
 ## T-032 sync latest main and refresh startup label (14 November 2026)
 
 - Selected task: T-032; affected feature F-001 (startup build label), plus merged features F-030 (PDF Tools) and F-023 (GSTIN lookup/bulk).

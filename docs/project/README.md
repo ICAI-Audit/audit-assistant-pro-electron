@@ -24,6 +24,7 @@ Start with [the review guide](REVIEW_START_HERE.md) and [the assembled applicati
 | Entry points and data flow | [Architecture](ARCHITECTURE.md) |
 | Tables and persistence ownership | [Data model](DATA_MODEL.md) |
 | Trial balance, mapping and financial statements (T-019) | [Financial Statement Review](FINANCIAL_STATEMENT_REVIEW.md) |
+| Ledger analysis and live Tally day book (T-033) | [Ledger Analysis](LEDGER_ANALYSIS.md) |
 | Screens and guards | [Screen map](SCREEN_MAP.md) |
 | Setup and commands | [Development guide](DEVELOPMENT_GUIDE.md) |
 | Check selection and UAT | [Testing guide](TESTING.md) |

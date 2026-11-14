@@ -143,7 +143,7 @@ FSG_Bharat had no users. In VERA every `fsg:*` call requires an authenticated, a
 - **Tests and scripts:** `test:classification` and `test:bulk-update`, and their tests. They tested only the removed classification code.
 - **IPC:** `app:getDownloadsPath` and `app:openPath`, used only by the removed export dialog.
 - **Database:** `schedule_iii_config`, `tb_new_entity_info`, `tb_new_ledgers`, `tb_new_stock_items`, `tb_new_classification_mappings` and `tb_new_sessions`. They had no reader or writer and were removed from `05_trial_balance_tables.sql` and the authorization lists. On an existing database they are dropped at start-up only if all are empty, after `VACUUM INTO <userData>/backups/audit_assistant-before-T019-legacy-tb-cleanup-<time>.db`; otherwise they are kept and a message is logged.
-- **Kept, because other modules use them:** `trial_balance_lines` and `useTrialBalance` (Audit Report setup, admin data integrity), `engagement_trial_balance_*` (dashboard, T-003 test), and the Tally ODBC handlers, `useTallyODBC` and `TallyContext` (VERA Tools). The tax-audit source chips keep their stored key `financial_review` and now open Financial Statement Review.
+- **Kept, because other modules use them:** `trial_balance_lines` and `useTrialBalance` (Audit Report setup, admin data integrity), `engagement_trial_balance_*` (dashboard, T-003 test), and the Tally ODBC handlers, `useTallyODBC` and `TallyContext` (VERA Tools). (T-033, 14 November 2026: the VERA Tools Tally Tools tab and `useTallyODBC` were since removed; Ledger Analysis replaces them. `TallyContext` and the ODBC handlers remain.) The tax-audit source chips keep their stored key `financial_review` and now open Financial Statement Review.
 
 ## Differences from FSG_Bharat
 
