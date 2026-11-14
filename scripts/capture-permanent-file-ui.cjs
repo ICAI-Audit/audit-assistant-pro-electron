@@ -171,8 +171,16 @@ const text = (value) => JSON.stringify(value);
 const clickByText = (pattern, root = 'document') => evaluate(`(() => {
   const re = new RegExp(${text(pattern)}, 'i');
   const el = [...${root}.querySelectorAll('button, [role="button"], a, summary')]
-    .find((x) => re.test((x.getAttribute('aria-label') || '') + ' ' + x.textContent.replace(/\\s+/g, ' ')) && x.offsetParent !== null);
-  if (el) { el.click(); return true; } return false;
+    .find((x) => re.test(((x.getAttribute('aria-label') || '') + ' ' + x.textContent.replace(/\\s+/g, ' ')).trim()) && x.offsetParent !== null);
+  if (el) { el.focus(); el.click(); return true; } return false;
+})()`);
+const setField = (selector, value) => evaluate(`(() => {
+  const el = document.querySelector(${text(selector)});
+  if (!el) return false;
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, ${text(value)});
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
 })()`);
 const dialogOpen = () => evaluate(`Boolean(document.querySelector('[role="dialog"]'))`);
 async function pressKey(key, code, keyCode) {
@@ -197,7 +205,7 @@ async function runAxe(name) {
   if (!axePath) return;
   await evaluate(`(() => { if (!window.axe) { (0, eval)(${text(fs.readFileSync(axePath, 'utf8'))}); } return true; })()`);
   const result = await evaluate(`axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }).then((r) => ({
-    violations: r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.length, targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')) })),
+    violations: r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.length, targets: v.nodes.slice(0, 25).map((n) => n.target.join(' ') + (n.any[0] && n.any[0].data && n.any[0].data.contrastRatio ? ' [' + n.any[0].data.contrastRatio + ' fg ' + n.any[0].data.fgColor + ' bg ' + n.any[0].data.bgColor + ']' : '')) })),
     passes: r.passes.length, incomplete: r.incomplete.length }))`);
   report.axe.push({ screen: name, ...result });
   console.log(`axe ${name}: ${result.violations.length} violation rule(s), ${result.violations.reduce((n, v) => n + v.nodes, 0)} node(s); ${result.incomplete} need review`);
@@ -246,7 +254,7 @@ async function seedPopulatedClient(clientId, engagementId) {
 
 // ── Flow ────────────────────────────────────────────────────────────────────
 async function capturePage(prefix, width, tall) {
-  await setViewport(width, tall ? (width >= 1024 ? 1100 : 2400) : 900);
+  await setViewport(width, tall ? (width >= 1024 ? 1700 : 3000) : 900);
   await setSidebarCollapsed(width <= 768);
   await shot(`${prefix}-${width}`);
 }
@@ -270,6 +278,44 @@ async function captureModals(prefix, width) {
     if (opened) check(`${prefix}: Esc closes ${name} (empty form) at ${width}px`, !(await dialogOpen()));
     else await remountPage();
   }
+}
+
+async function captureModalStates(prefix, width) {
+  await setViewport(width, 900);
+  // Ownership modal with inline validation errors.
+  await clickByText('add record|add ownership'); await sleep(400);
+  await setField('[role="dialog"] input[type="date"]', '2024-05-01');
+  await evaluate(`(() => { const d = document.querySelectorAll('[role="dialog"] input[type="date"]')[1];
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(d, '2024-04-01'); d.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+  await clickByText('^save record'); await sleep(300);
+  await shot(`${prefix}-modal-ownership-errors-${width}`);
+  await runAxe(`${prefix} modal-ownership-errors`);
+  // Dirty form: Esc asks before discarding, Keep editing returns to the form, Discard closes and restores focus.
+  await pressKey('Escape', 'Escape', 27); await sleep(300);
+  const asked = await evaluate(`Boolean(document.querySelector('[role="alertdialog"]'))`);
+  check(`${prefix}: Esc on a dirty ownership form asks before discarding`, asked);
+  if (asked) {
+    await shot(`${prefix}-discard-confirm-${width}`);
+    await clickByText('keep editing'); await sleep(300);
+    check(`${prefix}: Keep editing leaves the form open`, await dialogOpen() && !(await evaluate(`Boolean(document.querySelector('[role="alertdialog"]'))`)));
+    await pressKey('Escape', 'Escape', 27); await sleep(300);
+    await clickByText('^discard'); await sleep(400);
+    check(`${prefix}: Discard closes the form`, !(await dialogOpen()));
+    report.focusAfterDiscard = await describeFocus();
+    check(`${prefix}: focus returns to the Add record button`, /add record/i.test(report.focusAfterDiscard), report.focusAfterDiscard);
+  }
+  // Document modal with a file chosen.
+  await clickByText('add document'); await sleep(400);
+  report.documentModalNote = await evaluate(`document.querySelector('[role="dialog"]')?.innerText.includes('Choose a file to enable saving.')`);
+  await evaluate(`(() => { const input = document.querySelector('[role="dialog"] input[type="file"]');
+    const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array(2048)], 'Certificate of Incorporation.pdf', { type: 'application/pdf' }));
+    input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+  await sleep(300);
+  await setField('[role="dialog"] input[placeholder^="e.g."]', 'Certificate of Incorporation');
+  await shot(`${prefix}-modal-document-filled-${width}`);
+  await runAxe(`${prefix} modal-document-filled`);
+  await pressKey('Escape', 'Escape', 27); await sleep(300);
+  await clickByText('^discard'); await sleep(300);
 }
 
 async function main() {
@@ -317,35 +363,27 @@ async function main() {
     await captureModals('populated', width);
   }
 
-  // Focus return and dirty-form behaviour of the ownership modal.
+  await setViewport(1440, 900); await setSidebarCollapsed(false); await remountPage();
+  await captureModalStates('populated', 1440);
+
+  // Tab order inside the ownership modal.
   await setViewport(1440, 900); await setSidebarCollapsed(false); await remountPage();
   if (await clickByText('add record|add ownership')) {
     await sleep(400);
     report.focusOrder.ownershipModal = await tabStops(12);
-    await evaluate(`(() => { const el = document.querySelector('[role="dialog"] input:not([type="date"])'); el.focus();
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, 'Typed text');
-      el.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
     await pressKey('Escape', 'Escape', 27);
-    await sleep(400);
-    report.dirtyEscapeClosedDialog = !(await dialogOpen());
-    console.log(`info  Esc on a dirty ownership form closed the dialog: ${report.dirtyEscapeClosedDialog}`);
-    if (await dialogOpen()) {
-      await clickByText('discard', 'document'); await sleep(300);
-    }
-    report.focusAfterClose = await describeFocus();
-    console.log(`info  focus after closing the ownership modal: ${report.focusAfterClose}`);
   }
 
   // Client details edit mode and document metadata modal.
   await remountPage();
   for (const width of widths) {
-    await setViewport(width, width >= 1024 ? 1100 : 2400);
+    await setViewport(width, width >= 1024 ? 1700 : 3000);
     await setSidebarCollapsed(width <= 768);
     if (await clickByText('edit client')) { await shot(`client-edit-${width}`); if (width === widths[0]) await runAxe('client-edit'); }
     await remountPage();
   }
   await setViewport(1440, 900); await setSidebarCollapsed(false);
-  if (await clickByText('^.{0,4}edit')) { await sleep(400); await shot('modal-metadata-1440'); await pressKey('Escape', 'Escape', 27); }
+  if (await clickByText('edit details of|✎ edit')) { await sleep(400); await shot('modal-metadata-1440'); await pressKey('Escape', 'Escape', 27); }
 
   // Empty client.
   check('signed in (empty client)', await openAsUser(email, password, emptyEngagement, '#/permanent-file'));
