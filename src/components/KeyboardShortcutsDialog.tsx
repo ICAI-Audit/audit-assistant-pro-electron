@@ -136,7 +136,7 @@ export function KeyboardShortcutsDialog() {
               <Badge variant="outline">VERA Tools Tabs</Badge>
             </h3>
             <div className="bg-muted/30 rounded-lg p-4">
-              <ShortcutRow keys={[modKey, '1']} description="Tally Tools" />
+              <ShortcutRow keys={[modKey, '1']} description="Ledger Analysis" />
               <ShortcutRow keys={[modKey, '2']} description="GST Related" />
               <ShortcutRow keys={[modKey, '3']} description="MCA Data" />
               <ShortcutRow keys={[modKey, '4']} description="Income Tax" />
