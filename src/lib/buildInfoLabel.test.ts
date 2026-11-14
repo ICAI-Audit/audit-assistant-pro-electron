@@ -29,8 +29,8 @@ describe('build information label', () => {
   });
 
   it('identifies the latest pulled main updates on the startup label', () => {
-    expect(html).toContain('Repository sync: origin/main (13 November 2026)');
-    expect(html).toContain('Update: CAAT Tools (PR #109) + FSG/RSF updates (PR #110)');
+    expect(html).toContain('Repository sync: origin/main (14 November 2026)');
+    expect(html).toContain('Update: PDF Tools (PR #111) + GSTIN lookup/bulk (PR #112)');
     expect(buildDetailLines()).toContain('Source branch: main');
   });
 

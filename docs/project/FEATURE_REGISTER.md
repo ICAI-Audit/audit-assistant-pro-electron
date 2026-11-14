@@ -1,8 +1,12 @@
 # Feature register
 
+## F-001 startup build label update (14 November 2026)
+
+After fast-forwarding local `main` to `origin/main` at `6e5da5e`, the shared login/header label identifies the 14 November snapshot and PR #111 PDF Tools / PR #112 GSTIN lookup and bulk validation. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests and build validation are recorded in [T-032 status](CURRENT_STATUS.md#t-032-sync-latest-main-and-refresh-startup-label-14-november-2026).
+
 ## F-030 PDF Tools update (14 November 2026)
 
-PDF Tools phase 1 (F-030, task T-031) is implemented and committed on `feat/pdf-tools` (base `8ee2107`), pushed to `origin`, and replaces the inline PDF tab in VERA Tools. No pull request is open, nothing is merged, and it is not owner-accepted. See [PDF_TOOLS.md](PDF_TOOLS.md) for the design, known limits and the application problems found on the way, [CURRENT_STATUS.md](CURRENT_STATUS.md#t-031-pdf-tools-phase-1-14-november-2026) for results and [SESSION_HANDOFF.md](SESSION_HANDOFF.md#t-031-pdf-tools-phase-1-14-november-2026) for the handoff.
+PDF Tools phase 1 (F-030, task T-031) was committed on `feat/pdf-tools` (base `8ee2107`), pushed to `origin`, and merged to `main` in PR #111 at `6e5da5e`. It replaces the inline PDF tab in VERA Tools. The owner's hand check and UAT remain pending. See [PDF_TOOLS.md](PDF_TOOLS.md) for the design and known limits, [CURRENT_STATUS.md](CURRENT_STATUS.md#t-031-pdf-tools-phase-1-14-november-2026) for results, and [SESSION_HANDOFF.md](SESSION_HANDOFF.md#t-031-pdf-tools-phase-1-14-november-2026) for the handoff.
 
 ## F-001 startup build label update (13 November 2026)
 

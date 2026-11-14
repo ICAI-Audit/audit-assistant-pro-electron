@@ -5,9 +5,9 @@
 export const BUILD_MESSAGE = {
   lines: [
     'Welcome to ICAI Audit Tool',
-    'Repository sync: origin/main (13 November 2026)',
+    'Repository sync: origin/main (14 November 2026)',
   ],
-  updateNote: 'CAAT Tools (PR #109) + FSG/RSF updates (PR #110)',
+  updateNote: 'PDF Tools (PR #111) + GSTIN lookup/bulk (PR #112)',
   sourceBranch: 'main' as string,
 };
 
