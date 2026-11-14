@@ -1,5 +1,9 @@
 # Feature register
 
+## F-001 / F-031 Permanent File sync (14 November 2026)
+
+PR #113, including the Permanent File branch, is merged into `main` at `bb9ecf1`. The shared startup/header label identifies the 14 November snapshot and PR #113. It does not poll GitHub or prove another installation is updated. Permanent File remains partial with owner UAT and the previously recorded data-recovery and workflow gaps open. See [T-033 status](CURRENT_STATUS.md#t-033-permanent-file-sync-and-startup-label-14-november-2026).
+
 ## F-031 Permanent File (T-032)
 
 UI refresh (14 November 2026): new visual layer, unified Client Details edit mode, scoped tables, shared modal and dropzone; no change to data, IPC or permissions. Automated capture and axe evidence only, no owner acceptance: see [docs/ui-refresh](../ui-refresh/README.md) and the [handoff](SESSION_HANDOFF.md#t-032-permanent-file-ui-refresh-14-november-2026).
@@ -8,7 +12,7 @@ The latest UI pass is partial, not the requested complete redesign. Dialogs and 
 
 Client master editing and PAN-based GSTIN display separation are implemented for the Permanent File path, not across the whole application. Unmatched registrations remain stored and linked, and the requested record-preserving unlink is outstanding. PAN holder-type checks cover the explicitly requested C, F, P, H and T examples; other holder types need a sourced policy. The client master has no new correction audit trail. See [handoff](SESSION_HANDOFF.md#t-032-client-master-and-gstin-reconciliation-follow-up).
 
-The original checkout now includes the uncommitted Permanent File work alongside the PR #112 changes. The implementation is partial and is not owner-accepted: see [current status](CURRENT_STATUS.md#t-032-permanent-file-integration-14-november-2026) and [handoff](SESSION_HANDOFF.md#t-032-combining-permanent-file-into-the-original-checkout-14-november-2026) for the current scope and remaining checks.
+The originally uncommitted Permanent File work described in the earlier handoff was subsequently committed on the feature branch and merged to `main` in PR #113. The implementation remains partial and is not owner-accepted: see [current status](CURRENT_STATUS.md#t-032-permanent-file-integration-14-november-2026) and [handoff](SESSION_HANDOFF.md#t-032-combining-permanent-file-into-the-original-checkout-14-november-2026) for the earlier scope and remaining checks.
 
 ## F-001 startup build label update (14 November 2026)
 

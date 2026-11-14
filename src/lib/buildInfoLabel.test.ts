@@ -30,7 +30,7 @@ describe('build information label', () => {
 
   it('identifies the latest pulled main updates on the startup label', () => {
     expect(html).toContain('Repository sync: origin/main (14 November 2026)');
-    expect(html).toContain('Update: PDF Tools (PR #111) + GSTIN lookup/bulk (PR #112)');
+    expect(html).toContain('Update: Permanent File (PR #113)');
     expect(buildDetailLines()).toContain('Source branch: main');
   });
 

@@ -1,5 +1,11 @@
 # Current status
 
+## T-033 Permanent File sync and startup label (14 November 2026)
+
+- Local `main` fast-forwarded from `b835def` to fetched `origin/main` at `bb9ecf1`, containing the Permanent File branch merged in PR #113. No client data was opened or migrated by this sync.
+- Affected features: F-001 (startup label) and F-031 (Permanent File). The label identifies the 14 November snapshot and PR #113; it is static build information, not a live GitHub check.
+- Permanent File remains partial and is not owner-accepted. Its unresolved workflows, backup/restore and UAT limits remain open. See [latest handoff](SESSION_HANDOFF.md#t-033-permanent-file-sync-and-startup-label-14-november-2026) for validation.
+
 ## T-032 Permanent File UI refresh (14 November 2026)
 
 - Visual and accessibility refresh of the Permanent File screen on branch `feature/permanent-file-ui-refresh` (commits `b76febd` to `6b8a0b3` plus the evidence commit), no change to IPC, data model, permissions or validation rules. Client Details has a read-only view and one edit form; the ownership and document tables use a scoped table component (fixes the header overlap caused by the global `table th/td` rules); both dialogs share a `Modal` with dirty-form guard and focus return; upload uses a drag-and-drop dropzone with the same 25 MiB rule. Evidence, limits and before/after captures: [docs/ui-refresh](../ui-refresh/README.md).

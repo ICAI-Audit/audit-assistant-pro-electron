@@ -7,7 +7,7 @@ export const BUILD_MESSAGE = {
     'Welcome to ICAI Audit Tool',
     'Repository sync: origin/main (14 November 2026)',
   ],
-  updateNote: 'PDF Tools (PR #111) + GSTIN lookup/bulk (PR #112)',
+  updateNote: 'Permanent File (PR #113)',
   sourceBranch: 'main' as string,
 };
 
