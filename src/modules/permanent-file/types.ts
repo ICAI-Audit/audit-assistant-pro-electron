@@ -65,3 +65,5 @@ export type PermanentFileData =
   | { updated: boolean }
   | { entity: EntityData }
   | { changes: HistoryChange[]; records: HistoryRecord[] };
+
+export type ListData = Extract<PermanentFileData, { documents: unknown }>;
