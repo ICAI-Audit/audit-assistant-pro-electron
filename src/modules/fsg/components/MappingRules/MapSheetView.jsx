@@ -5,34 +5,34 @@ import { fsgApi } from '../../api.js'
 
 const MAP_CONFIGS = {
   map1: {
-    title: 'Map 1 — Stage 1: Tally Group → Level 1',
-    description: 'Maps the Pre-Primary Tally group value (value immediately before "Primary" in the hierarchy chain) to a Level 1 (Mapping1 Resultant) classification.',
+    title: 'Map 1 — Stage 1: Tally Group → Mapping 1',
+    description: 'Maps the Pre-Primary Tally group value (value immediately before "Primary" in the hierarchy chain) to a Mapping 1 (Mapping1 Resultant) classification.',
     columns: [
       { key: 'tally_pre_primary',   label: 'Tally Pre-Primary',   hint: 'Value just before "Primary" in Tally group hierarchy' },
-      { key: 'mapping1_resultant',  label: 'Mapping 1 Resultant', hint: 'Resulting Level 1 classification' },
+      { key: 'mapping1_resultant',  label: 'Mapping 1 Resultant', hint: 'Resulting Mapping 1 classification' },
     ],
     emptyMsg: 'No Map 1 rows for this constitution.',
   },
   map2: {
-    title: 'Map 2 — Stage 2: Keywords → Level 2',
-    description: 'Maps keyword patterns (matched against Tally group hierarchy FIRST, then ledger name as fallback) to a Level 2 classification within a given Level 1.',
+    title: 'Map 2 — Stage 2: Keywords → Mapping 2',
+    description: 'Maps keyword patterns (matched against Tally group hierarchy FIRST, then ledger name as fallback) to a Mapping 2 classification within a given Mapping 1.',
     columns: [
-      { key: 'mapping1_resultant',  label: 'Level 1 (Scope)',     hint: 'Map2 rule applies only within this Level 1' },
+      { key: 'mapping1_resultant',  label: 'Mapping 1 (Scope)',   hint: 'Map2 rule applies only within this Mapping 1' },
       { key: 'keywords',            label: 'Keywords',             hint: 'Pipe-separated (|) keyword patterns; matched as whole words' },
-      { key: 'mapping2_resultant',  label: 'Mapping 2 Resultant', hint: 'Resulting Level 2 classification' },
+      { key: 'mapping2_resultant',  label: 'Mapping 2 Resultant', hint: 'Resulting Mapping 2 classification' },
       { key: 'priority',            label: 'Priority',             hint: 'Lower number = higher priority when multiple rules match' },
       { key: 'notes',               label: 'Notes',                hint: 'Explanation or source reference' },
     ],
     emptyMsg: 'No Map 2 rows for this constitution.',
   },
   map3: {
-    title: 'Map 3 — Stage 3: Keywords → Level 3',
-    description: 'Maps keyword patterns (matched against Tally group hierarchy FIRST, then ledger name as fallback) to a Level 3 classification within a given Level 1 + Level 2.',
+    title: 'Map 3 — Stage 3: Keywords → Mapping 3',
+    description: 'Maps keyword patterns (matched against Tally group hierarchy FIRST, then ledger name as fallback) to a Mapping 3 classification within a given Mapping 1 + Mapping 2.',
     columns: [
-      { key: 'mapping1_resultant',  label: 'Level 1 (Scope)',     hint: 'Map3 rule applies within this Level 1' },
-      { key: 'mapping2_resultant',  label: 'Level 2 (Scope)',     hint: 'Map3 rule applies within this Level 2' },
+      { key: 'mapping1_resultant',  label: 'Mapping 1 (Scope)',   hint: 'Map3 rule applies within this Mapping 1' },
+      { key: 'mapping2_resultant',  label: 'Mapping 2 (Scope)',   hint: 'Map3 rule applies within this Mapping 2' },
       { key: 'keywords',            label: 'Keywords',             hint: 'Pipe-separated (|) keyword patterns; matched as whole words' },
-      { key: 'mapping3_resultant',  label: 'Mapping 3 Resultant', hint: 'Resulting Level 3 classification' },
+      { key: 'mapping3_resultant',  label: 'Mapping 3 Resultant', hint: 'Resulting Mapping 3 classification' },
       { key: 'priority',            label: 'Priority',             hint: 'Lower number = higher priority when multiple rules match' },
       { key: 'notes',               label: 'Notes',                hint: 'Explanation or source reference' },
     ],
@@ -124,7 +124,7 @@ export default function MapSheetView({ mapType, rsId, constitution }) {
     const seen = {}
     for (const row of filtered) {
       const key = mapType === 'map2'
-        ? (row.mapping1_resultant || '(no Level 1)')
+        ? (row.mapping1_resultant || '(no Mapping 1)')
         : `${row.mapping1_resultant || ''}||${row.mapping2_resultant || ''}`
       if (!seen[key]) {
         seen[key] = { key, label1: row.mapping1_resultant, label2: row.mapping2_resultant, rows: [] }
@@ -296,14 +296,14 @@ function GroupedTable({ groups, columns, search, mapType }) {
                     </svg>
                     {mapType === 'map2' ? (
                       <span className="text-white font-semibold text-xs">
-                        Level 1: <span className="text-blue-200">{group.label1 || '—'}</span>
+                        Mapping 1: <span className="text-blue-200">{group.label1 || '—'}</span>
                         <span className="ml-3 text-blue-300 font-normal">{group.rows.length} rule{group.rows.length !== 1 ? 's' : ''}</span>
                       </span>
                     ) : (
                       <span className="text-white font-semibold text-xs">
-                        Level 1: <span className="text-blue-200">{group.label1 || '—'}</span>
+                        Mapping 1: <span className="text-blue-200">{group.label1 || '—'}</span>
                         <span className="mx-2 text-blue-400">›</span>
-                        Level 2: <span className="text-blue-200">{group.label2 || '—'}</span>
+                        Mapping 2: <span className="text-blue-200">{group.label2 || '—'}</span>
                         <span className="ml-3 text-blue-300 font-normal">{group.rows.length} rule{group.rows.length !== 1 ? 's' : ''}</span>
                       </span>
                     )}

@@ -47,10 +47,10 @@ const CUSTOM_VALUE = '__custom__'
 // Level 4-7 classifications a ledger can need beyond Mapping 1/2/3 (utils/fixTargets.js). Their columns
 // appear, right after Mapping 3, only where a ledger on screen needs them (Level 5 always).
 const NATURE_COLUMNS = {
-  4: { key: 'level4_value', label: 'Level 4 (sub-head)', width: 200, level: 4 },
-  5: { key: 'level5_value', label: 'Level 5 (nature)', width: 190, level: 5 },
-  6: { key: 'level6_value', label: 'Level 6 (Secured / Unsecured)', width: 170, level: 6 },
-  7: { key: 'level7_value', label: 'Level 7 (specify nature)', width: 200, level: 7 },
+  4: { key: 'level4_value', label: 'Mapping 4 (sub-head)', width: 200, level: 4 },
+  5: { key: 'level5_value', label: 'Mapping 5 (nature)', width: 190, level: 5 },
+  6: { key: 'level6_value', label: 'Mapping 6 (Secured / Unsecured)', width: 170, level: 6 },
+  7: { key: 'level7_value', label: 'Mapping 7 (specify nature)', width: 200, level: 7 },
 }
 const columnsWith = (levels) => {
   const out = []
@@ -106,7 +106,6 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   const [search, setSearch] = useState('')
   const [columnFilters, setColumnFilters] = useState({})
   const [refreshTick, setRefreshTick] = useState(0)
-  const [diagnostics, setDiagnostics] = useState(null)
   const [showAll, setShowAll] = useState(false)
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
   const [page, setPage] = useState(0)
@@ -207,6 +206,23 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   }, [tbId, refreshTick, showAll, entity?.id, entity?.constitution, activeRsId, scopeFilter])
 
   const refresh = () => setRefreshTick(t => t + 1)
+
+  // T-040: Notes also shows Fix for Previous Year ledgers, so "every ledger is
+  // fully categorised" may only be said when the Previous Year Trial Balance
+  // has nothing left either.
+  const [pyQueue, setPyQueue] = useState([])
+  const pyCheckApplies = !scopeFilter && !showAll && !categorisePY && !!prevTB?.id
+  useEffect(() => {
+    if (!pyCheckApplies) { setPyQueue([]); return }
+    let live = true
+    Promise.resolve(fsgApi?.findMappedByFilter(prevTB.id, { uncategorised: true }))
+      .then(rows => { if (live) setPyQueue(rows || []) })
+      .catch(() => { if (live) setPyQueue([]) })
+    return () => { live = false }
+  }, [pyCheckApplies, prevTB?.id, refreshTick])
+  const pyPendingCount = useMemo(
+    () => (levelFormat.length ? pyQueue.filter(r => !isComplete(levelFormat, r)).length : pyQueue.length),
+    [pyQueue, levelFormat])
 
   // Bulk auto-map a TB — for Previous Year this is what actually carries
   // Current Year's classification across: runMapping's engine (see
@@ -620,7 +636,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
         return n
       })
       pushAction({
-        label: `Bulk Level ${p.level} (${impacted.length} rows)`,
+        label: `Bulk Mapping ${p.level} (${impacted.length} rows)`,
         changes: impacted.map(r => ({
           id: r.id,
           before: originalById[r.id] || snapshotMapping(r),
@@ -872,7 +888,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
           ) : null}
           {scopeFilter.focusLevel ? (
             <span className="ml-3 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 text-xs">
-              Fix is about Level {scopeFilter.focusLevel} — that column is highlighted
+              Fix is about Mapping {scopeFilter.focusLevel} — that column is highlighted
             </span>
           ) : null}
           <button onClick={() => setScopeFilter(null)}
@@ -931,15 +947,6 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
             className="px-3 py-1.5 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition">
             Refresh
           </button>
-          <button
-            onClick={async () => {
-              if (!tbId) return
-              const d = await fsgApi?.exceptionsDiagnostics(tbId)
-              setDiagnostics(d)
-            }}
-            className="px-3 py-1.5 text-xs border border-amber-400 text-amber-700 rounded hover:bg-amber-50 transition">
-            Diagnose
-          </button>
           <input type="text" placeholder="Search all visible fields..."
             value={search} onChange={e => setSearch(e.target.value)}
             className="border border-gray-300 rounded px-3 py-1.5 text-xs w-56 focus:ring-2 focus:ring-blue-400 focus:outline-none" />
@@ -950,19 +957,6 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
-        {diagnostics && (
-          <div className="mb-3 bg-amber-50 border border-amber-200 rounded p-3 text-xs font-mono">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold text-amber-900">Diagnostic snapshot</span>
-              <button onClick={() => setDiagnostics(null)} className="text-amber-700 hover:text-amber-900">close</button>
-            </div>
-            <div className="grid grid-cols-3 gap-3 mb-2">
-              <pre className="bg-white border border-amber-100 rounded p-2 text-[11px] whitespace-pre">{JSON.stringify(diagnostics.counts, null, 2)}</pre>
-              <pre className="bg-white border border-amber-100 rounded p-2 text-[11px] whitespace-pre">{JSON.stringify(diagnostics.byStatus, null, 2)}</pre>
-              <pre className="bg-white border border-amber-100 rounded p-2 text-[11px] whitespace-pre overflow-auto" style={{ maxHeight: '220px' }}>{JSON.stringify(diagnostics.sample, null, 2)}</pre>
-            </div>
-          </div>
-        )}
         {loading && <LoadingNote className="py-4" />}
         {error && <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{error}</div>}
 
@@ -986,9 +980,17 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
               </button>
             </div>
           </div>
+        ) : pyPendingCount > 0 ? (
+          <div className="fsg-py-pending text-amber-800 bg-amber-50 border border-amber-200 rounded px-4 py-5 text-sm">
+            <p className="font-semibold mb-1">This year’s Trial Balance has no exceptions, but the Previous Year Trial Balance still has {pyPendingCount} ledger{pyPendingCount !== 1 ? 's' : ''} to categorise.</p>
+            <p className="text-xs mb-3">Notes, the Balance Sheet and the P&amp;L show Fix for them until they are categorised.</p>
+            <button onClick={() => setCategorisePY(true)} className="px-2 py-1 text-xs rounded border border-amber-400 bg-white hover:bg-amber-100">
+              Open the Previous Year ledgers
+            </button>
+          </div>
         ) : (
           <div className="text-center text-green-700 bg-green-50 border border-green-200 rounded px-4 py-6 text-sm">
-            No exceptions - every ledger is fully categorised.
+            No exceptions - every ledger is fully categorised{prevTB?.id ? ', in this year’s and the Previous Year Trial Balance' : ''}.
           </div>
         ))}
 
@@ -1084,7 +1086,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                 {bulkNatures.map(n => (
                   <div key={n.level}>
                     <label className="block text-[10px] text-gray-500 mb-0.5">
-                      Level {n.level} {n.level === 4 ? '(Sub-head)' : n.level === 7 ? '(Specify nature)' : '(Nature)'}
+                      Mapping {n.level} {n.level === 4 ? '(Sub-head)' : n.level === 7 ? '(Specify nature)' : '(Nature)'}
                     </label>
                     {n.freeText ? (
                       <input type="text" value={bulkNatureValue[n.level]} onChange={e => setBulkNature(n.level, e.target.value)}
@@ -1101,10 +1103,11 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                     )}
                   </div>
                 ))}
-                {/* a custom note line has no Level Format row — Level 5 stays a free-text field for it, as before */}
-                {!bulkNatures.some(n => n.level === 5) && (
+                {/* a custom note line has no Level Format row — Mapping 5 stays a free-text field for it, as before.
+                    Shown only once such a line is chosen: before Mapping 3 it sat alone after Mapping 3 and looked as if Mapping 4 were missing. */}
+                {bulkM3 && !bulkLfRow && !bulkNatures.some(n => n.level === 5) && (
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-0.5">Level 5 (Nature)</label>
+                    <label className="block text-[10px] text-gray-500 mb-0.5">Mapping 5 (Nature)</label>
                     <input type="text" value={bulkL5} onChange={e => setBulkL5(e.target.value)}
                       disabled={!bulkM3}
                       className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs bg-white disabled:bg-gray-100" />
@@ -1121,14 +1124,14 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
               {levelOnlyPlan.length > 0 && (
                 <div className="mt-3 pt-2 border-t border-blue-200">
                   <div className="text-[10px] text-blue-700 mb-1.5">
-                    <span className="font-semibold">Level 4–7 only</span> — sets just that level on the ticked ledgers that need it.
-                    Their Mapping 1 / 2 / 3 and other levels stay as they are, so ledgers under different lines can be fixed together.
+                    <span className="font-semibold">Mapping 4–7 only</span> — sets just that mapping on the ticked ledgers that need it.
+                    Their Mapping 1 / 2 / 3 and other mappings stay as they are, so ledgers under different lines can be fixed together.
                   </div>
                   <div className="grid gap-2 text-xs" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                     {levelOnlyPlan.map(p => (
                       <div key={p.level} className="bg-white border border-blue-100 rounded p-2">
                         <label className="block text-[10px] text-gray-500 mb-0.5">
-                          Level {p.level} {p.level === 4 ? '(Sub-head)' : p.level === 7 ? '(Specify nature)' : '(Nature)'} — {p.ids.length} ledger{p.ids.length !== 1 ? 's' : ''}
+                          Mapping {p.level} {p.level === 4 ? '(Sub-head)' : p.level === 7 ? '(Specify nature)' : '(Nature)'} — {p.ids.length} ledger{p.ids.length !== 1 ? 's' : ''}
                           {p.missing > 0 && <span className="text-red-600"> ({p.missing} not set)</span>}
                         </label>
                         <div className="flex gap-1">

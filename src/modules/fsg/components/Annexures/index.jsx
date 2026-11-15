@@ -7,6 +7,8 @@ import PYTBSelector from '../shared/PYTBSelector'
 import PYModeSelect from '../shared/PYModeSelect'
 import RemarkCell, { useRemarks } from '../shared/RemarkCell'
 import { getSubnoteGroups, UNCLASSIFIED_LABEL, subnoteGroupFigures, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
+import OverrideModal from '../MappedTB/OverrideModal'
+import { fsgApi } from '../../api.js'
 
 function Guard({ activeTB, loading, error, children }) {
   if (!activeTB) return <div className="flex items-center justify-center h-full text-gray-400 text-sm">Load a Trial Balance in the Actual TB tab first.</div>
@@ -331,7 +333,7 @@ function TradePayablesReceivablesReconciliation({ activeTB, prevTB, data, tbId, 
   )
 }
 
-function NoteAnnexure({ note, activeTB, prevTB, tbId, getRemark, onRemarkSaved, showZero = false, onFix, jumpTarget, onJumpHandled, hasSeparatePYTB = false, prevMapL3 = null, prevRowsByLedger = null, showBranchCol = false, levelFormat = [] }) {
+function NoteAnnexure({ note, activeTB, prevTB, tbId, getRemark, onRemarkSaved, showZero = false, onFix, jumpTarget, onJumpHandled, hasSeparatePYTB = false, prevMapL3 = null, prevRowsByLedger = null, showBranchCol = false, levelFormat = [], onEditLedger = null }) {
   const periodLabels = noteColumnLabels(activeTB, prevTB, note)
   const [expanded, setExpanded] = useState(false)
   const blockRef = useRef(null)
@@ -432,7 +434,18 @@ function NoteAnnexure({ note, activeTB, prevTB, tbId, getRemark, onRemarkSaved, 
                 const remarkKey = code || ledgerName
                 return (
                   <tr key={`${gi}-${row.ledger_code || ri}`} className={`border-b border-gray-100 hover:bg-gray-50 ${isUncat ? 'bg-red-50/40' : ''} ${isTargetGroup ? 'bg-amber-50' : ''}`}>
-                    <td className={`py-0.5 px-4 ${isUncat ? 'text-red-700' : 'text-gray-800'}`}>{shown(ledgerName)}</td>
+                    <td className={`py-0.5 px-4 ${isUncat ? 'text-red-700' : 'text-gray-800'}`}>
+                      {shown(ledgerName)}
+                      {onEditLedger && row.mapped_id && (
+                        <button
+                          type="button"
+                          onClick={() => onEditLedger(row)}
+                          className="fsg-annex-edit ml-1.5 px-1 rounded text-[10px] text-blue-600 border border-transparent hover:border-blue-300 hover:bg-blue-50"
+                          title="Change this ledger's categorisation (same as Mapped TB)"
+                          aria-label={`Change categorisation of ${ledgerName}`}
+                        >✎</button>
+                      )}
+                    </td>
                     {showBranchCol && <td className="py-0.5 px-3 text-gray-600">{row.branch_name || ''}</td>}
                     <td className={`py-0.5 px-3 ${isUncat ? 'text-red-700 font-medium' : 'text-gray-600'}`}>
                       {ri === 0 ? shown(g.label) : ''}
@@ -524,6 +537,18 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
   const { get: getRemark, set: setRemark } = useRemarks(activeTB?.id)
   const onRemarkSaved = (scope, key, value) => setRemark(scope, key, value)
 
+  // T-039: change a ledger's categorisation right here, with the same dialog
+  // and the same saved override as Mapped TB (mappedTB:override), then reload.
+  // Not offered on the Consolidated view, where one line can stand for a
+  // ledger of several branches: change it on that branch's own view.
+  const [editRow, setEditRow] = useState(null)
+  const openEdit = (row) => setEditRow({ ...row, id: row.mapped_id, level_format_id: row.lf_id ?? row.level_format_id ?? '' })
+  const saveEdit = async (id, payload) => {
+    await fsgApi.overrideRow(id, payload)   // a refusal (e.g. a locked year) is shown in the dialog
+    setEditRow(null)
+    refresh()
+  }
+
   // A jump from a Notes "→ Annexure" link must always land on a visible
   // note — clear any active search that could be hiding it.
   useEffect(() => {
@@ -583,7 +608,8 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
                   tbId={activeTB?.id} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
                   onFix={openFix} jumpTarget={jumpTarget} onJumpHandled={onJumpHandled}
                   hasSeparatePYTB={!!prevTB?.id} prevMapL3={data.prevMapL3} prevRowsByLedger={data.prevRowsByLedger}
-                  showBranchCol={isConsolidated} levelFormat={data.levelFormat} />
+                  showBranchCol={isConsolidated} levelFormat={data.levelFormat}
+                  onEditLedger={isConsolidated ? null : openEdit} />
               ))}
 
               {noteList.length > 0 && (
@@ -598,6 +624,17 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
           )}
         </div>
       </Guard>
+      {editRow && (
+        <OverrideModal
+          row={editRow}
+          entity={entity}
+          rsId={activeRsId || null}
+          showSaveErrors
+          headerNote={`Ledger: ${editRow.ledger_name || editRow.name || ''}. The change is saved as a categorisation override, exactly as in Mapped TB, and every statement, note and annexure is refreshed.`}
+          onSave={saveEdit}
+          onClose={() => setEditRow(null)}
+        />
+      )}
     </div>
   )
 }

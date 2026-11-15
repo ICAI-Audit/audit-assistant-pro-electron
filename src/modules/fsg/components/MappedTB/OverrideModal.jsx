@@ -8,6 +8,7 @@ export default function OverrideModal({
   closeLabel = 'Cancel',
   askLedger = false,   // adding a ledger: also asks its name and adjustment (Mapped TB > Add Ledger)
   saving: externalSaving = false,
+  showSaveErrors = false, // T-039: show a refused save (e.g. a locked year) in the dialog instead of rethrowing
 }) {
   const [lf, setLf]         = useState([])
   const [m1, setM1]         = useState(row.mapping1_resultant || '')
@@ -107,7 +108,7 @@ export default function OverrideModal({
         override_note:      note || null,
       })
     } catch (e) {
-      if (!askLedger) throw e
+      if (!askLedger && !showSaveErrors) throw e
       setError(String((e && e.message) || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
     } finally {
       setInternalSaving(false)
@@ -194,7 +195,7 @@ export default function OverrideModal({
         </div>
 
         <div className="grid grid-cols-4 gap-3 mt-3">
-          {[['Level 4', l4, setL4, l4Options], ['Level 5', l5, setL5, l5Options], ['Level 6', l6, setL6, l6Options], ['Level 7 (Nature)', l7, setL7, l7Options]].map(([label, val, setter, opts]) => (
+          {[['Mapping 4', l4, setL4, l4Options], ['Mapping 5', l5, setL5, l5Options], ['Mapping 6', l6, setL6, l6Options], ['Mapping 7 (Nature)', l7, setL7, l7Options]].map(([label, val, setter, opts]) => (
             <div key={label}>
               <label className="block text-xs text-gray-500 mb-1">{label}</label>
               {opts ? (

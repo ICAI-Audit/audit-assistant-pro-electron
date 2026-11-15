@@ -138,8 +138,8 @@ export default function DeferredTax({ entity, activeTB, prevTB, activeRsId }) {
     add(`Deferred tax as per Profit & Loss account${m.a1.plKind ? ' (' + m.a1.plKind + ')' : ''}`, m.a1.plDeferred)
     add('Difference', m.a1.difference, true)
     head('Approach 2 - WDV approach')
-    add('WDV as per books - Dep (Comp) (A)', m.a2.bookWdv)
-    add('WDV as per Income Tax Act - Dep (IT) (B)', m.a2.itWdv)
+    add('WDV as per books - Dep (Books) (A)', m.a2.bookWdv)
+    add('WDV as per Income Tax Act - Dep (Income Tax) (B)', m.a2.itWdv)
     add('Cumulative timing difference (B) - (A)', m.a2.wdvTD, true)
     m.a2.other.forEach(r => add('  ' + r.label, r.amount))
     add('Net cumulative timing difference', m.a2.cumTD, true)
@@ -216,7 +216,7 @@ export default function DeferredTax({ entity, activeTB, prevTB, activeRsId }) {
               <Row indent label="Depreciation as per Profit & Loss account (A)" sub="drawn from the Profit & Loss account">
                 <Amt value={m.a1.bookDep} auto={input.bookDep} onCommit={v => setOv('bookDep', v)} />
               </Row>
-              <Row indent label="Depreciation as per Income Tax Act (B)" sub="drawn from WDV (IT) - Dep (IT)">
+              <Row indent label="Depreciation as per Income Tax Act (B)" sub="drawn from WDV (IT) - Dep (Income Tax)">
                 <Amt value={m.a1.itDep} auto={input.itDep} onCommit={v => setOv('itDep', v)} />
               </Row>
               <Row label="Timing difference on depreciation  (A) - (B)" bold><Num v={m.a1.depTD} bold /></Row>
@@ -229,10 +229,10 @@ export default function DeferredTax({ entity, activeTB, prevTB, activeRsId }) {
               <Row label="Difference (Approach 1 reconciliation)" sub="shown in the Exception Report" total shade="bg-gray-100"><Num v={m.a1.difference} bold tone={diffTone(m.a1.difference)} /></Row>
 
               <Band tone="bg-purple-50 text-purple-900">Approach 2 - WDV approach (cumulative)</Band>
-              <Row indent label="WDV of PPE as per books (A)" sub={`drawn from Dep (Comp): closing net block${src.bookWdvExcluded ? ` - excluding land / capital work-in-progress of ${fmt(src.bookWdvExcluded)}, which carry no timing difference` : ''}`}>
+              <Row indent label="WDV of PPE as per books (A)" sub={`drawn from Dep (Books): closing net block${src.bookWdvExcluded ? ` - excluding land / capital work-in-progress of ${fmt(src.bookWdvExcluded)}, which carry no timing difference` : ''}`}>
                 <Amt value={m.a2.bookWdv} auto={input.bookWdv} onCommit={v => setOv('bookWdv', v)} />
               </Row>
-              <Row indent label="WDV as per Income Tax Act (B)" sub="drawn from Dep (IT): closing WDV of the blocks">
+              <Row indent label="WDV as per Income Tax Act (B)" sub="drawn from Dep (Income Tax): closing WDV of the blocks">
                 <Amt value={m.a2.itWdv} auto={input.itWdv} onCommit={v => setOv('itWdv', v)} />
               </Row>
               <Row label="Cumulative timing difference  (B) - (A)" bold><Num v={m.a2.wdvTD} bold /></Row>

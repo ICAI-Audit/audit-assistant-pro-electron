@@ -12,7 +12,6 @@ import MappedTB from './components/MappedTB'
 import MappedTBWithRemarks from './components/MappedTBWithRemarks'
 import Exceptions from './components/Exceptions'
 import ExceptionReport from './components/ExceptionReport'
-import Depreciation from './components/Depreciation'
 import DepreciationIT from './components/DepreciationIT'
 import DepreciationComp from './components/DepreciationComp'
 import BS from './components/BS'
@@ -27,12 +26,12 @@ import { ConsolidationContext } from './utils/consolidationSelection'
 import { consolidatedPeriodOf } from './utils/consolidatedPeriod'
 import Ratio from './components/Ratio'
 import Format from './components/Format'
-import PPE from './components/PPE'
 import GeneralNotes from './components/GeneralNotes'
 import GenerateFinancials from './components/GenerateFinancials'
 import SettingsModal from './components/shared/SettingsModal'
 import BranchModeBar from './components/shared/BranchModeBar'
 import AdjustmentNotice from './components/shared/AdjustmentNotice'
+import LockBanner from './components/shared/LockBanner'
 import { undo as undoCategorisation, redo as redoCategorisation, canUndo as canUndoCat, canRedo as canRedoCat, subscribeUndo, peekUndoLabel, peekRedoLabel } from './utils/undoManager'
 import { fsgApi } from './api.js'
 import { getPortalRoot } from './portalRoot.js'
@@ -68,20 +67,30 @@ function fmtUploadedAt(v) {
 // label, same render case, just listed in more than one dropdown.
 // Screens whose figures come from the Trial Balance's closing balances: they say when those are revised by Adjustments.
 const ADJUSTMENT_NOTICE_TABS = new Set([
-  'BS', 'PL', 'CFS', 'Notes', 'Annex & Reco', 'Exception', 'Generate Financials', 'Ratio', 'PPE', 'Stock',
-  'Dep (Comp)', 'Dep (IT)', 'Dep (Old)', 'Tax Computation', 'Deferred Tax', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
+  'BS', 'PL', 'CFS', 'Notes', 'Annex & Reco', 'Exception', 'Generate Financials', 'Ratio', 'Stock',
+  'Dep (Books)', 'Dep (Income Tax)', 'Tax Computation', 'Deferred Tax', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
   'Rectification / Recategorisation', 'Mapped TB (Remarks)',
 ])
-const TABS = ['Master', 'Trial Balance', 'Stock', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'General Notes', 'Annex & Reco', 'Features', 'Exception', 'Generate Financials']
+// T-035: screens that hold the year's data show the lock banner when that year
+// is locked or final (Mapped TB and Rectification render their own).
+const LOCK_BANNER_TABS = new Set([
+  'Upload TB', 'Actual TB', 'Mapped TB (Remarks)', 'Journal Entry', 'Stock',
+  'Dep (Books)', 'Dep (Income Tax)', 'BS', 'PL', 'CFS', 'Notes', 'Policy', 'Annex & Reco',
+  'Tax Computation', 'Deferred Tax', 'Ratio', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
+  'Exception', 'Generate Financials',
+])
+// T-038: "General Notes" is shown as "Policy" (Ctrl+Shift+O); PPE removed from Features.
+const TABS = ['Master', 'Trial Balance', 'Stock', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'Policy', 'Annex & Reco', 'Features', 'Exception', 'Generate Financials']
 // ICAI VERA: the Auditee is the engagement's client and the Financial Year comes
 // from the engagement, so Master has no Financial Period leaf (T-019).
 const TAB_GROUPS = {
   'Master': ['Auditee Details', 'Auditor', 'Signatory', 'Mapping Rules'],
   'Trial Balance': ['Upload TB', 'Actual TB', 'Mapped TB', 'Mapped TB (Remarks)', 'Journal Entry'],
   'Mapping': ['Rectification / Recategorisation', 'Mapped TB', 'Mapping Rules'],
-  'Dep': ['Dep (Comp)', 'Dep (IT)', 'Dep (Old)'],
-  // Features submenu with ITR, PPE, Ratio
-  'Features': ['ITR', 'Tax Computation', 'Deferred Tax', 'PPE', 'Ratio', 'Format'],
+  // T-036: Dep (Comp) shown as Dep (Books), Dep (IT) as Dep (Income Tax); Dep (Old) removed.
+  'Dep': ['Dep (Books)', 'Dep (Income Tax)'],
+  // Features submenu with ITR, Ratio
+  'Features': ['ITR', 'Tax Computation', 'Deferred Tax', 'Ratio', 'Format'],
   // Blank Schedule III format (BS, P&L, notes, Fill Details) per constitution.
   'Format': ['Format: Proprietorship', 'Format: Partnership', 'Format: LLP', 'Format: Company'],
   // ITR-format BS/PL editable form (opens the layout matching the entity's
@@ -360,13 +369,13 @@ export default function App({ context }) {
   // Compute the TB that view-tabs (BS/PL/Notes/Annexures) will actually see
   const BRANCH_VIEW_TABS = new Set(['BS', 'PL', 'Notes', 'Annex & Reco'])
   // Working tabs also show per-branch data but don't support consolidated/columnar modes
-  // 'Dep (Comp)' and 'Dep (Old)' were missing here, so on a branch entity those
-  // tabs never received the selected branch TB and showed "Load a Trial
+  // 'Dep (Books)' (formerly Dep (Comp)) was missing here, so on a branch entity that
+  // tab never received the selected branch TB and showed "Load a Trial
   // Balance" although one was loaded (fixed 0.1.16).
-  const BRANCH_WORK_TABS = new Set(['Mapped TB', 'Mapped TB (Remarks)', 'Rectification / Recategorisation', 'Dep', 'Dep (Comp)', 'Dep (Old)', 'Dep (IT)', 'Stock', 'Actual TB', 'Exception', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details'])
+  const BRANCH_WORK_TABS = new Set(['Mapped TB', 'Mapped TB (Remarks)', 'Rectification / Recategorisation', 'Dep', 'Dep (Books)', 'Dep (Income Tax)', 'Stock', 'Actual TB', 'Exception', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details'])
   // Tabs that offer a "Consolidated (all branches)" pill: one depreciation
   // schedule for the whole entity instead of one per branch (see utils/depStore.js).
-  const DEP_CONSOL_TABS = new Set(['Dep (Comp)', 'Dep (IT)'])
+  const DEP_CONSOL_TABS = new Set(['Dep (Books)', 'Dep (Income Tax)'])
   const isBranchViewTab = BRANCH_VIEW_TABS.has(activeTab)
   const isBranchWorkTab = BRANCH_WORK_TABS.has(activeTab)
   const isBranchEntity = !!entity?.has_branches
@@ -375,9 +384,9 @@ export default function App({ context }) {
   const consolidatedVirtualTB = entity ? { id: '__consolidated__', entity_id: entity.id, entity_period_id: currentEntityPeriodId, period: consolidatedPeriodOf(branchTBList, currentEntityPeriodId), consKey } : null
   const consolidationCtx = { entityId: entity?.id ?? null, entityPeriodId: currentEntityPeriodId, consKey, bump: () => setConsKey(k => k + 1) }
 
-  // General Notes (with the Financial Ratios) and the Cash Flow Statement belong to the entity as a whole: for an Auditee with branches they
+  // Policy (formerly General Notes, with the Financial Ratios) and the Cash Flow Statement belong to the entity as a whole: for an Auditee with branches they
   // are always the Consolidated ones, never a branch's.
-  const ENTITY_LEVEL_TABS = new Set(['General Notes', 'CFS', 'Tax Computation', 'Deferred Tax'])
+  const ENTITY_LEVEL_TABS = new Set(['Policy', 'CFS', 'Tax Computation', 'Deferred Tax'])
   const ITR_TABS = new Set(['ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details'])
   const isEntityLevelTab = isBranchEntity && ENTITY_LEVEL_TABS.has(activeTab)
 
@@ -587,7 +596,7 @@ export default function App({ context }) {
             />
           </div>
         )
-      case 'Dep (Comp)':
+      case 'Dep (Books)':
         return (
           <div className="flex flex-col h-full overflow-hidden">
             {isBranchEntity && (
@@ -601,21 +610,7 @@ export default function App({ context }) {
             />
           </div>
         )
-      case 'Dep (Old)':
-        return (
-          <div className="flex flex-col h-full overflow-hidden">
-            {isBranchEntity && (
-              <BranchModeBar hideModes fsMode={fsMode} onFsModeChange={setFsMode}
-                branchTBList={branchTBList} selectedBranchTBId={selectedBranchTBId}
-                onBranchSelect={setSelectedBranchTBId} />
-            )}
-            <Depreciation
-              entity={entity}
-              activeTB={activeTBForDisplay}
-            />
-          </div>
-        )
-      case 'Dep (IT)':
+      case 'Dep (Income Tax)':
         return (
           <div className="flex flex-col h-full overflow-hidden">
             {isBranchEntity && (
@@ -827,12 +822,12 @@ export default function App({ context }) {
             onBranchSelect={setSelectedBranchTBId}
           />
         )
-      case 'General Notes':
+      case 'Policy':
         return (
           <div className="flex flex-col h-full overflow-hidden">
             {isBranchEntity && (
               <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-800">
-                🔀 <strong>Consolidated</strong> General Notes — the Financial Ratios are worked out from the Consolidated Balance Sheet and Profit &amp; Loss.
+                🔀 <strong>Consolidated</strong> Policy — the Financial Ratios are worked out from the Consolidated Balance Sheet and Profit &amp; Loss.
               </div>
             )}
             <GeneralNotes
@@ -840,15 +835,6 @@ export default function App({ context }) {
               activeTB={activeTBForDisplay}
               prevTB={(fsMode === 'consolidated' || isBranchEntity) ? null : prevTB}
               activeRsId={activeRsId}
-            />
-          </div>
-        )
-      case 'PPE':
-        return (
-          <div className="flex flex-col h-full overflow-hidden">
-            <PPE
-              entity={entity}
-              activeTB={activeTB}
             />
           </div>
         )
@@ -886,6 +872,10 @@ export default function App({ context }) {
             className="px-2.5 py-1 text-xs rounded bg-amber-600 text-white font-medium hover:bg-amber-700 transition"
           >Upload now</button>
         </div>
+      )}
+
+      {dbOk && activeTBForDisplay && LOCK_BANNER_TABS.has(activeTab) && (
+        <LockBanner entity={entity} activeTB={activeTBForDisplay} refreshKey={activeTab} />
       )}
 
       {dbOk && activeTBForDisplay && ADJUSTMENT_NOTICE_TABS.has(activeTab) && (

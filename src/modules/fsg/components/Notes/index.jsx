@@ -607,7 +607,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                     )}
                     {l2Label}
                     {toSplit && (
-                      <span className="ml-1 text-[10px] font-normal text-red-600">— bifurcate into Sale of Goods / Sale of Services (Level 3)</span>
+                      <span className="ml-1 text-[10px] font-normal text-red-600">— bifurcate into Sale of Goods / Sale of Services (Mapping 3)</span>
                     )}
                     {l2Uncat && onFix && (
                       <button
@@ -734,7 +734,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
               return (
                 <tr key={ri} className={`border-b border-gray-50 ${r.unclassified ? 'bg-red-50' : ''}`}>
                   <td className={`py-0.5 pl-10 pr-2 italic ${r.unclassified ? 'text-red-600' : 'text-gray-600'}`}>
-                    {r.unclassified ? `Unclassified${r.natureLevel ? ` — Level ${r.natureLevel}` : ''}` : r.label}
+                    {r.unclassified ? `Unclassified${r.natureLevel ? ` — Mapping ${r.natureLevel}` : ''}` : r.label}
                     {r.unclassified && onFix && (
                       <button
                         onClick={() => onFix(
@@ -752,7 +752,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                                 mapping3_resultant: r.parentL3,
                                 level5_unclassified: true,
                               }, r.ledgerIds, r.pyLedgerIds, r.natureLevel),
-                          `Fix Unclassified (Level ${r.natureLevel || 5}) — ${r.parentL3 || note.title}`
+                          `Fix Unclassified (Mapping ${r.natureLevel || 5}) — ${r.parentL3 || note.title}`
                         )}
                         className="ml-2 px-1.5 py-0.5 text-[10px] rounded border border-red-400 text-red-700 bg-white hover:bg-red-100 transition not-italic"
                       >
@@ -1319,7 +1319,7 @@ export function AssumptionDisclosureModal({ items, onClose }) {
         </div>
         <p className="text-xs text-gray-600 mb-4 leading-relaxed">
           The following ledgers could not be conclusively classified from their name or books hierarchy, so a
-          default nature was assumed. Please review and correct via the Categorisation tab (Mapping 3 / Level 3)
+          default nature was assumed. Please review and correct via the Categorisation tab (Mapping 3)
           if any of these are wrong for this entity.
         </p>
         <div className="max-h-80 overflow-y-auto border border-gray-200 rounded mb-4">

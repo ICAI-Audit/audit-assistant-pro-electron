@@ -3273,7 +3273,9 @@ export async function fetchFinancialsData(activeTB, prevTB, entity = null, activ
     ? (fsgApi?.getLevelFormat(entity.constitution, activeRsId || null) || Promise.resolve([]))
     : Promise.resolve([])
   const fetchND = fsgApi?.listNoteDetails(activeTB.id).catch(() => [])
-  const fetchDep = (fsgApi?.depGet?.(activeTB.id) || Promise.resolve(null)).catch(() => null)
+  // T-036: the ledger-level "Dep (Old)" schedule was removed from the menu and no
+  // longer shapes the PPE note; its saved rows stay in dep_schedules, unread.
+  const fetchDep = Promise.resolve(null)
   const fetchDepIT = (fsgApi?.depITGet?.(activeTB.id) || Promise.resolve(null)).catch(() => null)
   const fetchDepComp = (fsgApi?.depCompGet?.(activeTB.id) || Promise.resolve(null)).catch(() => null)
   const fetchManualPyEnabled = (fsgApi?.getManualPY?.(activeTB.id) || Promise.resolve(false)).catch(() => false)

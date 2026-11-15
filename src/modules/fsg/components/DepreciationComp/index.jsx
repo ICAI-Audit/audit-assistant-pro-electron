@@ -279,7 +279,7 @@ export default function DepreciationComp({ entity, activeTB }) {
         const itSaved = await itStore.get()
         if (itSaved?.includeInPPENote) {
           await itStore.save({ ...itSaved, includeInPPENote: false })
-          showToast('Included in PPE Note. Dep (IT)\'s inclusion was turned off — only one schedule can show in the note.')
+          showToast('Included in PPE Note. Dep (Income Tax)\'s inclusion was turned off — only one schedule can show in the note.')
         }
       } catch (_) {}
     }
@@ -479,7 +479,7 @@ export default function DepreciationComp({ entity, activeTB }) {
               <span>
                 <strong>Include this Fixed Assets Schedule in the PPE Note disclosure.</strong> When checked and saved, this
                 table appears inside the "Property, Plant & Equipment" note — in the Notes tab, the Excel export, and the
-                PDF export. Only one of Dep (Comp) or Dep (IT) can be included at a time — checking this turns off Dep (IT)'s
+                PDF export. Only one of Dep (Books) or Dep (Income Tax) can be included at a time — checking this turns off Dep (Income Tax)'s
                 inclusion if it was on. Uncheck and save to remove it again.
               </span>
             </label>
