@@ -5,6 +5,7 @@
 - Requested outcome: fetch the latest Git changes, merge them into local `main`, refresh the startup label and test the update. Selected task T-036; affected features F-001 and F-031, with F-008's VERA Tools path replaced and partial overlap with F-029.
 - Started on clean local `main` at `36130e6`; fetched `origin/main` at `a64319d` (7 commits ahead), including Ledger Analysis and the documentation-inventory repair in PR #114. `git merge --ff-only origin/main` fast-forwarded cleanly; local `main` now matches `origin/main`.
 - The shared label identifies `origin/main` (15 November 2026) and Ledger Analysis (PR #114). It is static build information, not a live GitHub check.
+- Committed as `758e4e5` and pushed to `origin/main` at the user's request; the remote accepted the direct push while reporting that its pull-request-only rule was bypassed. The post-push worktree is clean.
 - Passed: `npx.cmd --no-install vitest run src/modules/ledger-analysis src/lib/buildInfoLabel.test.ts` (29/29); scoped ESLint; `npm.cmd run test:t003-authorization` (production build and 28/28); inventory refresh and documentation checks. Exact results are in the [latest handoff](SESSION_HANDOFF.md#t-036-sync-latest-main-and-refresh-startup-label-15-november-2026).
 - No live Tally fetch, desktop label-layout check or new owner UAT was performed; previously recorded owner test-company evidence remains separate. Ledger Analysis owner UAT is pending.
 

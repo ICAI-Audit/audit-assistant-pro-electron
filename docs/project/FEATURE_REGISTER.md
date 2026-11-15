@@ -2,7 +2,7 @@
 
 ## F-001 / F-031 Ledger Analysis sync (15 November 2026)
 
-PR #114 is merged to `main` at `a64319d`; the shared startup label identifies the 15 November snapshot and Ledger Analysis. The label is static build metadata. Ledger Analysis automated verification passed after sync; owner UAT and desktop label-layout verification remain pending. See [T-036 status](CURRENT_STATUS.md#t-036-sync-latest-main-and-refresh-startup-label-15-november-2026).
+PR #114 is merged to `main` at `a64319d`; T-036's startup-label change was pushed to `origin/main` in `758e4e5` and identifies the 15 November snapshot and Ledger Analysis. The label is static build metadata. Ledger Analysis automated verification passed after sync; owner UAT and desktop label-layout verification remain pending. See [T-036 status](CURRENT_STATUS.md#t-036-sync-latest-main-and-refresh-startup-label-15-november-2026).
 
 ## F-031 Ledger Analysis (14 November 2026)
 
