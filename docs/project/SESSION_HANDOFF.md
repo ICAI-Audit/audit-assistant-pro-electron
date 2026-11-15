@@ -7,8 +7,8 @@
 - Root cause: `docs/project/inventory.json` had no comma after `"src/modules/ledger-analysis/ledgerAnalysis.test.ts"` before the next array element. The checker reported `Cannot validate source inventory: Expected ',' or ']' after array element in JSON at position 12875 (line 448 column 5)`.
 - Changed paths: `docs/project/inventory.json` (added the missing comma), `docs/project/CURRENT_STATUS.md`, `docs/project/NEXT_TASKS.md`, and this handoff. The inventory refresh produced no other changes; `docs/project/SCREEN_MAP.md` remained unchanged.
 - Passed: `npm run docs:inventory` (33 routes, 11 schema files, 58 test files); `npm run docs:check` (31 required documents, local links, shared adapters and inventory); `node --test scripts/check-project-docs.test.mjs` (3/3); `git -c core.whitespace=cr-at-eol diff --check`.
-- The original GitHub Actions run failed as described; the updated branch's Actions result is not yet available. Application behavior, builds and application tests were not in scope and were not run.
-- First executable next step: confirm the updated PR #114 Project documentation workflow passes on GitHub Actions; then resume the existing owner review/UAT of T-033 Ledger Analysis.
+- The original GitHub Actions run failed as described. Updated run `43682029592` for commit `803dd6dd3e7c23ba26e8d0359a9bae440d6cd2e0` is `action_required`; GitHub returned zero jobs, so the workflow did not execute and the fix is not yet remotely verified. Application behavior, builds and application tests were not in scope and were not run.
+- First executable next step: authorize or otherwise rerun PR #114's Project documentation workflow and confirm the job passes; then resume the existing owner review/UAT of T-033 Ledger Analysis.
 
 ## T-033 Ledger Analysis on branch ledger-analysis (14 November 2026)
 
