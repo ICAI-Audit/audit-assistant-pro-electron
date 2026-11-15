@@ -1,5 +1,13 @@
 # Current status
 
+## T-036 Sync latest main and refresh startup label (15 November 2026)
+
+- Requested outcome: fetch the latest Git changes, merge them into local `main`, refresh the startup label and test the update. Selected task T-036; affected features F-001 and F-031, with F-008's VERA Tools path replaced and partial overlap with F-029.
+- Started on clean local `main` at `36130e6`; fetched `origin/main` at `a64319d` (7 commits ahead), including Ledger Analysis and the documentation-inventory repair in PR #114. `git merge --ff-only origin/main` fast-forwarded cleanly; local `main` now matches `origin/main`.
+- The shared label identifies `origin/main` (15 November 2026) and Ledger Analysis (PR #114). It is static build information, not a live GitHub check.
+- Passed: `npx.cmd --no-install vitest run src/modules/ledger-analysis src/lib/buildInfoLabel.test.ts` (29/29); scoped ESLint; `npm.cmd run test:t003-authorization` (production build and 28/28); inventory refresh and documentation checks. Exact results are in the [latest handoff](SESSION_HANDOFF.md#t-036-sync-latest-main-and-refresh-startup-label-15-november-2026).
+- No live Tally fetch, desktop label-layout check or new owner UAT was performed; previously recorded owner test-company evidence remains separate. Ledger Analysis owner UAT is pending.
+
 ## T-035 Project documentation workflow repair (15 November 2026)
 
 - Fixed the Project documentation Actions failure on PR #114: the tracked `docs/project/inventory.json` omitted a comma between the Ledger Analysis and Permanent File test paths, making it invalid JSON. `npm run docs:inventory` regenerated the tracked inventory; review found only the comma correction.
@@ -7,13 +15,13 @@
 - Updated PR workflow run `43682029592` for commit `803dd6d` is `action_required` and has zero jobs; remote execution has not validated the fix.
 - Documentation/CI-only change; no product feature IDs or application behavior changed. The original failure and next GitHub Actions verification step are recorded in the [latest handoff](SESSION_HANDOFF.md#t-035-project-documentation-workflow-repair-15-november-2026).
 
-## T-033 Ledger Analysis on branch ledger-analysis (14 November 2026)
+## T-033 Ledger Analysis merged in PR #114 (15 November 2026)
 
 - Selected task: T-033; new feature F-031 (Ledger Analysis); F-008 VERA Tools path replaced; F-029 overlaps in part.
-- Branch `ledger-analysis` from `main` at `b835def`, built step by step from an owner-tested local copy. Ledger Analysis is the first and default VERA Tools tab; the Tally Tools tab, its component and the hooks `useTallyODBC` / `useOpeningBalanceMatching` were removed (Opening Balance Matching dropped with the owner's agreement).
+- The `ledger-analysis` branch was merged to `main` in PR #114. Ledger Analysis is the first and default VERA Tools tab; the Tally Tools tab, its component and the hooks `useTallyODBC` / `useOpeningBalanceMatching` were removed (Opening Balance Matching dropped with the owner's agreement).
 - Live check on the owner's TallyPrime test company: day book vs TB agreed for all 767 ledgers checked after two fetch fixes (collection instead of the one-day Day Book report; non-accounting voucher types left out). No database or schema change; results are not persisted.
 - New finding T-034: the T-003 authorization test is timing-dependent on unchanged `main` (3 of 4 runs failed); not fixed.
-- Validation and remaining limits: [latest handoff](SESSION_HANDOFF.md#t-033-ledger-analysis-on-branch-ledger-analysis-14-november-2026).
+- Owner UAT remains pending. Validation and remaining limits: [latest handoff](SESSION_HANDOFF.md#t-033-ledger-analysis-on-branch-ledger-analysis-14-november-2026).
 ## T-033 Permanent File sync and startup label (14 November 2026)
 
 - Local `main` fast-forwarded from `b835def` to fetched `origin/main` at `bb9ecf1`, containing the Permanent File branch merged in PR #113. No client data was opened or migrated by this sync.

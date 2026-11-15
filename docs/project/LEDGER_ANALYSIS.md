@@ -1,6 +1,6 @@
 # Ledger Analysis (VERA Tools > Ledger Analysis)
 
-Status (T-033, 14 November 2026): implemented on branch `ledger-analysis` (base `main` at `b835def`), pushed as a branch for the owner's review; **not merged, owner UAT pending**. Automated tests use synthetic data only. The live Tally fetch and every check were exercised by hand against the owner's live TallyPrime test company (FY 2025-26, 768 ledgers, about 19,700 day book lines); that client's names and figures are deliberately not recorded here. Task record: [T-033](tasks/T-033-ledger-analysis.md).
+Status (T-033, updated 15 November 2026): implemented on branch `ledger-analysis` (base `main` at `b835def`) and merged to `main` in PR #114; **owner UAT pending**. Automated tests use synthetic data only. The live Tally fetch and every check were exercised by hand against the owner's live TallyPrime test company (FY 2025-26, 768 ledgers, about 19,700 day book lines); that client's names and figures are deliberately not recorded here. Task record: [T-033](tasks/T-033-ledger-analysis.md).
 
 ## Purpose
 

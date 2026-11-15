@@ -1,8 +1,12 @@
 # Feature register
 
+## F-001 / F-031 Ledger Analysis sync (15 November 2026)
+
+PR #114 is merged to `main` at `a64319d`; the shared startup label identifies the 15 November snapshot and Ledger Analysis. The label is static build metadata. Ledger Analysis automated verification passed after sync; owner UAT and desktop label-layout verification remain pending. See [T-036 status](CURRENT_STATUS.md#t-036-sync-latest-main-and-refresh-startup-label-15-november-2026).
+
 ## F-031 Ledger Analysis (14 November 2026)
 
-Ledger Analysis (F-031, task T-033) was built on branch `ledger-analysis` from `main` at `b835def` and replaces the VERA Tools Tally Tools tab; F-008's VERA Tools path now runs through `electron/ledger-analysis/tally-xml.cjs`. Opening Balance Matching was dropped with the owner's agreement. Not merged; owner UAT pending. See [LEDGER_ANALYSIS.md](LEDGER_ANALYSIS.md) and [T-033](tasks/T-033-ledger-analysis.md).
+Ledger Analysis (F-031, task T-033) was built on branch `ledger-analysis` from `main` at `b835def` and merged to `main` in PR #114; it replaces the VERA Tools Tally Tools tab. F-008's VERA Tools path now runs through `electron/ledger-analysis/tally-xml.cjs`. Opening Balance Matching was dropped with the owner's agreement. Owner UAT remains pending. See [LEDGER_ANALYSIS.md](LEDGER_ANALYSIS.md) and [T-033](tasks/T-033-ledger-analysis.md).
 ## F-001 / F-031 Permanent File sync (14 November 2026)
 
 PR #113, including the Permanent File branch, is merged into `main` at `bb9ecf1`. The shared startup/header label identifies the 14 November snapshot and PR #113. It does not poll GitHub or prove another installation is updated. Permanent File remains partial with owner UAT and the previously recorded data-recovery and workflow gaps open. See [T-033 status](CURRENT_STATUS.md#t-033-permanent-file-sync-and-startup-label-14-november-2026).

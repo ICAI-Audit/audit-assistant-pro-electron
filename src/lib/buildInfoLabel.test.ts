@@ -29,8 +29,8 @@ describe('build information label', () => {
   });
 
   it('identifies the latest pulled main updates on the startup label', () => {
-    expect(html).toContain('Repository sync: origin/main (14 November 2026)');
-    expect(html).toContain('Update: Permanent File (PR #113)');
+    expect(html).toContain('Repository sync: origin/main (15 November 2026)');
+    expect(html).toContain('Update: Ledger Analysis (PR #114)');
     expect(buildDetailLines()).toContain('Source branch: main');
   });
 

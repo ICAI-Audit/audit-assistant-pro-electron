@@ -5,9 +5,9 @@
 export const BUILD_MESSAGE = {
   lines: [
     'Welcome to ICAI Audit Tool',
-    'Repository sync: origin/main (14 November 2026)',
+    'Repository sync: origin/main (15 November 2026)',
   ],
-  updateNote: 'Permanent File (PR #113)',
+  updateNote: 'Ledger Analysis (PR #114)',
   sourceBranch: 'main' as string,
 };
 

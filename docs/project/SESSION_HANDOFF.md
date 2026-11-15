@@ -1,5 +1,15 @@
 # Latest session handoff
 
+## T-036 Sync latest main and refresh startup label (15 November 2026)
+
+- Requested outcome: fetch the latest Git changes, merge them into local `main`, update the startup label and test the changes. Selected task T-036; affected features F-001 and F-031, with F-008's VERA Tools path replaced and overlap with F-029.
+- Started on clean local `main` at `36130e6fc841287899775098717db062102d1661`. `git fetch origin` found `origin/main` at `a64319d6c2484a30cd7c6dcf39a6f8fabd1bbe3b`, seven commits ahead, including PR #114 (Ledger Analysis and documentation-inventory repair). `git merge --ff-only origin/main` fast-forwarded without conflict. Local `main` now matches `origin/main`; no client data or database was opened or migrated.
+- Updated `src/config/buildMessage.ts` and `src/lib/buildInfoLabel.test.ts`: the shared label says `Repository sync: origin/main (15 November 2026)` and `Update: Ledger Analysis (PR #114)`. It is static build information, not live GitHub status.
+- Passed: `npx.cmd --no-install vitest run src/modules/ledger-analysis src/lib/buildInfoLabel.test.ts` (29/29); `npx.cmd --no-install eslint src/modules/ledger-analysis src/config/buildMessage.ts src/lib/buildInfoLabel.test.ts` (clean); `npm.cmd run test:t003-authorization` (production build passed, 28/28 including signed-in and signed-out Ledger Analysis IPC checks); `npm.cmd run docs:inventory` (33 routes, 11 schema files, 58 test files; refresh introduced no content diff); `npm.cmd run docs:check` (31 required documents and links); `node --test scripts/check-project-docs.test.mjs` (3/3); `git -c core.whitespace=cr-at-eol diff --check` (passed). The built bundle contains both updated label strings.
+- An initial bundle probe searched for the rendered prefix `Update: Ledger Analysis (PR #114)` as one literal and did not match; checking the note and date strings separately passed, and the label-rendering test passed.
+- The production build emitted existing Browserslist, mixed dynamic/static import, and large-chunk warnings; no build error. No live Tally fetch, desktop startup-label fit/tooltip verification, or new owner UAT was performed. Existing owner test-company evidence is separate; Ledger Analysis remains not owner-accepted.
+- First executable next step: owner UAT of Ledger Analysis on an authorised Tally test company; then verify the startup label's layout in the desktop app. The separate PR #114 documentation workflow run remains `action_required` with zero jobs as recorded under T-035.
+
 ## T-035 Project documentation workflow repair (15 November 2026)
 
 - Requested outcome: fix the failing `documentation` job in Project documentation workflow run `43681671321`, job `132713426018` (PR #114). Selected task T-035; no product feature IDs are affected.
