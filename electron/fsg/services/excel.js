@@ -309,7 +309,8 @@ export async function ensureStockCategories() {
 // ── Parse uploaded Trial Balance Excel ──────────────────────────────────────
 export function parseTBExcel(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  // T-047: skip the "How to Fill" guide and "Lists" sheets of a VERA-styled template.
+  const ws = wb.Sheets[wb.SheetNames.find(n => n !== 'How to Fill' && n !== 'Lists') ?? wb.SheetNames[0]]
   const rawRows = XLSX.utils.sheet_to_json(ws, { defval: null })
 
   // sheet_to_json keys each row off the header cell's FORMATTED display text

@@ -6,6 +6,8 @@ import { parseBusyTB, buildTBRowsFromBusy } from '../../utils/busyParsers'
 import FinancialPeriodPicker from '../shared/FinancialPeriodPicker'
 import WorkingsModal, { workingsResultText } from './WorkingsModal'
 import { fsgApi } from '../../api.js'
+import { finishWorkbook } from '../../utils/veraExcel'
+import { tbTemplateExcelSpec, workingsExcelSpec } from '../../utils/tbExcelSpecs'
 
 // Every TB is compulsorily tied to a real Financial Period — checks whether
 // that period already has a TB (branch entities excepted, since one TB per
@@ -45,7 +47,8 @@ export async function downloadWorkingsFile(tbId) {
     const { bytes, filename } = await fsgApi.exportWorkings(tbId)
     const result = await fsgApi?.saveFileDialog({ defaultPath: filename, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }] })
     if (!result?.filePath) return false
-    await fsgApi?.writeFile(result.filePath, bytes)
+    // T-047: VERA style; the "Workings data" sheet the upload reads is left exactly as built.
+    await fsgApi?.writeFile(result.filePath, Array.from(await finishWorkbook(bytes, workingsExcelSpec())))
     return true
   } catch (e) {
     window.alert('The workings could not be downloaded: ' + (e?.message || e))
@@ -1254,7 +1257,8 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
         filters: [{ name: 'Excel', extensions: ['xlsx'] }]
       })
       if (result?.canceled || !result?.filePath) return
-      await fsgApi?.writeFile(result.filePath, buf)
+      // T-047: VERA style (How to Fill, yellow cells, Yes/No dropdowns) — utils/tbExcelSpecs.js.
+      await fsgApi?.writeFile(result.filePath, Array.from(await finishWorkbook(new Uint8Array(buf), tbTemplateExcelSpec())))
     } catch (err) {
       setError(err.message)
     }

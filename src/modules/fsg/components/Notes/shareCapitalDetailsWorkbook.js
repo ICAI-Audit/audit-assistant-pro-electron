@@ -64,6 +64,75 @@ function buildAoa(details) {
   return rows
 }
 
+// T-047: the shareholder table's look, shared by ShareCapitalForm's standalone
+// Shareholder_Template.xlsx and this sheet. The only fixed choice is the Category
+// (Promoter / Non-Promoter): a real Excel dropdown, refusing other values. SheetJS
+// never wrote the old ws['!dataValidation'], so before T-047 there was no dropdown.
+export const SHAREHOLDER_CATEGORIES = ['Promoter', 'Non-Promoter']
+export const SHAREHOLDER_COLUMNS_GUIDE = [
+  ['Sl No', 'Running number of the row.', 'Number'],
+  ['Name of Shareholder', 'The shareholder\'s name as in the register of members.', 'Text — fill in'],
+  ['Folio No (Optional)', 'Folio number, if any.', 'Text — fill in'],
+  ['No. of Shares at Beginning (PY)', 'Shares held at the start of the year (end of the previous year).', 'Number — fill in'],
+  ['No. of Shares at End (CY)', 'Shares held at the end of this year.', 'Number — fill in'],
+  ['Category', 'Promoter or Non-Promoter. Promoters are listed in the promoters\' shareholding table.', 'Dropdown'],
+]
+export const shareholderCategoryDropdown = (fromRow, toRow) => ({
+  col: 'F', fromRow, toRow, list: SHAREHOLDER_CATEGORIES, name: 'Category',
+  prompt: 'Choose Promoter or Non-Promoter.', error: 'Please choose Promoter or Non-Promoter from the list.',
+})
+
+// T-047: the standalone Shareholder_Template.xlsx of ShareCapitalForm.jsx.
+export const SHAREHOLDER_SHEET = 'Shareholders'
+export function shareholderTemplateExcelSpec() {
+  return {
+    mode: 'template',
+    sheets: {
+      [SHAREHOLDER_SHEET]: {
+        // 100 ready rows (the import skips a row without a name).
+        headerRow: 1, lastRow: 101, lastCol: 'F', inputCols: ['B', 'C', 'D', 'E', 'F'], widths: [6, 40, 18, 30, 28, 18],
+        autoFilter: false, boldFirstCol: false,
+        dropdowns: [shareholderCategoryDropdown(2, 101)],
+      },
+    },
+    howTo: {
+      title: 'Shareholders — template',
+      purpose: 'List the shareholders of the company with their shares at the beginning and end of the year. VERA works out the % holding, the shareholders holding 5% or more, and the promoters\' shareholding.',
+      steps: [
+        'Go to the "Shareholders" sheet.',
+        'Enter one shareholder per row in the pale-yellow cells (up to 100 rows are ready; a row without a name is skipped).',
+        'Choose the Category of each shareholder from the dropdown: Promoter or Non-Promoter.',
+        'Save the file, then in the VERA Share Capital form click "Import Excel" and pick it.',
+      ],
+      columns: SHAREHOLDER_COLUMNS_GUIDE,
+      tips: [
+        'Enter the number of shares, not the amount. % holding is calculated by VERA from the total shares of the company.',
+        'Only shareholders holding 5% or more (this year or last year) and promoters are shown in the note.',
+      ],
+    },
+  }
+}
+
+/**
+ * T-047: the veraExcel sheet spec of the Share Capital Details sheet, for the Fill Details
+ * workbook — key it 'Share Capital - Details*' (the sheet may get a " (2)" suffix). Pass the
+ * same `details` given to appendShareCapitalDetailsSheet. Rows are unchanged, so
+ * parseShareCapitalDetailsSheet reads old and new files alike. The styled table is the
+ * shareholder rows; the Rights, Disclosures and Footnotes below it are left as plain
+ * notes (veraExcel's after-table style, unwrapped so their long text stays readable).
+ */
+export function shareCapitalDetailsSheetSpec(details) {
+  const aoa = buildAoa(details)
+  const headerRow = 4                            // three rows are put above the header
+  const shCount = aoa.findIndex((r, i) => i > 0 && !r.length) - 1
+  const firstSh = headerRow + 1, lastSh = headerRow + shCount
+  return {
+    headerRow, lastRow: lastSh, lastCol: 'F', inputCols: ['B', 'C', 'D', 'E', 'F'],
+    widths: [6, 40, 18, 30, 28, 18], autoFilter: false, boldFirstCol: false,
+    dropdowns: [shareholderCategoryDropdown(firstSh, lastSh)],
+  }
+}
+
 /**
  * Appends the Share Capital Details sheet to `wb`. `details` is the note's
  * currently-saved Fill Details data (or null for a blank template).

@@ -23,8 +23,8 @@ import { getPortalRoot } from '../../portalRoot.js'
 // Top-level tab -> its key (Ctrl+Shift+key). Unique across the bar.
 export const TOP_SHORTCUTS = {
   'Master': 'M',
-  'Trial Balance': 'T',
-  'Stock': 'S',
+  'TB': 'T',
+  'Inventory': 'I',
   'Mapping': 'P',
   'Dep': 'D',
   'BS': 'B',
@@ -32,19 +32,19 @@ export const TOP_SHORTCUTS = {
   'CFS': 'C',
   'Notes': 'N',
   'Policy': 'O',
-  'Annex & Reco': 'X',
+  'Annex': 'X',
   'Features': 'U',
   'Exception': 'E',
-  'Generate Financials': 'F',
+  'Review Financials': 'F',
 }
 
 // Item -> its key, per dropdown (unique within the dropdown it is in)
 const ITEM_SHORTCUTS = {
   'Master': { 'Auditee Details': 'A', 'Financial Period': 'F', 'Auditor': 'U', 'Signatory': 'S', 'Mapping Rules': 'M' },
-  'Trial Balance': { 'Upload TB': 'U', 'Actual TB': 'A', 'Mapped TB': 'M', 'Mapped TB (Remarks)': 'R', 'Journal Entry': 'J' },
+  'TB': { 'Upload TB': 'U', 'Actual TB': 'A', 'Mapped TB': 'M', 'Mapped TB (Remarks)': 'R', 'Journal Entry': 'J' },
   'Mapping': { 'Rectification / Recategorisation': 'R', 'Mapped TB': 'M', 'Mapping Rules': 'U' },
   'Dep': { 'Dep (Books)': 'B', 'Dep (Income Tax)': 'I' },
-  'Features': { 'ITR': 'I', 'Tax Computation': 'T', 'Deferred Tax': 'D', 'Ratio': 'R', 'Format': 'F' },
+  'Features': { 'ITR': 'I', 'Tax Computation': 'T', 'Deferred Tax': 'D', 'Ratio': 'R', 'Reco': 'C', 'Format': 'F' },
   'ITR': { 'ITR: BS': 'B', 'ITR: PL': 'P', 'ITR: BS Details': 'D', 'ITR: PL Details': 'L' },
   'Format': { 'Format: Proprietorship': 'R', 'Format: Partnership': 'A', 'Format: LLP': 'L', 'Format: Company': 'C' },
 }
@@ -231,7 +231,7 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
             onMouseEnter={() => children && openGroupAt(tab, idx)}
             onMouseLeave={() => children && scheduleClose()}
             onKeyDown={(e) => handleKeyDown(e, idx)}
-            className={`px-4 py-2.5 text-sm whitespace-nowrap transition-all duration-150 flex items-center gap-1
+            className={`px-2 py-2.5 text-[13px] whitespace-nowrap transition-all duration-150 flex items-center gap-1
               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset
               ${topActive ? 'tab-active' : 'tab-inactive'}`}
           >

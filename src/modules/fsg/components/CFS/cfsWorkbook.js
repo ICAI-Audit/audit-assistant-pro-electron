@@ -81,6 +81,59 @@ export function buildCfsWorkbook(rows, opts = {}) {
   return wb
 }
 
+/**
+ * T-047: how utils/veraExcel.js finishes the CFS sheet — the sheet spec alone (for the
+ * Fill Details workbook, key it under CFS_SHEET) and the whole spec for the CFS tab's
+ * own file. Layout and Row IDs are unchanged, so parseCfsSheet reads old and new files.
+ * Yellow: the figures that can be typed (Current Year of an item, Previous Year, the
+ * "New row" description). Subtotals, totals and Row IDs are not inputs. No dropdowns:
+ * nothing in this sheet is a choice from a fixed list.
+ */
+export function cfsSheetSpec(rows, opts = {}) {
+  const aoa = buildCfsAoa(rows, opts)
+  const byId = new Map([...(rows || []), ...((opts.cc && opts.cc.rows) || [])].map(r => [r.id, r]))
+  const inputCells = []
+  aoa.forEach((r, i) => {
+    if (i < 4) return
+    const id = String(r[3] ?? '').trim()
+    if (!id) return
+    const row = i + 1
+    if (id.startsWith('new:')) { inputCells.push(`A${row}`, `B${row}`, `C${row}`); return }
+    const src = byId.get(id)
+    if (!(src && src.calc)) inputCells.push(`B${row}`)
+    inputCells.push(`C${row}`)
+  })
+  return { headerRow: 4, lastRow: aoa.length, inputCells, amountCols: ['B', 'C'], widths: [70, 20, 20, 22], autoFilter: false }
+}
+
+export function cfsExcelSpec(mode, rows, opts = {}) {
+  return {
+    mode,
+    sheets: { [CFS_SHEET]: cfsSheetSpec(rows, opts) },
+    howTo: {
+      title: mode === 'filled' ? 'Cash Flow Statement — saved figures' : 'Cash Flow Statement — template',
+      purpose: 'The Cash Flow Statement (AS 3, indirect method) as VERA shows it. Correct or complete the figures here and upload the file back on the CFS screen.',
+      steps: [
+        'Go to the "CFS" sheet.',
+        'Type over a Current Year figure only where it should differ from the one VERA draws from the Balance Sheet and Profit & Loss. Type the Previous Year figures.',
+        'Enter outflows as negative figures (for example -25000) or in brackets.',
+        'To add a line, type its description and figures on the "New row" line of that activity.',
+        'Save the file, then on VERA\'s CFS screen click "Upload Excel" and pick it.',
+      ],
+      columns: [
+        ['Particulars', 'The line of the statement. Type a description only on a "New row" line.', 'Fixed (New row: fill in)'],
+        ['Current Year', 'This year\'s figure. Leave it as it is to keep VERA\'s figure.', 'Amount — fill in'],
+        ['Previous Year', 'Last year\'s figure, for the comparative column.', 'Amount — fill in'],
+        ['Row ID (do not edit)', 'How VERA knows which line is which. Do not change or delete it.', 'Fixed'],
+      ],
+      tips: [
+        'Subtotals and totals are worked out again by VERA; figures typed in them are not read.',
+        'A blank Current Year cell leaves VERA\'s figure as it is; a blank Previous Year cell clears it.',
+      ],
+    },
+  }
+}
+
 // Reads the CFS sheet. null when there is none. any: the sheet has at least one figure (a blank template changes nothing).
 export function parseCfsSheet(wb) {
   const name = (wb.SheetNames || []).find(n => n === CFS_SHEET || n.startsWith(CFS_SHEET + ' '))

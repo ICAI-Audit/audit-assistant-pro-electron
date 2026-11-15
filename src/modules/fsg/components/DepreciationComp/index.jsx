@@ -21,7 +21,8 @@ import { fmtINR, displayAmt, fetchFinancialsData } from '../../hooks/useFinancia
 import { depStoreFor } from '../../utils/depStore'
 import { joinDepCompSchedules } from '../../utils/depJoin'
 import { withNet, isDerivedField } from '../../utils/depCompNet'
-import { buildDepCompBlankTemplate, buildDepCompFilledWorkbook, parseDepCompWorkbook } from './depCompWorkbook'
+import { buildDepCompBlankTemplate, buildDepCompFilledWorkbook, parseDepCompWorkbook, depCompExcelSpec } from './depCompWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
 
 const INP  = 'w-full border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
@@ -285,8 +286,9 @@ export default function DepreciationComp({ entity, activeTB }) {
     }
   }
 
-  const saveWorkbook = async (wb, defaultPath) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells, dropdowns) — utils/veraExcel.js.
+  const saveWorkbook = async (wb, defaultPath, mode) => {
+    const buf = await finishWorkbook(wb, depCompExcelSpec(mode, scheduleII))
     const result = await fsgApi?.saveFileDialog({
       defaultPath, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
     })
@@ -299,7 +301,7 @@ export default function DepreciationComp({ entity, activeTB }) {
 
   const downloadBlankTemplate = async () => {
     try {
-      const path = await saveWorkbook(buildDepCompBlankTemplate(scheduleII), 'Dep_Comp_Template.xlsx')
+      const path = await saveWorkbook(buildDepCompBlankTemplate(scheduleII), 'Dep_Comp_Template.xlsx', 'template')
       if (path) showToast('Blank template saved.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
@@ -307,7 +309,7 @@ export default function DepreciationComp({ entity, activeTB }) {
   const downloadFilled = async () => {
     try {
       const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
-      const path = await saveWorkbook(buildDepCompFilledWorkbook(categoryRows, scheduleII), `${eName}_Dep_Comp_Filled.xlsx`)
+      const path = await saveWorkbook(buildDepCompFilledWorkbook(categoryRows, scheduleII), `${eName}_Dep_Comp_Filled.xlsx`, 'filled')
       if (path) showToast('Filled schedule saved — keep this safe before re-uploading a Trial Balance.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }

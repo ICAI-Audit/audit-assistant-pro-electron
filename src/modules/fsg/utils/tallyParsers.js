@@ -5,6 +5,10 @@
 
 import * as XLSX from 'xlsx'
 
+// T-047: a file VERA styled opens on a "How to Fill" guide (and may hold a hidden "Lists"
+// sheet); the data is on the first other sheet. Same names as utils/veraExcel.js.
+const firstDataSheetName = (wb) => wb.SheetNames.find(n => n !== 'How to Fill' && n !== 'Lists') ?? wb.SheetNames[0]
+
 /**
  * Parses a Tally Trial Balance Excel file.
  * @param {ArrayBuffer} buffer
@@ -13,7 +17,7 @@ import * as XLSX from 'xlsx'
  */
 export function parseTallyTB(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer', cellText: true, cellNF: false })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  const ws = wb.Sheets[firstDataSheetName(wb)]
   if (!ws || !ws['!ref']) return { rows: [], header: '' }
   const range = XLSX.utils.decode_range(ws['!ref'])
   const rows = []
@@ -216,7 +220,7 @@ export function buildTBRowsFromTally(tbRows, ledgerMap) {
  */
 export function parseRealBooksTB(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  const ws = wb.Sheets[firstDataSheetName(wb)]
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
 
   let headerIdx = -1
@@ -267,7 +271,7 @@ export function parseRealBooksTB(buffer) {
  */
 export function parseRealBooksMaster(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  const ws = wb.Sheets[firstDataSheetName(wb)]
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
 
   let headerIdx = -1

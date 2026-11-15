@@ -301,7 +301,7 @@ function NetCreditPurchasesWorking({ data, activeTB, prevTB }) {
   )
 }
 
-function TradePayablesReceivablesReconciliation({ activeTB, prevTB, data, tbId, getRemark, onRemarkSaved, hasSeparatePYTB, showZero }) {
+function TradePayablesReceivablesReconciliation({ activeTB, prevTB, data, tbId, getRemark, onRemarkSaved, hasSeparatePYTB, showZero, emptyText = null }) {
   const notes = Object.values(data.notes || {})
   const payablesNote = notes.find(n => !n.isPL && /^trade\s+payables?$/i.test(n.title || ''))
   const receivablesNote = notes.find(n => !n.isPL && /^trade\s+receivables?$/i.test(n.title || ''))
@@ -315,10 +315,12 @@ function TradePayablesReceivablesReconciliation({ activeTB, prevTB, data, tbId, 
   const payablesBookRows = [...(payablesNote?.rows || []), ...reclassifiedFromPayables]
   const receivablesBookRows = [...(receivablesNote?.rows || []), ...reclassifiedFromReceivables]
 
-  if (payablesBookRows.length === 0 && receivablesBookRows.length === 0) return null
+  if (payablesBookRows.length === 0 && receivablesBookRows.length === 0) {
+    return emptyText ? <div className="text-center text-gray-400 text-sm mt-10">{emptyText}</div> : null
+  }
 
   return (
-    <div className="mt-8">
+    <div className="fsg-reco mt-2">
       <h3 className="font-bold text-blue-900 text-base mb-1 uppercase tracking-wide border-t-2 border-blue-800 pt-4">Reconciliation</h3>
       <p className="text-xs text-gray-400 mb-4">Books vs Balance Sheet placement for Trade Payables and Trade Receivables, Current Year and Previous Year alike.</p>
       <TradeReconTable activeTB={activeTB} prevTB={prevTB} title="Trade Payables — Books vs Balance Sheet Reconciliation"
@@ -522,7 +524,10 @@ function NoteAnnexure({ note, activeTB, prevTB, tbId, getRemark, onRemarkSaved, 
   )
 }
 
-export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrevTBChange, jumpTarget, onJumpHandled, onFixNavigate }) {
+// T-045: view 'annex' (menu Annex) shows the ledger annexures and the ratio working;
+// view 'reco' (menu Features > Reco) shows only the Trade Payables / Receivables reconciliation.
+export default function Annexures({ view = 'annex', entity, activeTB, prevTB, activeRsId, onPrevTBChange, jumpTarget, onJumpHandled, onFixNavigate }) {
+  const isReco = view === 'reco'
   const { data, loading, error, refresh } = useFinancials(activeTB, prevTB, entity, activeRsId)
   const period = activeTB?.period || ''
   // Consolidated view merges every branch's ledgers into one set — show
@@ -566,7 +571,7 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
       <Guard activeTB={activeTB} loading={loading} error={error}>
         <div className="flex items-center gap-3 px-5 py-3 border-b border-blue-100 shrink-0 bg-white flex-wrap">
           <div>
-            <h2 className="font-bold text-blue-900 text-sm">Annexures &amp; Reconciliation to Financial Statements</h2>
+            <h2 className="font-bold text-blue-900 text-sm">{isReco ? 'Reconciliation — Trade Payables and Trade Receivables' : 'Annexures to Financial Statements'}</h2>
             {entity && <p className="text-xs text-gray-500">{entity.name}{period ? ` | ${period}` : ''}</p>}
           </div>
           <div className="ml-auto flex items-center gap-3 flex-wrap">
@@ -574,24 +579,33 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
             <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
               disabled={!!data?.pyMode && data.pyMode !== 'required'}
               disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
+            {!isReco && (
             <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
               <input type="checkbox" checked={showEmptyAnnex} onChange={e => setShowEmptyAnnex(e.target.checked)}
                 className="rounded border-gray-300" />
               Show empty annexures
             </label>
+            )}
             <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
               <input type="checkbox" checked={showZero} onChange={e => setShowZero(e.target.checked)}
                 className="rounded border-gray-300" />
               Show zero-balance ledgers
             </label>
-            <input type="text" placeholder="Search annexures..." value={search} onChange={e => setSearch(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1.5 text-xs w-40 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-            {search && <button onClick={() => setSearch('')} className="text-gray-400 text-xs">X</button>}
+            {!isReco && (
+              <input type="text" placeholder="Search annexures..." value={search} onChange={e => setSearch(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1.5 text-xs w-40 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
+            )}
+            {!isReco && search && <button onClick={() => setSearch('')} className="text-gray-400 text-xs">X</button>}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
-          {data && (
+          {data && isReco && (
+            <TradePayablesReceivablesReconciliation activeTB={activeTB} prevTB={prevTB} data={data} tbId={activeTB?.id} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
+              hasSeparatePYTB={!!prevTB?.id} showZero={showZero}
+              emptyText="No Trade Payables or Trade Receivables ledgers to reconcile in this Trial Balance." />
+          )}
+          {data && !isReco && (
             <>
               <h3 className="font-bold text-blue-800 text-sm mb-3 uppercase tracking-wide">Detailed Annexures by Note</h3>
               <MissingAlieWarning report={data.missingAlie} onFix={openFix} tbId={activeTB?.id} />
@@ -616,9 +630,7 @@ export default function Annexures({ entity, activeTB, prevTB, activeRsId, onPrev
                 <div className="text-xs text-gray-400 text-right mt-4">All figures derived from Mapped Trial Balance</div>
               )}
 
-              <TradePayablesReceivablesReconciliation activeTB={activeTB} prevTB={prevTB} data={data} tbId={activeTB?.id} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
-                hasSeparatePYTB={!!prevTB?.id} showZero={showZero} />
-
+              {/* T-045: the Trade Payables / Receivables reconciliation moved to Features > Reco. */}
               <NetCreditPurchasesWorking activeTB={activeTB} prevTB={prevTB} data={data} />
             </>
           )}

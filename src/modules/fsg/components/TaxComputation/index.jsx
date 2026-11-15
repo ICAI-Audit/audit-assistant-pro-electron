@@ -7,6 +7,8 @@ import {
   resolveGroup, todayLocal, figuresOf, buildTaxInput, loadDepIT, loadTaxComputationSaved,
   buildSavedWorkbook, parseSavedWorkbook, computationLines,
 } from '../../utils/taxComputationIO'
+import { finishWorkbook } from '../../utils/veraExcel'
+import { taxComputationExcelSpec } from './taxExcelSpec'
 
 // Features > Tax Computation: Profit before tax -> Total Income -> Tax, Surcharge, Cess -> Net tax payable / (refundable), with
 // interest u/s 234A / 234B / 234C. Every figure drawn from the statements can be typed over (the ↺ puts the drawn figure back);
@@ -126,8 +128,10 @@ export default function TaxComputation({ entity, activeTB, prevTB, activeRsId })
 
   // ── Excel save / upload, PDF ─────────────────────────────────────────────
   const saveExcel = async () => {
-    const wb = buildSavedWorkbook({ entityName: entity?.name, title, subtitle: `${label} - Profit before tax taken from the Profit & Loss account`, lines: computationLines(m), saved })
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const lines = computationLines(m)
+    const wb = buildSavedWorkbook({ entityName: entity?.name, title, subtitle: `${label} - Profit before tax taken from the Profit & Loss account`, lines, saved })
+    // T-047: finished in the VERA style (How to Fill sheet, blue header) — utils/veraExcel.js.
+    const buf = await finishWorkbook(wb, taxComputationExcelSpec(lines.length))
     const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
     const r = await fsgApi?.saveFileDialog({ defaultPath: `${eName}_Tax_Computation.xlsx`, filters: [{ name: 'Excel', extensions: ['xlsx'] }] })
     if (r?.filePath) { await fsgApi?.writeFile(r.filePath, Array.from(new Uint8Array(buf))); flash('Excel saved - keep it to restore the figures with "Upload saved Excel"') }

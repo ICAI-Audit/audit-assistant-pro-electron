@@ -27,7 +27,8 @@ import * as XLSX from 'xlsx-js-style'
 import { fmtINR } from '../../hooks/useFinancials'
 import { depStoreFor, EMPTY_WIP, wipHasFigures, wipCYTotal } from '../../utils/depStore'
 import { joinDepITSchedules } from '../../utils/depJoin'
-import { buildDepITBlankTemplate, buildDepITFilledWorkbook, parseDepITWorkbook } from './depITWorkbook'
+import { buildDepITBlankTemplate, buildDepITFilledWorkbook, parseDepITWorkbook, depITExcelSpec } from './depITWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
 
 // ── Style constants (matches Depreciation/index.jsx) ─────────────────────────
@@ -684,8 +685,9 @@ export default function DepreciationIT({ entity, activeTB }) {
     }
   }
 
-  const saveWorkbook = async (wb, defaultPath) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells, dropdowns) — utils/veraExcel.js.
+  const saveWorkbook = async (wb, defaultPath, mode) => {
+    const buf = await finishWorkbook(wb, depITExcelSpec(mode, blocks))
     const result = await fsgApi?.saveFileDialog({
       defaultPath, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
     })
@@ -698,7 +700,7 @@ export default function DepreciationIT({ entity, activeTB }) {
 
   const downloadBlankTemplate = async () => {
     try {
-      const path = await saveWorkbook(buildDepITBlankTemplate(blocks), 'Dep_IT_Template.xlsx')
+      const path = await saveWorkbook(buildDepITBlankTemplate(blocks), 'Dep_IT_Template.xlsx', 'template')
       if (path) showToast('Blank template saved.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
@@ -706,7 +708,7 @@ export default function DepreciationIT({ entity, activeTB }) {
   const downloadFilled = async () => {
     try {
       const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
-      const path = await saveWorkbook(buildDepITFilledWorkbook(ledgers, inputs, blocks, wip), `${eName}_Dep_IT_Filled.xlsx`)
+      const path = await saveWorkbook(buildDepITFilledWorkbook(ledgers, inputs, blocks, wip), `${eName}_Dep_IT_Filled.xlsx`, 'filled')
       if (path) showToast('Filled form saved — keep this safe before re-uploading a Trial Balance.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
