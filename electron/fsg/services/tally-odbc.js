@@ -979,7 +979,7 @@ export async function getTallyLedgerMasters(host, port, company = null) {
       <TDL><TDLMESSAGE>
         <COLLECTION NAME="VERA Groups" ISMODIFY="No">
           <TYPE>Group</TYPE>
-          <FETCH>Name,Parent,IsDeemedPositive</FETCH>
+          <FETCH>Name,Parent,IsRevenue,IsDeemedPositive</FETCH>
         </COLLECTION>
       </TDLMESSAGE></TDL>
     </DESC></BODY>
@@ -1092,6 +1092,7 @@ export function parseTallyMasterXml(xmlString) {
   const ledgerMap = {}
   const groupParent = {}
   const groupDeemedPositive = {}
+  const groupRevenue = {}
 
   // Extract GROUP entries first. IsDeemedPositive is a genuine attribute of
   // the GROUP master (explicitly set when the group is created — reserved
@@ -1107,6 +1108,10 @@ export function parseTallyMasterXml(xmlString) {
     if (name) groupParent[name] = parent || null
     const gdpTag = tagValue(inner, 'ISDEEMEDPOSITIVE')
     if (name && gdpTag) groupDeemedPositive[name] = /^yes$/i.test(gdpTag)
+    // T-037: IsRevenue (P&L vs Balance Sheet nature) together with
+    // IsDeemedPositive gives the ledger's ALIE, exactly as Tally classifies it.
+    const grTag = tagValue(inner, 'ISREVENUE')
+    if (name && grTag) groupRevenue[name] = /^yes$/i.test(grTag)
   }
 
   // Chain resolver
@@ -1125,14 +1130,16 @@ export function parseTallyMasterXml(xmlString) {
   // and Tally does not reliably resolve that inheritance for a raw ledger
   // FETCH, so it is used only as a last-resort fallback here, after the group
   // chain (which fetches the attribute directly from its true owner).
-  const deemedPositiveOf = (groupName) => {
+  const inheritedOf = (map) => (groupName) => {
     let cur = groupName; let safety = 0
     while (cur && safety++ < 20) {
-      if (groupDeemedPositive[cur] !== undefined) return groupDeemedPositive[cur]
+      if (map[cur] !== undefined) return map[cur]
       cur = groupParent[cur]
     }
     return null
   }
+  const deemedPositiveOf = inheritedOf(groupDeemedPositive)
+  const revenueOf = inheritedOf(groupRevenue)
 
   // Extract LEDGER entries
   const ledgerRegex = /<LEDGER\b([^>]*)>([\s\S]*?)<\/LEDGER>/gi
@@ -1148,7 +1155,12 @@ export function parseTallyMasterXml(xmlString) {
       const isDeemedPositiveTag = tagValue(inner, 'ISDEEMEDPOSITIVE')
       isDeemedPositive = isDeemedPositiveTag ? /^yes$/i.test(isDeemedPositiveTag) : null
     }
-    ledgerMap[name.trim().toLowerCase()] = { name, parent, hierarchy, affectsstock, isDeemedPositive }
+    let isRevenue = parent ? revenueOf(parent) : null
+    if (isRevenue === null) {
+      const isRevenueTag = tagValue(inner, 'ISREVENUE')
+      isRevenue = isRevenueTag ? /^yes$/i.test(isRevenueTag) : null
+    }
+    ledgerMap[name.trim().toLowerCase()] = { name, parent, hierarchy, affectsstock, isDeemedPositive, isRevenue }
   }
 
   return { ledgerMap, groupCount: Object.keys(groupParent).length, ledgerCount: Object.keys(ledgerMap).length }

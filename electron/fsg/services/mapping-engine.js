@@ -288,6 +288,37 @@ function deriveAlieFromType(trialBalanceType) {
   return null
 }
 
+/**
+ * T-037: Tally's own nature flags of the ledger's group decide ALIE when the
+ * TrialBalance column is absent (Tally ODBC exports and the live Tally fetch):
+ *   IsRevenue No  + IsDeemedPositive Yes (Dr) → ASSETS
+ *   IsRevenue No  + IsDeemedPositive No  (Cr) → EQUITY AND LIABILITIES
+ *   IsRevenue Yes + IsDeemedPositive Yes (Dr) → Expenses
+ *   IsRevenue Yes + IsDeemedPositive No  (Cr) → Income
+ * Both flags must be known; nothing is guessed from the balance side.
+ */
+function flagValue(v) {
+  if (v === true || v === 1 || v === '1') return true
+  if (v === false || v === 0 || v === '0') return false
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase()
+    if (s === 'yes' || s === 'true') return true
+    if (s === 'no' || s === 'false') return false
+  }
+  return null
+}
+
+function deriveAlieFromFlags(isRevenue, isDeemedPositive) {
+  const revenue = flagValue(isRevenue), debit = flagValue(isDeemedPositive)
+  if (revenue === null || debit === null) return null
+  if (!revenue) return debit ? 'ASSETS' : 'EQUITY AND LIABILITIES'
+  return debit ? 'Expenses' : 'Income'
+}
+
+function deriveAlieForRow(row) {
+  return deriveAlieFromType(row.trial_balance_type) ?? deriveAlieFromFlags(row.is_revenue, row.is_deemed_positive)
+}
+
 // ── Main engine ───────────────────────────────────────────────────────────────
 
 /**
@@ -390,7 +421,7 @@ export async function runMappingEngine(tbId, rsId, constitution, { excludeZero =
       tb_id:                  tbId,
       tb_row_id:              row.id,
       rule_set_id:            rsId,
-      alie:                   deriveAlieFromType(row.trial_balance_type),
+      alie:                   deriveAlieForRow(row),
       mapping1_resultant:     null,
       mapping2_resultant:     null,
       mapping3_resultant:     null,

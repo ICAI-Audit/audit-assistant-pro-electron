@@ -30,7 +30,7 @@ function CellRenderer(p) {
 }
 
 const LEVEL_COLS = ['alie', 'level1', 'level2', 'level3', 'level4', 'level5', 'level6', 'level7']
-const LEVEL_HEADERS = ['ALIE', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Level 6', 'Level 7']
+const LEVEL_HEADERS = ['ALIE', 'Mapping 1', 'Mapping 2', 'Mapping 3', 'Mapping 4', 'Mapping 5', 'Mapping 6', 'Mapping 7']
 
 export default function ModelFormat({ entity, activeRsId, onRsChange }) {
   const [constitution, setConstitution] = useState(entity?.constitution || 3)

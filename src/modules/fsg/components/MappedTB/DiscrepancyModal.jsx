@@ -50,7 +50,7 @@ export default function DiscrepancyModal({ row, onResolve, onClose }) {
           </p>
           <p>
             However, the ledger <strong>name</strong> matches keyword rules that suggest a different
-            Level 1 classification. Please choose how to proceed.
+            Mapping 1 classification. Please choose how to proceed.
           </p>
         </div>
 

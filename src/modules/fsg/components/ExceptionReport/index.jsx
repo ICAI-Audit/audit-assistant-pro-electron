@@ -502,7 +502,7 @@ export default function ExceptionReport({ entity, activeTB, prevTB, activeRsId, 
     for (const f of data.foreignLevel2 || []) {
       rows.push({
         area: `Categorisation — ${f.ledger}${f.branch ? ` (${f.branch})` : ''}`,
-        check: `Under ${f.statement} head "${f.level1}", but its Level 2 "${f.level2}" is a ${f.otherStatement} heading. Shown under "${f.level1}" without that heading; set the right Level 2 in Rectification / Recategorisation`,
+        check: `Under ${f.statement} head "${f.level1}", but its Mapping 2 "${f.level2}" is a ${f.otherStatement} heading. Shown under "${f.level1}" without that heading; set the right Level 2 in Rectification / Recategorisation`,
         aLabel: 'Ledger balance', bLabel: 'Correctly categorised',
         cyA: num(f.cy), cyB: 0, cyDiff: num(f.cy),
         pyA: num(f.py), pyB: 0, pyDiff: num(f.py),

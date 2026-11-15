@@ -84,20 +84,20 @@ export function registerTBHandlers() {
       const values = []
       const params = []
       chunk.forEach((r, idx) => {
-        const base = idx * 21
-        values.push(
-          `($${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9},$${base+10},$${base+11},$${base+12},$${base+13},$${base+14},$${base+15},$${base+16},$${base+17},$${base+18},$${base+19},$${base+20},$${base+21})`
-        )
+        // T-037: also keeps Group.$Parent.8 (ninth group level) and the TrialBalance (ALIE) column.
+        const base = idx * 23
+        values.push(`(${Array.from({ length: 23 }, (_, k) => `$${base + k + 1}`).join(',')})`)
         params.push(
           tb.id, r.period, r.branch, r.ledger_code, r.name,
           r.opening_balance, r.debit, r.credit, r.closing_balance,
           r.is_revenue, r.is_deemed_positive, r.trail_balance, r.parent,
           r.group_parent, r.group_parent_1, r.group_parent_2, r.group_parent_3,
-          r.group_parent_4, r.group_parent_5, r.group_parent_6, r.group_parent_7
+          r.group_parent_4, r.group_parent_5, r.group_parent_6, r.group_parent_7,
+          r.group_parent_8 ?? null, r.trial_balance_type ?? null
         )
       })
       await query(
-        `INSERT INTO tb_rows (tb_id,period,branch,ledger_code,name,opening_balance,debit,credit,closing_balance,is_revenue,is_deemed_positive,trail_balance,parent,group_parent,group_parent_1,group_parent_2,group_parent_3,group_parent_4,group_parent_5,group_parent_6,group_parent_7)
+        `INSERT INTO tb_rows (tb_id,period,branch,ledger_code,name,opening_balance,debit,credit,closing_balance,is_revenue,is_deemed_positive,trail_balance,parent,group_parent,group_parent_1,group_parent_2,group_parent_3,group_parent_4,group_parent_5,group_parent_6,group_parent_7,group_parent_8,trial_balance_type)
          VALUES ${values.join(',')}`,
         params
       )
@@ -172,8 +172,8 @@ export function registerTBHandlers() {
             (tb_id,period,branch,ledger_code,name,opening_balance,debit,credit,closing_balance,
              is_revenue,is_deemed_positive,trail_balance,parent,group_parent,group_parent_1,
              group_parent_2,group_parent_3,group_parent_4,group_parent_5,group_parent_6,group_parent_7,
-             upload_nature)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+             group_parent_8,trial_balance_type,upload_nature)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
            RETURNING id, name`,
           [
             tb.id, r.period || '', r.branch || '', r.ledger_code || '', r.name,
@@ -182,6 +182,7 @@ export function registerTBHandlers() {
             r.group_parent || '', r.group_parent_1 || '', r.group_parent_2 || '',
             r.group_parent_3 || '', r.group_parent_4 || '', r.group_parent_5 || '',
             r.group_parent_6 || '', r.group_parent_7 || '',
+            r.group_parent_8 || '', r.trial_balance_type || null,
             uploadNature,
           ]
         )
@@ -538,8 +539,8 @@ export function registerTBHandlers() {
             (tb_id,period,branch,ledger_code,name,opening_balance,debit,credit,closing_balance,
              is_revenue,is_deemed_positive,trail_balance,parent,group_parent,group_parent_1,
              group_parent_2,group_parent_3,group_parent_4,group_parent_5,group_parent_6,group_parent_7,
-             trial_balance_type,upload_nature)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+             group_parent_8,trial_balance_type,upload_nature)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
           [
             tb.id, r.period || '', r.branch || '', r.ledger_code || '', r.name,
             r.opening_balance || 0, r.debit || 0, r.credit || 0, r.closing_balance || 0,
@@ -547,7 +548,7 @@ export function registerTBHandlers() {
             r.parent || '', r.group_parent || '', r.group_parent_1 || '',
             r.group_parent_2 || '', r.group_parent_3 || '', r.group_parent_4 || '',
             r.group_parent_5 || '', r.group_parent_6 || '', r.group_parent_7 || '',
-            r.trial_balance_type || null, uploadNature,
+            r.group_parent_8 || '', r.trial_balance_type || null, uploadNature,
           ]
         )
       }

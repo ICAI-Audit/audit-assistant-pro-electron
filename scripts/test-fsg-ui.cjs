@@ -74,6 +74,9 @@ function seedUpgradeDatabase() {
       CREATE TABLE tb_new_classification_mappings (id TEXT PRIMARY KEY, entity_info_id TEXT REFERENCES tb_new_entity_info(id));
       CREATE TABLE tb_new_sessions (id TEXT PRIMARY KEY, engagement_id TEXT);
     \`);
+    // HEAD's schema already includes firm_settings.place (T-023), so remove it to
+    // reproduce a pre-T-023 install; start-up must back up and re-add it (T-034).
+    db.exec('ALTER TABLE firm_settings DROP COLUMN place');
     db.prepare("INSERT INTO clients (id, name, constitution) VALUES ('existing-client', 'Existing Client Before Upgrade', 'company')").run();
     db.close();
   `, [projectRoot, databasePath, dir]);
@@ -328,6 +331,29 @@ async function main() {
   await openAsUser('fsg-admin@example.invalid', password, engagement, '#/financial-statement-review');
   await waitFor(`document.querySelector('.fsg-root') && document.body.innerText.includes('Generate Financials')`, 30000);
   await sleep(1500);
+  // T-036: the Dep menu lists only Dep (Books) and Dep (Income Tax).
+  const openDepMenu = () => evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\u25b4\u25be\s]+/g, ' ').trim() === 'Dep')?.click(), true)`);
+  await openDepMenu();
+  const depItems = () => evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`);
+  await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+  const depMenu = await depItems();
+  check('T-036 Dep menu shows only Dep (Books) and Dep (Income Tax)', JSON.stringify(depMenu) === JSON.stringify(['Dep (Books)', 'Dep (Income Tax)']), depMenu);
+  for (const item of ['Dep (Books)', 'Dep (Income Tax)']) {
+    if (!(await depItems()).length) await openDepMenu();
+    await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+    await evaluate(`([...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].find(x => x.textContent.replace(/\\s+/g, ' ').trim() === ${JSON.stringify(item)})?.click(), true)`);
+    await sleep(800);
+    check(`T-036 ${item} screen opens without an error`, await evaluate(`!/Something went wrong|coming soon/i.test(document.querySelector('.fsg-root')?.innerText || '') && /depreciation|block|asset/i.test(document.querySelector('.fsg-root')?.innerText || '')`));
+  }
+  // T-038: General Notes is shown as Policy (Ctrl+Shift+O) and Features has no PPE.
+  const topLabels = await evaluate(`[...document.querySelectorAll('.fsg-root [role=tablist] > button, .fsg-root nav button')].map(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim())`);
+  check('T-038 the menu shows Policy instead of General Notes', topLabels.includes('Policy') && !topLabels.includes('General Notes'), topLabels);
+  await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'Features')?.click(), true)`);
+  await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+  const featureItems = await evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/[\\u25b4\\u25be\\u25b8\\u203a\\s]+/g, ' ').trim())`);
+  check('T-038 the Features menu no longer lists PPE', featureItems.length > 0 && !featureItems.some(t => /^PPE\\b/.test(t)), featureItems);
+  await evaluate(`(document.activeElement?.blur?.(), document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), true)`);
+  await sleep(300);
   check('BS tab can be opened', await clickFsgButton('BS'));
   const bs = await waitFor(`/Balance Sheet/i.test(document.querySelector('.fsg-root')?.innerText || '') && /Share capital|Shareholders/i.test(document.querySelector('.fsg-root').innerText)`, 30000);
   check('T-027 Balance Sheet columns show reporting dates', await waitFor(`[...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='As at 31 March 2025') && [...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='As at 31 March 2024')`));
@@ -338,7 +364,8 @@ async function main() {
   check('T-027 P&L columns show year-ended dates', await waitFor(`[...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2025') && [...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2024')`));
   await screenshot('03-profit-and-loss');
   await clickFsgButton('Notes');
-  check('T-027 BS and PL notes show their respective dated column headings', await waitFor(`[...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='As at 31 March 2025') && [...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2025') && ![...document.querySelectorAll('.fsg-root th')].some(t=>/^(Current Year|Previous Year)$/.test(t.textContent.trim()))`));
+  check('T-027 BS and PL notes show their respective dated column headings', await waitFor(`[...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='As at 31 March 2025') && [...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2025') && ![...document.querySelectorAll('.fsg-root th')].some(t=>/^(Current Year|Previous Year)$/.test(t.textContent.trim()))`),
+    await evaluate(`[...new Set([...document.querySelectorAll('.fsg-root th')].map(t=>t.textContent.trim()).filter(t=>/Year|As at|For the year/.test(t)))].slice(0, 20)`));
   await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(b=>b.textContent.trim()==='Reviewed, Close')?.click(),true)`);
   await screenshot('03b-notes-dated');
   await clickFsgButton('Annex & Reco');
@@ -347,6 +374,42 @@ async function main() {
   check('T-027 BS and PL ledger annexures show matching dates', await waitFor(`[...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.includes('As at 31 March 2025 - Ledger')) && [...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.includes('For the year ended 31 March 2025 - Ledger'))`));
   check('T-027 long dated annexure headings stay within their note card', await evaluate(`(document.querySelectorAll('.fsg-root table.table-fixed').length>0 && [...document.querySelectorAll('.fsg-root table.table-fixed')].every(t=>t.getBoundingClientRect().right<=t.parentElement.getBoundingClientRect().right+1 && [...t.querySelectorAll('th.fsg-dated-heading')].every(h=>getComputedStyle(h).whiteSpace==='normal' && h.scrollWidth<=h.clientWidth+1)))`));
   await screenshot('03c-annexures-dated');
+
+  // T-039: a ledger's categorisation can be changed from the Annexure itself.
+  const editButtons = `[...document.querySelectorAll('.fsg-root button.fsg-annex-edit')]`;
+  check('T-039 every annexure ledger offers a change-categorisation button', await waitFor(`${editButtons}.length > 0`, 10000));
+  const editLabel = await evaluate(`${editButtons}[0]?.getAttribute('aria-label') || ''`);
+  await evaluate(`(${editButtons}[0]?.click(), true)`);
+  const modalOpen = `[...document.querySelectorAll('.fsg-root .modal-box h2')].some(h => h.textContent.trim() === 'Override Mapping')`;
+  check('T-039 the Mapped TB categorisation dialog opens from the Annexure', await waitFor(modalOpen, 5000));
+  check('T-039 the dialog starts from the ledger\'s current Mapping 1', await evaluate(`(() => { const s = document.querySelector('.fsg-root .modal-box select'); return !!(s && s.value) })()`));
+  await evaluate(`(() => { const t = document.querySelector('.fsg-root .modal-box textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, 'T-039 annexure recategorisation'); t.dispatchEvent(new Event('input', { bubbles: true })); return true })()`);
+  await evaluate(`([...document.querySelectorAll('.fsg-root .modal-box button')].find(b => b.textContent.trim() === 'Save Override')?.click(), true)`);
+  check('T-039 saving closes the dialog', await waitFor(`!(${modalOpen})`, 10000));
+  await sleep(1500);
+  if (!(await evaluate(`${editButtons}.length > 0`))) await evaluate(`([...document.querySelectorAll('.fsg-root button')].filter(b=>/^Note [0-9]+:/.test(b.textContent.trim())).forEach(b=>b.click()),true)`);
+  await waitFor(`${editButtons}.length > 0`, 10000);
+  await evaluate(`(${editButtons}.find(b => b.getAttribute('aria-label') === ${JSON.stringify(editLabel)})?.click(), true)`);
+  await waitFor(modalOpen, 5000);
+  check('T-039 the annexure change is saved and read back after the refresh', await evaluate(`document.querySelector('.fsg-root .modal-box textarea')?.value === 'T-039 annexure recategorisation'`));
+  await evaluate(`([...document.querySelectorAll('.fsg-root .modal-box button')].find(b => b.textContent.trim() === 'Cancel')?.click(), true)`);
+  await waitFor(`!(${modalOpen})`, 5000);
+
+  // T-038: run after the Notes checks, since opening Policy saves its default text
+  // (whose ratio and useful-life tables still use Current/Previous Year headings).
+  await evaluate(`(document.activeElement?.blur?.(), true)`);
+  // Real key presses are cancelable, which is how FSG's handler keeps VERA's Ctrl+O (VERA Tools) from also firing.
+  await evaluate(`(document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'O', code: 'KeyO', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })), true)`);
+  check('T-038 Ctrl+Shift+O stays inside Financial Statement Review', await evaluate(`location.hash.includes('financial-statement-review') && !!document.querySelector('.fsg-root')`), await evaluate('location.hash'));
+  check('T-038 Ctrl+Shift+O opens Policy', await waitFor(`[...document.querySelectorAll('.fsg-root button.tab-active')].some(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'Policy')`, 5000),
+    await evaluate(`[...document.querySelectorAll('.fsg-root button.tab-active')].map(b => b.textContent.trim())`));
+  check('T-043 Policy offers the blank / filled Excel format and its upload', await waitFor(`!!document.querySelector('.fsg-root .fsg-policy-blank') && !!document.querySelector('.fsg-root .fsg-policy-filled') && !!document.querySelector('.fsg-root .fsg-policy-upload')`, 10000));
+
+  // T-044: one-stop download / upload of every working of the active Trial Balance.
+  await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'Trial Balance')?.click(), true)`);
+  await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+  await evaluate(`([...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].find(x => x.textContent.replace(/\\s+/g, ' ').trim() === 'Upload TB')?.click(), true)`);
+  check('T-044 Upload TB offers Download all workings and Upload all workings', await waitFor(`!!document.querySelector('.fsg-root .fsg-workings-download') && !!document.querySelector('.fsg-root .fsg-workings-upload')`, 10000));
 
   check('Statement of Profit and Loss renders', pl, (await evaluate(`document.querySelector('.fsg-root')?.innerText || ''`)).slice(0, 1200));
   check('Generate Financials tab can be opened', await clickFsgButton('Generate Financials'));

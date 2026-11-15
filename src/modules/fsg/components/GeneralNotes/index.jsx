@@ -35,6 +35,7 @@ import { withoutRatioIntro } from '../../utils/ratioNoteIntro'
 import { buildRatiosTableHtml, buildRatioSnapshot, refreshRatiosInNote } from '../../utils/ratioTable'
 import * as XLSX from 'xlsx-js-style'
 import { buildRatioBlankTemplate, buildRatioFilledWorkbook, parseRatioWorkbook } from './ratioWorkbook'
+import { buildPolicyBlankWorkbook, buildPolicyFilledWorkbook, parsePolicyWorkbook } from '../../utils/policyWorkbook'
 import { pointLabel } from '../../utils/pointLabel'
 
 let _ptId = 0
@@ -517,6 +518,36 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
     return false
   }
 
+  // T-043: the whole Policy as an Excel format — blank (with a worked example)
+  // or filled with the current wording — and its upload, which rebuilds every
+  // section after a confirmation. Sections are lettered (a), (b) ... by the app.
+  const downloadPolicyFormat = async (filled) => {
+    try {
+      const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
+      const wb = filled ? buildPolicyFilledWorkbook(note.points) : buildPolicyBlankWorkbook()
+      const saved = await saveRatioWorkbook(wb, filled ? `${eName}_Policy.xlsx` : 'Policy_Format.xlsx')
+      if (saved) { setSaveStatus('Saved'); setTimeout(() => setSaveStatus(''), 1500) }
+    } catch (e) { window.alert('Download failed: ' + (e?.message || '')) }
+  }
+  const uploadPolicyFormat = async () => {
+    try {
+      const result = await fsgApi?.openFileDialog({ filters: [{ name: 'Excel Workbook', extensions: ['xlsx', 'xls'] }], properties: ['openFile'] })
+      const filePath = result?.filePaths?.[0]
+      if (!filePath) return
+      const bytes = await fsgApi?.readFile(filePath)
+      const wb = XLSX.read(new Uint8Array(bytes), { type: 'array' })
+      const { points, warnings, errors } = parsePolicyWorkbook(wb, note.points)
+      if (errors.length) { window.alert(`The Policy format could not be used:\n\n${errors.slice(0, 8).join('\n')}`); return }
+      const list = points.slice(0, 12).map((p, i) => `${pointLabel(i)} ${p.header}`).join('\n') + (points.length > 12 ? `\n... and ${points.length - 12} more` : '')
+      const ok = window.confirm(
+        `Replace this year's Policy with ${points.length} section${points.length !== 1 ? 's' : ''} from the file?\n\n${list}` +
+        (warnings.length ? `\n\nNote:\n${warnings.slice(0, 5).join('\n')}` : '') +
+        `\n\nThe current ${note.points.length} section${note.points.length !== 1 ? 's are' : ' is'} replaced. Download "Policy Format (Filled)" first if you want a copy.`)
+      if (!ok) return
+      persist({ ...note, points: points.map(p => ({ ...p, id: newPointId() })) })
+    } catch (e) { window.alert('Upload failed: ' + (e?.message || '')) }
+  }
+
   // A blank, reusable template — just the 11 Particulars/Numerator/
   // Denominator rows, no figures — for filling in by hand or reusing on
   // another Company.
@@ -628,6 +659,21 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
               title="Discard every point below and reload the tool's current standard template for this constitution"
               className="px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-red-600 hover:border-red-300 transition text-sm font-medium"
             >↺ Reset to Default Template</button>
+            <button
+              onClick={() => downloadPolicyFormat(false)}
+              title="Download a blank Policy format in Excel, with a worked example: one row per paragraph or bullet, under its section heading"
+              className="fsg-policy-blank px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
+            >⬇ Policy Format (Blank)</button>
+            <button
+              onClick={() => downloadPolicyFormat(true)}
+              title="Download this Policy as it reads now, in the same Excel format, to edit or reuse for another client"
+              className="fsg-policy-filled px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
+            >⬇ Policy Format (Filled)</button>
+            <button
+              onClick={uploadPolicyFormat}
+              title="Upload a filled Policy format: each Section heading becomes a section, lettered (a), (b), (c) ... automatically"
+              className="fsg-policy-upload px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
+            >⬆ Upload Policy Format</button>
             <button onClick={addPoint} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium">+ Add Point</button>
           </div>
         </div>

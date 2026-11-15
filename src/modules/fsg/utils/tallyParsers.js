@@ -167,9 +167,19 @@ export function buildTBRowsFromTally(tbRows, ledgerMap) {
     // still Dr-natured. Falling back to the balance-side heuristic only
     // when the master data doesn't carry the field at all (e.g. some Excel
     // Master.json exports).
-    const isDeemedPositive = m?.isDeemedPositive !== null && m?.isDeemedPositive !== undefined
+    const natureKnown = m?.isDeemedPositive !== null && m?.isDeemedPositive !== undefined
+    const isDeemedPositive = natureKnown
       ? m.isDeemedPositive
       : (r.closing_dr >= r.closing_cr ? true : (r.opening_dr > r.opening_cr))
+    // T-037: Tally's IsRevenue master flag, kept only when the nature itself
+    // came from the master too, so the mapping engine never derives ALIE from
+    // a balance-side guess.
+    const isRevenue = natureKnown && typeof m?.isRevenue === 'boolean' ? m.isRevenue : null
+    // T-037: keep up to ten hierarchy levels. Chains of nine or fewer are laid
+    // out exactly as before (top group repeated in group_parent_7); a longer
+    // chain now fills group_parent_7 and keeps its top group in group_parent_8
+    // instead of dropping the levels in between.
+    const long = chain.length > 9
 
     return {
       period: '',
@@ -180,7 +190,7 @@ export function buildTBRowsFromTally(tbRows, ledgerMap) {
       debit: r.debit,
       credit: r.credit,
       closing_balance: closingBalance,
-      is_revenue: null,
+      is_revenue: isRevenue,
       is_deemed_positive: isDeemedPositive,
       trail_balance: 0,
       parent:         chain[0] || '',
@@ -191,7 +201,8 @@ export function buildTBRowsFromTally(tbRows, ledgerMap) {
       group_parent_4: chain[5] || '',
       group_parent_5: chain[6] || '',
       group_parent_6: chain[7] || '',
-      group_parent_7: chain[chain.length - 1] || '',  // primary group at the top
+      group_parent_7: long ? chain[8] : (chain[chain.length - 1] || ''),  // primary group at the top
+      group_parent_8: long ? chain[chain.length - 1] : '',
     }
   })
 }

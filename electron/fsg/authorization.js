@@ -34,10 +34,14 @@ import { basename, dirname, extname, resolve as resolvePath } from 'node:path'
 // ── Policy table ───────────────────────────────────────────────────────────
 // access: 'auth' | 'manager' | 'partner' | 'disabled'
 // scopes: [{ kind, arg, prop?, many?, optional? }]
-// write:  true when the call changes data (period/client write rules apply)
+// write:  true when the call changes data (period/client write rules apply;
+//         a locked or final Financial Year named by the call is refused)
+// lockExempt: true only for the actions that lock, unlock or finalise a year
 // paths:  [{ arg, prop?, mode: 'open' | 'save' }]
 
 const R = (kind, arg = 0, extra = {}) => ({ kind, arg, ...extra })
+
+export const LOCKED_YEAR_MESSAGE = 'This Financial Year is locked or final, so its data cannot be changed. A manager, partner or admin can unlock it from the Master tab.'
 
 const DISABLED_IN_VERA = {
   'entity:delete': 'Auditees are VERA clients. Delete the client in VERA instead.',
@@ -97,9 +101,9 @@ export const CHANNEL_POLICY = {
   'investments:save': { access: 'auth', write: true, scopes: [R('entityPeriod', 0, { prop: 'entityPeriodId' }), R('tb', 0, { prop: 'tbId', optional: true })] },
   'entityPeriod:setPrevTB': { access: 'auth', write: true, scopes: [R('entityPeriod'), R('tb', 1, { optional: true, readOnly: true })] },
   'entityPeriod:setPYMode': { access: 'auth', write: true, scopes: [R('entityPeriod')] },
-  'entityPeriod:lock': { access: 'auth', write: true, scopes: [R('entityPeriod')] },
-  'entityPeriod:unlock': { access: 'manager', write: true, scopes: [R('entityPeriod')] },
-  'entityPeriod:finalise': { access: 'auth', write: true, scopes: [R('entityPeriod')] },
+  'entityPeriod:lock': { access: 'auth', write: true, lockExempt: true, scopes: [R('entityPeriod')] },
+  'entityPeriod:unlock': { access: 'manager', write: true, lockExempt: true, scopes: [R('entityPeriod')] },
+  'entityPeriod:finalise': { access: 'auth', write: true, lockExempt: true, scopes: [R('entityPeriod')] },
 
   // Trial balances
   'tb:upload': { access: 'auth', write: true, scopes: [R('entity', 0, { prop: 'entityId' }), R('entityPeriod', 0, { prop: 'entityPeriodId' })], paths: [{ arg: 0, prop: 'filePath', mode: 'open' }] },
@@ -111,6 +115,11 @@ export const CHANNEL_POLICY = {
   'tb:listByEntityPeriod': { access: 'auth', scopes: [R('entityPeriod')] },
   'tb:rows': { access: 'auth', scopes: [R('tb')] },
   'tb:delete': { access: 'auth', write: true, scopes: [R('tb')] },
+  // T-044: a Trial Balance's workings - summary, carry-over to a re-uploaded TB of the same year, one Excel file out and back in.
+  'workings:summary': { access: 'auth', scopes: [R('tb')] },
+  'workings:carryOver': { access: 'auth', write: true, scopes: [R('tb', 0, { prop: 'fromTbId', readOnly: true }), R('tb', 0, { prop: 'toTbId' })] },
+  'workings:export': { access: 'auth', scopes: [R('tb')] },
+  'workings:import': { access: 'auth', write: true, scopes: [R('tb', 0, { prop: 'tbId' })] },
   'tb:saveStock': { access: 'auth', write: true, scopes: [R('tb', 0, { prop: 'tbId' })] },
   'tb:getStockRows': { access: 'auth', scopes: [R('tb')] },
   'tb:getOtherExpenseHeads': { access: 'auth', scopes: [R('tb')] },
@@ -152,7 +161,6 @@ export const CHANNEL_POLICY = {
   'mappedTB:downloadExcel': { access: 'auth', scopes: [R('tb')] },
   'mappedTB:captionTuples': { access: 'auth', scopes: [R('tb')] },
   'mappedTB:findByFilter': { access: 'auth', scopes: [R('tb')] },
-  'mappedTB:diagnostics': { access: 'auth', scopes: [R('tb')] },
   'learnedRules:download': { access: 'auth', scopes: [R('entity')] },
   'learnedRules:upload': { access: 'auth', write: true, scopes: [R('entity')] },
   'learnedRules:apply': { access: 'auth', write: true, scopes: [R('entity')] },
@@ -285,14 +293,14 @@ function makeResolvers(db) {
       LEFT JOIN entity_periods ep ON ep.id = tb.entity_period_id
       LEFT JOIN financial_periods fp ON fp.id = ep.financial_period_id
      WHERE tb.id = ?`
-  const fromTb = (row) => (row ? { clientId: row.client_id, fy: fyKey(row.year_label), periodless: !row.entity_period_id } : null)
+  const fromTb = (row) => (row ? { clientId: row.client_id, fy: fyKey(row.year_label), periodless: !row.entity_period_id, entityPeriodId: row.entity_period_id ?? null } : null)
   const entityScope = (row) => (row ? { clientId: row.client_id, fy: null } : null)
 
   const tb = (id) => fromTb(one(tbSql, id))
   const entity = (id) => entityScope(one('SELECT client_id FROM entities WHERE id = ?', id))
   const entityPeriod = (id) => {
     const row = one(periodSql, id)
-    return row ? { clientId: row.client_id, fy: fyKey(row.year_label) } : null
+    return row ? { clientId: row.client_id, fy: fyKey(row.year_label), entityPeriodId: id } : null
   }
   const viaTb = (sql) => (id) => {
     const row = one(sql, id)
@@ -407,6 +415,7 @@ export function authorizeCall({ db, context, channel, args }) {
   const resolvers = makeResolvers(db)
   const access = createAccessChecker(db, context)
   const clients = new Set()
+  const writtenPeriods = new Set()
   let resolvedAny = false
 
   for (const spec of policy.scopes || []) {
@@ -445,6 +454,18 @@ export function authorizeCall({ db, context, channel, args }) {
       if (policy.write && !spec.readOnly && scope.periodless && !context.hasGlobalEngagementAccess) {
         throw new AuthorizationError('This trial balance is not attached to a financial year.')
       }
+      if (policy.write && !spec.readOnly && scope.entityPeriodId != null) writtenPeriods.add(Number(scope.entityPeriodId))
+    }
+  }
+
+  // T-035: a locked or final Financial Year is frozen for every write that
+  // names it (directly, or through its trial balance, ledger rows, notes,
+  // depreciation, cash flow, stock, PPE ledgers and the like). Only the
+  // lock/unlock/finalise actions themselves are exempt.
+  if (!policy.lockExempt) {
+    for (const id of writtenPeriods) {
+      const ep = db.prepare('SELECT locked, is_final FROM entity_periods WHERE id = ?').get(id)
+      if (ep && (ep.locked || ep.is_final)) throw new AuthorizationError(LOCKED_YEAR_MESSAGE)
     }
   }
 

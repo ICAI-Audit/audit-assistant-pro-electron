@@ -17,6 +17,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { checkLevel1Fallbacks } from './fsg-fallback-checks.mjs'
 import { checkInvestments } from './fsg-investment-checks.mjs'
 import { checkMissingAlie } from './fsg-missing-alie-checks.mjs'
+import { skippedPdfChecks } from './fsg-pdf-text.mjs'
+import { checkTbImport } from './fsg-tb-import-checks.mjs'
+import { checkQueue } from './fsg-queue-checks.mjs'
+import { checkNaming } from './fsg-naming-checks.mjs'
+import { checkPolicyFormat } from './fsg-policy-checks.mjs'
+import { checkWorkings } from './fsg-workings-checks.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
@@ -258,10 +264,63 @@ async function main() {
   check('staff can lock their financial year', r.ok && r.result.locked === true, r)
   r = await staff('mappedTB:clearAll', tbId)
   check('locked year refuses changes', r.ok === false && /lock/i.test(r.error), r)
+  // T-035: every kind of year data is frozen while the year is locked, for
+  // every role, and reads still work.
+  const frozenTables = ['tb_rows', 'mapped_tb', 'note_details', 'note_disclosures', 'remarks', 'dep_schedules', 'dep_it_schedules',
+    'dep_comp_schedules', 'cash_flow_entries', 'general_notes', 'tax_computations', 'deferred_tax_computations', 'form_3cd',
+    'ppe_ledgers', 'manual_py_entries', 'manual_face_lines', 'ratio_gp_selection', 'trial_balances']
+  const snapshotFrozen = () => JSON.stringify(frozenTables.map((t) => db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all()))
+  const lockedWrites = [
+    ['noteDetails:save', { tbId, noteNum: 1, noteTitle: 'Share Capital', data: { x: 1 } }],
+    ['noteDisclosure:save', { tbId, noteNum: 1, noteTitle: 'Share Capital', text: 'x' }],
+    ['remarks:save', { tbId, scope: 'note', scope_key: '1', remark: 'x' }],
+    ['dep:save', { tbId, data: { rows: [] } }],
+    ['dep:saveComp', { tbId, data: { categoryRows: [] } }],
+    ['dep:saveIT', { tbId, data: { blockSummary: [] } }],
+    ['cfs:save', entityId, periodId, { cy: { a: 9 }, py: {}, include: true }],
+    ['generalNotes:save', entityId, periodId, { points: [] }],
+    ['taxComputation:save', entityId, periodId, {}],
+    ['deferredTax:save', entityId, periodId, {}],
+    ['saveForm3CD', entityId, periodId, {}],
+    ['ratio:saveGPSelection', entityId, periodId, []],
+    ['savePPELedgers', entityId, periodId, []],
+    ['tb:saveStock', { tbId, stockData: [] }],
+    ['tb:insertManualRow', { tbId, rowData: { name: 'Locked ledger', closing_balance: 1 } }],
+    ['tb:saveJournalEntry', { tbId, date: '2025-03-31', entries: [] }],
+    ['tb:delete', tbId],
+    ['manualPY:set', tbId, true],
+    ['manualPyEntries:upsert', { tbId, noteNum: 1, particularLabel: 'x', pyAmount: 1 }],
+    ['manualFaceLines:add', { tbId, label: 'x' }],
+    ['plClosedToCapital:set', tbId, true],
+    ['eps:set', tbId, 'basic_cy', 1],
+    ['entityPeriod:setPrevTB', periodId, null],
+    ['mappedTB:override', mapped[0]?.id, {}],
+  ]
+  for (const [label, caller] of [['locked', staff], ['final', partner]]) {
+    if (label === 'final') {
+      r = await partner('entityPeriod:finalise', periodId, 'Synthetic Place', '2025-09-01')
+      check('partner can mark the year final', r.ok, r)
+    }
+    const before = snapshotFrozen()
+    const allowed = []
+    for (const [channel, ...args] of lockedWrites) {
+      const res = await caller(channel, ...args)
+      if (!(res.ok === false && res.denied && /locked or final/i.test(res.error))) allowed.push({ channel, res })
+    }
+    check(`T-035 ${label} year refuses note, depreciation, cash flow, stock, journal, tax, 3CD, PPE, PY and TB writes`, allowed.length === 0, allowed)
+    check(`T-035 ${label} year data is unchanged after the refused writes`, snapshotFrozen() === before)
+    r = await caller('financials:getData', tbId)
+    check(`T-035 ${label} year can still be read`, r.ok && Array.isArray(r.result), r)
+  }
+  r = await partner('entityPeriod:lock', periodId)
+  check('T-035 locking an already final year is still allowed', r.ok, r)
+
   r = await staff('entityPeriod:unlock', periodId)
   check('staff cannot unlock', r.ok === false && r.denied, r)
   r = await partner('entityPeriod:unlock', periodId)
   check('partner can unlock', r.ok && r.result.locked === false, r)
+  r = await staff('noteDetails:save', { tbId, noteNum: 1, noteTitle: 'Share Capital', data: { x: 1 } })
+  check('T-035 unlocked year accepts changes again', r.ok, r)
 
   // JSON documents (former JSONB columns) round-trip.
   r = await staff('cfs:save', entityId, periodId, { cy: { a: 1 }, py: {}, include: true })
@@ -351,9 +410,19 @@ async function main() {
     renderPdf: html => partner('financials:renderPDF', html) })
   await checkLevel1Fallbacks({ Database, root, userData, originalDb: db, check,
     renderPdf: html => partner('financials:renderPDF',html) })
+  await checkTbImport({ db, root, userData, check, staff, entityId, periodId, defaultRs })
+  await checkQueue({ db, check, staff, entityId, periodId, defaultRs })
+  await checkNaming({ db, root, check, staff, entityId, defaultRs })
+  await checkPolicyFormat({ root, userData, check })
+  await checkWorkings({ db, check, staff, partner, entityId, periodId, defaultRs })
 
   const failed = results.filter((x) => !x.pass)
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
+  const skipped = skippedPdfChecks()
+  if (skipped.length) {
+    console.log(`${skipped.length} PDF text check(s) skipped, not passed (${skipped[0].reason}):`)
+    for (const s of skipped) console.log(`  - ${s.name}`)
+  }
   db.close()
   try { rmSync(userData, { recursive: true, force: true }) } catch (_) { /* temp folder */ }
   app.exit(failed.length ? 1 : 0)

@@ -4,6 +4,7 @@ import { copyFileSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { attachDatabase, query } from '../electron/fsg/db/client.js'
+import { pdfPageTexts } from './fsg-pdf-text.mjs'
 import { seedDefaultMapping } from '../electron/fsg/services/excel.js'
 import { runMappingEngine, persistMappingResults } from '../electron/fsg/services/mapping-engine.js'
 import { ensureLevel1Fallbacks, LEVEL1_FALLBACK_ADDITIONS, PRE_FALLBACK_WORKBOOK_HASH, FALLBACK_WORKBOOK_HASH } from '../electron/fsg/db/level1-fallbacks.js'
@@ -143,13 +144,13 @@ export async function checkLevel1Fallbacks({ Database, root, userData, originalD
       if (c === 3) {
         const pdfResult = await renderPdf(html)
         if (!pdfResult.ok) throw new Error(pdfResult.error)
-        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-        const document = await pdfjs.getDocument({data:new Uint8Array(pdfResult.result),useSystemFonts:true}).promise
-        let content = ''
-        for (let p = 1;p<=document.numPages;p++) content += (await (await document.getPage(p)).getTextContent()).items.map(i=>i.str).join(' ') + ' '
-        check('T-024 actual PDF contains the unresolved fallback categories and figures',labels.every(l => content.includes(l))
-          && [100000,60000,30000].every(n => content.includes(fmt(n))))
-        await document.destroy()
+        const pdfCheck = 'T-024 actual PDF contains the unresolved fallback categories and figures'
+        const pages = await pdfPageTexts(pdfResult.result, pdfCheck)
+        if (pages) {
+          const content = pages.map(p => p + ' ').join('')
+          check(pdfCheck,labels.every(l => content.includes(l))
+            && [100000,60000,30000].every(n => content.includes(fmt(n))))
+        }
       }
       if (c !== 3) {
         // The original non-corporate profit-transfer rule requires an actual

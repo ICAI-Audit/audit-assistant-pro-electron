@@ -2756,7 +2756,7 @@ export function buildGeneralNotesSheet(data, { entity, auditor, signatories, sig
     addSignatureBlock(rows, rows, entity, auditor, signatories, signPlace, signDate)
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(rows.length ? rows : [['No General Notes added yet.']])
+  const ws = XLSX.utils.aoa_to_sheet(rows.length ? rows : [['No Policy added yet.']])
   ws['!cols'] = [{ wch: 100 }, { wch: 30 }, { wch: 30 }, { wch: 30 }]
   for (const rowIdx of boldRowIdxs) {
     const addr = XLSX.utils.encode_cell({ r: rowIdx, c: 0 })
@@ -2884,13 +2884,13 @@ export function buildFinancialsWorkbook({ entity, activeTB, prevTB, data, levelF
     ? buildGeneralNotesSheet(data, { entity, auditor, signatories, signPlace, signDate })
     : null
   if (generalNotesSheet && !generalNotesLast) {
-    XLSX.utils.book_append_sheet(wb, generalNotesSheet, 'General Notes')
+    XLSX.utils.book_append_sheet(wb, generalNotesSheet, 'Policy')
   }
   XLSX.utils.book_append_sheet(wb, notesWs,  'Notes')
   XLSX.utils.book_append_sheet(wb, annexWs,  'Annexures')
   appendMissingAlieSheet(wb, data.missingAlie)
   if (generalNotesSheet && generalNotesLast) {
-    XLSX.utils.book_append_sheet(wb, generalNotesSheet, 'General Notes')
+    XLSX.utils.book_append_sheet(wb, generalNotesSheet, 'Policy')
   }
   // Previous Year not required, column left out: hidden (not deleted) on the sheets whose Previous Year sits in
   // columns of its own - so every formula and link keeps working. The Notes sheet stacks tables of different
@@ -3309,7 +3309,7 @@ export function buildColumnarWorkbook({ entity, branchTBsData, denomination = 'a
 
   // General Notes (Significant Accounting Policies ...) of the Auditee as a whole - not a branch's, so one sheet
   if (generalData?.generalNotes?.points?.length) {
-    XLSX.utils.book_append_sheet(wb, buildGeneralNotesSheet(generalData, { entity, auditor, signatories, signPlace, signDate }), 'General Notes')
+    XLSX.utils.book_append_sheet(wb, buildGeneralNotesSheet(generalData, { entity, auditor, signatories, signPlace, signDate }), 'Policy')
   }
 
   appendMissingAlieSheet(wb, alieReport)

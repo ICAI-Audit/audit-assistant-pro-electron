@@ -1,5 +1,46 @@
 # Current status
 
+## T-042 to T-044 Mapping 1-7, Policy format and workings carry-over (15 November 2026)
+
+- Branch `FSG-AM` from `main` `36130e6`, updated to `e1fb062`; Financial Statement Review only (F-007, F-009). Committed and pushed on `FSG-AM`.
+- T-042: "Level 4-7" (and "Level 1-3" captions) are shown as Mapping 4-7 / Mapping 1-3 across Rectification, Mapped TB, Override, Journal Entry, Notes, Mapping Rules and Excel downloads (Mapped TB download: "Mapping 1-3 (Format)" beside the engine's "Mapping 1-3"). `formatLevel` reads Level Format rows with either header; Learned Ledger Rules upload accepts both. Follow-up after owner review: the Rectification bulk row showed a free-text "Mapping 5 (Nature)" box right after Mapping 3 before any mapping was chosen, so Mapping 4 looked missing; it now appears only for a custom note line (no Level Format row), and the remaining "Level 4–7 only" and Mapping Rules descriptions say Mapping. `npm run test:fsg-ui` 95/95 after the change.
+- T-043: Policy Excel format download (blank with the AS-1 example, or filled) and upload; see `utils/policyWorkbook.js`. Formatting (bold, italics, alignment) is not carried through Excel.
+- T-044: workings of a TB (Fill Details, disclosures, ITR details, remarks, Dep (Books), Dep (Income Tax), Stock, manual PY, extra face lines, P&L-closed/EPS, adjustments, journal entries and added ledgers) are carried over to a re-uploaded TB of the same year and branch, in one transaction; Stock goes through `tb:saveStock` and adjustments through `mappedTB:setAdjustment`. Adjustments are matched by ledger code, else name; unmatched ones are reported. One Excel file holds all workings plus the learned ledger rules and is uploaded back with a preview; a file of another client is refused and another year is warned. Not carried: the hidden Dep (Old) schedule; consolidated (entity-level) branch data, which is not per TB.
+- Checks: `npm run test:fsg` 282/282 (5 T-042, 11 T-043, 22 T-044 new checks), 4 PDF text checks skipped (win32-arm64); `npm run test:fsg-ui` 95/95; `npm run docs:inventory`; `npm run docs:check`. Not run: the carry-over dialog through a real re-upload in the desktop app, owner UAT. See [handoff](SESSION_HANDOFF.md#t-042-to-t-044-mapping-1-7-policy-format-and-workings-carry-over-15-november-2026).
+
+## T-041 Diagnose button removed (15 November 2026)
+
+- Branch `FSG-AM`; committed and pushed. The Rectification "Diagnose" button showed raw database counts as JSON and changed nothing; it, its panel, the `mappedTB:diagnostics` handler, its policy and `exceptionsDiagnostics` were removed. `npm run test:fsg` 244/244 (4 PDF text checks skipped, win32-arm64); `npm run test:fsg-ui` 93/93.
+- Proposed to the owner, awaiting decisions: renaming Level 4-7 as Mapping 4-7; a downloadable/uploadable Policy format (Excel, optionally Word); carrying a year's workings over to a re-uploaded Trial Balance with a reminder. See [handoff](SESSION_HANDOFF.md#t-041-diagnose-removed-and-proposals-15-november-2026).
+
+## T-040 recategorisation queue matches Notes Fix (15 November 2026)
+
+- Branch `FSG-AM` from `main` `36130e6`, updated to `e1fb062`; Financial Statement Review only (F-007). Committed and pushed on `FSG-AM`.
+- Cause: the queue exempted `user_override`/`user_approved` ledgers from the Level 4/5 test, never tested Level 6, treated a value outside the option list as chosen, and did not flag unsplit "Sale" ledgers, while Notes (`buildNoteTemplateRows`, `unsplitSaleLine`) flags all of these. The empty state also ignored the Previous Year Trial Balance, which Notes includes.
+- Fix: `electron/fsg/ipc/mapped-tb.js` (`optionUnresolved` for Levels 4-6, `saleUnsplit`, `level6_value` in the combination key), `src/modules/fsg/utils/fixTargets.js` (bifurcation need), `src/modules/fsg/components/Exceptions/index.jsx` (Previous Year check before "No exceptions"). Ledgers saved earlier with a blank option list now reappear until an option is chosen. Level 7 is still not tested by the queue; Notes does not flag it either.
+- Checks: `npm run test:fsg` 244/244 (13 new T-040 checks; 4 fail with the previous `mapped-tb.js`), 4 PDF text checks skipped (win32-arm64); `npm run test:fsg-ui` 93/93; `npm run docs:check`. See [handoff](SESSION_HANDOFF.md#t-040-recategorisation-queue-matches-notes-fix-15-november-2026).
+
+## T-037 to T-039 TB import ALIE, menus and annexure recategorisation (15 November 2026)
+
+- Branch `FSG-AM` from `main` `36130e6`, updated to `e1fb062`; Financial Statement Review only (F-007, F-009). Committed and pushed on `FSG-AM`.
+- T-037: `tb:upload` (Excel), `tb:uploadTally` and the RealBooks/Zoho/Busy path now store `group_parent_8` and `trial_balance_type` (previously dropped by Excel and Tally). The mapping engine takes ALIE from TrialBalance, else from Tally's IsRevenue + IsDeemedPositive (No/Yes ASSETS, No/No EQUITY AND LIABILITIES, Yes/Yes Expenses, Yes/No Income); nothing is guessed when either is unknown. The live Tally master fetch reads group IsRevenue, inherited like IsDeemedPositive, and keeps the top group of chains longer than nine levels in `group_parent_8`; shorter chains keep their earlier layout. Not changed: the Python ODBC fallback (no flags fetched); existing TBs until re-uploaded or re-mapped. Re-running mapping on an affected TB can change previously unknown ALIEs.
+- T-038: General Notes is shown as Policy (Ctrl+Shift+O; VERA's Ctrl+O is not triggered) and the exported sheet is "Policy". PPE removed from Features; the screen fed no statement. Known gap: Policy's ratio and useful-life tables use "Current Year/Previous Year" headings, not reporting dates.
+- T-039: Annex & Reco ledgers have a ✎ button opening the Mapped TB Override Mapping dialog; the override is saved through `mappedTB:override` and the annexures reload. Consolidated view excluded.
+- Checks: `npm run test:fsg` 231/231 (16 new T-037 checks), 4 PDF text checks skipped (win32-arm64); `npm run test:fsg-ui` 93/93; `npm run docs:check`. No live Tally, no real client data, no owner UAT. See [handoff](SESSION_HANDOFF.md#t-037-to-t-039-tb-import-alie-menus-and-annexure-recategorisation-15-november-2026).
+
+## T-035 and T-036 locked years and Dep menu (15 November 2026)
+
+- Branch `FSG-AM` from `main` `36130e6`, updated to `e1fb062`; Financial Statement Review only (F-009). Committed and pushed on `FSG-AM`.
+- T-035: `authorizeCall` now refuses any write whose scope resolves to a locked or final `entity_periods` row (directly, or through a TB, mapped row, manual PY entry, face line or PPE ledger). Only `entityPeriod:lock`, `unlock` and `finalise` are exempt. Previously only TB uploads, mapping changes, PY mode and investments checked the lock. Reads still work. `LockBanner` now appears on every year-data tab and names everything that is frozen. Not covered: entity-level consolidated branch data (`entity_note_*`, `entity_manual_py_entries`, `entities.consolidated_*`), which has no year; one-time start-up data migrations.
+- T-036: Dep menu items are Dep (Books) (Companies Act schedule, formerly Dep (Comp)) and Dep (Income Tax) (formerly Dep (IT)). Dep (Old) and its component were removed, and the PPE note no longer reads its saved schedule; the PPE note now comes from mapped ledgers or the schedule marked "Include in PPE Note". Saved `dep_schedules` rows remain. Excel template sheet names are unchanged.
+- Checks: `npm run test:fsg` 215/215, 4 PDF text checks skipped (win32-arm64); `npm run test:fsg-ui` 84/84 (one earlier run stopped with a CDP `localStorage` SecurityError after all FSG checks had passed; the rerun passed); `npm run docs:check`. Not run: x64 PDF text checks, owner UAT. See [handoff](SESSION_HANDOFF.md#t-035-and-t-036-locked-years-and-dep-menu-15-november-2026).
+
+## T-034 FSG test baseline on Windows-on-ARM (14 November 2026)
+
+- Branch `FSG-AM` from `main` `36130e6`; FSG test scripts only (F-009 verification). No application code, schema, dependency or `package.json` change.
+- `npm run test:fsg` previously aborted on win32-arm64 because the unused `pdf-parse` pins `@napi-rs/canvas` 0.1.80, which has no win32-arm64 binary, so pdfjs throws `DOMMatrix is not defined`. The four PDF text checks now go through `scripts/fsg-pdf-text.mjs`, which records them as **skipped, not passed** in that case only; other errors still fail, and `FSG_REQUIRE_PDF_TEXT=1` makes a skip fail. Result on this machine: 206/206 passed, 4 skipped (210 total). The PDF text checks still need a run on x64. Dependency fix options (remove `pdf-parse` or override `@napi-rs/canvas` ≥ 0.1.85) are left to the owner.
+- `npm run test:fsg-ui` check "existing database receives a backup before the firm Place upgrade" was stale: the seed used HEAD's schema, which already has `firm_settings.place`. The seed now drops that column to reproduce a pre-T-023 install. Result: 81/81. See [handoff](SESSION_HANDOFF.md#t-034-fsg-test-baseline-on-windows-on-arm-14-november-2026).
+
 ## T-036 Sync latest main and refresh startup label (15 November 2026)
 
 - Requested outcome: fetch the latest Git changes, merge them into local `main`, refresh the startup label and test the update. Selected task T-036; affected features F-001 and F-031, with F-008's VERA Tools path replaced and partial overlap with F-029.
