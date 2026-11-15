@@ -1,5 +1,15 @@
 # Latest session handoff
 
+## T-035 Project documentation workflow repair (15 November 2026)
+
+- Requested outcome: fix the failing `documentation` job in Project documentation workflow run `43681671321`, job `132713426018` (PR #114). Selected task T-035; no product feature IDs are affected.
+- Branch `ledger-analysis`, source HEAD `0ead684abadcbfe7f8607b090602ee69778a3e45`. The failing run tested PR merge commit `4d7df9d8a9596a3b5baca25c7c3b6b34e68c2226`.
+- Root cause: `docs/project/inventory.json` had no comma after `"src/modules/ledger-analysis/ledgerAnalysis.test.ts"` before the next array element. The checker reported `Cannot validate source inventory: Expected ',' or ']' after array element in JSON at position 12875 (line 448 column 5)`.
+- Changed paths: `docs/project/inventory.json` (added the missing comma), `docs/project/CURRENT_STATUS.md`, `docs/project/NEXT_TASKS.md`, and this handoff. The inventory refresh produced no other changes; `docs/project/SCREEN_MAP.md` remained unchanged.
+- Passed: `npm run docs:inventory` (33 routes, 11 schema files, 58 test files); `npm run docs:check` (31 required documents, local links, shared adapters and inventory); `node --test scripts/check-project-docs.test.mjs` (3/3); `git -c core.whitespace=cr-at-eol diff --check`.
+- The original GitHub Actions run failed as described; the updated branch's Actions result is not yet available. Application behavior, builds and application tests were not in scope and were not run.
+- First executable next step: confirm the updated PR #114 Project documentation workflow passes on GitHub Actions; then resume the existing owner review/UAT of T-033 Ledger Analysis.
+
 ## T-033 Ledger Analysis on branch ledger-analysis (14 November 2026)
 
 - Agent: Claude Code (desktop app), working with the user step by step. Approval source: the owner's instruction (relayed by the user, 14 November 2026) to make a new branch "Ledger Analysis", do the work there and push the branch; the owner reviews and merges. Branch name `ledger-analysis` (git does not allow spaces). Decisions confirmed by the user on 14 November 2026: task ID T-033 (T-024 is already used three times), remove Tally Tools and drop Opening Balance Matching, several reviewable commits.

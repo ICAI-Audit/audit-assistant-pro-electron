@@ -444,7 +444,7 @@
     "src/lib/taxAuditReportPack.test.ts",
     "src/lib/taxAuditReportReadiness.test.ts",
     "src/lib/taxAuditStatutoryVersion.test.ts",
-    "src/modules/ledger-analysis/ledgerAnalysis.test.ts"
+    "src/modules/ledger-analysis/ledgerAnalysis.test.ts",
     "src/modules/permanent-file/format.test.ts",
     "src/modules/permanent-file/response.test.ts"
   ],
