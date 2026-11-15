@@ -175,7 +175,6 @@
         "src/hooks/useEngagementTrialBalance.ts",
         "src/services/trialBalanceNewClassification.ts",
         "src/utils/classificationRules.ts",
-        "src/hooks/useTallyODBC.ts",
         "electron/main.cjs"
       ],
       "tableNames": [
