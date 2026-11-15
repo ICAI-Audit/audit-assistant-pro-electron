@@ -820,6 +820,14 @@ function resolveEvidenceFile(db, bucket, relativePath, context) {
 function registerIpcHandlers() {
   const { ipcMain } = require('electron');
 
+  const { createPermanentFileHandler } = require('./permanent-file/ipc.cjs');
+  ipcMain.handle('permanent-file:request', createPermanentFileHandler({
+    getDb: getSqliteDb,
+    getContext: getAuthorizedSession,
+    backupDir: path.join(app.getPath('userData'), 'backups'),
+    storageDir: path.join(app.getPath('userData'), 'files', 'permanent-file'),
+  }));
+
   // --- SQLite AUTH & QUERY HANDLERS ---
   ipcMain.handle('sqlite-auth', async (event, payload) => {
     if (!isTrustedRendererEvent(event)) {

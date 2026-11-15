@@ -406,6 +406,39 @@ async function testHarness(t) {
     const result = await query({ table: 'engagements', action: 'select' });
     console.log(`[T003 ${result.error ? 'DENIED' : 'ALLOWED'}] database read after logout; expected=deny; rows=${result.data?.length}; error=${result.error?.message || 'none'}`);
     assert.ok(result.error, 'database read succeeded after logout');
+    const permanent = await evaluate(`globalThis.electronAPI.permanentFile.request({ action: 'list', clientId: ${JSON.stringify(clientA.id)} })`);
+    assert.equal(permanent.success, false, 'permanent file opened after logout');
+  });
+
+  await t.test('permanent-file IPC restricts client and document versions', async () => {
+    await login(staffEmail, password);
+    const denied = await evaluate(`globalThis.electronAPI.permanentFile.request({ action: 'list', clientId: ${JSON.stringify(clientB.id)} })`);
+    assert.equal(denied.success, false, 'unassigned client permanent file was accessible');
+    const upload = await evaluate(`globalThis.electronAPI.permanentFile.request({
+      action: 'upload',
+      clientId: ${JSON.stringify(clientA.id)},
+      category: 'PF-02',
+      name: 'Synthetic Deed',
+      fileName: 'deed.txt',
+      bytes: new Uint8Array([1, 2, 3]),
+      engagementIds: [${JSON.stringify(engagementA.id)}]
+    })`);
+    assert.equal(upload.success, true, upload.error);
+    const list = await evaluate(`globalThis.electronAPI.permanentFile.request({ action: 'list', clientId: ${JSON.stringify(clientA.id)} })`);
+    assert.equal(list.success, true, list.error);
+    assert.equal(list.data.documents.length, 1);
+    assert.equal(list.data.documents[0].versionId, upload.data.versionId);
+    const download = await evaluate(`(async () => {
+      const result = await globalThis.electronAPI.permanentFile.request({
+        action: 'download', clientId: ${JSON.stringify(clientA.id)}, versionId: ${JSON.stringify(upload.data.versionId)}
+      });
+      return result.success ? Array.from(result.data.bytes) : result;
+    })()`);
+    assert.deepEqual(download, [1, 2, 3]);
+    const forged = await evaluate(`globalThis.electronAPI.permanentFile.request({
+      action: 'download', clientId: ${JSON.stringify(clientB.id)}, versionId: ${JSON.stringify(upload.data.versionId)}
+    })`);
+    assert.equal(forged.success, false, 'cross-client download succeeded');
   });
 
   await t.test('staff listing is filtered to assigned engagement', async () => {
