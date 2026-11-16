@@ -12,6 +12,7 @@
 // only record of its SHA-256, is still written, silently and with the captured engagement id, as
 // long as the same user is signed in (never under another user's name).
 import { buildActivityEntry, type ActivityEntry } from '@/lib/pdf-tools/activity';
+import { forgetMatchedText } from '@/lib/pdf-tools/matchedText';
 import type { WorkingListStore } from '@/lib/pdf-tools/workingList';
 import type { Destination, SourceRef, VaultRecord, WorkingFile } from '@/lib/pdf-tools/types';
 import { plainMessage } from './format';
@@ -30,7 +31,7 @@ export const EVIDENCE_TYPES: readonly { value: EvidenceType; label: string }[] =
 ];
 
 export const ATTACH_FAILED = 'Attachment failed. The file is in the Evidence Vault; you can retry.';
-export const LOG_FAILED = 'Saved, but the activity record could not be written.';
+export const LOG_FAILED = 'Saved, but this step could not be recorded in the Audit Trail.';
 export const NOT_IN_VAULT = 'It is no longer in the Evidence Vault. Attach it again to add it there first.';
 export const VAULT_UNCHECKED = 'The Evidence Vault could not be checked for this file. Try again.';
 const VAULT_REFUSED = 'The Evidence Vault did not accept it.';
@@ -350,7 +351,10 @@ function emptyResult(): BatchResult {
   return { status: 'done', succeeded: [], failed: [], addedToVault: [], droppedFromVault: [], logFailures: 0, notStarted: 0 };
 }
 
-/** Runs `each` over the files in order, with Stop, progress and the scope check before each file. */
+/**
+ * Runs `each` over the files in order, with Stop, progress and the scope check before each file. When
+ * the batch settles, however it ends, the engine forgets the file name a pattern read last (matchedText.ts).
+ */
 async function inTurn(
   files: readonly WorkingFile[],
   scope: DestinationScope,
@@ -358,16 +362,20 @@ async function inTurn(
   options: BatchOptions,
   each: (file: WorkingFile, result: BatchResult) => Promise<'stale' | void>,
 ): Promise<BatchResult> {
-  const result = emptyResult();
-  for (const [index, file] of files.entries()) {
+  try {
+    const result = emptyResult();
+    for (const [index, file] of files.entries()) {
+      if (!isLive(scope, deps.store)) return { ...result, status: 'stale' };
+      if (options.signal?.aborted) return { ...result, status: 'stopped', notStarted: files.length - index };
+      options.onProgress?.(index, files.length, file.name);
+      if ((await each(file, result)) === 'stale') return { ...result, status: 'stale' };
+    }
     if (!isLive(scope, deps.store)) return { ...result, status: 'stale' };
-    if (options.signal?.aborted) return { ...result, status: 'stopped', notStarted: files.length - index };
-    options.onProgress?.(index, files.length, file.name);
-    if ((await each(file, result)) === 'stale') return { ...result, status: 'stale' };
+    options.onProgress?.(files.length, files.length, '');
+    return result;
+  } finally {
+    forgetMatchedText();
   }
-  if (!isLive(scope, deps.store)) return { ...result, status: 'stale' };
-  options.onProgress?.(files.length, files.length, '');
-  return result;
 }
 
 /** Adds each file to the current engagement's Evidence Vault through its existing upload. */
@@ -491,6 +499,12 @@ export function attachToWorkingPaper(
   });
 }
 
+/** ", converted from TIFF to PDF" for a TIFF converted when it was added (intake.ts); '' otherwise. */
+function convertedFromTiff(file: WorkingFile): string {
+  if (file.convertedFrom !== 'tiff') return '';
+  return `, converted from TIFF to ${file.kind === 'pdf' ? 'PDF' : file.mimeType === 'image/jpeg' ? 'JPEG' : 'PNG'}`;
+}
+
 /**
  * The activity entry of a save to the computer ('computer', through a save dialog) or a download
  * ('download', the fallback, whose completion cannot be seen). An input saved as it is was not made
@@ -504,7 +518,7 @@ function computerEntry(file: WorkingFile, sha: string, destination: 'computer' |
     destination,
     sha256: sha,
     zip,
-    summary: `Copy of a file from the ${file.origin === 'vault' ? 'Evidence Vault' : 'computer'}${file.wasProtected ? ', without its password' : ''}`,
+    summary: `Copy of a file from the ${file.origin === 'vault' ? 'Evidence Vault' : 'computer'}${file.wasProtected ? ', without its password' : ''}${convertedFromTiff(file)}`,
     sources: [source],
   });
 }
@@ -520,18 +534,22 @@ export async function recordComputerSave(
   scope: DestinationScope,
   deps: DestinationDeps,
 ): Promise<{ status: 'done' | 'stale'; logFailures: number }> {
-  const live = isLive(scope, deps.store);
-  if (!live && !(await sameUser(scope, deps))) return { status: 'stale', logFailures: 0 };
-  const destination = args.download ? 'download' : 'computer';
-  const marked = new Set(args.markIds);
-  const saved = args.files.map((file, i) => ({ file, sha: args.hashes[i] ?? null })).filter(({ file }) => marked.has(file.id));
-  if (live) for (const { file } of saved) deps.store.markSent(file.id, destination);
-  let logFailures = 0;
-  for (const { file, sha } of saved) {
-    if (!isLive(scope, deps.store) && !(await sameUser(scope, deps))) return { status: 'stale', logFailures };
-    if (sha === null || !(await writeLog(computerEntry(file, sha, destination, args.zip), scope, deps))) logFailures += 1;
+  try {
+    const live = isLive(scope, deps.store);
+    if (!live && !(await sameUser(scope, deps))) return { status: 'stale', logFailures: 0 };
+    const destination = args.download ? 'download' : 'computer';
+    const marked = new Set(args.markIds);
+    const saved = args.files.map((file, i) => ({ file, sha: args.hashes[i] ?? null })).filter(({ file }) => marked.has(file.id));
+    if (live) for (const { file } of saved) deps.store.markSent(file.id, destination);
+    let logFailures = 0;
+    for (const { file, sha } of saved) {
+      if (!isLive(scope, deps.store) && !(await sameUser(scope, deps))) return { status: 'stale', logFailures };
+      if (sha === null || !(await writeLog(computerEntry(file, sha, destination, args.zip), scope, deps))) logFailures += 1;
+    }
+    return { status: isLive(scope, deps.store) ? 'done' : 'stale', logFailures };
+  } finally {
+    forgetMatchedText(); // a save batch has settled (matchedText.ts)
   }
-  return { status: isLive(scope, deps.store) ? 'done' : 'stale', logFailures };
 }
 
 // ---- what the user is told ----------------------------------------------------------------------

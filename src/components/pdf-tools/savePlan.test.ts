@@ -64,7 +64,7 @@ describe('planSaveResult', () => {
 
   it('names the one saved file', () => {
     const plan = planSaveResult(report({ mode: 'one', files: [files[0]], written: [] }));
-    expect(plan).toEqual({ markIds: ['a'], toast: { tone: 'success', title: 'Saved to your computer', description: 'Bank.pdf' } });
+    expect(plan).toEqual({ markIds: ['a'], toast: { tone: 'success', title: 'Saved to computer', description: 'Bank.pdf' } });
   });
 
   it('marks every file of a download, as for a save: the fallback counts as sent', () => {

@@ -5,6 +5,7 @@
 // First start: refuses to run if a database already exists in that profile.
 // Restart (PDF_TOOLS_TEST_RESTART=1): the test checks persistence, so its own database must
 // already be there; it refuses to run if it is missing.
+// PDF_TOOLS_TEST_KEYS (optional): the test's command file for real key events (see the end).
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -63,4 +64,29 @@ app.whenReady().then(() => {
   const { session } = require('electron');
   session.defaultSession.on('will-download', (_event, item) => item.setSavePath(path.join(resolvedDownloads, item.getFilename())));
 });
+// Real key events from the main process (webContents.sendInputEvent), asked for by the test: it writes
+// { id, events } to the command file PDF_TOOLS_TEST_KEYS (inside the test's runtime folder); each event is
+// sent to the window, then the id is written to "<file>.done". The application's shortcuts are checked with
+// these, as a user's keys arrive, rather than with events made in the page.
+const keysFile = process.env.PDF_TOOLS_TEST_KEYS ? path.resolve(process.env.PDF_TOOLS_TEST_KEYS) : null;
+if (keysFile) {
+  if (!samePath(path.dirname(keysFile), runtimeFolder)) {
+    throw new Error(`Refusing a key command file outside the PDF Tools test runtime folder: ${keysFile}`);
+  }
+  const keysTimer = setInterval(() => {
+    if (!fs.existsSync(keysFile)) return;
+    let command;
+    try {
+      command = JSON.parse(fs.readFileSync(keysFile, 'utf8'));
+      fs.unlinkSync(keysFile);
+    } catch {
+      return; // written but not complete yet: read again on the next turn
+    }
+    const { BrowserWindow } = require('electron');
+    const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+    if (win) for (const event of command.events) win.webContents.sendInputEvent(event);
+    fs.writeFileSync(`${keysFile}.done`, String(command.id));
+  }, 100);
+  keysTimer.unref();
+}
 require(path.join(projectRoot, 'electron', 'main.cjs'));

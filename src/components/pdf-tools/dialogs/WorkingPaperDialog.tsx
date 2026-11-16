@@ -8,7 +8,7 @@ import type { WorkingFile } from '@/lib/pdf-tools/types';
 import { boxOptions, sectionOptions, type AttachTarget, type BatchOptions, type BatchResult, type SummaryToast, type TargetOption, type VaultForm } from '../destinations';
 import { plural } from '../format';
 import type { VaultFileRow } from '../vaultBytes';
-import { DestinationFrame, VaultFormFields } from './DestinationFrame';
+import { DestinationFrame, ProtectedNote, VaultFormFields } from './DestinationFrame';
 import { FileChip, Notice } from './ToolDialog';
 import { useBatchRun, useVaultForm } from './useDestinationDialog';
 
@@ -178,6 +178,7 @@ export default function WorkingPaperDialog({ files, leftOut, programmes, vaultRo
       onClose={onClose}
       onReturnFocus={onReturnFocus}
     >
+      <ProtectedNote files={files} />
       {leftOut > 0 && (
         <Notice tone="neutral" title={`${plural(leftOut, 'selected file')} ${leftOut === 1 ? 'is' : 'are'} left out`}>
           Only results made by a tool are attached from here. Files from your computer or the Evidence Vault are attached in Audit Execution.
@@ -206,7 +207,7 @@ export default function WorkingPaperDialog({ files, leftOut, programmes, vaultRo
         <div className="space-y-2.5">
           {count === 1 && <FileChip file={files[0]} />}
           <Notice tone="info" icon={Archive} title={count > 1 ? `All ${count} are in the Evidence Vault already` : `Already in the Evidence Vault as ${files[0].vaultRecord?.name}`}>
-            {count > 1 ? 'They are' : 'It is'} attached from {count > 1 ? 'their' : 'its'} Evidence Vault record. No second copy is uploaded.
+            {count > 1 ? 'They are' : 'It is'} attached from the Evidence Vault. No second copy is made.
           </Notice>
           {count > 1 && (
             <ul aria-label="Results to attach" className="max-h-40 divide-y overflow-y-auto rounded-md border bg-muted/20 text-sm">

@@ -103,9 +103,10 @@ describe('groupTitle', () => {
     const long = 'L'.repeat(200);
     const parts = [partName(long, 1, 2), partName(long, 2, 2)];
     expect(parts[0].length).toBe(120);
-    expect(groupTitle(parts.map((name, i) => file(String(i), 'g', name))).title).toBe(`${'L'.repeat(108)} — 2 parts`);
+    // Cut in the middle (QA-FIX G): the start and the end of the stem stay.
+    expect(groupTitle(parts.map((name, i) => file(String(i), 'g', name))).title).toBe(`${'L'.repeat(54)}…${'L'.repeat(53)} — 2 parts`);
     const pages = [pageImageName(long, 1, 3, 'jpg'), pageImageName(long, 3, 3, 'jpg')];
-    expect(groupTitle(pages.map((name, i) => file(String(i), 'g', name))).title).toMatch(/^L+ — 2 page images$/);
+    expect(groupTitle(pages.map((name, i) => file(String(i), 'g', name))).title).toMatch(/^L+…L+ — 2 page images$/);
     const empty = [partName('', 1, 2), partName('', 2, 2)];
     expect(groupTitle(empty.map((name, i) => file(String(i), 'g', name))).title).toBe('document — 2 parts');
   });
@@ -135,6 +136,17 @@ describe('numberedResultName', () => {
     expect(plain.endsWith(' (2).pdf')).toBe(true);
   });
 
+  it('keeps the end of a long stem when it numbers it, and never adds a second "…" (QA-FIX G)', () => {
+    const numbered = numberedResultName(`${'S'.repeat(60)}final copy v3 revised${'E'.repeat(35)}.pdf`, 2);
+    expect(numbered.length).toBeLessThanOrEqual(120);
+    expect(numbered).toMatch(/E{30} \(2\)\.pdf$/);
+    expect(numbered.startsWith('S'.repeat(40))).toBe(true);
+    const twice = numberedResultName(`${'a'.repeat(58)}…${'b'.repeat(57)}.pdf`, 12);
+    expect(twice.length).toBeLessThanOrEqual(120);
+    expect(twice.match(/…/g)).toHaveLength(1);
+    expect(twice.endsWith(`${'b'.repeat(57)} (12).pdf`)).toBe(true);
+  });
+
   it('numbers a name holding a line or paragraph separator', () => {
     expect(numberedResultName('a\u2028b.pdf', 2)).toBe('a\u2028b (2).pdf');
     expect(numberedResultName('a\u2029b_part_01.pdf', 3)).toBe('a\u2029b_part_01 (3).pdf');
@@ -158,6 +170,6 @@ describe('numberedResultName', () => {
   it('keeps numbered capped parts in one group title', () => {
     const long = 'L'.repeat(200);
     const names = [numberedResultName(partName(long, 1, 2), 2), numberedResultName(partName(long, 2, 2), 2)];
-    expect(groupTitle(names.map((name, i) => file(String(i), 'g', name))).title).toMatch(/^L+ — 2 parts$/);
+    expect(groupTitle(names.map((name, i) => file(String(i), 'g', name))).title).toMatch(/^L+…L+ — 2 parts$/);
   });
 });

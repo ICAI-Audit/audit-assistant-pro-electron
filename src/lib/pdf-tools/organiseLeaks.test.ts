@@ -151,14 +151,19 @@ describe('pages that share or inherit one resource dictionary', () => {
 describe('a 300-page scan whose pages share one image dictionary', () => {
   it('one page is small, Split every page comes to about the size of the source, in reasonable time', async () => {
     const scan = await makeSharedScan(300, 4000);
-    let t = performance.now();
+    // This thread's processor time, not the clock (which on a busy machine also counts other work).
+    const cpuMs = (since: NodeJS.CpuUsage) => {
+      const used = process.threadCpuUsage(since);
+      return (used.user + used.system) / 1000;
+    };
+    let t = process.threadCpuUsage();
     const one = await extractPages(scan, [149]);
-    const oneMs = performance.now() - t;
+    const oneMs = cpuMs(t);
     expect(one.length).toBeLessThan(50_000);
     expect(rawFound(one, ['SCAN-IMG-150-', 'SCAN-IMG-149-', 'SCAN-IMG-151-'])).toEqual(['SCAN-IMG-150-']);
-    t = performance.now();
+    t = process.threadCpuUsage();
     const parts = await splitEvery(scan, 1);
-    const splitMs = performance.now() - t;
+    const splitMs = cpuMs(t);
     const total = parts.reduce((sum, p) => sum + p.length, 0);
     expect(parts).toHaveLength(300);
     expect(total, `${total} bytes in ${Math.round(splitMs)} ms (source ${scan.length}, one page ${one.length} bytes in ${Math.round(oneMs)} ms)`).toBeLessThan(scan.length * 1.5);

@@ -4,7 +4,10 @@ import {
   LIST_WARN_BYTES,
   contextKeyFor,
   createWorkingListStore,
+  heldBytes,
+  listHeldBytes,
   newFileId,
+  viewableFile,
   selectedInOrder,
   workingListStore,
   type WorkingListStore,
@@ -308,6 +311,52 @@ describe('size limits (real bytes, small limits)', () => {
     // the 50+30 already held count: 121 more would pass MAX
     expect(s.addFiles('u1:e1', [f('over', MAX - 79, 0)])).toMatchObject({ added: 0, refused: 1 });
     expect(s.addFiles('u1:e1', [f('fits', MAX - 80, 0)])).toMatchObject({ added: 1, refused: 0 });
+  });
+});
+
+describe("a protected result's preview bytes (design 5.18)", () => {
+  const withPreview = (name: string, length: number, preview: number): WorkingFile => ({ ...f(name, length), origin: 'result', protectedOutput: true, previewBytes: new Uint8Array(preview) });
+
+  it('count in what the list holds, but not in the size the row shows', () => {
+    const s = fresh();
+    expect(s.addResults('u1:e1', [withPreview('p', 40, 60)])).toBe(true);
+    const [row] = s.getState().files;
+    expect(row.size).toBe(40);
+    expect(row.previewBytes?.byteLength).toBe(60);
+    expect(heldBytes(row)).toBe(100);
+    expect(listHeldBytes(s.getState().files)).toBe(100);
+    // 100 held: a file of 101 bytes no longer fits under MAX (200), one of 100 does
+    expect(s.addFiles('u1:e1', [f('over', 101)])).toMatchObject({ added: 0, refused: 1 });
+    expect(s.addFiles('u1:e1', [f('fits', 100)])).toMatchObject({ added: 1, refused: 0 });
+  });
+
+  it('count when a result arrives: preview and file together must fit', () => {
+    const s = fresh();
+    expect(() => s.addResults('u1:e1', [withPreview('p', 150, 51)])).toThrow(PdfToolsError);
+    expect(s.getState().files).toEqual([]);
+    expect(s.addResults('u1:e1', [withPreview('p', 150, 50)])).toBe(true);
+  });
+
+  it('are what thumbnails and the viewer show, the same view each time; other rows are shown as they are', () => {
+    const row = withPreview('p', 40, 60);
+    const view = viewableFile(row);
+    expect(view.bytes).toBe(row.previewBytes);
+    expect(view).toMatchObject({ id: row.id, name: row.name, protectedOutput: true });
+    expect(viewableFile(row)).toBe(view);
+    expect(row.bytes.byteLength).toBe(40); // the row keeps its own (protected) bytes
+    const plain = f('plain', 5);
+    expect(viewableFile(plain)).toBe(plain);
+  });
+
+  it('go with the row, and with an engagement change', () => {
+    const s = fresh();
+    s.addResults('u1:e1', [withPreview('p', 10, 20)]);
+    s.remove([idOf(s, 'p')]);
+    expect(listHeldBytes(s.getState().files)).toBe(0);
+    s.addResults('u1:e1', [withPreview('q', 10, 20)]);
+    s.setContext('u1:e2');
+    expect(s.getState().files).toEqual([]);
+    expect(listHeldBytes(s.getState().files)).toBe(0);
   });
 });
 

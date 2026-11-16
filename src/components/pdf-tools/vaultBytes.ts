@@ -58,7 +58,7 @@ export async function readVaultFile(filePath: string): Promise<Uint8Array> {
 }
 
 const PDF_TYPES = new Set(['application/pdf', 'application/x-pdf']);
-const IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp', 'image/bmp', 'image/x-ms-bmp', 'image/gif']);
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp', 'image/bmp', 'image/x-ms-bmp', 'image/gif', 'image/tiff', 'image/tif', 'image/x-tiff']);
 
 /** Whether PDF Tools can open a vault file: by its recorded type, else by its extension. */
 export function isVaultFileUsable(f: { name: string; mime_type: string | null }): 'pdf' | 'image' | null {
@@ -67,7 +67,7 @@ export function isVaultFileUsable(f: { name: string; mime_type: string | null })
   if (IMAGE_TYPES.has(type)) return 'image';
   const name = f.name.trim();
   if (/\.pdf$/i.test(name)) return 'pdf';
-  if (/\.(jpe?g|png|webp|bmp|gif)$/i.test(name)) return 'image';
+  if (/\.(jpe?g|png|webp|bmp|gif|tiff?)$/i.test(name)) return 'image';
   return null;
 }
 

@@ -27,9 +27,11 @@ describe('parsePageList', () => {
     }
   });
   it('rejects a huge range quickly', () => {
-    const start = Date.now();
+    // This thread's processor time, not the clock (which on a busy machine also counts other work).
+    const start = process.threadCpuUsage();
     expect(() => parsePageList('1-999999999', 5)).toThrowError(PdfToolsError);
-    expect(Date.now() - start).toBeLessThan(500);
+    const used = process.threadCpuUsage(start);
+    expect((used.user + used.system) / 1000).toBeLessThan(500);
   });
   it('reports a user-facing message and code', () => {
     try {

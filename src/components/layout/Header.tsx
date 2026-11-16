@@ -32,17 +32,17 @@ export function Header() {
   const { currentVersion, isBeta, checkForUpdates, isCheckingForUpdates } = useAutoUpdater();
 
   const handleSignOut = async () => {
-    clearEngagement();
+    if (!(await clearEngagement('sign-out'))) return;
     await signOut();
     navigate('/auth', { replace: true });
   };
 
   const handleSwitchEngagement = (engagement: typeof engagements[0]) => {
-    setCurrentEngagement(engagement);
+    void setCurrentEngagement(engagement);
   };
 
-  const handleGoToSelector = () => {
-    clearEngagement();
+  const handleGoToSelector = async () => {
+    if (!(await clearEngagement())) return;
     navigate('/select-engagement');
   };
 

@@ -18,5 +18,5 @@ export function signedWarningText(files: WorkingFile[]): string {
       : signed.length === 1
         ? `${signed[0].name} carries a digital signature.`
         : `${signed.length} of these files carry digital signatures.`;
-  return `${who} The result will not carry a valid signature.`;
+  return `${who} The result will not carry a valid signature. Keep the signed original as the evidence; use this copy only where a signature is not needed.`;
 }

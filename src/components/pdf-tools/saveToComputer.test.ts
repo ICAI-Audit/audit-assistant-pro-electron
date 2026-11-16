@@ -17,7 +17,7 @@ vi.setConfig({ testTimeout: 20_000 });
 // JSZip's first use is the slow part of the zip tests: pay it before they run.
 beforeAll(async () => {
   await new JSZip().file('warm-up.txt', 'x').generateAsync({ type: 'uint8array' });
-}, 30_000);
+}, 120_000); // a hang guard only: a cold import takes seconds alone and passed 30 s on a loaded machine
 
 const PDF = new TextEncoder().encode('%PDF-1.7\n%fake\n');
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);

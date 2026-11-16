@@ -162,4 +162,11 @@ describe('a tool named inside a sentence', () => {
     expect(toolNameInSentence('delete-pages')).toBe('delete pages');
     expect(toolNameInSentence('page-numbers')).toBe('page numbers');
   });
+
+  it('the Stop confirmation names the tool as its button does and says what stopping means (UX audit C6.2)', async () => {
+    const { stopQuestion, stopTitle } = await import('./useToolRun');
+    expect(stopTitle('compress')).toBe('Stop Compress?');
+    expect(stopTitle('pdf-to-images')).toBe('Stop PDF to images?');
+    expect(stopQuestion('page-numbers')).toBe('Page numbers is still running. If you stop now, nothing is added to the list.');
+  });
 });

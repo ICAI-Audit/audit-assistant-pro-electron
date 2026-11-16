@@ -1,4 +1,4 @@
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import {
   Archive,
   ArrowDown,
@@ -11,6 +11,8 @@ import {
   HardDrive,
   Loader2,
   Lock,
+  Maximize2,
+  MessageSquareText,
   Paperclip,
   Save,
   ShieldCheck,
@@ -34,13 +36,20 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { LIST_MAX_BYTES, LIST_WARN_BYTES } from '@/lib/pdf-tools/workingList';
+import { LIST_MAX_BYTES, LIST_WARN_BYTES, listHeldBytes, viewableFile } from '@/lib/pdf-tools/workingList';
 import type { Destination, FileOrigin, WorkingFile } from '@/lib/pdf-tools/types';
 import { focusAfterRemove, groupTitle, listUnits, movesToOrder, orderAfterMove, unitIds, visibleRows, type ListUnit, type VisibleRow } from './fileGroups';
+import { carriedGroupLabel, carriedTagLabel } from './carriedNotice';
 import { isUnsavedResult, SENT_TONES } from './destinations';
-import { formatBytes, plural } from './format';
+import { formatBytes, plural, unsavedLine, unsavedWarning } from './format';
+import { convertedNote } from './intake';
 import HintButton from './HintButton';
+import MiddleName from './MiddleName';
+import { focusQuietly } from './quietFocus';
 import Thumb from './Thumb';
+import QuietTip from './viewer/QuietTip';
+import { WhyContext } from './whyLine';
+import { useDialogKeys } from './useDialogKeys';
 
 const SELECT_ALL = '__select-all__';
 // Compact actions so the whole selection bar fits on one line at 1280 px.
@@ -52,26 +61,33 @@ const ORIGINS: Record<FileOrigin, { label: string; icon: typeof HardDrive }> = {
   result: { label: 'Result', icon: Sparkles },
 };
 
+// The badge says what the toast said (UX audit C10): "Saved to computer", "Download started".
 const SENT_LABELS: Record<Destination, string> = {
   computer: 'Saved to computer',
-  download: 'Sent to download',
+  download: 'Download started',
   vault: 'In Evidence Vault',
   'working-paper': 'On working paper',
 };
 
 type Tone = 'neutral' | 'info' | 'warning' | 'success';
 
-const TONES: Record<Tone, string> = {
-  neutral: 'border-border bg-muted text-muted-foreground',
-  info: 'border-primary/30 bg-primary/10 text-primary',
-  warning: 'border-warning/40 bg-warning/10 text-warning',
-  success: 'border-success/40 bg-success/10 text-success',
+// Badge text is always the normal text colour (UX audit C3.2: coloured text on its own tint measured
+// 2.4:1 for amber and 3.3:1 for green); the tint, the border and the icon carry the tone.
+const TONES: Record<Tone, { box: string; icon: string }> = {
+  neutral: { box: 'border-border bg-muted', icon: 'text-muted-foreground' },
+  info: { box: 'border-primary/30 bg-primary/10', icon: 'text-primary' },
+  warning: { box: 'border-warning/40 bg-warning/10', icon: 'text-warning' },
+  success: { box: 'border-success/40 bg-success/10', icon: 'text-success' },
 };
 
-function Tag({ tone = 'neutral', icon, children, hint }: { tone?: Tone; icon?: ReactNode; children: ReactNode; hint?: string }) {
+function Tag({ tone = 'neutral', icon, children, hint, testId }: { tone?: Tone; icon?: ReactNode; children: ReactNode; hint?: string; testId?: string }) {
   const tag = (
-    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-4', TONES[tone])}>
-      {icon}
+    <span data-testid={testId} className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-4 text-foreground', TONES[tone].box)}>
+      {icon && (
+        <span className={cn('inline-flex', TONES[tone].icon)} aria-hidden="true">
+          {icon}
+        </span>
+      )}
       {children}
       {hint && <span className="sr-only">{`: ${hint}`}</span>}
     </span>
@@ -87,25 +103,28 @@ function Tag({ tone = 'neutral', icon, children, hint }: { tone?: Tone; icon?: R
 
 function FileTags({ file }: { file: WorkingFile }) {
   const tags: ReactNode[] = [];
-  if (file.wasProtected && file.origin === 'result') {
+  if (file.protectedOutput) {
+    // A result of Protect (design 5.18): it opens only with the password just set.
     tags.push(
-      <Tag key="protection" tone="info" icon={<ShieldCheck className="h-3 w-3" />} hint="Made from a password-protected file. This result has no password.">
-        Protection removed
+      <Tag key="protection" tone="info" icon={<Lock className="h-3 w-3" />} testId="pdf-tools-file-protected" hint="Opens only with the password you set. VERA does not keep it.">
+        Protected
       </Tag>,
     );
-  } else if (file.wasProtected) {
+  } else if (file.wasProtected && file.origin !== 'result') {
+    // The file in hand (QA-FIX E): a file that opened without a password had restrictions, not a password.
+    // A result never has either; that a source had one is in its record ("protection removed").
     tags.push(
       <Tag
         key="protection"
         tone="info"
-        icon={<Lock className="h-3 w-3" />}
+        icon={file.hasRestrictions ? <ShieldCheck className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
         hint={
           file.hasRestrictions
-            ? 'Opened without a password — protection removed. The copy in this list is not protected.'
+            ? 'It opens without a password but restricts things such as copying or printing. The copy in this list has no restrictions.'
             : 'Opened with its password. The copy in this list has no password.'
         }
       >
-        {file.hasRestrictions ? 'Protection removed' : 'Unlocked'}
+        {file.hasRestrictions ? 'Restrictions removed' : 'Unlocked'}
       </Tag>,
     );
   }
@@ -132,16 +151,25 @@ function FileTags({ file }: { file: WorkingFile }) {
         key="resources-kept"
         tone="warning"
         icon={<TriangleAlert className="h-3 w-3" />}
-        hint="Some pages could not be read with certainty, so everything they could draw with was kept. The file may still contain images or fonts from pages that were left out."
+        hint="Some pages could not be read with certainty, so everything they could draw with was kept. The file may still contain images or fonts from pages that were removed."
       >
-        May hold left-out pages&apos; images
+        May contain traces of removed pages
+      </Tag>,
+    );
+  }
+  // What a result still carries besides its pages (QA-FIX A): one short label, only when there is any.
+  const carried = file.origin === 'result' ? carriedTagLabel(file.carried) : null;
+  if (carried) {
+    tags.push(
+      <Tag key="carried" icon={<MessageSquareText className="h-3 w-3" />} testId="pdf-tools-file-carried">
+        {carried}
       </Tag>,
     );
   }
   if (file.origin === 'result') {
     if (file.sentTo.length === 0) {
       tags.push(
-        <Tag key="unsaved" tone="warning" icon={<CloudOff className="h-3 w-3" />} hint="This result exists only in this list until you save it somewhere.">
+        <Tag key="unsaved" icon={<CloudOff className="h-3 w-3" />} hint="This result exists only in this list until you save it somewhere.">
           Not saved
         </Tag>,
       );
@@ -155,7 +183,7 @@ function FileTags({ file }: { file: WorkingFile }) {
             destination === 'vault' && file.vaultRecord
               ? `In this engagement's Evidence Vault as ${file.vaultRecord.name}.`
               : destination === 'download'
-                ? 'Handed to a download because no save dialog was available. PDF Tools cannot see whether it was saved, or where.'
+                ? 'A download was started, because no save dialog was available. PDF Tools cannot tell if it was kept, or where.'
                 : undefined
           }
         >
@@ -167,7 +195,57 @@ function FileTags({ file }: { file: WorkingFile }) {
   return <>{tags}</>;
 }
 
+/**
+ * "More ways to save" (UX audit C4.3): unavailable, it stays focusable and says why on hover, on focus
+ * and on a click (tooltip and the line under the toolbar), as the other destinations do.
+ */
+function ZipChevron({ blocked }: { blocked: string | null }) {
+  const [tip, setTip] = useState(false);
+  const sayWhy = useContext(WhyContext);
+  const stop = (event: { preventDefault: () => void }) => {
+    if (!blocked) return false;
+    event.preventDefault();
+    setTip(true);
+    sayWhy?.(blocked);
+    return true;
+  };
+  return (
+    <Tooltip open={Boolean(blocked) && tip} onOpenChange={setTip}>
+      <TooltipTrigger asChild>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="pdf-tools-dest-computer-more"
+            data-enabled={blocked ? 'false' : 'true'}
+            aria-disabled={blocked ? true : undefined}
+            className={cn('h-8 rounded-l-none border-l-0 px-1.5', blocked && 'cursor-not-allowed opacity-70 hover:bg-transparent')}
+            aria-label={blocked ? `More ways to save. ${blocked}` : 'More ways to save'}
+            // The menu opens on pointer down and on Enter, Space or Down: while unavailable those say why instead.
+            onPointerDown={(event) => stop(event)}
+            onKeyDown={(event) => {
+              if (['Enter', ' ', 'ArrowDown'].includes(event.key)) stop(event);
+            }}
+            onClick={(event) => stop(event)}
+          >
+            <ChevronDown />
+          </Button>
+        </DropdownMenuTrigger>
+      </TooltipTrigger>
+      {blocked && (
+        <TooltipContent side="top" collisionPadding={8} className="max-w-[260px] text-xs">
+          {blocked}
+        </TooltipContent>
+      )}
+    </Tooltip>
+  );
+}
+
 function describe(file: WorkingFile): string {
+  // A converted TIFF says so, never "Image, PNG" (TIFF-report.md 7.3): "Converted from a 12-page TIFF" | "Converted from TIFF".
+  const converted = convertedNote(file);
+  if (converted) return converted;
   if (file.kind === 'image') return `Image, ${file.mimeType === 'image/png' ? 'PNG' : 'JPG'}`;
   return file.pageCount === null ? 'PDF' : plural(file.pageCount, 'page');
 }
@@ -238,6 +316,49 @@ function MoveButtons({ name, isFirst, isLast, onMove }: MoveButtonsProps) {
   );
 }
 
+/** Opens the page viewer at page 1 (an image: the image itself). */
+function ViewButton({ file, onView }: { file: WorkingFile; onView: (id: string, opener: HTMLElement) => void }) {
+  return (
+    <QuietTip text={file.kind === 'pdf' ? 'View the pages larger' : 'View the image larger'}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        data-action="view"
+        data-testid="pdf-tools-file-view"
+        aria-haspopup="dialog"
+        aria-label={`View ${file.name}`}
+        onClick={(event) => onView(file.id, event.currentTarget)}
+      >
+        <Maximize2 />
+      </Button>
+    </QuietTip>
+  );
+}
+
+/**
+ * The row's thumbnail opens the viewer with a single click (UX audit C3.3, T1-11), as the View button
+ * does. It is for the mouse: the View button stays the keyboard's and screen readers' way (one Tab stop
+ * per action), and the picture keeps its own description. Focus goes back to the View button on close.
+ */
+function ThumbView({ file, onView }: { file: WorkingFile; onView: (id: string, opener: HTMLElement) => void }) {
+  return (
+    <QuietTip text={file.kind === 'pdf' ? 'View the pages larger' : 'View the image larger'}>
+      <div
+        data-testid="pdf-tools-row-thumb"
+        className="shrink-0 cursor-zoom-in rounded-sm transition-shadow hover:ring-2 hover:ring-primary/40"
+        onClick={(event) => {
+          const viewButton = event.currentTarget.closest('[data-testid="pdf-tools-row"]')?.querySelector<HTMLElement>('[data-action="view"]');
+          onView(file.id, viewButton ?? event.currentTarget);
+        }}
+      >
+        <Thumb file={viewableFile(file)} width={36} alt={file.kind === 'pdf' ? `First page of ${file.name}` : `Preview of ${file.name}`} className="h-[48px]" />
+      </div>
+    </QuietTip>
+  );
+}
+
 function RemoveButton({ name, onRemove, hint = 'Remove from the list' }: { name: string; onRemove: () => void; hint?: string }) {
   return (
     <Tooltip>
@@ -271,10 +392,11 @@ interface RowProps {
   onToggle: (id: string, checked: boolean) => void;
   onMove: (key: string, direction: 'up' | 'down') => void;
   onRemove: (id: string) => void;
+  onView?: (id: string, opener: HTMLElement) => void;
 }
 
 // Memoised with stable handlers: a change to one row (or a thumbnail arriving) does not redraw the others.
-const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selected, member = false, onToggle, onMove, onRemove }: RowProps) {
+const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selected, member = false, onToggle, onMove, onRemove, onView }: RowProps) {
   const origin = ORIGINS[file.origin];
   const checkId = `pdf-tools-check-${file.id}`;
   // A file inside a group moves with its group; the keys are still kept from VERA Tools' tab shortcut.
@@ -291,9 +413,9 @@ const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selecte
       data-row-id={file.id}
       data-member={member ? 'true' : undefined}
       onKeyDown={onKeyDown}
-      className={cn('flex items-center gap-3 py-2 pr-3 transition-colors sm:pr-4', member ? 'pl-12 sm:pl-14' : 'pl-3 sm:pl-4', selected ? 'bg-accent/50' : 'hover:bg-muted/40')}
+      className={cn('flex items-center gap-3 py-1 pr-3 transition-colors sm:pr-4', member ? 'pl-12 sm:pl-14' : 'pl-3 sm:pl-4', selected ? 'bg-accent/50' : 'hover:bg-muted/40')}
     >
-      <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground" aria-hidden="true">
+      <span className={cn('w-5 shrink-0 text-right text-xs tabular-nums', selected ? 'text-foreground/70' : 'text-muted-foreground')} aria-hidden="true">
         {position}
       </span>
       <Checkbox
@@ -303,12 +425,15 @@ const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selecte
         onCheckedChange={(checked) => onToggle(file.id, checked === true)}
         aria-label={`Select ${file.name}`}
       />
-      <Thumb file={file} width={38} alt={file.kind === 'pdf' ? `First page of ${file.name}` : `Preview of ${file.name}`} className="h-[50px]" />
+      {onView ? (
+        <ThumbView file={file} onView={onView} />
+      ) : (
+        <Thumb file={viewableFile(file)} width={36} alt={file.kind === 'pdf' ? `First page of ${file.name}` : `Preview of ${file.name}`} className="h-[48px]" />
+      )}
       <label htmlFor={checkId} className="min-w-0 flex-1 cursor-pointer select-none">
-        <span className="block truncate text-sm font-medium text-foreground" title={file.name}>
-          {file.name}
-        </span>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <MiddleName name={file.name} className="text-sm font-medium text-foreground" />
+
+        <span className={cn('mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs', selected ? 'text-foreground/70' : 'text-muted-foreground')}>
           <span className="inline-flex items-center gap-1">
             <origin.icon className="h-3.5 w-3.5" aria-hidden="true" />
             {origin.label}
@@ -321,6 +446,7 @@ const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selecte
         </span>
       </label>
       <div className="flex shrink-0 items-center gap-0.5">
+        {onView && <ViewButton file={file} onView={onView} />}
         {!member && <MoveButtons name={file.name} isFirst={isFirst} isLast={isLast} onMove={(direction) => onMove(file.id, direction)} />}
         <RemoveButton name={file.name} onRemove={() => onRemove(file.id)} />
       </div>
@@ -343,6 +469,7 @@ interface GroupRowProps {
   onMove: (key: string, direction: 'up' | 'down') => void;
   onRemove: (id: string) => void;
   onRemoveGroup: (groupId: string) => void;
+  onView?: (id: string, opener: HTMLElement) => void;
 }
 
 /** One row for results that belong together; it opens to show them. */
@@ -360,24 +487,27 @@ const GroupRow = memo(function GroupRow({
   onMove,
   onRemove,
   onRemoveGroup,
+  onView,
 }: GroupRowProps) {
   const { files, groupId, key } = unit;
   const { title, range } = groupTitle(files);
   const listId = `pdf-tools-group-${groupId}`;
   const size = files.reduce((sum, f) => sum + f.size, 0);
-  const unsaved = files.filter((f) => f.origin === 'result' && f.sentTo.length === 0).length;
+  // One meaning of "not saved" everywhere: also a result only handed to a download (REV-B S12).
+  const unsaved = files.filter(isUnsavedResult).length;
   // Where every file of the group has been sent (the rows inside say it for each one).
   const sharedDestinations = (Object.keys(SENT_LABELS) as Destination[]).filter((d) => files.every((f) => f.sentTo.includes(d)));
   const all = selectedCount === files.length;
   const origin = ORIGINS[files[0].origin];
+  const carried = carriedGroupLabel(files);
 
   return (
     <li data-testid="pdf-tools-group" data-row-id={key} data-group-id={groupId} data-count={files.length}>
       <div
         onKeyDown={(event) => moveKey(event, (direction) => onMove(key, direction))}
-        className={cn('flex items-center gap-3 px-3 py-2 transition-colors sm:px-4', all ? 'bg-accent/50' : 'hover:bg-muted/40')}
+        className={cn('flex items-center gap-3 px-3 py-1 transition-colors sm:px-4', all ? 'bg-accent/50' : 'hover:bg-muted/40')}
       >
-        <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground" aria-hidden="true">
+        <span className={cn('w-5 shrink-0 text-right text-xs tabular-nums', all ? 'text-foreground/70' : 'text-muted-foreground')} aria-hidden="true">
           {position}
         </span>
         <Checkbox
@@ -396,16 +526,16 @@ const GroupRow = memo(function GroupRow({
           className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <span className="relative shrink-0" aria-hidden="true">
-            <span className="absolute -right-1 -top-1 h-[50px] w-[38px] rounded border bg-muted" />
-            <Thumb file={files[0]} width={38} alt="" className="relative h-[50px] bg-card" />
+            <span className="absolute -right-1 -top-1 h-[48px] w-[36px] rounded border bg-muted" />
+            <Thumb file={viewableFile(files[0])} width={36} alt="" className="relative h-[48px] bg-card" retryButton={false} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
               <ChevronRight className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
-              <span className="truncate text-sm font-medium text-foreground">{title}</span>
+              <MiddleName name={title} title={false} className="text-sm font-medium text-foreground" />
               <span className="sr-only">{expanded ? ', open' : ', closed'}. {range}</span>
             </span>
-            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[22px] text-xs text-muted-foreground">
+            <span className={cn('mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[22px] text-xs', all ? 'text-foreground/70' : 'text-muted-foreground')}>
               <span className="inline-flex items-center gap-1">
                 <origin.icon className="h-3.5 w-3.5" />
                 {origin.label}
@@ -414,13 +544,13 @@ const GroupRow = memo(function GroupRow({
               <span>{describeGroup(files)}</span>
               <span>·</span>
               <span className="tabular-nums">{formatBytes(size)}</span>
-              {files.some((f) => f.wasProtected) && (
-                <Tag tone="info" icon={<ShieldCheck className="h-3 w-3" />}>
-                  Protection removed
+              {carried && (
+                <Tag icon={<MessageSquareText className="h-3 w-3" />} testId="pdf-tools-group-carried">
+                  {carried}
                 </Tag>
               )}
               {unsaved > 0 && (
-                <Tag tone="warning" icon={<CloudOff className="h-3 w-3" />}>
+                <Tag icon={<CloudOff className="h-3 w-3" />}>
                   {unsaved === files.length ? 'Not saved' : `${unsaved} not saved`}
                 </Tag>
               )}
@@ -451,6 +581,7 @@ const GroupRow = memo(function GroupRow({
               onToggle={onToggle}
               onMove={onMove}
               onRemove={onRemove}
+              onView={onView}
             />
           ))}
         </ul>
@@ -460,6 +591,8 @@ const GroupRow = memo(function GroupRow({
 });
 
 export interface FileListProps {
+  /** The screen's "Add files" controls, shown first in the list bar (no drop strip once files are listed). */
+  addControls?: ReactNode;
   files: WorkingFile[];
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
@@ -478,9 +611,14 @@ export interface FileListProps {
   reveal?: { id: string; token: number } | null;
   /** Where focus goes when removing rows emptied the list (this component is then gone). */
   onListEmptied?: () => void;
+  /** The row's View action: opens the page viewer on that file. `opener` gets focus back on close. */
+  onView?: (id: string, opener: HTMLElement) => void;
+  /** Saves every result not saved yet (the "N not saved" count in the list bar; QA-FIX K). */
+  onSaveUnsaved?: () => void;
 }
 
 export default function FileList({
+  addControls,
   files,
   selectedIds,
   onSelectionChange,
@@ -495,6 +633,8 @@ export default function FileList({
   checking = null,
   reveal,
   onListEmptied,
+  onView,
+  onSaveUnsaved,
 }: FileListProps) {
   const [confirming, setConfirming] = useState<string[] | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -511,6 +651,10 @@ export default function FileList({
   const listRef = useRef<HTMLUListElement>(null);
   const selectAllRef = useRef<HTMLButtonElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  // While the remove question is open, the application's shortcuts never act behind it (useDialogKeys.ts); an
+  // Escape that no layer took closes it, as Escape does (REV-B S13).
+  const confirmContent = useRef<HTMLDivElement>(null);
+  useDialogKeys(confirmContent, () => setConfirming(null));
   const [stickTop, setStickTop] = useState(0);
   const units = useMemo(() => listUnits(files), [files]);
 
@@ -525,13 +669,19 @@ export default function FileList({
   // Kept between renders, so memoised group rows redraw only when the selection changes.
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedCount = selectedIds.length;
-  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  // What the list holds against its limit: a protected result's preview bytes count too (workingList.ts).
+  const totalSize = listHeldBytes(files);
+  // The same count as the Remove and leave questions: a result only handed to a download is not known to be kept (REV-B S12).
+  const unsavedCount = files.filter(isUnsavedResult).length;
   const allSelected = files.length > 0 && selectedCount === files.length;
   const nothingSelected = selectedCount === 0;
 
   // The rows get stable handlers; these read the latest props through a ref.
-  const latest = useRef({ files, units, expanded, selectedIds, onSelectionChange, onMove, onRemove, onListEmptied });
-  latest.current = { files, units, expanded, selectedIds, onSelectionChange, onMove, onRemove, onListEmptied };
+  const latest = useRef({ files, units, expanded, selectedIds, onSelectionChange, onMove, onRemove, onListEmptied, onView });
+  latest.current = { files, units, expanded, selectedIds, onSelectionChange, onMove, onRemove, onListEmptied, onView };
+  // A stable View handler for the memoised rows; none when the screen offers no viewer.
+  const viewFile = useCallback((id: string, opener: HTMLElement) => latest.current.onView?.(id, opener), []);
+  const rowView = onView ? viewFile : undefined;
 
   // The row (or group row) on screen that holds a file.
   const rowFor = useCallback((ids: string[]): HTMLElement | null => {
@@ -665,15 +815,49 @@ export default function FileList({
             onCheckedChange={(checked) => onSelectionChange(checked === true ? files.map((f) => f.id) : [])}
             aria-label={allSelected ? 'Clear the selection' : 'Select all files'}
           />
-          <p className="text-sm">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <span className="font-medium text-foreground">{nothingSelected ? plural(files.length, 'file') : `${selectedCount} of ${files.length} selected`}</span>
-            <span className={cn('ml-2 text-xs tabular-nums', totalSize > LIST_WARN_BYTES ? 'text-warning' : 'text-muted-foreground')}>
-              {formatBytes(totalSize)} of {formatBytes(LIST_MAX_BYTES)}
-            </span>
+            {unsavedCount > 0 && (
+              // "3 not saved" on a laptop, "3 results not saved yet" on a wide screen; on hover and focus, and read
+              // out in full, what happens to them (cleared when the engagement changes or VERA closes); a click saves
+              // them all (QA-FIX K). An engagement change through VERA's own controls now asks first (leaveGuard.ts),
+              // so the wide line no longer repeats it.
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    data-testid="pdf-tools-unsaved-count"
+                    data-count={unsavedCount}
+                    aria-label={unsavedWarning(unsavedCount)}
+                    disabled={saving || !onSaveUnsaved}
+                    onClick={() => onSaveUnsaved?.()}
+                    className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[11px] font-medium leading-4 text-foreground ring-offset-background transition-colors hover:bg-warning/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+                  >
+                    <CloudOff className="h-3 w-3 text-warning" aria-hidden="true" />
+                    <span className="2xl:hidden" aria-hidden="true">
+                      {unsavedCount} not saved
+                    </span>
+                    <span className="hidden 2xl:inline" aria-hidden="true">
+                      {unsavedLine(unsavedCount)}
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[300px] text-xs" data-testid="pdf-tools-unsaved-tip">
+                  {unsavedWarning(unsavedCount)}
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {totalSize > LIST_WARN_BYTES && (
+              <span data-testid="pdf-tools-list-size" className="inline-flex items-center gap-1 text-xs tabular-nums text-foreground">
+                <TriangleAlert className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
+                List is large: {formatBytes(totalSize)} of {formatBytes(LIST_MAX_BYTES)}
+              </span>
+            )}
           </p>
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {addControls}
           <HintButton
             type="button"
             variant="ghost"
@@ -684,7 +868,8 @@ export default function FileList({
             onClick={() => requestRemove(selectedIds)}
           >
             <Trash2 />
-            Remove
+            {/* Short on a laptop (only the icon), in words on a wide screen; its name is always "Remove". */}
+            <span className="sr-only 2xl:not-sr-only">Remove</span>
           </HintButton>
 
           <div className="flex items-center">
@@ -699,22 +884,16 @@ export default function FileList({
               onClick={() => onSaveToComputer(false)}
             >
               {saving ? <Loader2 className="animate-spin" /> : <Save />}
-              {saving ? 'Saving…' : 'Save to computer'}
+              {saving ? (
+                'Saving…'
+              ) : (
+                <span>
+                  Save<span className="sr-only 2xl:not-sr-only"> to computer</span>
+                </span>
+              )}
             </HintButton>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  data-testid="pdf-tools-dest-computer-more"
-                  className="h-8 rounded-l-none border-l-0 px-1.5"
-                  disabled={selectedCount < 2 || saving}
-                  aria-label="More ways to save"
-                >
-                  <ChevronDown />
-                </Button>
-              </DropdownMenuTrigger>
+              <ZipChevron blocked={saving ? 'Saving…' : selectedCount < 2 ? 'Select two or more files to save them as one zip.' : null} />
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => onSaveToComputer(true)}>
                   <FolderArchive className="mr-2 h-4 w-4" />
@@ -768,6 +947,7 @@ export default function FileList({
               onToggle={toggle}
               onMove={move}
               onRemove={removeOne}
+              onView={rowView}
             />
           ) : (
             <GroupRow
@@ -785,6 +965,7 @@ export default function FileList({
               onMove={move}
               onRemove={removeOne}
               onRemoveGroup={removeGroup}
+              onView={rowView}
             />
           ),
         )}
@@ -792,6 +973,7 @@ export default function FileList({
 
       <AlertDialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <AlertDialogContent
+          ref={confirmContent}
           onCloseAutoFocus={(event) => {
             // Radix would focus a trigger, and there is none. After Remove, focus goes to the next row
             // (chosen when the rows were removed); after Keep or Escape, back to the control that asked.
@@ -803,7 +985,7 @@ export default function FileList({
               removedByConfirm.current = false;
               focusRemoveTarget();
             } else if (back?.isConnected) {
-              back.focus();
+              focusQuietly(back);
             } else {
               selectAllRef.current?.focus();
             }
@@ -812,9 +994,8 @@ export default function FileList({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {unsavedInConfirm === 1 ? 'an unsaved result' : `${unsavedInConfirm} unsaved results`}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {unsavedInConfirm === 1 ? 'This result has' : 'These results have'} not been saved anywhere PDF Tools can confirm and will be lost
-              {downloadOnlyInConfirm > 0 ? ' (a download was started, but whether it was kept cannot be seen)' : ''}. Files in the Evidence Vault are never
-              affected by removing them from this list.
+              {unsavedInConfirm === 1 ? 'This result has' : 'These results have'} not been saved and will be lost. Files in the Evidence Vault are not
+              affected.{downloadOnlyInConfirm > 0 ? ' A download was started, but PDF Tools cannot tell if it was kept.' : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { LIST_MAX_BYTES } from '@/lib/pdf-tools/workingList';
 import { EVIDENCE_TYPES } from '../destinations';
-import { formatBytes, plural } from '../format';
+import { formatBytes, plural, shortDateOfStored } from '../format';
+import MiddleName from '../MiddleName';
 import { filterChoices, type VaultChoice } from '../vaultBytes';
 import { DestinationFrame } from './DestinationFrame';
 import { moveIndex } from './listNavigation';
@@ -29,11 +30,8 @@ const TYPE_LABELS: Record<string, string> = Object.fromEntries(EVIDENCE_TYPES.ma
 const optionId = (id: string) => `pdf-tools-vault-option-${id}`;
 const STAGES: Record<string, string> = { draft: 'Draft', prepared: 'Prepared', reviewed: 'Reviewed', approved: 'Approved' };
 
-function shortDate(text: string): string {
-  // SQLite writes "YYYY-MM-DD HH:MM:SS" in UTC.
-  const date = new Date(/Z|[+-]\d\d:?\d\d$/.test(text) ? text : `${text.replace(' ', 'T')}Z`);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-}
+// Dates as the Evidence Vault writes them, "13 Nov 2026" (format.ts), whatever the system's locale.
+const shortDate = shortDateOfStored;
 
 /**
  * Add from Evidence Vault: this engagement's PDFs and images, with a name search and ticks. The
@@ -206,9 +204,7 @@ export default function VaultPickerDialog({ choices, loading, inList, listBytes,
                     <Kind className="h-4 w-4 text-muted-foreground" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-foreground" title={choice.name}>
-                      {choice.name}
-                    </span>
+                    <MiddleName name={choice.name} className="text-sm font-medium text-foreground" />
                     <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       <span>{choice.kind === 'pdf' ? 'PDF' : 'Image'}</span>
                       <span aria-hidden="true">·</span>

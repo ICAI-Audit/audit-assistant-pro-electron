@@ -1,8 +1,9 @@
 // The frame every tool dialog shares: title, the files it works on, the signed-file and
 // protection notices, the options (disabled while running), messages, and a footer that shows
-// Close and Run, or progress and Cancel while the tool runs. Closing while running asks first.
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { AlertCircle, FileSignature, Info, Loader2, ShieldCheck, type LucideIcon } from 'lucide-react';
+// Cancel and Run, or progress and Stop while the tool runs (UX audit C6.2: Cancel before a run, Stop
+// during it, Keep running in the confirmation). Closing while running asks first.
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { AlertCircle, ChevronRight, FileSignature, Info, Loader2, ShieldCheck, type LucideIcon } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,21 +15,33 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
+import { forgetMatchedText } from '@/lib/pdf-tools/matchedText';
 import type { ToolId, WorkingFile } from '@/lib/pdf-tools/types';
-import { formatBytes, plural } from '../format';
+import { viewableFile } from '@/lib/pdf-tools/workingList';
+import { elapsedText, formatBytes, plural } from '../format';
 import Thumb from '../Thumb';
+import HintButton from '../HintButton';
+import MiddleName from '../MiddleName';
 import { TOOL_ICONS } from '../toolIcons';
+import { WHY_LINE_MS, WhyContext } from '../whyLine';
 import { toolInfo } from '../toolRules';
 import { describedBy, signedWarningText } from './fieldProps';
-import { toolNameInSentence, type ToolRun, type useResultName } from './useToolRun';
+import { protectionNotice } from './protectionNotice';
+import { stopQuestion, stopTitle, type ToolRun, type useResultName } from './useToolRun';
+import { useDialogKeys } from '../useDialogKeys';
+import { frameEscape, ignoreHeldKey } from '../dialogKeys';
+import { focusQuietly } from '../quietFocus';
 
 const SIZES = { md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 'sm:max-w-3xl', '2xl': 'sm:max-w-4xl' } as const;
+/** From this many seconds a run shows how long it has taken. */
+const ELAPSED_FROM_S = 10;
 
 // ---- small parts -------------------------------------------------------------------------------
 
@@ -89,15 +102,18 @@ export function Field({
       {children}
       {/* An error is inserted as an alert, so it is read out as soon as it appears; the key makes
           sure it is a new element, not the hint changing its role. */}
+      {/* The hint's element is never removed when the hint goes (for example "Will be saved as..." when a
+          name is cleaned on leaving the field): a node removed while focus moves between fields makes the
+          dialog's focus trap pull focus back to the dialog, and Tab stops reaching the next field. */}
       {error ? (
         <p key="error" id={`${id}-message`} role="alert" className="text-xs text-destructive" data-testid="pdf-tools-field-error">
           {error}
         </p>
-      ) : hint ? (
-        <p key="hint" id={`${id}-message`} className="text-xs text-muted-foreground">
+      ) : (
+        <p key="hint" id={`${id}-message`} hidden={!hint} className="text-xs text-muted-foreground">
           {hint}
         </p>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -160,7 +176,7 @@ export function ChoiceCards<T extends string>({
                 <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
                   {choice.label}
                   {choice.badge && (
-                    <span className="rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold uppercase leading-4 tracking-wide text-primary">{choice.badge}</span>
+                    <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 text-[11px] font-medium leading-4 text-foreground">{choice.badge}</span>
                   )}
                 </span>
                 {choice.description && <span className="block text-xs leading-snug text-muted-foreground">{choice.description}</span>}
@@ -170,6 +186,64 @@ export function ChoiceCards<T extends string>({
         })}
       </RadioGroup>
     </div>
+  );
+}
+
+/**
+ * "More options" (UX audit C6.4, principle 4): the choices most runs leave alone, folded under one line
+ * that shows their current values, so nothing is hidden silently. It opens while a field inside has a
+ * problem, so an error is never inside a closed fold, and stays open once the problem is fixed: closing
+ * under the control just used would take that control, and the focus, away (REV-B S1). The one fold for
+ * every tool dialog.
+ */
+export function MoreOptions({
+  id,
+  summary,
+  label = 'More options',
+  invalid = false,
+  defaultOpen = false,
+  children,
+}: {
+  /** Test id of the line that opens it; its summary is `${id}-summary`, its body `${id}-body`. */
+  id: string;
+  /** The current values in a few words, shown while it is closed. */
+  summary: ReactNode;
+  label?: string;
+  /** A field inside has a problem: the fold is held open. */
+  invalid?: boolean;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  // A problem opens the fold for good; while the problem lasts the fold cannot be closed.
+  useEffect(() => {
+    if (invalid) setOpen(true);
+  }, [invalid]);
+  const shown = open || invalid;
+  return (
+    <Collapsible open={shown} onOpenChange={(next) => setOpen(next || invalid)}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          data-testid={id}
+          aria-expanded={shown}
+          className="flex w-full items-start gap-2 rounded-md border border-dashed px-3 py-2 text-left transition-colors ring-offset-background hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <ChevronRight className={cn('mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform', shown && 'rotate-90')} aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-foreground">{label}</span>
+            {/* Kept in place (hidden when open, by class: `block` would beat the `hidden` attribute), never
+                removed: see Field's note on the focus trap. */}
+            <span aria-hidden={shown} className={cn('text-xs leading-snug text-muted-foreground', shown ? 'hidden' : 'block')} data-testid={`${id}-summary`}>
+              {summary}
+            </span>
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-4 pt-3" data-testid={`${id}-body`}>
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -208,11 +282,9 @@ export function ResultNameField({
 export function FileChip({ file }: { file: WorkingFile }) {
   return (
     <div className="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
-      <Thumb file={file} width={28} alt="" className="h-9 bg-card" />
+      <Thumb file={viewableFile(file)} width={28} alt="" className="h-9 bg-card" />
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-foreground" title={file.name}>
-          {file.name}
-        </p>
+        <MiddleName name={file.name} className="text-sm font-medium text-foreground" />
         <p className="text-xs text-muted-foreground">
           {file.pageCount === null ? 'Image' : plural(file.pageCount, 'page')} · {formatBytes(file.size)}
         </p>
@@ -253,6 +325,12 @@ export interface ToolDialogShellProps<T extends ToolId> {
   runLabel: string;
   /** Run cannot be pressed: the options are incomplete or invalid. */
   blocked: boolean;
+  /**
+   * Why Run cannot be pressed (UX audit principle 8). Given, Run stays focusable while blocked and says it
+   * on hover, on focus and on a click (tooltip, and a line in the footer); not given, Run is simply
+   * disabled, as in phase 1.
+   */
+  blockedReason?: string | null;
   onRun: () => void;
   onClose: () => void;
   /** Overrides the general signed-file warning (Compress says more). */
@@ -272,6 +350,7 @@ export function ToolDialog<T extends ToolId>({
   size = 'md',
   runLabel,
   blocked,
+  blockedReason,
   onRun,
   onClose,
   signedWarning,
@@ -282,19 +361,50 @@ export function ToolDialog<T extends ToolId>({
   const info = toolInfo(tool);
   const Icon: LucideIcon = TOOL_ICONS[tool as ToolId];
   const [confirmStop, setConfirmStop] = useState(false);
+  // A click on a blocked Run (or another unavailable control inside) says why in the footer, for a while.
+  const [why, setWhy] = useState<{ text: string; key: number } | null>(null);
+  const sayWhy = useCallback((text: string) => setWhy({ text, key: Date.now() }), []);
+  useEffect(() => {
+    if (!why) return;
+    const timer = window.setTimeout(() => setWhy(null), WHY_LINE_MS);
+    return () => window.clearTimeout(timer);
+  }, [why]);
+  // A reason that no longer holds goes at once: Run became available, or its reason changed.
+  useEffect(() => {
+    setWhy(null);
+  }, [blocked, blockedReason]);
+  // Closed without a run: the engine forgets the name typed last, which a pattern cleaned (matchedText.ts).
+  useEffect(() => () => forgetMatchedText(), []);
   const content = useRef<HTMLDivElement>(null);
+  // The application's shortcuts never act behind the dialog, wherever the focus is (useDialogKeys.ts). An
+  // Escape that no layer took, because a tooltip (the blocked Run's) was appearing at that moment, is acted on
+  // here as the top layer would have: the Stop question closes (Keep running), else the dialog closes or,
+  // while a run goes on, asks to stop first.
+  const lostEscape = useRef<() => void>(() => undefined);
+  useDialogKeys(content, () => lostEscape.current());
   const runButton = useRef<HTMLButtonElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
   // The Stop confirmation is opened from state (no trigger), so it returns focus here itself.
   const stopOpener = useRef<HTMLElement | null>(null);
   const busy = run.phase !== 'idle';
+  // How long the run has taken, shown after a while so that a long step never looks hung (QA-FIX I).
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!busy) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
   const signed = files.filter((f) => f.hasSignature);
-  const protectedFiles = files.filter((f) => f.wasProtected);
+  const protection = protectionNotice(files);
   const progress = run.progress;
   const measured = progress !== null && progress.total > 0;
   const percent = measured ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : 0;
 
-  // Run disappears when a run starts and Cancel disappears when it ends: move focus with them, so it
+  // Run disappears when a run starts and Stop disappears when it ends: move focus with them, so it
   // is never left on the page body. A run that ends by closing the dialog returns to the tool button.
   const previousPhase = useRef(run.phase);
   useEffect(() => {
@@ -303,14 +413,18 @@ export function ToolDialog<T extends ToolId>({
     if (run.phase === 'running' && before === 'idle') cancelButton.current?.focus();
     if (run.phase === 'idle' && before !== 'idle') {
       setConfirmStop(false);
+      // The Stop question is on screen or still closing (its exit animation keeps the rest of the page
+      // aria-hidden): focusing Run now would put the focus inside a hidden tree, which Chromium blocks and
+      // warns about. The question's own onCloseAutoFocus puts the focus on Run once it has gone.
+      if (stopOpener.current) return;
       if (runButton.current && !runButton.current.disabled) runButton.current.focus();
       else content.current?.focus();
     }
   }, [run.phase]);
 
   // Every way of stopping a running tool asks first; only the confirmation's Stop ends the run.
-  // Cancel holds focus for the whole run, so one stray Enter or Space must not throw away minutes of
-  // work. Stopping from Cancel keeps the dialog open; from Escape or the close button it closes it.
+  // The footer's Stop holds focus for the whole run, so one stray Enter or Space must not throw away minutes of
+  // work. Stopping from the footer's Stop keeps the dialog open; from Escape or the close button it closes it.
   const stopCloses = useRef(true);
   const askToStop = (thenClose: boolean) => {
     stopOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -322,13 +436,14 @@ export function ToolDialog<T extends ToolId>({
     if (run.phase === 'running') askToStop(true);
     else if (run.phase === 'idle') onClose();
   };
-
-  // A held key repeats: the repeats must not press Run, Cancel or Stop again.
-  const ignoreRepeat = (event: KeyboardEvent) => {
-    if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
+  lostEscape.current = () => {
+    if (confirmStop) setConfirmStop(false);
+    else requestClose();
   };
 
   return (
+    // Inside the dialog, an unavailable control's reason goes to the footer line, not the screen's (behind the dialog).
+    <WhyContext.Provider value={sayWhy}>
     <Dialog open onOpenChange={(open) => !open && requestClose()}>
       <DialogContent
         ref={content}
@@ -345,14 +460,19 @@ export function ToolDialog<T extends ToolId>({
           if (busy) event.preventDefault();
         }}
         onEscapeKeyDown={(event) => {
-          if (!busy) return;
+          // The Stop question first, even while it is still appearing (dialogKeys.ts frameEscape).
+          const what = frameEscape({ stopQuestionOpen: confirmStop, phase: run.phase });
+          if (what === 'close') return;
           event.preventDefault();
-          if (run.phase === 'running') askToStop(true);
+          if (what === 'keep-running') setConfirmStop(false);
+          else if (what === 'ask-to-stop') askToStop(true);
         }}
         onCloseAutoFocus={(event) => {
-          // Back to the tool's button, without scrolling away from results just revealed in the list.
+          // Back to the tool's button, without scrolling away from results just revealed in the list, and
+          // without its tooltip: after a run the tool may be unavailable for the results now selected, and
+          // its reason must not sit over the success message (QA-FIX F).
           event.preventDefault();
-          document.querySelector<HTMLElement>(`[data-testid="pdf-tools-tool-${tool}"]`)?.focus({ preventScroll: true });
+          focusQuietly(document.querySelector<HTMLElement>(`[data-testid="pdf-tools-tool-${tool}"]`), { preventScroll: true });
         }}
       >
         <DialogHeader className="space-y-1 border-b px-6 pb-3.5 pr-12 pt-5 text-left">
@@ -372,10 +492,9 @@ export function ToolDialog<T extends ToolId>({
               {signedWarning ?? signedWarningText(files)}
             </Notice>
           )}
-          {protectedFiles.length > 0 && (
-            <Notice tone="info" icon={ShieldCheck} title="Protection removed" testId="pdf-tools-protection-notice">
-              {protectedFiles.length === 1 ? `${protectedFiles[0].name} was` : `${protectedFiles.length} of these files were`} password-protected. The
-              result will not have a password.
+          {protection && (
+            <Notice tone="info" icon={ShieldCheck} title={protection.title} testId="pdf-tools-protection-notice">
+              {protection.text}
             </Notice>
           )}
           <fieldset disabled={busy} className="min-w-0 space-y-4">
@@ -404,7 +523,10 @@ export function ToolDialog<T extends ToolId>({
                     <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" aria-hidden="true" />
                     <span className="truncate">{progress?.label ?? 'Working…'}</span>
                   </span>
-                  {measured && <span className="shrink-0 tabular-nums text-muted-foreground">{percent}%</span>}
+                  <span className="flex shrink-0 items-baseline gap-2 tabular-nums text-muted-foreground">
+                    {elapsed >= ELAPSED_FROM_S && <span data-testid="pdf-tools-run-elapsed">{elapsedText(elapsed)}</span>}
+                    {measured && <span>{percent}%</span>}
+                  </span>
                 </div>
                 {measured ? <Progress value={percent} className="h-2" aria-label={`${info.label} progress`} /> : <IndeterminateBar label={`${info.label} in progress`} />}
                 {busyNote && <p className="text-[11px] text-muted-foreground">{busyNote}</p>}
@@ -417,23 +539,42 @@ export function ToolDialog<T extends ToolId>({
                 data-testid="pdf-tools-cancel-run"
                 aria-disabled={run.phase === 'stopping' ? true : undefined}
                 className={cn(run.phase === 'stopping' && 'cursor-default opacity-60 hover:bg-background')}
-                onKeyDown={ignoreRepeat}
+                onKeyDown={ignoreHeldKey}
                 onClick={() => {
                   if (run.phase === 'running') askToStop(false);
                 }}
               >
-                {run.phase === 'stopping' ? 'Stopping…' : 'Cancel'}
+                {run.phase === 'stopping' ? 'Stopping…' : 'Stop'}
               </Button>
             </div>
           ) : (
             <>
-              <Button type="button" variant="outline" onClick={onClose}>
-                Close
+              {/* Always present, so it is read out when it changes; empty, it takes no room. */}
+              <p role="status" aria-live="polite" data-testid="pdf-tools-dialog-why" className={cn(why ? 'mr-auto min-w-0 text-xs text-foreground' : 'sr-only')}>
+                {why?.text ?? ''}
+              </p>
+              <Button type="button" variant="outline" data-testid="pdf-tools-dialog-cancel" onClick={onClose}>
+                Cancel
               </Button>
-              <Button ref={runButton} type="button" data-testid="pdf-tools-run" disabled={blocked} onKeyDown={ignoreRepeat} onClick={onRun}>
-                <Icon />
-                {runLabel}
-              </Button>
+              {blockedReason !== undefined ? (
+                <HintButton
+                  ref={runButton}
+                  type="button"
+                  data-testid="pdf-tools-run"
+                  enabled={!blocked}
+                  hint={blocked ? (blockedReason ?? undefined) : undefined}
+                  onKeyDown={ignoreHeldKey}
+                  onClick={onRun}
+                >
+                  <Icon />
+                  {runLabel}
+                </HintButton>
+              ) : (
+                <Button ref={runButton} type="button" data-testid="pdf-tools-run" disabled={blocked} onKeyDown={ignoreHeldKey} onClick={onRun}>
+                  <Icon />
+                  {runLabel}
+                </Button>
+              )}
             </>
           )}
         </DialogFooter>
@@ -443,8 +584,8 @@ export function ToolDialog<T extends ToolId>({
         <AlertDialogContent
           data-testid="pdf-tools-stop-confirm"
           onCloseAutoFocus={(event) => {
-            // No trigger for Radix to return to: back to the control that asked (Cancel, the close
-            // button), else Cancel, else Run (the run ended while this was closing: Stop from Cancel
+            // No trigger for Radix to return to: back to the control that asked (Stop, the close
+            // button), else Stop, else Run (the run ended while this was closing: Stop from the footer
             // keeps the dialog open), else the dialog itself, so focus stays in the tool's dialog.
             event.preventDefault();
             const back = stopOpener.current;
@@ -457,17 +598,18 @@ export function ToolDialog<T extends ToolId>({
           }}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>Stop {toolNameInSentence(tool)}?</AlertDialogTitle>
-            <AlertDialogDescription>The tool is still running. If you stop it now, nothing is added to the list.</AlertDialogDescription>
+            <AlertDialogTitle>{stopTitle(tool)}</AlertDialogTitle>
+            <AlertDialogDescription>{stopQuestion(tool)}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onKeyDown={ignoreRepeat}>Keep running</AlertDialogCancel>
-            <AlertDialogAction data-testid="pdf-tools-stop-confirm-yes" onKeyDown={ignoreRepeat} onClick={() => run.stop(stopCloses.current)}>
+            <AlertDialogCancel onKeyDown={ignoreHeldKey}>Keep running</AlertDialogCancel>
+            <AlertDialogAction data-testid="pdf-tools-stop-confirm-yes" onKeyDown={ignoreHeldKey} onClick={() => run.stop(stopCloses.current)}>
               Stop
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </Dialog>
+    </WhyContext.Provider>
   );
 }

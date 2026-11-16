@@ -4,7 +4,7 @@
 // control that opened it when it closes, and it cannot be closed while files are being sent (Stop
 // finishes the file being sent and leaves the rest). The hooks are in useDestinationDialog.ts.
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
-import { AlertCircle, AlertTriangle, FileText, Image as ImageIcon, Loader2, type LucideIcon } from 'lucide-react';
+import { AlertCircle, AlertTriangle, FileText, Image as ImageIcon, Loader2, Lock, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -12,13 +12,16 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { forgetMatchedText } from '@/lib/pdf-tools/matchedText';
 import type { WorkingFile } from '@/lib/pdf-tools/types';
 import { batchNames, EVIDENCE_TYPES, sameNameInVault, vaultName, type EvidenceType } from '../destinations';
 import { formatBytes } from '../format';
 import type { VaultFileRow } from '../vaultBytes';
 import { Field, FileChip, IndeterminateBar, Notice } from './ToolDialog';
+import { ignoreHeldKey } from '../dialogKeys';
 import { describedBy } from './fieldProps';
 import type { BatchRun, VaultFormState } from './useDestinationDialog';
+import { useDialogKeys } from '../useDialogKeys';
 
 // ---- the frame ---------------------------------------------------------------------------------
 
@@ -66,9 +69,14 @@ export function DestinationFrame({
   children,
 }: DestinationFrameProps) {
   const content = useRef<HTMLDivElement>(null);
+  const busy = batch?.busy ?? false;
+  // The application's shortcuts never act behind the dialog, wherever the focus is (useDialogKeys.ts). An Escape
+  // that no layer took does what Escape does: closes the dialog, unless files are being sent (REV-B S13).
+  useDialogKeys(content, () => {
+    if (!busy) onClose();
+  });
   const stopButton = useRef<HTMLButtonElement>(null);
   const confirmButton = useRef<HTMLButtonElement>(null);
-  const busy = batch?.busy ?? false;
   const progress = batch?.progress ?? null;
   const percent = progress && progress.total > 0 ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : 0;
 
@@ -82,6 +90,8 @@ export function DestinationFrame({
     }
     wasBusy.current = busy;
   }, [busy]);
+  // Closed without sending: the engine forgets the name typed last, which a pattern cleaned (matchedText.ts).
+  useEffect(() => () => forgetMatchedText(), []);
 
   const message = batch?.message ?? null;
   const progressText =
@@ -186,7 +196,8 @@ export function DestinationFrame({
               <Button type="button" variant="outline" data-testid="pdf-tools-dest-cancel" onClick={onClose}>
                 Cancel
               </Button>
-              <Button ref={confirmButton} type="button" data-testid={confirmTestId} disabled={confirmDisabled} onClick={onConfirm}>
+              {/* A held key repeats: the repeats must not start the batch again once it has ended (REV-B minor 12). */}
+              <Button ref={confirmButton} type="button" data-testid={confirmTestId} disabled={confirmDisabled} onKeyDown={ignoreHeldKey} onClick={onConfirm}>
                 {confirmLabel}
               </Button>
             </>
@@ -202,6 +213,20 @@ export function DestinationFrame({
 const KIND_ICON = { pdf: FileText, image: ImageIcon } as const;
 
 /** Name(s), evidence type and working-paper reference, with a warning for names the vault already has. */
+/**
+ * Design 5.18: a protected result goes to the vault and to a working paper as it is (with its password).
+ * Said before it is sent, so nobody files it unaware; never names or hints at the password.
+ */
+export function ProtectedNote({ files }: { files: readonly WorkingFile[] }) {
+  const locked = files.filter((f) => f.protectedOutput).length;
+  if (locked === 0) return null;
+  return (
+    <Notice tone="info" icon={Lock} title={locked < files.length ? `${locked} of these files are password-protected` : locked === 1 ? 'This file is password-protected' : 'These files are password-protected'} testId="pdf-tools-vault-protected-note">
+      {locked === 1 ? 'Reviewers will need the password to open it.' : 'Reviewers will need the passwords to open them.'} VERA does not keep passwords.
+    </Notice>
+  );
+}
+
 export function VaultFormFields({
   files,
   state,
@@ -250,19 +275,22 @@ export function VaultFormFields({
           spellCheck={false}
           autoComplete="off"
           onChange={(event) => state.setName(file.id, event.target.value)}
-          onBlur={() => state.commitName(file)}
+          // After focus has landed on the next control (see useResultName's commit): the cleaning removes the hint line.
+          onBlur={() => window.setTimeout(() => state.commitName(file), 0)}
         />
-        {(lines.length > 0 || hint) && (
-          <div id={`${id}-message`} className="space-y-0.5">
-            {lines.map((line) => (
-              <p key={line} data-testid="pdf-tools-vault-same-name" className="flex items-start gap-1.5 text-xs text-warning">
-                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-                {line}
-              </p>
-            ))}
-            {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-          </div>
-        )}
+        {/* Kept in place when empty: the name is cleaned when the field is left, and a node removed while
+            focus moves between fields makes the dialog's focus trap pull focus back (W2-OG's finding). */}
+        <div id={`${id}-message`} hidden={lines.length === 0 && !hint} className="space-y-0.5">
+          {lines.map((line) => (
+            <p key={line} data-testid="pdf-tools-vault-same-name" className="flex items-start gap-1.5 text-xs text-foreground">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warning" aria-hidden="true" />
+              {line}
+            </p>
+          ))}
+          <p hidden={!hint} className="text-xs text-muted-foreground">
+            {hint}
+          </p>
+        </div>
       </div>
     );
   };
@@ -318,7 +346,7 @@ export function VaultFormFields({
             </SelectContent>
           </Select>
         </Field>
-        <Field id="pdf-tools-vault-ref" label="Working-paper reference" hint="Optional, for example A.1.1">
+        <Field id="pdf-tools-vault-ref" label="Workpaper reference" hint="Optional, for example A.1.1">
           <Input
             {...describedBy('pdf-tools-vault-ref', null, 'Optional')}
             data-testid="pdf-tools-vault-ref"

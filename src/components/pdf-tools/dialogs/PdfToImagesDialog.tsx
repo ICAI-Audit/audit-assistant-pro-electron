@@ -60,7 +60,7 @@ export default function PdfToImagesDialog(props: ToolDialogProps) {
         testIdPrefix="pdf-tools-image-pages"
         choices={[
           { value: 'all', label: `All ${plural(pageCount, 'page')}` },
-          { value: 'selected', label: 'Selected pages' },
+          { value: 'selected', label: 'Chosen pages' },
         ]}
       />
 
@@ -99,7 +99,7 @@ export default function PdfToImagesDialog(props: ToolDialogProps) {
           testIdPrefix="pdf-tools-image-dpi"
           choices={[
             { value: '100', label: '100 dpi', description: 'For viewing on screen.' },
-            { value: '150', label: '150 dpi', description: 'Clear on screen and in print drafts.', badge: 'Default' },
+            { value: '150', label: '150 dpi', description: 'Clear on screen and in print drafts.', badge: 'Recommended' },
             { value: '300', label: '300 dpi', description: 'For printing; much larger files.' },
           ]}
         />

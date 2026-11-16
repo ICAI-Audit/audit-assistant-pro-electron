@@ -87,19 +87,20 @@ describe('isVaultFileUsable', () => {
   it('goes by the recorded type first', () => {
     expect(isVaultFileUsable({ name: 'Bank statement', mime_type: 'application/pdf' })).toBe('pdf');
     expect(isVaultFileUsable({ name: 'photo', mime_type: 'image/jpeg' })).toBe('image');
-    for (const mime of ['image/png', 'image/webp', 'image/bmp', 'image/gif']) expect(isVaultFileUsable({ name: 'x', mime_type: mime })).toBe('image');
+    for (const mime of ['image/png', 'image/webp', 'image/bmp', 'image/gif', 'image/tiff', 'image/x-tiff']) expect(isVaultFileUsable({ name: 'x', mime_type: mime })).toBe('image');
   });
 
   it('falls back to the extension, ignoring case', () => {
     expect(isVaultFileUsable({ name: 'Ledger.PDF', mime_type: null })).toBe('pdf');
     expect(isVaultFileUsable({ name: 'scan.JPEG', mime_type: 'application/octet-stream' })).toBe('image');
     expect(isVaultFileUsable({ name: 'scan.png', mime_type: '' })).toBe('image');
+    expect(isVaultFileUsable({ name: 'fax.TIF', mime_type: null })).toBe('image');
+    expect(isVaultFileUsable({ name: 'statement.tiff', mime_type: 'application/octet-stream' })).toBe('image');
   });
 
   it('leaves out what PDF Tools cannot open', () => {
     expect(isVaultFileUsable({ name: 'Trial balance.xlsx', mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })).toBeNull();
     expect(isVaultFileUsable({ name: 'Letter.docx', mime_type: null })).toBeNull();
-    expect(isVaultFileUsable({ name: 'scan.tif', mime_type: 'image/tiff' })).toBeNull();
     expect(isVaultFileUsable({ name: 'photo.heic', mime_type: 'image/heic' })).toBeNull();
     expect(isVaultFileUsable({ name: 'pdf', mime_type: null })).toBeNull();
   });
@@ -141,7 +142,7 @@ describe('vaultChoices', () => {
 
 describe('filterChoices', () => {
   const choices = vaultChoices(
-    [row({ id: '1', name: 'HDFC Bank statement March.pdf' }), row({ id: '2', name: 'Debtor confirmation.pdf' }), row({ id: '3', name: 'bank reconciliation.png', mime_type: 'image/png' })],
+    [row({ id: '1', name: 'Current account Bank statement March.pdf' }), row({ id: '2', name: 'Debtor confirmation.pdf' }), row({ id: '3', name: 'bank reconciliation.png', mime_type: 'image/png' })],
     'E1',
   );
   it('matches every word, ignoring case and order', () => {

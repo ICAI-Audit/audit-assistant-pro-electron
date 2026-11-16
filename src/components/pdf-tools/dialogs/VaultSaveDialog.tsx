@@ -3,7 +3,7 @@ import type { WorkingFile } from '@/lib/pdf-tools/types';
 import type { BatchOptions, BatchResult, SummaryToast, VaultForm } from '../destinations';
 import { plural } from '../format';
 import type { VaultFileRow } from '../vaultBytes';
-import { DestinationFrame, VaultFormFields } from './DestinationFrame';
+import { DestinationFrame, ProtectedNote, VaultFormFields } from './DestinationFrame';
 import { Notice } from './ToolDialog';
 import { useBatchRun, useVaultForm } from './useDestinationDialog';
 
@@ -52,6 +52,7 @@ export default function VaultSaveDialog({ files, leftOut, vaultRows, engagementI
           Only results made by a tool are added from here. Files from your computer or the Evidence Vault are added in the Evidence Vault itself.
         </Notice>
       )}
+      <ProtectedNote files={files} />
       <VaultFormFields files={files} state={state} vaultRows={vaultRows} engagementId={engagementId} showAlreadyInVault />
     </DestinationFrame>
   );

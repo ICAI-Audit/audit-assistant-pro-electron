@@ -1,11 +1,13 @@
 import { deflateSync } from 'node:zlib';
-import { PDFDocument, PDFName } from 'pdf-lib';
+import { PDFDocument, PDFHexString, PDFName } from 'pdf-lib';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildActivityEntry } from '@/lib/pdf-tools/activity';
 import type { CompressResult } from '@/lib/pdf-tools/compress';
 import { defaultPageNumberOptions } from '@/lib/pdf-tools/pageNumbers';
 import { makeSharedResourcesPdf } from '@/lib/pdf-tools/testLeakPdf';
 import { makeFormPdf, makePdf, pageTexts } from '@/lib/pdf-tools/testPdf';
+import { makeStrayPdf } from '@/lib/pdf-tools/testMarksPdf';
+import { bookmarkPageTexts, pdfjsOutline } from '@/lib/pdf-tools/testOutlinePdf';
 import { createWorkingListStore } from '@/lib/pdf-tools/workingList';
 import { PdfToolsError, type WorkingFile } from '@/lib/pdf-tools/types';
 import { groupTitle } from './fileGroups';
@@ -128,9 +130,9 @@ describe('merge', () => {
     expect(result.message).toBe('Merged 3 files into A_merged.pdf');
     const [made] = files();
     expect(result.ids).toEqual([made.id]);
-    expect(made).toMatchObject({ name: 'A_merged.pdf', origin: 'result', kind: 'pdf', mimeType: 'application/pdf', pageCount: 6, wasProtected: true, hasRestrictions: false, sentTo: [] });
+    expect(made).toMatchObject({ name: 'A_merged.pdf', origin: 'result', kind: 'pdf', mimeType: 'application/pdf', pageCount: 6, wasProtected: false, hasRestrictions: false, sentTo: [] });
     expect(made.groupId).toBeUndefined();
-    expect(made.operation).toMatchObject({ tool: 'merge', summary: 'Merged 3 files' });
+    expect(made.operation).toMatchObject({ tool: 'merge', summary: 'Merged 3 files; protection removed', flags: { protectionRemoved: true } });
     expect(made.operation!.sources).toMatchObject([
       { name: 'A.pdf', origin: 'computer' },
       { name: 'photo.png', origin: 'computer' },
@@ -157,6 +159,17 @@ describe('merge', () => {
     const { ctx, deps, files } = setup();
     await runTool('merge', [pdf('A.pdf', A2, 2), pdf('B.pdf', B3, 3)], {}, ctx, deps);
     expect(files()[0].wasProtected).toBe(false);
+  });
+
+  it('merges in the order the dialog shows, not the list order (UX audit T2-6)', async () => {
+    const { store, ctx, deps, files } = setup();
+    const [a, b] = [pdf('A.pdf', A2, 2), pdf('B.pdf', B3, 3)];
+    store.addFiles('u1:A', [a, b]); // the list says A, B; the dialog was reordered to B, A
+    const result = await runTool('merge', [b, a], {}, ctx, deps);
+    const made = files().find((f) => f.id === result.ids[0])!;
+    expect(made.name).toBe('B_merged.pdf');
+    expect(made.operation!.sources.map((s) => s.name)).toEqual(['B.pdf', 'A.pdf']);
+    expect(await pageTexts(made.bytes)).toEqual(['B p1', 'B p2', 'B p3', 'A p1', 'A p2']);
   });
 });
 
@@ -187,13 +200,14 @@ describe('split', () => {
     expect(parts.map((f) => f.name)).toEqual(['C_part_01.pdf', 'C_part_02.pdf', 'C_part_03.pdf']);
     expect(parts.map((f) => f.pageCount)).toEqual([2, 2, 1]);
     expect(parts.map((f) => f.operation!.summary)).toEqual([
-      'Split every 2 pages (part 1 of 3)',
-      'Split every 2 pages (part 2 of 3)',
-      'Split every 2 pages (part 3 of 3)',
+      'Split every 2 pages (part 1 of 3); protection removed',
+      'Split every 2 pages (part 2 of 3); protection removed',
+      'Split every 2 pages (part 3 of 3); protection removed',
     ]);
     expect(new Set(parts.map((f) => f.groupId)).size).toBe(1);
     expect(parts[0].groupId).toBeTruthy();
-    expect(parts.every((f) => f.wasProtected)).toBe(true);
+    // The parts have no password; that the source had one is in their record (QA-FIX E).
+    expect(parts.every((f) => !f.wasProtected && f.operation!.flags?.protectionRemoved === true)).toBe(true);
     expect(await pageTexts(parts[2].bytes)).toEqual(['C p5']);
   });
 
@@ -236,8 +250,8 @@ describe('compress', () => {
     const compressPdf = vi.fn(async (bytes: Uint8Array) => compressed(A2, Math.round(A2.byteLength / 0.58)));
     const result = await runTool('compress', [pdf('Scan.pdf', B3, 2, { wasProtected: true })], { level: 'recommended' }, ctx, { ...deps, compressPdf });
     const [made] = files();
-    expect(made).toMatchObject({ name: 'Scan_compressed.pdf', pageCount: 2, wasProtected: true });
-    expect(made.operation!.summary).toMatch(/^Compressed, Recommended \(42% smaller: .+ → .+\)$/);
+    expect(made).toMatchObject({ name: 'Scan_compressed.pdf', pageCount: 2, wasProtected: false });
+    expect(made.operation!.summary).toMatch(/^Compressed, Balanced \(42% smaller: .+ → .+\); protection removed$/);
     expect(made.operation!.options).toEqual({ level: 'recommended' });
     expect(made.operation!.sources).toMatchObject([{ name: 'Scan.pdf', origin: 'computer' }]);
     expect(result.message).toBe('Compressed Scan_compressed.pdf');
@@ -306,19 +320,56 @@ describe('compress', () => {
 });
 
 describe('page numbers', () => {
-  it('numbers the pages and records the options as plain values', async () => {
+  it('numbers the pages and records the options as plain values, the typed text around the number by its length only', async () => {
     const { ctx, deps, files } = setup();
     const numbers = { position: 'bottom-right', format: 'custom', prefix: 'WP-A1 / ', suffix: '', startNumber: 1, fromPage: 2, toPage: 3, fontSize: 10, marginPt: 28, color: { r: 0, g: 0, b: 0 } } as const;
     await runTool('page-numbers', [pdf('B.pdf', B3, 3)], { numbers }, ctx, deps);
     const [made] = files();
     expect(made).toMatchObject({ name: 'B_numbered.pdf', pageCount: 3 });
     expect(made.operation!.summary).toBe('Added page numbers');
-    expect(made.operation!.options).toMatchObject({ position: 'bottom-right', format: 'custom', prefix: 'WP-A1 / ', fromPage: 2, toPage: 3, color: '#000000' });
+    expect(made.operation!.options).toMatchObject({ position: 'bottom-right', format: 'custom', prefix: 'custom', prefixLength: 8, fromPage: 2, toPage: 3, color: '#000000' });
+    expect(made.operation!.options).not.toHaveProperty('suffix');
+    expect(JSON.stringify(made.operation)).not.toContain('WP-A1');
+    expect(buildActivityEntry({ file: made, destination: 'computer', sha256: 'ab'.repeat(32) }).metadata.options).toEqual(made.operation!.options);
     expect(primitivesOnly(made.operation!.options)).toBe(true);
     const texts = await pageTexts(made.bytes);
     expect(texts[0]).toBe('B p1');
     expect(texts[1]).toContain('WP-A1 / 1');
     expect(texts[2]).toContain('WP-A1 / 2');
+  });
+
+  it('refuses a list that cannot take the numbered copy before numbering anything, as Watermark does (REV-B minor 10)', async () => {
+    const { ctx, deps, files } = setup({ maxBytes: B3.byteLength - 1 });
+    const addPageNumbers = vi.fn();
+    await expect(runTool('page-numbers', [pdf('B.pdf', B3, 3)], { numbers: defaultPageNumberOptions(3) }, ctx, { ...deps, addPageNumbers })).rejects.toThrow(
+      /^The numbered file would take the list over /,
+    );
+    expect(addPageNumbers).not.toHaveBeenCalled();
+    expect(files()).toEqual([]);
+  });
+
+  it('a refusal of the run ends with "Nothing was added.", as the other tools say (UX principle 9)', async () => {
+    const { ctx, deps, files } = setup();
+    const tooLong = { ...defaultPageNumberOptions(3), fontSize: 36, texts: { 'top-left': 'W'.repeat(100) } };
+    await expect(runTool('page-numbers', [pdf('B.pdf', B3, 3)], { numbers: tooLong }, ctx, deps)).rejects.toThrow(
+      'The header or footer text does not fit on page 1. Use shorter text, a smaller font size or a smaller margin. Nothing was added.',
+    );
+    const rupee = { ...defaultPageNumberOptions(3), texts: { 'top-left': 'Fee ₹ 100' } };
+    const refused = await runTool('page-numbers', [pdf('B.pdf', B3, 3)], { numbers: rupee }, ctx, deps).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(PdfToolsError);
+    expect((refused as PdfToolsError).message).toMatch(/ Nothing was added\.$/);
+    expect((refused as PdfToolsError).message.match(/Nothing was added/g)).toHaveLength(1);
+    expect(files()).toEqual([]);
+  });
+
+  it('a stop between pages is still a stop, not a refusal', async () => {
+    const { controller, ctx, deps, files, progress } = setup();
+    progress.mockImplementation((_done: number, _total: number, label?: string) => {
+      if (label === 'Adding page numbers (page 2 of 3)…') controller.abort();
+    });
+    const result = await runTool('page-numbers', [pdf('B.pdf', B3, 3)], { numbers: defaultPageNumberOptions(3) }, ctx, deps);
+    expect(result.status).toBe('cancelled');
+    expect(files()).toEqual([]);
   });
 });
 
@@ -334,6 +385,18 @@ describe('images to PDF', () => {
     const doc = await PDFDocument.load(made.bytes);
     expect(doc.getPage(0).getSize().width).toBeCloseTo(841.89, 1);
     expect(doc.getPage(1).getSize().width).toBeCloseTo(595.28, 1);
+  });
+
+  it('places the images in the order the dialog shows (UX audit T2-6)', async () => {
+    const { ctx, deps, files } = setup();
+    const tall = makePng(20, 40);
+    await runTool('images-to-pdf', [image('scan2.png', tall), image('scan1.png', png)], { pageSize: 'a4-auto', marginPt: 28 }, ctx, deps);
+    const [made] = files();
+    expect(made.name).toBe('scan2.pdf');
+    expect(made.operation!.sources.map((s) => s.name)).toEqual(['scan2.png', 'scan1.png']);
+    const doc = await PDFDocument.load(made.bytes);
+    expect(doc.getPage(0).getSize().width).toBeCloseTo(595.28, 1); // the tall image first: portrait
+    expect(doc.getPage(1).getSize().width).toBeCloseTo(841.89, 1);
   });
 
   it('fails the run on one bad image with a message naming it', async () => {
@@ -354,10 +417,10 @@ describe('PDF to images', () => {
     expect(renderPage.mock.calls.map((c) => c[1])).toEqual([0, 2]); // page order, each once
     const images = files();
     expect(images.map((f) => f.name)).toEqual(['B_page_001.png', 'B_page_003.png']);
-    expect(images.every((f) => f.kind === 'image' && f.mimeType === 'image/png' && f.pageCount === null && f.wasProtected)).toBe(true);
+    expect(images.every((f) => f.kind === 'image' && f.mimeType === 'image/png' && f.pageCount === null && !f.wasProtected && f.operation!.flags?.protectionRemoved)).toBe(true);
     expect(new Set(images.map((f) => f.groupId)).size).toBe(1);
     expect(images[0].groupId).toBeTruthy();
-    expect(images.map((f) => f.operation!.summary)).toEqual(['Converted page 1 to PNG at 150 dpi', 'Converted page 3 to PNG at 112 dpi']);
+    expect(images.map((f) => f.operation!.summary)).toEqual(['Converted page 1 to PNG at 150 dpi; protection removed', 'Converted page 3 to PNG at 112 dpi; protection removed']);
     expect(result.message).toBe('Made 2 page images');
     expect(result.detail).toContain('Page 3 is very large, so it was saved at 112 dpi');
   });
@@ -727,7 +790,8 @@ describe('result names are never repeated in the list', () => {
     const second = files().slice(2);
     expect(second.every((f) => f.name.length <= 120)).toBe(true);
     expect(second.map((f) => f.name.slice(-16))).toEqual(['_part_01 (2).pdf', '_part_02 (2).pdf', '_part_03 (2).pdf']);
-    expect(groupTitle(second).title).toMatch(/^L+ — 3 parts$/);
+    // The stem is cut in the middle (QA-FIX G), once.
+    expect(groupTitle(second).title).toMatch(/^L+…L+ — 3 parts$/);
   });
 
   it('compares without case, also within one run', async () => {
@@ -825,7 +889,7 @@ describe('results made from results', () => {
     expect(part.name).toBe('x_compressed_numbered_pages_1-2.pdf');
     const entry = buildActivityEntry({ file: part, destination: 'vault', sha256: SHA, vaultRecordId: 'ev-10' });
     expect(entry.details).toMatch(
-      /^Split pages 1-2 → x_compressed_numbered_pages_1-2\.pdf \(2 pages, SHA-256 cdcdcdcdcdcd…\)\. Sources: x_compressed_numbered\.pdf \[result\]\. Earlier steps: Compressed, Recommended \(75% smaller: .+ → .+\) → x_compressed\.pdf; Added page numbers → x_compressed_numbered\.pdf\. Original sources: x\.pdf \[vault\]\. Destination: Evidence Vault\.$/,
+      /^Split pages 1-2 → x_compressed_numbered_pages_1-2\.pdf \(2 pages, SHA-256 cdcdcdcdcdcd…\)\. Sources: x_compressed_numbered\.pdf \[result\]\. Earlier steps: Compressed, Balanced \(75% smaller: .+ → .+\) → x_compressed\.pdf; Added page numbers → x_compressed_numbered\.pdf\. Original sources: x\.pdf \[vault\]\. Destination: Evidence Vault\.$/,
     );
     expect(entry.metadata).toMatchObject({
       earlierSteps: [
@@ -836,7 +900,7 @@ describe('results made from results', () => {
     });
     // a one-step result's entry is as before
     const first = buildActivityEntry({ file: compressed, destination: 'vault', sha256: SHA, vaultRecordId: 'ev-11' });
-    expect(first.details).toMatch(/^Compressed, Recommended \(75% smaller: .+\) → x_compressed\.pdf \(3 pages, SHA-256 cdcdcdcdcdcd…\)\. Sources: x\.pdf \[vault\]\. Destination: Evidence Vault\.$/);
+    expect(first.details).toMatch(/^Compressed, Balanced \(75% smaller: .+\) → x_compressed\.pdf \(3 pages, SHA-256 cdcdcdcdcdcd…\)\. Sources: x\.pdf \[vault\]\. Destination: Evidence Vault\.$/);
     expect(first.metadata).not.toHaveProperty('earlierSteps');
   });
 
@@ -938,22 +1002,167 @@ describe('what a result says about the signature, the form and the bookmarks of 
     expect(part.hasFormFields).toBe(true);
   });
 
-  it('Split, Delete pages and Merge of a bookmarked file say the bookmarks were not carried', async () => {
+  it('Split and Delete pages carry the bookmarks of the pages kept, and say so only when one is not carried; Merge without the options carries none', async () => {
     const h = setup();
     const source = pdf('Marked.pdf', marked, 3, { hasBookmarks: true, hasFormFields: true });
     await runTool('split', [source], { mode: 'selected', pages: '1' }, h.ctx, h.deps);
     await runTool('delete-pages', [source], { pages: '2' }, h.ctx, h.deps);
     await runTool('merge', [source, pdf('A.pdf', A2, 2)], {}, h.ctx, h.deps);
     expect(h.files().map((f) => f.operation!.summary)).toEqual([
-      'Extracted page 1; bookmarks not carried',
-      'Deleted page 2; bookmarks not carried',
-      'Merged 2 files; form fields not carried; bookmarks not carried',
+      'Extracted page 1; some bookmarks not carried',
+      'Deleted page 2; some bookmarks not carried',
+      'Merged 2 files; form fields not carried; some bookmarks not carried',
     ]);
-    expect(h.files().map((f) => f.hasBookmarks)).toEqual([false, false, false]);
+    // A2: the bookmarks of the pages kept are in the result now; a merge with neither option has none (phase 1)
+    expect(h.files().map((f) => f.hasBookmarks)).toEqual([true, true, false]);
+    expect(h.files().map((f) => f.operation!.flags?.bookmarksDropped)).toEqual([true, true, true]);
+    expect(await pdfjsOutline(h.files()[0].bytes)).toEqual([[0, 'Page 1', 0]]);
+    expect(await pdfjsOutline(h.files()[1].bytes)).toEqual([
+      [0, 'Page 1', 0],
+      [0, 'Page 3', 1],
+    ]);
+    expect(await pdfjsOutline(h.files()[2].bytes)).toEqual([]);
     // Compress and Page numbers keep the bookmarks and the form
     await runTool('page-numbers', [source], { numbers: defaultPageNumberOptions(3) }, h.ctx, h.deps);
     expect(h.files()[3]).toMatchObject({ hasBookmarks: true, hasFormFields: true });
     expect(h.files()[3].operation!.flags).toBeUndefined();
+  });
+
+  it('a Split that keeps every bookmarked page says nothing about bookmarks; so does each part of a Split every N', async () => {
+    const h = setup();
+    const source = pdf('Marked.pdf', marked, 3, { hasBookmarks: true, hasFormFields: true });
+    await runTool('split', [source], { mode: 'range', from: 1, to: 3 }, h.ctx, h.deps);
+    expect(h.files()[0].operation!.summary).toBe('Split pages 1-3');
+    expect(h.files()[0].operation!.flags).toBeUndefined();
+    expect(await pdfjsOutline(h.files()[0].bytes)).toEqual([
+      [0, 'Page 1', 0],
+      [0, 'Page 2', 1],
+      [0, 'Page 3', 2],
+    ]);
+    // every page: each part carries its own page's bookmark; the others belong to the other parts
+    await runTool('split', [source], { mode: 'every', every: 1 }, h.ctx, h.deps);
+    const parts = h.files().slice(1);
+    expect(parts.map((f) => f.operation!.flags)).toEqual([undefined, undefined, undefined]);
+    expect(await Promise.all(parts.map((f) => pdfjsOutline(f.bytes)))).toEqual([[[0, 'Page 1', 0]], [[0, 'Page 2', 0]], [[0, 'Page 3', 0]]]);
+  });
+
+  it('Merge adds a bookmark for each file, images included, in list order, with each file\'s own bookmarks under it', async () => {
+    const h = setup();
+    const source = pdf('Marked.pdf', marked, 3, { hasBookmarks: true, hasFormFields: true });
+    const inputs = [pdf('A.pdf', A2, 2), image('photo.png', png), source];
+    await runTool('merge', inputs, { fileBookmarks: true, keepOwnBookmarks: true }, h.ctx, h.deps);
+    const [made] = h.files();
+    // the image is page 3, so Marked's pages are 4 to 6
+    expect(await pdfjsOutline(made.bytes)).toEqual([
+      [0, 'A', 0],
+      [0, 'photo', 2],
+      [0, 'Marked', 3],
+      [1, 'Page 1', 3],
+      [1, 'Page 2', 4],
+      [1, 'Page 3', 5],
+    ]);
+    expect(await bookmarkPageTexts(made.bytes)).toEqual(['A -> A p1', 'photo -> ', 'Marked -> Form p1', 'Page 1 -> Form p1', 'Page 2 -> Form p2', 'Page 3 -> Form p3']);
+    expect(made).toMatchObject({ hasBookmarks: true, pageCount: 6 });
+    expect(made.operation!.summary).toBe('Merged 3 files; form fields not carried');
+    expect(made.operation!.flags).toEqual({ formFieldsDropped: true });
+    expect(made.operation!.options).toMatchObject({ fileBookmarks: true, keepOwnBookmarks: true });
+  });
+
+  it("Merge with only a bookmark for each file drops the files' own bookmarks and says so; with only keep-own it carries them at the top", async () => {
+    const h = setup();
+    const source = pdf('Marked.pdf', marked, 3, { hasBookmarks: true });
+    await runTool('merge', [pdf('A.pdf', A2, 2), source], { fileBookmarks: true, keepOwnBookmarks: false }, h.ctx, h.deps);
+    await runTool('merge', [pdf('A.pdf', A2, 2), source], { fileBookmarks: false, keepOwnBookmarks: true, name: 'own.pdf' }, h.ctx, h.deps);
+    const [perFile, own] = h.files();
+    expect(await pdfjsOutline(perFile.bytes)).toEqual([
+      [0, 'A', 0],
+      [0, 'Marked', 2],
+    ]);
+    expect(perFile.operation!.summary).toBe('Merged 2 files; some bookmarks not carried');
+    expect(await pdfjsOutline(own.bytes)).toEqual([
+      [0, 'Page 1', 2],
+      [0, 'Page 2', 3],
+      [0, 'Page 3', 4],
+    ]);
+    expect(own.operation!.summary).toBe('Merged 2 files');
+    // no source with bookmarks: nothing to say, whatever the options
+    await runTool('merge', [pdf('A.pdf', A2, 2), pdf('B.pdf', B3, 3)], { fileBookmarks: true, keepOwnBookmarks: true }, h.ctx, h.deps);
+    expect(h.files()[2].operation!.flags).toBeUndefined();
+    expect(await pdfjsOutline(h.files()[2].bytes)).toEqual([
+      [0, 'A', 0],
+      [0, 'B', 2],
+    ]);
+  });
+});
+
+describe('Page numbers with the phase 2 options (lane M)', () => {
+  const tokens = { file: 'B.pdf', client: 'Synthetic Client Pvt Ltd', fy: '2025-26', today: new Date(2026, 10, 14) };
+
+  it('adds a header and footer with tokens, names the result _header_footer, and records a token template as it is, typed text only by its length and tokens, never the client (REV-B B1)', async () => {
+    const { ctx, deps, files } = setup();
+    const numbers = { ...defaultPageNumberOptions(3), style: 'roman-upper', bold: true, texts: { 'top-left': '{client} FY {fy}', 'top-right': '{date}', 'bottom-right': 'Page {page} of {pages}' }, dateFormat: 'dd-mm-yyyy', tokens } as const;
+    const result = await runTool('page-numbers', [pdf('B.pdf', B3, 3)], { numbers }, ctx, deps);
+    const [made] = files();
+    expect(made.name).toBe('B_header_footer.pdf');
+    expect(made.operation!.summary).toBe('Added page numbers, header and footer');
+    expect(made.operation!.options).toMatchObject({
+      style: 'roman-upper',
+      bold: true,
+      dateFormat: 'dd-mm-yyyy',
+      text_top_left: 'custom',
+      text_top_left_length: 16,
+      text_top_left_uses: '{client} {fy}',
+      text_top_right: '{date}',
+      text_bottom_right: 'custom',
+      text_bottom_right_length: 22,
+      text_bottom_right_uses: '{page} {pages}',
+    });
+    expect(made.operation!.options).not.toHaveProperty('text_top_right_length');
+    expect(JSON.stringify(made.operation)).not.toContain(' FY ');
+    expect(JSON.stringify(made.operation)).not.toContain('Page {page}');
+    // the activity entry keeps the record whole: producer and activity.ts's allow-list agree
+    expect(buildActivityEntry({ file: made, destination: 'computer', sha256: 'ab'.repeat(32) }).metadata.options).toEqual(made.operation!.options);
+    expect(primitivesOnly(made.operation!.options)).toBe(true);
+    expect(JSON.stringify(made.operation)).not.toContain('Synthetic Client');
+    expect(JSON.stringify(made.operation)).not.toContain('2025-26');
+    expect(result.detail).toBe('Numbers, header and footer added to every page.');
+    const texts = await pageTexts(made.bytes);
+    expect(texts[1]).toContain('Synthetic Client Pvt Ltd FY 2025-26');
+    expect(texts[1]).toContain('Page II of III');
+  });
+
+  it('header and footer only: the summary and message say so', async () => {
+    const { ctx, deps, files } = setup();
+    const numbers = { ...defaultPageNumberOptions(2), numbersOn: false, texts: { 'top-center': 'WP {name}' }, tokens: { ...tokens, file: 'A.pdf' } };
+    const result = await runTool('page-numbers', [pdf('A.pdf', A2, 2)], { numbers }, ctx, deps);
+    expect(files()[0].operation!.summary).toBe('Added header and footer');
+    expect(result.detail).toBe('Header and footer added to every page.');
+    expect((await pageTexts(files()[0].bytes))[0]).toContain('WP A');
+  });
+
+  it('flags a number that may be misplaced on a damaged page, and says which page', async () => {
+    const { ctx, deps, files } = setup();
+    const damaged = await makeStrayPdf('extra-q');
+    const result = await runTool('page-numbers', [pdf('Odd.pdf', damaged, 1)], { numbers: defaultPageNumberOptions(1) }, ctx, deps);
+    const [made] = files();
+    expect(made.operation!.flags).toEqual({ markMayBeMisplaced: true });
+    expect(made.operation!.summary).toBe('Added page numbers; a mark may be misplaced');
+    expect(result.tone).toBe('warning');
+    expect(result.detail).toContain('may be misplaced on page 1');
+    expect(buildActivityEntry({ file: made, destination: 'computer', sha256: 'ab'.repeat(32) }).metadata).toMatchObject({ markMayBeMisplaced: true });
+  });
+
+  it('shows the pages as they are numbered and can be stopped between pages', async () => {
+    const { controller, ctx, deps, files, progress } = setup();
+    progress.mockImplementation((_done: number, _total: number, label?: string) => {
+      if (label === 'Adding page numbers (page 2 of 5)…') controller.abort();
+    });
+    const result = await runTool('page-numbers', [pdf('C.pdf', C5, 5)], { numbers: defaultPageNumberOptions(5) }, ctx, deps);
+    expect(result.status).toBe('cancelled');
+    expect(files()).toEqual([]);
+    const labels = progress.mock.calls.map((c) => c[2]);
+    expect(labels).toContain('Adding page numbers (page 2 of 5)…');
+    expect(labels).not.toContain('Adding page numbers (page 3 of 5)…');
   });
 });
 
@@ -991,6 +1200,70 @@ describe('resources kept whole, and Split every N part by part', () => {
     expect(labels).toContain('Splitting… part 1 of 5');
     expect(labels).toContain('Splitting… part 3 of 5');
     expect(labels).not.toContain('Splitting… part 4 of 5');
+  });
+
+  // REV-A B6 / INT3: the libraries copy page by page and call `onPage` before each page; the run passes its
+  // own check there, so a Stop pressed while a file is copied lands before the next page, not at the end.
+  it('Merge: a Stop pressed while a file is being copied ends the run before its next page', async () => {
+    const { controller, ctx, deps, files } = setup();
+    const { mergePdfs: real } = await import('@/lib/pdf-tools/organise');
+    const copied: string[] = [];
+    const mergePdfs: RunDeps['mergePdfs'] = (parts, options = {}) =>
+      real(parts, {
+        ...options,
+        onPage: async (file, done, total) => {
+          copied.push(`${file}:${done}`);
+          if (file === 1 && done === 1) controller.abort(); // Stop pressed while the second file is copied
+          await options.onPage?.(file, done, total);
+        },
+      });
+    const result = await runTool('merge', [pdf('A.pdf', A2, 2), pdf('C.pdf', C5, 5)], {}, ctx, { ...deps, mergePdfs });
+    expect(result.status).toBe('cancelled');
+    expect(files()).toEqual([]);
+    expect(copied).toEqual(['0:0', '0:1', '1:0', '1:1']);
+  });
+
+  it('Split every N: a Stop pressed while a part is being made ends the run before its next page', async () => {
+    const { controller, ctx, deps, files } = setup();
+    const { splitEvery: real } = await import('@/lib/pdf-tools/organise');
+    const copied: string[] = [];
+    const splitEvery: RunDeps['splitEvery'] = (file, n, options = {}) =>
+      real(file, n, {
+        ...options,
+        onPage: async (part, done, total) => {
+          copied.push(`${part}:${done}`);
+          if (part === 0 && done === 1) controller.abort(); // Stop pressed while the first part is made
+          await options.onPage?.(part, done, total);
+        },
+      });
+    const result = await runTool('split', [pdf('C.pdf', C5, 5)], { mode: 'every', every: 3 }, ctx, { ...deps, splitEvery });
+    expect(result.status).toBe('cancelled');
+    expect(files()).toEqual([]);
+    expect(copied).toEqual(['0:0', '0:1']);
+  });
+
+  // FIX-A2 follow-up (INT3 concern 1): the run also passes its own check to the read of the source (`check`,
+  // run at each wait inside pdf-lib's load), so a Stop pressed while the file is still being read lands there.
+  // Each double presses Stop, then asks the check as the load would: the run must end before any page.
+  it('Merge, Split, Delete pages and Page numbers: a Stop pressed while the source is read ends the run before any page', async () => {
+    const organise = await import('@/lib/pdf-tools/organise');
+    const numbers = await import('@/lib/pdf-tools/pageNumbers');
+    type Hooks = { check?: () => void; onPage?: (...args: number[]) => unknown };
+    const cases: [string, (abort: () => void, pages: () => void) => Partial<RunDeps>, Parameters<typeof runTool>[0], WorkingFile[], unknown][] = [
+      ['merge', (abort, pages) => ({ mergePdfs: async (parts, options: Hooks = {}) => { abort(); options.check?.(); return organise.mergePdfs(parts, { ...options, onPage: async (...a: number[]) => { pages(); await options.onPage?.(...a); } }); } }), 'merge', [pdf('A.pdf', A2, 2), pdf('C.pdf', C5, 5)], {}],
+      ['split every N', (abort, pages) => ({ splitEvery: async (file, n, options: Hooks = {}) => { abort(); options.check?.(); return organise.splitEvery(file, n, { ...options, onPage: async (...a: number[]) => { pages(); await options.onPage?.(...a); } }); } }), 'split', [pdf('C.pdf', C5, 5)], { mode: 'every', every: 2 }],
+      ['split one range', (abort, pages) => ({ extractPages: async (file, indices, options: Hooks = {}) => { abort(); options.check?.(); return organise.extractPages(file, indices, { ...options, onPage: async (d: number, t: number) => { pages(); await options.onPage?.(d, t); } }); } }), 'split', [pdf('C.pdf', C5, 5)], { mode: 'range', from: 1, to: 3 }],
+      ['delete pages', (abort, pages) => ({ deletePages: async (file, indices, options: Hooks = {}) => { abort(); options.check?.(); return organise.deletePages(file, indices, { ...options, onPage: async (d: number, t: number) => { pages(); await options.onPage?.(d, t); } }); } }), 'delete-pages', [pdf('C.pdf', C5, 5)], { pages: '1' }],
+      ['page numbers', (abort, pages) => ({ addPageNumbers: async (file, opts, hooks: Hooks = {}) => { abort(); hooks.check?.(); return numbers.addPageNumbers(file, opts, { ...hooks, onPage: async (d: number, t: number) => { pages(); await hooks.onPage?.(d, t); } }); } }), 'page-numbers', [pdf('C.pdf', C5, 5)], { numbers: defaultPageNumberOptions(5) }],
+    ];
+    for (const [name, double, tool, inputs, options] of cases) {
+      const { controller, ctx, deps, files } = setup();
+      let pages = 0;
+      const result = await runTool(tool, inputs, options as never, ctx, { ...deps, ...double(() => controller.abort(), () => void pages++) } as RunDeps);
+      expect(result.status, name).toBe('cancelled');
+      expect(files(), name).toEqual([]);
+      expect(pages, `${name}: no page copied or numbered after the Stop`).toBe(0);
+    }
   });
 
   it('Delete pages and Split (one result) show the pages as they are copied and can be stopped between pages', async () => {
@@ -1034,5 +1307,69 @@ describe('a name collision never ends the run as a damaged file', () => {
     };
     const named = withUniqueNames([pdf('x.pdf', A2, 2), { ...image('x.png', png), name: 'x.pdf', groupId: 'g' }, { ...image('x.png', png), name: 'y.png', groupId: 'g' }], taken, throwing);
     expect(named.map((f) => f.name)).toEqual(['result (3).pdf', 'result (2).png', 'y.png']);
+  });
+});
+
+// ---- the file in hand: protection and what a copy still carries (QA-FIX E and A) -------------
+
+/** A PDF with a sticky-note comment, an attached file and a title and author (synthetic). */
+async function makeCarryingPdf(): Promise<Uint8Array> {
+  const doc = await PDFDocument.load(await makePdf('D', 2));
+  const { context } = doc;
+  doc.getPage(0).node.addAnnot(context.register(context.obj({ Type: 'Annot', Subtype: 'Text', Rect: [10, 10, 30, 30], Contents: PDFHexString.fromText('Synthetic note') })));
+  await doc.attach(new TextEncoder().encode('synthetic workings'), 'workings.txt', { mimeType: 'text/plain' });
+  doc.setTitle('Synthetic title');
+  doc.setAuthor('Synthetic author');
+  return doc.save();
+}
+
+describe('a result describes itself, not its sources', () => {
+  it('a result made from an unlocked file is not "password-protected"; the record says the protection was removed', async () => {
+    const { ctx, deps, files } = setup();
+    await runTool('merge', [pdf('A.pdf', A2, 2), pdf('B.pdf', B3, 3, { wasProtected: true })], {}, ctx, deps);
+    const [made] = files();
+    expect(made.wasProtected).toBe(false);
+    expect(made.operation!.flags).toMatchObject({ protectionRemoved: true });
+    expect(made.operation!.summary).toBe('Merged 2 files; protection removed');
+    const entry = buildActivityEntry({ file: made, destination: 'computer', sha256: 'a'.repeat(64) });
+    expect(entry.metadata.protectionRemoved).toBe(true);
+  });
+
+  it('a result of results that were never protected says nothing about protection', async () => {
+    const { ctx, deps, files } = setup();
+    await runTool('merge', [pdf('A.pdf', A2, 2), pdf('B.pdf', B3, 3)], {}, ctx, deps);
+    const [merged] = files();
+    await runTool('page-numbers', [merged], { numbers: defaultPageNumberOptions(5) }, ctx, deps);
+    const numbered = files().find((f) => f.id !== merged.id)!;
+    expect(numbered.wasProtected).toBe(false);
+    expect(numbered.operation!.flags?.protectionRemoved).toBeUndefined();
+  });
+});
+
+describe('what a copy still carries is said where the user decides to save or send it', () => {
+  it('counts comments, attachments and properties on the result and says so in one sentence', async () => {
+    const { ctx, deps, files } = setup();
+    const result = await runTool('page-numbers', [pdf('Draft.pdf', await makeCarryingPdf(), 2)], { numbers: defaultPageNumberOptions(2) }, ctx, deps);
+    const [made] = files();
+    expect(made.carried).toEqual({ comments: 1, attachments: 1, properties: ['title', 'author'] });
+    expect(result.detail).toBe('Numbers added to every page. This copy still carries 1 comment, 1 attachment and its title and author.');
+    expect(result.tone).toBe('success');
+    const entry = buildActivityEntry({ file: made, destination: 'computer', sha256: 'b'.repeat(64) });
+    expect(entry.metadata.carried).toEqual({ comments: 1, attachments: 1, properties: ['title', 'author'] });
+    expect(JSON.stringify(entry)).not.toMatch(/Synthetic (note|title|author)|workings/);
+  });
+
+  it('says only what the result really kept: Split does not carry the attachment', async () => {
+    const { ctx, deps, files } = setup();
+    const result = await runTool('split', [pdf('Draft.pdf', await makeCarryingPdf(), 2)], { mode: 'range', from: 1, to: 1 }, ctx, deps);
+    expect(files()[0].carried).toEqual({ comments: 1, attachments: 0, properties: ['title', 'author'] });
+    expect(result.detail).toContain('This copy still carries 1 comment and its title and author.');
+  });
+
+  it('says nothing about a result that carries nothing', async () => {
+    const { ctx, deps, files } = setup();
+    const result = await runTool('merge', [pdf('A.pdf', A2, 2), pdf('B.pdf', B3, 3)], {}, ctx, deps);
+    expect(files()[0].carried).toBeUndefined();
+    expect(result.detail).not.toMatch(/still carr/);
   });
 });

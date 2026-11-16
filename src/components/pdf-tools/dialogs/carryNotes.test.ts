@@ -42,11 +42,33 @@ describe('carryNotes', () => {
       'Links between pages do not work in the merged file.',
     ]);
     expect(carryNotes('split', [file('a.pdf', { hasBookmarks: true, hasPageLinks: true })]).notes).toEqual([
-      'Bookmarks are not carried into the result.',
+      'Bookmarks of pages that are left out are not carried.',
       'Links to pages that are left out are removed; other links between pages may not work.',
     ]);
     expect(carryNotes('delete-pages', [file('a.pdf', { hasPageLinks: true })]).notes).toEqual([
       'Links to pages that are left out are removed; other links between pages may not work.',
     ]);
+    expect(carryNotes('delete-pages', [file('a.pdf', { hasBookmarks: true })]).notes).toEqual(['Bookmarks of pages that are left out are not carried.']);
+  });
+
+  it("Merge says bookmarks are not carried only when each file's own bookmarks are not kept", () => {
+    const files = [file('a.pdf', { hasBookmarks: true }), file('b.pdf')];
+    expect(carryNotes('merge', files).notes).toEqual(['Bookmarks are not carried into the merged file.']);
+    expect(carryNotes('merge', files, { keepOwnBookmarks: false }).notes).toEqual(['Bookmarks are not carried into the merged file.']);
+    expect(carryNotes('merge', files, { keepOwnBookmarks: true }).notes).toEqual([]);
+    expect(carryNotes('merge', [file('a.pdf', { hasPageLinks: true })], { keepOwnBookmarks: true }).notes).toEqual(['Links between pages do not work in the merged file.']);
+    // the option means nothing to Split and Delete pages
+    expect(carryNotes('split', files, { keepOwnBookmarks: true }).notes).toEqual(['Bookmarks of pages that are left out are not carried.']);
+  });
+
+  it("says the attachments in a document's list are not carried, only when a file has them (inspectPdf hasAttachments)", () => {
+    expect(carryNotes('split', [file('a.pdf', { hasAttachments: true })]).notes).toEqual(["Attachments in the document's list are not carried."]);
+    expect(carryNotes('delete-pages', [file('a.pdf', { hasBookmarks: true, hasPageLinks: true, hasAttachments: true })]).notes).toEqual([
+      'Bookmarks of pages that are left out are not carried.',
+      'Links to pages that are left out are removed; other links between pages may not work.',
+      "Attachments in the document's list are not carried.",
+    ]);
+    expect(carryNotes('merge', [file('a.pdf'), file('b.pdf', { hasAttachments: true })]).notes).toEqual(['Attachments are not carried into the merged file.']);
+    expect(carryNotes('split', [file('a.pdf', { hasAttachments: false })]).notes).toEqual([]);
   });
 });

@@ -83,6 +83,19 @@ describe('BatchRunner', () => {
     expect(runner.start(() => gate.promise, () => null)).toBe(false);
   });
 
+  it('a summary that throws (a defect in finish) ends with the plain message: the dialog is never left busy (REV-B S14)', async () => {
+    const { runner, last } = setup();
+    const gate = deferred<BatchResult>();
+    runner.start(() => gate.promise, () => {
+      throw new Error('summary broke');
+    });
+    gate.resolve(done());
+    await vi.waitFor(() => expect(last().phase).toBe('idle'));
+    expect(last().message).toEqual(UNEXPECTED);
+    // and a new batch can start
+    expect(runner.start(() => new Promise(() => undefined), () => null)).toBe(true);
+  });
+
   it('a batch that throws (a defect) ends with a plain message instead of hanging', async () => {
     const { runner, last } = setup();
     const gate = deferred<BatchResult>();
