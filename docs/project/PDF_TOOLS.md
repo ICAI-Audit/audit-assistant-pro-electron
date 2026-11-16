@@ -516,7 +516,7 @@ Rows show the kind as a coloured label (PAN, Aadhaar, …, Typed, Drawn, Same te
 - a filter box (matches kind, value or page number);
 - "Show unticked" (on by default);
 - choosing a row shows its page and highlights its box; clicking a box on the page selects its row;
-- delete a drawn box (Delete key or its row's button); "Clear drawn boxes on this page"; "Clear all drawn boxes";
+- delete a drawn box (Delete or Backspace key, or its row's button); "Clear page boxes"; "Clear all drawn boxes";
 - undo and redo of every change in the dialog (Ctrl+Z, and Ctrl+Y or Ctrl+Shift+Z), up to 100 steps **(design call)**.
 
 On the page: a proposal is an outlined box (blue for sure, dashed amber for possible, grey when unticked); a ticked box is filled half-transparent black; the selected box has a thick outline. The opacity on screen is fixed **(design call)**.
@@ -700,7 +700,7 @@ Added by the owner on 14 November 2026. The toolbar's "Watermark" button, a "soo
 - Angle: Diagonal (default; corner to corner of the page as displayed, about 55° on A4 portrait), Horizontal, Vertical, or a custom angle from −90° to 90°.
 - Position: centre (default), one of the other eight anchors (top, middle, bottom × left, centre, right; 20 pt, about 7 mm, from the edges), or a point clicked on the preview or typed as a percentage across and down.
 - Colour: swatches Black, Grey (default, #808080), Dark red and Dark blue, and "Other…" for any colour; opacity 5–100% (default 25%).
-- Layer: **In front** (default) or **Behind** the page. A watermark behind a page is covered by anything opaque on it: behind a scan it cannot be seen at all. When chosen pages are scans, the dialog says "On 2 of the chosen pages (scans) a watermark behind the page cannot be seen. Put it in front to show it there." and Behind stays available. When marks in front meet pages with form fields, those pages are named, because the fields are drawn over marks in front.
+- Layer: **In front of the page** (Recommended, the default) or **Behind the page**. A watermark behind a page is covered by anything opaque on it: behind a scan it cannot be seen at all. When chosen pages are scans, the dialog says "On 2 of the chosen pages (scans) a watermark behind the page cannot be seen. Put it in front to show it there." and Behind stays available. When marks in front meet pages with form fields, those pages are named, because the fields are drawn over marks in front.
 
 **Stamp** (off by default): text VERIFIED, RECEIVED, CHECKED, PAID, ORIGINAL SEEN or custom (1–60 characters, the same characters and tokens as above); size Small, Medium (20 pt, recommended), Large (14, 20 and 32 pt) or another letter height of 2–18 mm, held within 8–72 pt; bold on; colour dark red #A00000; opacity 78% (the owner's numbers); angle 0° (−90° to 90°); position top right (default), another anchor or a point; 20 pt from the edges.
 
