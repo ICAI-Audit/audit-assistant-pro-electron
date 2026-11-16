@@ -92,7 +92,7 @@ export default function RedactDialog(props: ToolDialogProps) {
   const [finding, setFinding] = useState<{ done: number; total: number } | null>({ done: 0, total: 0 });
   const [findError, setFindError] = useState<string | null>(null);
   const [findAgain, setFindAgain] = useState(0);
-  // Wave 6 (T-048): the pages that may not be copied (ruling M), or null while they are being read.
+  // Wave 6 (T-052): the pages that may not be copied (ruling M), or null while they are being read.
   const [notPlain, setNotPlain] = useState<number[] | null>(null);
   const findStop = useRef<AbortController | null>(null);
   const [state, dispatch] = useReducer(reviewReducer, undefined, () => initialReview(storedProfile()));
@@ -118,7 +118,7 @@ export default function RedactDialog(props: ToolDialogProps) {
         setFound(result);
         setFinding(null);
         dispatch({ type: 'loaded', proposals: result.proposals, held: result.held });
-        // Wave 6 (T-048, ruling M): which pages may not be copied, read now so the confirmation can name them and
+        // Wave 6 (T-052, ruling M): which pages may not be copied, read now so the confirmation can name them and
         // count them in the size (in turns for the window; until it is known, the confirmation says pages may be).
         void pageDrawingsAndVerdicts(file.bytes, Array.from({ length: result.models.length }, (_, i) => i), { signal: controller.signal, onProgress: () => yieldToUi() }).then(
           ({ verdicts }) => {
@@ -263,7 +263,7 @@ export default function RedactDialog(props: ToolDialogProps) {
   const onTickValue = (places: readonly Proposal[], on: boolean) => {
     dispatch({ type: 'tick', ids: places.map((p) => p.id), on });
     if (!on || !found || places.some((p) => p.confidence === 'sure')) return;
-    // Wave 6 (T-048): searched in turns for the window (a value over every page of a long file held it over 1 s).
+    // Wave 6 (T-052): searched in turns for the window (a value over every page of a long file held it over 1 s).
     void expandValueInTurns(found, places, new Set(state.proposals.map((p) => p.id)), canvasMeasure, yieldToUi).then((extras) => {
       const now = new Set(proposalsRef.current.map((p) => p.id));
       const fresh = extras.filter((p) => !now.has(p.id));
@@ -280,7 +280,7 @@ export default function RedactDialog(props: ToolDialogProps) {
   const [step, setStep] = useState<'review' | 'confirm'>('review');
   const [ask, setAsk] = useState<{ pages: number[]; mayShow: number[]; answer: (yes: boolean) => void } | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
-  // Wave 6 (T-048): Redact waits while a typed word is still being searched (from the moment it is added).
+  // Wave 6 (T-052): Redact waits while a typed word is still being searched (from the moment it is added).
   const searchingWords = researching || (searchedTerms !== null ? searchedTerms !== state.terms : state.terms.length > 0);
   const problem = found ? choicesError({ ...choices, token: tokenHolder.current }, state, searchingWords) : null;
   const facts = useMemo(

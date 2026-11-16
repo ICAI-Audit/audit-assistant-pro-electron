@@ -38,7 +38,7 @@ function luhnCard(first15: string): string {
   return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
 }
 
-describe('every group of data reaches the find (RX-PAT widened the groups, T-048)', () => {
+describe('every group of data reaches the find (RX-PAT widened the groups, T-052)', () => {
   it('ALL_GROUPS is every group the patterns know; a card, a CIN and a UAN are proposed; Business is ticked by no profile, DPDP ticks the UAN', async () => {
     expect([...ALL_GROUPS].sort()).toEqual([...REDACT_GROUPS].sort());
     const card = luhnCard('453201511283036');
@@ -110,7 +110,7 @@ describe('findInModels', () => {
     const found = await findInFile(positions, { ...base(), reader: env.renderer });
     const long = { ...found, models: Array.from({ length: 30 }, (_, i) => ({ ...found.models[i % 5], pageIndex: i })), annotations: Array.from({ length: 30 }, () => []), geometries: Array.from({ length: 30 }, (_, i) => found.geometries[i % 5]) };
     let pauses = 0;
-    // Wave 6 (T-048): turns come by the clock; with no time between them every chance is taken.
+    // Wave 6 (T-052): turns come by the clock; with no time between them every chance is taken.
     await findInModels(
       long,
       [],
@@ -123,7 +123,7 @@ describe('findInModels', () => {
     expect(pauses).toBeGreaterThanOrEqual(30);
   });
 
-  it('wave 6 (T-048): the whole find gives the window a chance of a turn at every page (models, page search, every value), and finds the same', async () => {
+  it('wave 6 (T-052): the whole find gives the window a chance of a turn at every page (models, page search, every value), and finds the same', async () => {
     const plain = await findInFile(positions, { ...base(), reader: env.renderer, terms: [{ text: 'assessee', reason: 'Typed' }] });
     let pauses = 0;
     const paced = await findInFile(positions, {
@@ -142,7 +142,7 @@ describe('findInModels', () => {
     expect(pauses).toBeGreaterThanOrEqual(11);
   });
 
-  it('wave 6 (T-048): every other place of a value is searched a few pages at a time, over a page turn too, and gives exactly the places of one search over every page', async () => {
+  it('wave 6 (T-052): every other place of a value is searched a few pages at a time, over a page turn too, and gives exactly the places of one search over every page', async () => {
     const doc = await PDFDocument.create();
     const font = await doc.embedFont(StandardFonts.Helvetica);
     const lines = [
@@ -171,7 +171,7 @@ describe('findInModels', () => {
     expect(turns).toBeGreaterThanOrEqual(1);
   });
 
-  it('wave 6 (T-048, ruling Q): a typed word whose only mention is broken by the page end gets a place on both pages', async () => {
+  it('wave 6 (T-052, ruling Q): a typed word whose only mention is broken by the page end gets a place on both pages', async () => {
     const doc = await PDFDocument.create();
     const font = await doc.embedFont(StandardFonts.Helvetica);
     const one = doc.addPage([400, 300]);
@@ -185,14 +185,14 @@ describe('findInModels', () => {
     expect(typed.every((p) => p.confidence === 'sure')).toBe(true);
   });
 
-  it('wave 6 (T-048): the enlarged-view copy is read and written in turns, byte for byte the library\'s own', async () => {
+  it('wave 6 (T-052): the enlarged-view copy is read and written in turns, byte for byte the library\'s own', async () => {
     const own = await enlargedViewCopy(positions);
     const paced = await enlargedCopyInTurns(positions, () => undefined);
     expect(Buffer.from(paced).equals(Buffer.from(own))).toBe(true);
     await expect(enlargedCopyInTurns(new TextEncoder().encode('not a pdf'), () => undefined)).rejects.toMatchObject({ code: 'redact-find-failed' });
   });
 
-  it('wave 6 (T-048): a read the busy renderer could not finish is tried again; if it never can, the find says the computer was busy, not that the file may be damaged', async () => {
+  it('wave 6 (T-052): a read the busy renderer could not finish is tried again; if it never can, the find says the computer was busy, not that the file may be damaged', async () => {
     let fails = 2;
     const flaky: FindReader = {
       ...env.renderer,

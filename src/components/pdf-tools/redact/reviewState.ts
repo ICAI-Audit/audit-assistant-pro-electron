@@ -279,7 +279,7 @@ export function reviewReducer(state: ReviewState, action: ReviewAction): ReviewS
       );
     case 'tick-group': {
       // On: the user asked for this group, so its sure and its possible values are ticked whatever the
-      // profile (T-048, owner, 16 November 2026), except the kinds no profile ticks; every other tick stays
+      // profile (T-052, owner, 16 November 2026), except the kinds no profile ticks; every other tick stays
       // as it is. Off: untick every place of the group (fix round 1, F7).
       const groups = new Set(state.groups);
       if (action.on) groups.add(action.group);
@@ -526,7 +526,7 @@ export function checkTargets(state: ReviewState): RedactTarget[] {
     const set = forms.get(p.kind, p.key);
     if (set) for (const form of checkForms(p.kind, p.key, p.value)) set.add(form);
   }
-  // Wave 3b (T-048, RX-RUN on the lead's instruction): a phrase the user typed that the find placed nowhere (only in
+  // Wave 3b (T-052, RX-RUN on the lead's instruction): a phrase the user typed that the find placed nowhere (only in
   // a stamp, or read in an order the find does not follow) is still looked for in the result by every reading; seen
   // there, it is covered where it paints, or the run stops. A typed phrase with places, all unticked, stays out.
   for (const term of state.terms) {

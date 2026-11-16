@@ -174,7 +174,7 @@ describe('comparison by kind, in two passes (lead rulings 1 and 2)', () => {
     const typed = targetPass([{ kind: 'typed', forms: ['Sharma & Co'], wholeWord: true }]);
     expect(typed('paid to SHARMA &\n  co today')).toBe('strict');
     expect(typed('paid to ＳＨＡＲＭＡ & Co today')).toBe('strict');
-    // hyphens between the words: the find's own rule since T-048 (redactPatterns.ts TERM_RULE), so strict
+    // hyphens between the words: the find's own rule since T-052 (redactPatterns.ts TERM_RULE), so strict
     expect(typed('paid to Sharma - & - Co today')).toBe('strict');
     // Any punctuation between the words, or none, is the find's own rule since fix wave 2 (ruling 4: one rule; RX-PAT's
     // findTerm follows loosePlacesOf), so strict too.
@@ -876,7 +876,7 @@ describe('fix round 1: the strict pass and the find agree on every written form 
       ...codesApart.map((name) => `gstin: ${name}`),
       'ip: spaces around the dots',
       'ip: a line break after a dot',
-      // (typed words with hyphens between them: the find's own rule since T-048, redactPatterns.ts TERM_RULE)
+      // (typed words with hyphens between them: the find's own rule since T-052, redactPatterns.ts TERM_RULE)
     ]);
     // And the loose pass flags nothing the find boxes: a boxed form is always a strict one.
     expect(results.filter((r) => r.pass === 'loose' && r.boxed).map((r) => r.label)).toEqual([]);
@@ -885,7 +885,7 @@ describe('fix round 1: the strict pass and the find agree on every written form 
   });
 });
 
-// ---- fix wave (T-048): what the end-to-end review (redact-e2e-review.md) got past the check ------------
+// ---- fix wave (T-052): what the end-to-end review (redact-e2e-review.md) got past the check ------------
 
 const QW = 'QWXPT4821K';
 const QW_PAN: CheckTarget = { kind: 'pan', forms: [QW], wholeWord: false };
@@ -946,7 +946,7 @@ describe("fix wave, non-blocking 3: a rebuilt page's text layer boxes only the w
 });
 
 describe('fix wave round 2: a short added number (8 digits or fewer) needs no digit joined to it in the loose pass too', () => {
-  // RX-PAT (T-048): the find places a PIN code, cheque number, membership number, director's DIN and the
+  // RX-PAT (T-052): the find places a PIN code, cheque number, membership number, director's DIN and the
   // like only where no digit is joined to it (redactPatterns.ts placesOfValue). The check's loose pass keeps
   // that boundary, with any punctuation between the digits, so an amount or a longer reference is not a
   // "survivor" that fails a good run or boxes unrelated digits.
@@ -974,7 +974,7 @@ describe('fix wave round 2: a short added number (8 digits or fewer) needs no di
     expect(targetPass([DIN])('DIN 0123 / / / / 4567')).toBe('loose');
     const survivor = await pdfWith({ 1: 'BT /F1 12 Tf 50 700 Td (Mumbai PIN 400 .... 001 and Rs. 14000012.00) Tj ET' });
     expect(await findTargets(survivor, [PIN], NONE)).toEqual({ pages: [1], elsewhere: [] });
-    // The kinds of before T-048 keep their rule: a number inside a longer run is a place of it.
+    // The kinds of before T-052 keep their rule: a number inside a longer run is a place of it.
     expect(targetPass([{ kind: 'micr', forms: ['400240002'], wholeWord: false }])('ref 14002400021')).not.toBeNull();
   });
 
@@ -999,7 +999,7 @@ describe('fix wave round 2: a short added number (8 digits or fewer) needs no di
   });
 });
 
-// ---- fix wave 2 (T-048): what the adversarial re-test (redact-retest-1.md) got past ---------------------
+// ---- fix wave 2 (T-052): what the adversarial re-test (redact-retest-1.md) got past ---------------------
 
 const ch = (code: number) => String.fromCharCode(code);
 /** Annotations on page 2 (index 1) of pdfWith's file, each given its own dictionary. */
@@ -1373,7 +1373,7 @@ describe('fix wave 2, R4 and ruling 2: a Type 3 glyph that draws a picture is un
   });
 });
 
-// ---- fix wave 3 (T-048): what the second adversarial re-test (redact-retest-2.md) got past ---------------
+// ---- fix wave 3 (T-052): what the second adversarial re-test (redact-retest-2.md) got past ---------------
 
 describe('fix wave 3, findings 4 to 8: the pdf-lib reader as the second net (Ruling A keeps it; rulings B and 2)', () => {
   const RTP: CheckTarget = { kind: 'pan', forms: [QW], wholeWord: false };
@@ -1584,7 +1584,7 @@ describe('fix wave 3, Ruling D: an image is searched for the value, not read as 
   });
 });
 
-// ---- fix wave 4 (T-048): re-test 3, lane T3-A (redact-fix-rules-5.md rulings M, N, O) ----------------------
+// ---- fix wave 4 (T-052): re-test 3, lane T3-A (redact-fix-rules-5.md rulings M, N, O) ----------------------
 
 describe('fix wave 4, rulings N, O and M: letters the reader cannot trust, two inline-image ends, and the copy allow-list', () => {
   const helv = (doc: PDFDocument) => doc.context.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: 'Helvetica', Encoding: 'WinAnsiEncoding' });
@@ -1719,7 +1719,7 @@ describe('fix wave 4, rulings N, O and M: letters the reader cannot trust, two i
   });
 });
 
-// ---- final pass (T-048), F2: the byte reading of a large stream body gives the window turns ------------------------
+// ---- final pass (T-052), F2: the byte reading of a large stream body gives the window turns ------------------------
 
 describe('final pass, F2: a large stream body read byte by byte, in turns', () => {
   /** Text-like bytes (invented words), `size` of them, with no value in them. */

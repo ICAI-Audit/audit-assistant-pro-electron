@@ -299,7 +299,7 @@ export function ordinaryLines(n = 5000): string[] {
   return Array.from({ length: n }, () => pick(gens)());
 }
 
-// ---- the wider identifier set (T-048, lane RX-PAT) -----------------------------------------------------
+// ---- the wider identifier set (T-052, lane RX-PAT) -----------------------------------------------------
 // Invented values only, built here to pass or fail their check digit on purpose. The two check-digit
 // helpers below are this file's own (an oracle independent of redactPatterns.ts).
 

@@ -369,7 +369,7 @@ describe('splitEvery: a one-page file', () => {
   });
 });
 
-describe('T-048: annotations that pointed at a left-out page leave no null entry', () => {
+describe('T-052: annotations that pointed at a left-out page leave no null entry', () => {
   async function source(): Promise<Uint8Array> {
     const doc = await PDFDocument.create();
     const p1 = doc.addPage([200, 200]);

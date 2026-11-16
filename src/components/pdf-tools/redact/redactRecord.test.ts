@@ -242,7 +242,7 @@ describe('words', () => {
     ]);
   });
 
-  it('wave 6 (T-048): the confirmation names the pages that may not be copied and counts them in the size; while that is not known it says pages may be made pictures; Redact waits for words still being searched', () => {
+  it('wave 6 (T-052): the confirmation names the pages that may not be copied and counts them in the size; while that is not known it says pages may be made pictures; Redact waits for words still being searched', () => {
     const pan: Proposal = { id: 't0-10-20-pan', kind: 'pan', key: 'QWXPT4821K', value: 'QWXPT4821K', page: 0, rects: [{ x0: 60, y0: 700, x1: 140, y1: 712 }], confidence: 'sure', source: 'text', outsideView: false, ranges: [[10, 20]], label: 'PAN', angle: 0 };
     const state = reviewReducer(initialReview('balanced'), { type: 'loaded', proposals: [pan] });
     const chars = () => 2000;

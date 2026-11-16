@@ -128,7 +128,7 @@ describe('ticking', () => {
     expect(network.ticked[p.ip.id]).toBe(true);
   });
 
-  it('a group ticked by hand ticks its possible matches too, whatever the profile, but never the kinds no profile ticks (T-048, owner, 16 November 2026)', () => {
+  it('a group ticked by hand ticks its possible matches too, whatever the profile, but never the kinds no profile ticks (T-052, owner, 16 November 2026)', () => {
     const { p, state } = loaded('balanced');
     expect(state.ticked[p.name.id]).toBe(false);
     const names = reviewReducer(state, { type: 'tick-group', group: 'names', on: true });

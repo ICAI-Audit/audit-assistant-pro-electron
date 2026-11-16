@@ -10,7 +10,7 @@ import { calculateGstinCheckDigit } from '@/lib/gstinValidation';
 import { PdfToolsError, PHASE_TWO_ERROR_MESSAGES } from './types';
 
 /**
- * The kinds added on 14 November 2026 (T-048, owner-approved): the identifiers chartered accountants
+ * The kinds added on 14 November 2026 (T-052, owner-approved): the identifiers chartered accountants
  * meet in India and the personal data of the Digital Personal Data Protection Act. A father's, mother's
  * or spouse's name is found as the kind 'name' (same rules, its own reason).
  */
@@ -105,7 +105,7 @@ export const KIND_GROUP: Readonly<Record<FoundKind, RedactGroup>> = {
   name: 'names',
   address: 'names',
   addressee: 'names',
-  // T-048: kinds that plainly belong to an existing group join it (so the profiles that tick it tick them)
+  // T-052: kinds that plainly belong to an existing group join it (so the profiles that tick it tick them)
   passport: 'identity',
   'voter-id': 'identity',
   'driving-licence': 'identity',
@@ -233,7 +233,7 @@ export interface PatternMatch {
   kind: RedactKind;
   /**
    * UTF-16 offsets in the searched text; `end` is exclusive. The place to cover: for an account or card number it
-   * runs on over the digit groups right after the number itself (T-048 wave 5, ruling T: coveredEnd), so the place
+   * runs on over the digit groups right after the number itself (T-052 wave 5, ruling T: coveredEnd), so the place
    * may hold more digits than `key`.
    */
   start: number;
@@ -245,7 +245,7 @@ export interface PatternMatch {
    * IFSC, tax document number, EVC); the digits for Aadhaar (12), mobile (10), account, MICR and
    * acknowledgement numbers (an account number without its leading zeros, nine digits always kept, and
    * when its end is not certain the shorter number: wave 5, ruling T); lower case for email; the dotted address for IP; trimmed,
-   * whitespace-collapsed lower case for names, addresses and typed terms. Every kind added in T-048
+   * whitespace-collapsed lower case for names, addresses and typed terms. Every kind added in T-052
    * is a code: its letters and digits, upper case (a UPI ID without its @, a date of birth as written
    * without its separators), except the Aadhaar enrolment number (its 14 digits, without the date and
    * time) and a landline (the 10 digits of STD code and number). Always from the folded text.
@@ -266,7 +266,7 @@ export const TERM_LIMITS = { min: 3, max: 100, count: 20 } as const;
 
 /**
  * The profiles. Strict is "every group", so it ticks the new groups too, except 'business' (company and
- * professional numbers, ticked by no profile). DPDP personal data (T-048) ticks every group about a person,
+ * professional numbers, ticked by no profile). DPDP personal data (T-052) ticks every group about a person,
  * possible matches too, and leaves company numbers and tax and GST document numbers to the user.
  */
 export const PROFILES: Readonly<Record<'balanced' | 'strict' | 'identity' | 'dpdp', { ticked: readonly RedactGroup[]; tickPossible: boolean }>> = {
@@ -339,7 +339,7 @@ export const KIND_LABELS: Readonly<Record<RedactKind, string>> = {
 
 /**
  * The reasons shown for possible matches. Fixed words; they never hold a value. Plain words for an accountant
- * (T-048 wave 4, owner's sample run): no "holder type", "check digit" or "handle".
+ * (T-052 wave 4, owner's sample run): no "holder type", "check digit" or "handle".
  */
 export const REASONS = {
   panType: 'does not look like a valid PAN',
@@ -358,7 +358,7 @@ export const REASONS = {
   name: 'words after a "Name" label',
   address: 'lines after an "Address" label',
   addressee: 'the lines after "To,"',
-  // T-048
+  // T-052
   relativeName: "words after S/o, D/o, W/o or a father's, mother's or spouse's name label",
   labelOnly: 'found only by the label before it',
   checkDigit: 'does not look like a valid number of this kind: one digit may be mistyped',
@@ -369,11 +369,11 @@ export const REASONS = {
   upiUnknown: 'the part after @ is not a bank or payment app this tool knows',
   landlineLabelled: 'a phone number with an STD code',
   landlineUnlabelled: 'shaped like a phone number with an STD code, with no phone label',
-  // T-048 wave 4 (an ITR acknowledgement and a notice)
+  // T-052 wave 4 (an ITR acknowledgement and a notice)
   addresseeName: 'the first line after "To,"',
   addressBeside: 'a line with a PIN code next to an "Address" label',
   nameBeforePan: 'the name before "having PAN"',
-  // T-048 wave 5 (ruling U: forms and tables)
+  // T-052 wave 5 (ruling U: forms and tables)
   underHeading: 'under a column heading that names it',
   nameBelow: 'the line under a "Name" label',
   sameRow: 'in the same row as a value with a label',
@@ -396,7 +396,7 @@ export function neverTickedByDefault(kind: RedactKind, confidence: 'sure' | 'pos
     (kind === 'aadhaar' && reason === REASONS.aadhaarUnlabelled) ||
     // fix round 2: a heading written with a space between every letter reads as a PAN as often as not
     (kind === 'pan' && reason === REASONS.spacedOut) ||
-    // T-048: new kinds found by their shape alone, with no label (part and reference codes share them)
+    // T-052: new kinds found by their shape alone, with no label (part and reference codes share them)
     (kind === 'driving-licence' && reason === REASONS.dlUnlabelled) ||
     (kind === 'vehicle' && reason === REASONS.vehicleUnlabelled) ||
     (kind === 'landline' && reason === REASONS.landlineUnlabelled) ||
@@ -599,7 +599,7 @@ export function keyOf(kind: RedactKind, written: string): string {
 }
 
 /**
- * T-048 wave 5 (ruling T): account numbers are compared with leading zeros removed (a statement's header prints
+ * T-052 wave 5 (ruling T): account numbers are compared with leading zeros removed (a statement's header prints
  * "00000030012345678", its narrations "30012345678"). Nine digits are always kept, the fewest an account number has:
  * a shorter key would be found inside every other number.
  */
@@ -615,7 +615,7 @@ const TAIL_NOT_OWN = /^(?:[.,:/]\d|\/-|[ \t]?%|[ \t]+(?:of|jan|feb|mar|apr|may|j
 const TAIL_DATE = /^(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}[/.-]\d{1,2}[/.-]\d{1,2})(?!\d)/;
 
 /**
- * T-048 wave 5 (ruling T, "key short, cover long"): where the covered place of an account or card number ends. The key
+ * T-052 wave 5 (ruling T, "key short, cover long"): where the covered place of an account or card number ends. The key
  * stays the number itself (when unsure, the shorter number: ruling H), but at every place the cover runs on over the
  * digit groups that directly follow, on the same line or on the wrapped next line, one space or hyphen apart, until
  * something that is not a group of digits, so that no tail of a longer number stays visible ("9012" after 3-3-3,
@@ -653,7 +653,7 @@ export const MAX_SEPARATORS = 3;
  * Every place a value stands in `text`, by the ONE rule the find and the check's strict pass share
  * (fix round 1, F3). Always on the folded text (foldWithMap), places returned in `text`'s offsets.
  * - Codes and numbers (PAN, GSTIN, TAN, IFSC, tax document number, EVC, Aadhaar, mobile, account,
- *   MICR, acknowledgement, and every kind added in T-048): the key's characters in order, ignoring case,
+ *   MICR, acknowledgement, and every kind added in T-052): the key's characters in order, ignoring case,
  *   with up to MAX_SEPARATORS characters that are not ASCII letters or digits (line breaks included)
  *   between any two; found inside longer runs too (a PAN inside a GSTIN is a place of the PAN), except
  *   that an added kind whose key is 8 digits or fewer (PIN code, cheque, membership number, director's
@@ -672,7 +672,7 @@ export function placesOfValue(text: string, kind: RedactKind, key: string): { st
 }
 
 /**
- * The places of a value as the find covers them (T-048 wave 5, ruling T, "key short, cover long"): placesOfValue's
+ * The places of a value as the find covers them (T-052 wave 5, ruling T, "key short, cover long"): placesOfValue's
  * places, each of an account or card number run on to the end of its digits: the zeros written before an account
  * number, the digits joined to the key (the key may be the shorter number: ruling H), and the digit groups right
  * after it (coveredEnd). Every place of placesOfValue lies inside one of these. For every other kind the same places.
@@ -766,7 +766,7 @@ const MOBILE = new RegExp(`(?<!\\d)${MOBILE_PREFIX}([6-9]\\d{4}[\\s-]{0,2}\\d{5}
 /** With a prefix or a label, ten digits split anywhere (a line break included). */
 const MOBILE_LOOSE = new RegExp(`(?<!\\d)${MOBILE_PREFIX}([6-9](?:[ \\n-]?\\d){9})(?!\\d)`, 'g');
 /**
- * A run of digit groups (T-048 wave 4, ruling H): digits, hyphens inside a group (5010-0123-4567-89,
+ * A run of digit groups (T-052 wave 4, ruling H): digits, hyphens inside a group (5010-0123-4567-89,
  * 073-123456-001), one space or one line break between groups. Which groups are one account number is
  * decided afterwards (accountEnd): a balance, a date, "1 of 4" or the next line after it are not its digits.
  */
@@ -787,7 +787,7 @@ const TAN_WORDS = /\b(?:TAN|tax deduction (?:and collection )?account(?: number)
 const AADHAAR_WORDS = new RegExp(`(?:\\b(?:aadhaa?r|uid(?:ai)?)\\b|${AADHAAR_HINDI})[^\\n]{0,25}$`, 'i');
 const MOBILE_WORDS = /(?:\b(?:mobile|mob\.?|cell|phone|ph\.?|tel\.?|contact|whats ?app)\s*(?:\(m\))?|\bm[:.]|\(m\))\s*(?:no\.?|number|#)?\s*[:.-]{0,2}\s*$/i;
 /**
- * T-048 wave 4 (K6): a phone word in a sentence, then at most six ordinary filler words and no digit, before the
+ * T-052 wave 4 (K6): a phone word in a sentence, then at most six ordinary filler words and no digit, before the
  * number ("the mobile number on record is", "or call", "call me on", "registered with the bank is").
  */
 const MOBILE_PROSE =
@@ -796,7 +796,7 @@ const ACCOUNT_WORDS = /\b(?:a\/c|acct\.?|account|acc\.?|sb|ca|od|cc|savings|curr
 const IFSC_WORDS = /\bifsc?\s*(?:code)?\s*[:.-]{0,2}\s*$/i;
 const MICR_LINE = /\bMICR\b/i;
 const ACK_LINE = /\bACK(?:NOWLEDGE?MENT)?\b/i;
-/** T-048 wave 4 (K6): an acknowledgement label right before the number, its words perhaps wrapped over the lines of its cell. */
+/** T-052 wave 4 (K6): an acknowledgement label right before the number, its words perhaps wrapped over the lines of its cell. */
 const ACK_BEFORE = /\bACK(?:NOWLEDGE?MENT)?\.?(?:\s*(?:NO\.?|NUMBER|#))?\s*[:.#-]{0,2}\s*$/i;
 const EVC_WORD = /\b(?:EVC|VERIFICATION CODE)\b/i;
 const IP_WORD = /\bIP\b/i;
@@ -1005,7 +1005,7 @@ interface AccountCandidate {
 }
 
 /**
- * The account numbers of the text, 9 to 18 digits each (T-048 wave 4, ruling H: a number ends where its own digits
+ * The account numbers of the text, 9 to 18 digits each (T-052 wave 4, ruling H: a number ends where its own digits
  * end, so the value looked for everywhere else is the number itself). Each run of digit groups is read group by
  * group (accountEnd); a run may hold several numbers, or a serial number and then an account number.
  */
@@ -1171,7 +1171,7 @@ function findNamesAndAddresses(f: Finder): void {
       f.addAround('address', line.start + addr.index + addr[0].length - addr[1].length, end, REASONS.address);
     }
     if (TO_LINE.test(line.text) && i + 1 < lines.length) {
-      // Up to six lines, ending (T-048 wave 4) at the line with the PIN code or before a letterhead line: a
+      // Up to six lines, ending (T-052 wave 4) at the line with the PIN code or before a letterhead line: a
       // notice may write its letterhead ("Government of India ...") after the address.
       let end = -1;
       let last = i;
@@ -1200,7 +1200,7 @@ function findNamesAndAddresses(f: Finder): void {
   });
 }
 
-// ---- the wider identifier set (T-048, lane RX-PAT) -------------------------------------------------
+// ---- the wider identifier set (T-052, lane RX-PAT) -------------------------------------------------
 //
 // Three kinds of rule (the R1 design: keyword-anchored values before shape-only guesses):
 // - Shapes: values with a check digit or a strict shape (IRN, LEI, CIN, UDIN, Udyam, PF member ID, NSDL
@@ -1295,7 +1295,7 @@ function validDate(written: string): boolean {
   return m >= 1 && m <= 12 && d >= 1 && d <= DAYS_IN_MONTH[m - 1] && y >= 1900 && y <= 2099;
 }
 
-// ---- T-048 wave 4 (lane RX-PAT2), ruling H: a number ends where its own digits end ------------------------
+// ---- T-052 wave 4 (lane RX-PAT2), ruling H: a number ends where its own digits end ------------------------
 //
 // Page text joins table cells with one space, so a statement prints an account number followed by a balance,
 // a date, "1 of 4", a branch code or the next line's first figure with nothing more than a space or a line
@@ -1445,7 +1445,7 @@ function evenlyGrouped(written: string): boolean {
 }
 
 // Names and addresses in table cells with no colon after the label, the name in an e-filing acknowledgement's
-// verification sentence, and the "To," block's end (T-048 wave 4: the owner's ITR acknowledgement and notice).
+// verification sentence, and the "To," block's end (T-052 wave 4: the owner's ITR acknowledgement and notice).
 // Page text shows a table cell's edge as one space, so a value must also look like one: a name in capitals, an
 // address with its PIN code or two commas; a tab or two spaces (a wide gap) are read as a cell's edge.
 
@@ -2138,7 +2138,7 @@ function findSpacedOut(f: Finder): void {
     const addJudged = (kind: RedactKind, js: number, je: number, key: string, judged: Judged) => {
       if (judged) f.add({ kind, start: run.at[js], end: run.at[je - 1] + 1, key, ...judged });
     };
-    // T-048: a value of an added kind right after its label (that label wins over the old kinds' guesses below)
+    // T-052: a value of an added kind right after its label (that label wins over the old kinds' guesses below)
     for (const rule of SPACED_LABELLED) {
       for (const m of J.matchAll(rule.value)) {
         if (!rule.label.test(before(m.index))) continue;
@@ -2146,7 +2146,7 @@ function findSpacedOut(f: Finder): void {
         addJudged(rule.kind, m.index, m.index + m[0].length, key, rule.judge(m[0], key));
       }
     }
-    // T-048: the added kinds found by their shape (strict shapes: before the old kinds' guesses)
+    // T-052: the added kinds found by their shape (strict shapes: before the old kinds' guesses)
     for (const rule of SHAPES) {
       if (!rule.joined) continue;
       for (const m of J.matchAll(rule.joined)) {
@@ -2206,11 +2206,11 @@ const SPACED_LABELLED = (Object.keys(LABEL_RULES) as LabelRuleId[])
  * Every kind of design 5.9 in `text`, sorted by start, never overlapping, with offsets in `text`.
  * The text is searched folded (foldWithMap: full-width forms, invisible characters), as written and,
  * for spaced-out runs, joined up. Where kinds overlap, the first in the design's order keeps the text:
- * email, (T-048) UPI ID and the added shapes (IRN, LEI, CIN, UDIN, Udyam, PF member ID, NSDL demat,
+ * email, (T-052) UPI ID and the added shapes (IRN, LEI, CIN, UDIN, Udyam, PF member ID, NSDL demat,
  * Indian SWIFT code, driving licence, vehicle, grouped card), GSTIN, PAN, MICR, ITR acknowledgement,
- * EVC, account number after an account word, (T-048) the added kinds after their labels, Aadhaar,
- * mobile, (T-048) landline, TAN, tax document number, IP address, spaced-out values, account number
- * next to an IFSC, IFSC, (wave 5) a number after a label in an Indian script, names and addresses, then (T-048)
+ * EVC, account number after an account word, (T-052) the added kinds after their labels, Aadhaar,
+ * mobile, (T-052) landline, TAN, tax document number, IP address, spaced-out values, account number
+ * next to an IFSC, IFSC, (wave 5) a number after a label in an Indian script, names and addresses, then (T-052)
  * relatives' names; last, each account or card place is run on over the digit groups after it. Every kind is looked for
  * whatever `groups` holds, so a value is classified the same way however the search is narrowed; only
  * the matches of kinds in `groups` are returned.
@@ -2337,7 +2337,7 @@ export function maskValue(kind: RedactKind, key: string): string {
     }
     case 'aadhaar':
       return key.length === 12 ? `XXXX XXXX ${key.slice(8)}` : KIND_LABELS.aadhaar;
-    // T-048
+    // T-052
     case 'card': {
       const digits = key.replace(/\D/g, '');
       return digits.length >= 8 ? `XXXX XXXX XXXX ${digits.slice(-4)}` : 'XXXX';

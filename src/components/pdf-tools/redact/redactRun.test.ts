@@ -312,7 +312,7 @@ describe('the Redact run', () => {
   });
 });
 
-// ---- the end-to-end review's survivors (redact-e2e-review.md, T-048 fix wave) -------------------------------
+// ---- the end-to-end review's survivors (redact-e2e-review.md, T-052 fix wave) -------------------------------
 // Each recipe is built twice: as the reader sees it, and as a twin in which only the value is invisible.
 // "left" counts the value's ink still visible in the result at 200 dpi (inkLeft, the review's measure).
 
@@ -368,7 +368,7 @@ async function survivors(
   return { file, made, left, options };
 }
 
-describe("the end-to-end review's recipes (T-048)", () => {
+describe("the end-to-end review's recipes (T-052)", () => {
   it('B1: a stamp whose appearance draws the PAN on the redacted page is covered (no pixel of it left)', async () => {
     const { left } = await survivors('Stamp.pdf', async (hide) => {
       const b = await newDoc();
@@ -611,7 +611,7 @@ async function holds2(name: string, make: (hide: boolean) => Promise<Uint8Array>
 }
 const typed = { terms: [{ text: SIGNER, reason: 'Typed' }] };
 
-describe("wave 2: the retest's survivors (T-048)", () => {
+describe("wave 2: the retest's survivors (T-052)", () => {
   it('R1: a signature box that writes the name over two lines, on the redacted page and on a copied page; a PAN in pieces', async () => {
     const box = (h: boolean) => `BT /F1 9 Tf 6 30 Td 11 TL (Digitally signed by ) Tj ${hidden3(h, '(RAMESH) Tj')} T* ${hidden3(h, '(KUMAR GUPTA) Tj')} T* (Date: 2026.11.14 10:22:31) Tj ET`;
     for (const where of ['redacted', 'copied'] as const) {
@@ -1027,7 +1027,7 @@ async function bothPages(id: string, make: (b: Build, hide: boolean, target: PDF
   }
 }
 
-describe("wave 3: the renderer's own reading (T-048)", () => {
+describe("wave 3: the renderer's own reading (T-052)", () => {
   it('finding 3: a stamp that writes other text between the pieces of the PAN (placed back with Tm); and a name the same way', async () => {
     await bothPages('W3-F3-stamp-order', (b, hide, target) => {
       stampOf(b, target, formStream(b, `BT /F1 9 Tf 1 0 0 1 6 30 Tm (PAN ) Tj ${hidden3(hide, '(QWXPT) Tj')} 1 0 0 1 6 12 Tm (Date 14 Nov 2026) Tj 1 0 0 1 49.5 30 Tm ${hidden3(hide, '(4821K) Tj')} ET`, { Font: { F1: b.font.ref } }));
@@ -1234,7 +1234,7 @@ function suffixedFont(b: Build, type3: boolean) {
   );
 }
 
-describe('wave 4 (RX-RUN2), ruling M: a page is copied only when it is on the allow-list (T-048)', () => {
+describe('wave 4 (RX-RUN2), ruling M: a page is copied only when it is on the allow-list (T-052)', () => {
   /** Page 1 holds the PAN and the name (rebuilt); page 2 holds the recipe alone (copied, unless ruling M). */
   async function copiedRecipe(id: string, make: (b: Build, hide: boolean, target: PDFPage) => void) {
     const build = async (hide: boolean) => {
@@ -1405,7 +1405,7 @@ describe('wave 4 (RX-RUN2), ruling M: a page is copied only when it is on the al
   });
 });
 
-describe('wave 6 (RX-RUN2): a busy machine (T-048)', () => {
+describe('wave 6 (RX-RUN2): a busy machine (T-052)', () => {
   it('a drawing the busy renderer could not finish is drawn again; if it never can, the run says the computer was busy, not that a page could not be drawn', async () => {
     const make = async () => {
       const b = await newDoc();
@@ -1425,7 +1425,7 @@ describe('wave 6 (RX-RUN2): a busy machine (T-048)', () => {
   });
 });
 
-describe('wave 4 (RX-RUN2), K4: a scan with a hidden text layer (T-048)', () => {
+describe('wave 4 (RX-RUN2), K4: a scan with a hidden text layer (T-052)', () => {
   it('a page whose only text is an invisible layer over a picture gets one sentence: the picture may still show a value the layer misread', async () => {
     const make = async (ocr: boolean) => {
       const b = await newDoc();
@@ -1513,7 +1513,7 @@ async function bilingualNotice(hide: boolean, opts: { beside?: boolean; digits?:
   return doc.save({ useObjectStreams: false });
 }
 
-describe('wave 4 (RX-RUN2), K1: text that holds no chosen value stays visible on a rebuilt page (T-048)', () => {
+describe('wave 4 (RX-RUN2), K1: text that holds no chosen value stays visible on a rebuilt page (T-052)', () => {
   /** Black added on page 1 and what the review asked (the areas' share of the page). */
   async function measure(visible: Uint8Array, opts: { terms?: { text: string; reason: string }[] } = {}) {
     const source = pdf('K1-notice.pdf', visible, 1);
@@ -1569,7 +1569,7 @@ describe('wave 4 (RX-RUN2), K1: text that holds no chosen value stays visible on
     expect(found.detail).toMatch(/On page 1, text or a drawing that could not be read was covered whole, to be safe\./);
   });
 });
-// ---- final pass (T-048), F1: the judge's answer for one text is searched one chosen value at a time -----------------
+// ---- final pass (T-052), F1: the judge's answer for one text is searched one chosen value at a time -----------------
 
 /** About 200 invented values (100 PAN-shaped, 100 typed names) and a page of text that holds each of them. */
 function manyValues() {
@@ -1584,7 +1584,7 @@ function manyValues() {
   return { targets, text };
 }
 
-describe('final pass, F1: one answer of the judge in turns (T-048)', () => {
+describe('final pass, F1: one answer of the judge in turns (T-052)', () => {
   it('gives exactly the answer of the search made at once, on a text with about 200 values', async () => {
     const { targets, text } = manyValues();
     const atOnce = spansOf(targets, text);

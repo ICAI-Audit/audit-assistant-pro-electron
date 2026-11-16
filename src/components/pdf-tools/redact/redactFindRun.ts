@@ -22,7 +22,7 @@ export interface FindReader {
   pageAnnotationTexts(file: Uint8Array, pageIndex: number, options?: { signal?: AbortSignal }): Promise<AnnotationText[]>;
 }
 
-/** Every kind is searched; the profile decides only what is ticked (R1 report, "What the run passes"). Every group the patterns know (RX-PAT widened them, T-048). */
+/** Every kind is searched; the profile decides only what is ticked (R1 report, "What the run passes"). Every group the patterns know (RX-PAT widened them, T-052). */
 export const ALL_GROUPS: ReadonlySet<RedactGroup> = new Set<RedactGroup>(REDACT_GROUPS);
 
 export interface FindProgress {
@@ -67,7 +67,7 @@ interface ReadOptions {
   /** False once the dialog's scope has moved on (engagement, user, session): the find stops quietly. */
   live: () => boolean;
   onProgress: (p: FindProgress) => void;
-  /** Wave 6 (T-048): a turn for the window (the dialog's yield); absent, the work runs without turns (tests). */
+  /** Wave 6 (T-052): a turn for the window (the dialog's yield); absent, the work runs without turns (tests). */
   pause?: Pause;
   /** How long work may hold the window before it gives a turn (TURN_MS; tests pass 0 to count every chance). */
   turnEveryMs?: number;
@@ -77,11 +77,11 @@ function stopIfDone(options: Pick<ReadOptions, 'signal' | 'live'>): void {
   if (options.signal.aborted || !options.live()) throw new FindStopped();
 }
 
-/** Wave 6 (T-048): how long the find's own loops may hold the window before they give it a turn. */
+/** Wave 6 (T-052): how long the find's own loops may hold the window before they give it a turn. */
 export const TURN_MS = 40;
 
 /**
- * Wave 6 (T-048): a gate on `pause` by the clock: it gives a turn only once `everyMs` have passed since the last
+ * Wave 6 (T-052): a gate on `pause` by the clock: it gives a turn only once `everyMs` have passed since the last
  * one, so a loop can ask at every step and a quick file is not slowed. Undefined when no turn is due.
  */
 export function turnsEvery(pause: Pause, everyMs: number = TURN_MS): () => Promise<void> | undefined {
@@ -95,10 +95,10 @@ export function turnsEvery(pause: Pause, everyMs: number = TURN_MS): () => Promi
   };
 }
 
-/** Wave 6 (T-048): the renderer ran out of time or had to restart; the machine was busy, the file is not to blame. */
+/** Wave 6 (T-052): the renderer ran out of time or had to restart; the machine was busy, the file is not to blame. */
 export const findBusy = () => new PdfToolsError('redact-find-failed', 'The computer was too busy to search this file. Close other programs, then search again.');
 
-/** Wave 6 (T-048): how many times a read the busy renderer could not finish is tried again before the find stops. */
+/** Wave 6 (T-052): how many times a read the busy renderer could not finish is tried again before the find stops. */
 const BUSY_RETRIES = 2;
 
 /** The renderer's own "out of time" or "had to restart": a busy machine, not a damaged file. */
@@ -109,7 +109,7 @@ export function rendererBusy(error: unknown): boolean {
 const RENDERER_RESTARTED_CODE = 'renderer-restarted';
 
 /**
- * Wave 6 (T-048): the enlarged-view copy (pageText.ts enlargedViewCopy, the same steps and the same bytes) read and
+ * Wave 6 (T-052): the enlarged-view copy (pageText.ts enlargedViewCopy, the same steps and the same bytes) read and
  * written with pdf-lib's waits taken by the clock (pace.ts loadPaced, savePaced): its parse held the window 1.07 s on
  * a 500-page statement. `check` (the find's Stop) is asked after each wait while the file is read.
  */
@@ -143,7 +143,7 @@ export async function enlargedCopyInTurns(file: Uint8Array, check: () => void): 
 export async function readFileText(file: Uint8Array, options: ReadOptions): Promise<FileText> {
   const { reader, signal } = options;
   stopIfDone(options);
-  // Wave 6 (T-048): a read the busy renderer could not finish (out of time, or restarted) is tried again, after a
+  // Wave 6 (T-052): a read the busy renderer could not finish (out of time, or restarted) is tried again, after a
   // turn; if it still cannot, the find says the computer was busy, never that the file may be damaged.
   const guard = async <T>(work: () => Promise<T>): Promise<T> => {
     for (let attempt = 0; ; attempt++) {
@@ -201,7 +201,7 @@ export async function readFileText(file: Uint8Array, options: ReadOptions): Prom
   await inBatches((page) => reader.pageTextContent(enlarged, page, { signal }), texts);
   const models: PageTextModel[] = [];
   const pagesWithoutText: number[] = [];
-  // Wave 6 (T-048): a turn for the window when one is due between pages (all 500 in one loop held it 1.04 s).
+  // Wave 6 (T-052): a turn for the window when one is due between pages (all 500 in one loop held it 1.04 s).
   for (const [page, text] of texts.entries()) {
     const due = turn();
     if (due) await due;
@@ -219,11 +219,11 @@ const READ_BATCH = 16;
 export type Pause = () => Promise<void>;
 const noPause: Pause = async () => undefined;
 
-/** Wave 6 (T-048): about how long one piece of a value's search over the pages should take before a turn may come. */
+/** Wave 6 (T-052): about how long one piece of a value's search over the pages should take before a turn may come. */
 const PIECE_MS = 25;
 
 /**
- * Wave 6 (T-048): every other place of each value of `places` (redactFind.ts everyOccurrence, the same places), one
+ * Wave 6 (T-052): every other place of each value of `places` (redactFind.ts everyOccurrence, the same places), one
  * value at a time over a few pages at a time, with a chance of a turn (`turn`) between the pieces: one value over a
  * 500-page statement's every page held the window 1.89 s. Each piece shares its last page with the next, so a value
  * that runs on over a page turn is found as at once; the places found so far go into each piece, so none is
@@ -295,7 +295,7 @@ function expandsAtOnce(group: readonly Proposal[]): boolean {
  * so the window stays responsive on a long file. Run again when a typed word changes (no file reading).
  */
 export async function findInModels(text: FileText, terms: readonly Term[], measure: MeasureChar, pause: Pause = noPause, turnEveryMs: number = TURN_MS): Promise<FindResult> {
-  // Wave 6 (T-048): turns by the clock, not by a count of pages or values (ten pages, or 25 values over every page,
+  // Wave 6 (T-052): turns by the clock, not by a count of pages or values (ten pages, or 25 values over every page,
   // held the window 1 to 1.9 s on long statements).
   const turn = turnsEvery(pause, turnEveryMs);
   const found: Proposal[] = [];
@@ -345,7 +345,7 @@ export function expandValue(text: FileText, places: readonly Proposal[], known: 
   return everyOccurrence(text.models, places, measure, text.annotations).filter((p) => !known.has(p.id));
 }
 
-/** `expandValue` in turns for the window (wave 6, T-048): the same places. */
+/** `expandValue` in turns for the window (wave 6, T-052): the same places. */
 export async function expandValueInTurns(text: FileText, places: readonly Proposal[], known: ReadonlySet<string>, measure: MeasureChar, pause: Pause): Promise<Proposal[]> {
   return (await everyOccurrenceInTurns(text, places, measure, turnsEvery(pause))).filter((p) => !known.has(p.id));
 }

@@ -12,7 +12,7 @@
 //   flag, ends the run "not verified" (flattening drawn text would print it into the picture);
 // - a hit with no page (bookmarks, document properties, the form, other) ends the run.
 //
-// After the end-to-end review (T-048): what a page to rebuild DRAWS is looked at, not only its text.
+// After the end-to-end review (T-052): what a page to rebuild DRAWS is looked at, not only its text.
 // Before the first build the source is checked once and what it draws on those pages that the find did
 // not box (an annotation's appearance, a pattern, a form) is boxed where it paints (B1); every page to
 // rebuild gets the check's wider places in its text, whatever the output (B2); flattening never drops a

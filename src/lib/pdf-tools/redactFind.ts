@@ -103,7 +103,7 @@ export const KIND_NAMES: Readonly<Record<RedactKind, string>> = {
   name: 'Name',
   address: 'Address',
   addressee: 'Addressee',
-  // The kinds lane RX-PAT added in T-048 (redactPatterns.ts), named there.
+  // The kinds lane RX-PAT added in T-052 (redactPatterns.ts), named there.
   ...ADDED_KIND_NAMES,
   typed: 'Typed',
   drawn: 'Drawn',

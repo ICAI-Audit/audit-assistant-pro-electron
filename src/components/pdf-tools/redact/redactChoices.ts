@@ -23,7 +23,7 @@ export const DEFAULT_CHOICES: RedactChoices = { mode: 'remove', style: 'token', 
 
 /**
  * Why Redact cannot run with these choices and this review, or null. Never repeats a value or a token. `searching`
- * (wave 6, T-048): a typed word is still being searched, so the review does not yet hold its places.
+ * (wave 6, T-052): a typed word is still being searched, so the review does not yet hold its places.
  */
 export function choicesError(choices: RedactChoices, state: ReviewState, searching = false): string | null {
   if (searching) return 'Wait until your words have been searched.';
@@ -68,7 +68,7 @@ export interface ConfirmFacts {
   areas: number;
   /** 0-based pages that become pictures. */
   pages: number[];
-  /** Wave 6 (T-048, ruling M): 0-based pages without an area that will be made pictures too, because they may not be copied. */
+  /** Wave 6 (T-052, ruling M): 0-based pages without an area that will be made pictures too, because they may not be copied. */
   pagesAlso: number[];
   /** Wave 6: which pages may not be copied is not known yet (the file is still being read): more pages may become pictures. */
   alsoUnknown: boolean;
@@ -80,7 +80,7 @@ export interface ConfirmFacts {
 
 /**
  * `charsOf` (wave 4): the characters on a page (white space aside), for the size estimate; absent, an ordinary page is
- * assumed. `notPlain` (wave 6, T-048): the pages that may not be copied (redactCheck.ts pageDrawingsAndVerdicts,
+ * assumed. `notPlain` (wave 6, T-052): the pages that may not be copied (redactCheck.ts pageDrawingsAndVerdicts,
  * `plain: false`): those without an area are made pictures too, and counted in the size; `null` while they are not
  * known yet; absent, none.
  */
@@ -112,7 +112,7 @@ export function confirmFacts(
 
 /**
  * "14 areas on 3 pages will be removed. Pages 2, 5 and 7 will become pictures of the page; the other 37 pages are copied
- * unchanged." Wave 6 (T-048): pages made pictures because they may not be copied are named ("pages 8-20 will also
+ * unchanged." Wave 6 (T-052): pages made pictures because they may not be copied are named ("pages 8-20 will also
  * become pictures, to be safe"); while that is not known, the sentence says some pages may, and claims no page is copied.
  */
 export function confirmSentence(facts: ConfirmFacts): string {

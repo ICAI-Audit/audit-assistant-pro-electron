@@ -20,7 +20,7 @@ export const GROUP_NAMES: Readonly<Record<RedactGroup, string>> = {
   documents: 'Tax and GST documents',
   business: 'Company and professional numbers',
 };
-/** The patterns' own order (RX-PAT widened the groups, T-048). */
+/** The patterns' own order (RX-PAT widened the groups, T-052). */
 export const GROUP_ORDER: readonly RedactGroup[] = REDACT_GROUPS;
 /** The group no profile ticks (company and professional numbers): the options show it apart, saying so. */
 export const SEPARATE_GROUP: RedactGroup = 'business';
@@ -114,7 +114,7 @@ export function placesOfKind(state: ReviewState, kind: RedactKind): string[] {
 
 /**
  * The notice about pages without text (design 5.9 step 1), or null. Pages 0-based. It says plainly that
- * automatic finding cannot read them and only drawn boxes apply (lead, T-048). Wave 4, ruling P: a page whose
+ * automatic finding cannot read them and only drawn boxes apply (lead, T-052). Wave 4, ruling P: a page whose
  * content pdf.js cannot draw is shown blank and has no text either, so the notice says what is true of both.
  */
 export function noTextNotice(pagesWithoutText: readonly number[], pageCount: number): { title: string; body: string } | null {
@@ -133,7 +133,7 @@ export function noTextNotice(pagesWithoutText: readonly number[], pageCount: num
   };
 }
 
-/** The line over a page without text while it is shown (lead, T-048). */
+/** The line over a page without text while it is shown (lead, T-052). */
 export const PAGE_WITHOUT_TEXT = 'Automatic finding cannot read this page: only the boxes you draw remove anything on it.';
 
 /**

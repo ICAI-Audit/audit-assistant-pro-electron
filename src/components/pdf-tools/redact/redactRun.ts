@@ -47,7 +47,7 @@ import { flaggedOperations, placeOperations, type TextOp } from './rendererView'
 import { omitsHindi } from './redactView';
 import type { RedactArea } from './reviewState';
 
-/** Switched on (T-048): the toolbar offers Redact and runTool.ts runs its step. */
+/** Switched on (T-052): the toolbar offers Redact and runTool.ts runs its step. */
 export const BUILT: boolean = true;
 
 /** One chosen value's places in a text, by the find's own rule and by the check's looser net (every form of it). */
@@ -290,7 +290,7 @@ function watchedRenderer(env: RedactEnv, watch: SilenceWatch): RedactEnv['render
     renderPagePixels: (file, page, scale, options) =>
       watch.race(
         (async () => {
-          // Wave 6 (T-048): a drawing the busy renderer could not finish (out of time, or restarted under it) is tried
+          // Wave 6 (T-052): a drawing the busy renderer could not finish (out of time, or restarted under it) is tried
           // again; if it still cannot, the run says the computer was busy, never that the page could not be drawn.
           for (let attempt = 0; ; attempt++) {
             try {
@@ -314,10 +314,10 @@ function watchedRenderer(env: RedactEnv, watch: SilenceWatch): RedactEnv['render
   };
 }
 
-/** Wave 6 (T-048): how many times a drawing the busy renderer could not finish is tried again. */
+/** Wave 6 (T-052): how many times a drawing the busy renderer could not finish is tried again. */
 const DRAW_RETRIES = 2;
 
-/** Wave 6 (T-048): the renderer stayed too busy to draw a page: nothing is added, and the file is not to blame. */
+/** Wave 6 (T-052): the renderer stayed too busy to draw a page: nothing is added, and the file is not to blame. */
 export const runBusy = () => new PdfToolsError('render-failed', 'The computer was too busy to finish. Nothing was added. Close other programs, then try again.');
 
 const appEnv: RedactEnv = {

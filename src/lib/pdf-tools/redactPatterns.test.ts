@@ -48,7 +48,7 @@ import {
   writtenForms,
 } from './testRedactCorpus';
 
-// Several tests search thousands of lines; on a busy machine the default 5 s per test is not enough (T-048
+// Several tests search thousands of lines; on a busy machine the default 5 s per test is not enough (T-052
 // round 2: one took 6.4 s with every CPU busy). No test here depends on how fast the machine is.
 vi.setConfig({ testTimeout: 120_000 });
 
@@ -100,7 +100,7 @@ describe('findPatterns: the trial corpus', () => {
   });
 
   it('handles the near-misses: possible with a reason, or nothing', () => {
-    // T-048 wave 4: three reasons were reworded in plain words; the corpus (testRedactCorpus.ts, not this lane's
+    // T-052 wave 4: three reasons were reworded in plain words; the corpus (testRedactCorpus.ts, not this lane's
     // file) still holds the old texts, so they are read through this table until it takes REASONS itself.
     const reworded: Record<string, string> = {
       'fourth letter is not a holder type': REASONS.panType,
@@ -165,10 +165,10 @@ describe('findPatterns: the trial corpus', () => {
     expect(found.map((m) => [m.kind, m.key, m.value, m.confidence])).toEqual([['aadhaar', '234567890124', '2345 6789\n0124', 'sure']]);
   });
 
-  // Speed (T-048 round 2: a wall-clock limit failed whenever the machine was busy). The find is timed against a
+  // Speed (T-052 round 2: a wall-clock limit failed whenever the machine was busy). The find is timed against a
   // calibration loop of plain regular expressions over the same page, interleaved, best of 30 each: load slows
   // both alike, and the best run is the least disturbed. The bound, 4 loops, is the old 5 ms budget on the machine
-  // where it was set (one loop took about 1.1 ms there; the find about 1.4 ms, 0.6 ms before T-048; the ratio
+  // where it was set (one loop took about 1.1 ms there; the find about 1.4 ms, 0.6 ms before T-052; the ratio
   // stayed 1.1-1.6 with every CPU busy). Measured on a scratch copy: a find doing four times its work fails it,
   // one doing three times its work passes; machine load does not move the ratio.
   const page = lines.slice(0, 60).join('\n');
@@ -427,7 +427,7 @@ describe('fix round 1, F3: the shared normalisation and separator rule', () => {
     ['bank-account', '50100123456789'],
     ['tan', 'MUMR12345B'],
     ['email', 'r.kumar@example.in'],
-    // T-048: every new kind, by its key
+    // T-052: every new kind, by its key
     ['passport', 'M5830271'],
     ['voter-id', 'ABC1234567'],
     ['driving-licence', 'MH1420110012345'],
@@ -553,7 +553,7 @@ describe('module memory (fix round 2, MF3)', () => {
   });
 });
 
-// ---- T-048 (lane RX-PAT): the wider identifier set ---------------------------------------------------------
+// ---- T-052 (lane RX-PAT): the wider identifier set ---------------------------------------------------------
 
 const NEW_KINDS: FoundKind[] = [
   'passport',
@@ -598,7 +598,7 @@ const EVERY: ReadonlySet<RedactGroup> = new Set<RedactGroup>(REDACT_GROUPS);
 const findAll = (text: string) => findPatterns(text, EVERY);
 const triple = (found: PatternMatch[]) => found.map((m) => [m.kind, m.key, m.confidence]);
 
-describe('T-048: the wider identifier set', () => {
+describe('T-052: the wider identifier set', () => {
   it('finds every true case of every new kind once, with its key, the whole value and its confidence', () => {
     const failed: string[] = [];
     for (const c of newKindCases()) {
@@ -773,7 +773,7 @@ describe('T-048: the wider identifier set', () => {
   });
 });
 
-describe('T-048 wave 2: typed words by the one loose rule (ruling 4; redact-retest-1.md R7, rx2-contract.md (a))', () => {
+describe('T-052 wave 2: typed words by the one loose rule (ruling 4; redact-retest-1.md R7, rx2-contract.md (a))', () => {
   // The re-tester's eleven separators (R7: en dash, em dash, middle dot, bullet, slash, semicolon, colon, four
   // dots, ampersand, apostrophe, brackets), a mixed one, and none at all.
   const SEPARATORS = [C(0x2013), C(0x2014), C(0xb7), C(0x2022), '/', ';', ':', '....', ' & ', "'", ') (', ' .  ,_ - \n', ''];
@@ -820,7 +820,7 @@ describe('T-048 wave 2: typed words by the one loose rule (ruling 4; redact-rete
   });
 });
 
-// ---- T-048 wave 4 (lane RX-PAT2): a number ends where its own digits end (ruling H; ruling K6) ---------------
+// ---- T-052 wave 4 (lane RX-PAT2): a number ends where its own digits end (ruling H; ruling K6) ---------------
 
 /** The one match of `kind` in `text` as [value, key, confidence]; null when there is none; every match when more. */
 const one = (text: string, kind: RedactKind) => {
@@ -946,7 +946,7 @@ const CARD_CASES: readonly (readonly [string, string])[] = [
   ['Paid by 4111 1111 1111 1111 12 Oct', '4111 1111 1111 1111'],
 ];
 
-describe('T-048 wave 4 (ruling H): an account or card number ends where its own digits end', () => {
+describe('T-052 wave 4 (ruling H): an account or card number ends where its own digits end', () => {
   it('reads the 34 ordinary phrasings of a labelled account as the account number alone (re-test 3, T3-B finding 2)', () => {
     expect(ACCOUNT_34).toHaveLength(34);
     expect(misread(ACCOUNT_34, 'bank-account')).toEqual([]);
@@ -1024,7 +1024,7 @@ describe('T-048 wave 4 (ruling H): an account or card number ends where its own 
   });
 });
 
-describe('T-048 wave 4 (ruling K6): labelled values that were missed or only possible', () => {
+describe('T-052 wave 4 (ruling K6): labelled values that were missed or only possible', () => {
   it('finds a mobile number after a phone word in a sentence as sure, and leaves other numbers in sentences possible', () => {
     for (const text of ['the mobile number on record is 98765 01234 and', 'or call 98765 01234 for details', 'please call me on 98765 01234', 'Mobile number registered with the bank is 98765 01234.']) {
       expect(one(text, 'mobile'), text).toEqual(['98765 01234', '9876501234', 'sure']);
@@ -1066,7 +1066,7 @@ const NOTICE_PAGE_1 = [
 ].join('\n');
 const values = (text: string, kind: RedactKind) => findAll(text).filter((m) => m.kind === kind).map((m) => [m.value, m.confidence]);
 
-describe('T-048 wave 4 (coordinator, SAMPLE-report.md): what an ITR acknowledgement and a notice carry', () => {
+describe('T-052 wave 4 (coordinator, SAMPLE-report.md): what an ITR acknowledgement and a notice carry', () => {
   it('finds a name and an address in a table cell with no colon after the label, and the name before "having PAN"', () => {
     expect(values(ITR_V, 'name')).toEqual([
       ['RAMESH KUMAR GUPTA', 'possible'],
@@ -1132,7 +1132,7 @@ describe('T-048 wave 4 (coordinator, SAMPLE-report.md): what an ITR acknowledgem
   });
 });
 
-// ---- T-048 wave 5 (lane RX-PAT3): rulings T and U after re-test 4 (lane T4-B) ----------------------------------
+// ---- T-052 wave 5 (lane RX-PAT3): rulings T and U after re-test 4 (lane T4-B) ----------------------------------
 
 const digitCount = (s: string) => s.replace(/\D/g, '').length;
 /** The matches of an account or card number in `text`, the sure one first. */
@@ -1181,7 +1181,7 @@ const PHRASINGS_30: readonly (readonly [string, string])[] = [
   ['Card No. 4111111111111111 Exp 12/28', '4111111111111111'],
 ];
 
-describe('T-048 wave 5 (ruling T): the key is the number itself, the covered place runs to the end of its digits', () => {
+describe('T-052 wave 5 (ruling T): the key is the number itself, the covered place runs to the end of its digits', () => {
   it('compares account numbers with leading zeros removed (re-test 4, N14)', () => {
     expect(one('Account Number : 00000030012345678', 'bank-account')).toEqual(['00000030012345678', '30012345678', 'sure']);
     expect(keyOf('bank-account', '00000030012345678')).toBe('30012345678');
@@ -1393,7 +1393,7 @@ const FORM_16 = [
   'Total\t\t14,80,000\t1,36,800',
 ].join('\n');
 
-describe('T-048 wave 5 (ruling U): labels in forms and tables', () => {
+describe('T-052 wave 5 (ruling U): labels in forms and tables', () => {
   it('finds the name and the address after "Name and address of the Employee", and the names under a "Name of the Deductee" heading (N25)', () => {
     expect(values(FORM_16, 'name')).toEqual([
       ['Ramesh Kumar Gupta', 'possible'],

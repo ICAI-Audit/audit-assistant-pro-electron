@@ -1,4 +1,4 @@
-// TEST HELPER (Redact, the renderer-view reading, T-048 wave 4 lane RX-VIEW): recipes that place an invented
+// TEST HELPER (Redact, the renderer-view reading, T-052 wave 4 lane RX-VIEW): recipes that place an invented
 // value with one PDF feature (re-test 3 lane T3-A's, rebuilt here), and the reading's own measure of what of
 // the value it would leave showing. Never imported by the application. Invented values only.
 import * as fs from 'node:fs';

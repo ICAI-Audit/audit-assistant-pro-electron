@@ -207,7 +207,7 @@ describe('redactInRounds', () => {
     expect(fromCheckHits([hit])).toEqual([{ pages: [1], elsewhere: [], drawn: false, remedy: 'flatten', part: 'content', object: '4 0 R' }]);
   });
 
-  // ---- T-048 (redact-e2e-review.md B4, B5, non-blocking 6) ----
+  // ---- T-052 (redact-e2e-review.md B4, B5, non-blocking 6) ----
 
   it('B4: a page that gets boxes in a round is never flattened, whatever the order of its hits', async () => {
     const boxed: RoundHit = { pages: [1], elsewhere: [], boxes: [{ page: 1, rect: rect(330) }], drawn: true, remedy: 'boxes' };
@@ -532,7 +532,7 @@ describe('placing a value on a page\'s text', () => {
     expect(asked).toBeGreaterThanOrEqual(3);
   });
 
-  it('a short number of a kind added in T-048 (8 digits or fewer) is a place only where no digit is joined to it; punctuation between its digits still counts', () => {
+  it('a short number of a kind added in T-052 (8 digits or fewer) is a place only where no digit is joined to it; punctuation between its digits still counts', () => {
     // Inside an amount: not a place. Written with a space: a place.
     expect(loosePlaces('Total 1400001.00 paid; PIN 400 001 here', 'pin-code', '400001')).toEqual([{ start: 27, end: 34 }]);
     expect(loosePlaces('Cheque 123456 cleared, ref 91234567', 'cheque', '123456')).toEqual([{ start: 7, end: 13 }]);
@@ -548,7 +548,7 @@ describe('placing a value on a page\'s text', () => {
   });
 });
 
-describe('the proof hides what draws a value and nothing beside it (T-048 wave 2, ruling 6)', () => {
+describe('the proof hides what draws a value and nothing beside it (T-052 wave 2, ruling 6)', () => {
   const NAME = 'Ramesh Kumar Gupta';
   const holds = (s: string) => loosePlaces(s, 'typed', NAME).length > 0;
   const spans = (s: string) => loosePlaces(s, 'typed', NAME).map((p): [number, number] => [p.start, p.end]);

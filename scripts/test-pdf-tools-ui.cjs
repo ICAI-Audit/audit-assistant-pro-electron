@@ -21,7 +21,7 @@
 // each result read back as bytes and checked; Save to computer marking and its activity entry,
 // and the download fallback; Enter and Cancel during a long run (Keep running, Stop); an
 // engagement change while PDF Tools is closed; an engagement change during a vault upload.
-// Phase 2 (T-048): the toolbar (its order, Organise pages, Watermark, Redact, Bookmarks and Protect usable,
+// Phase 2 (T-052): the toolbar (its order, Organise pages, Watermark, Redact, Bookmarks and Protect usable,
 // one Tab stop with arrow keys); bookmarks carried by Merge, Split and Delete pages
 // (read back with pdf.js); the bookmark list beside the page panel; Protect (the protected row, its
 // preview, refused as input, the vault note, the saved bytes open only with the password, the password
@@ -34,7 +34,7 @@
 // the viewer and the Bookmarks strip; the question before an engagement change throws away unsaved results.
 // FIX-B (REV-B): the password prompt's field wiped after a wrong password; a fold opened by a problem stays open;
 // a token chip goes into its own field; Organise pages keeps the focus and asks before throwing changes away.
-// Redact (T-048, switched on): the find on a short statement made here (an invented PAN and e-mail address), a
+// Redact (T-052, switched on): the find on a short statement made here (an invented PAN and e-mail address), a
 // typed word that is not in the file, the confirmation, a Searchable run and its result read with pdf.js, the
 // record (counts and choices only), a Stop during a run, and the values typed or redacted found nowhere afterwards;
 // a group ticked by hand ticks its possible values too (a labelled name and address); "Add a box" with its two
@@ -93,7 +93,7 @@ const PDF_PASSWORD = 'Synthetic-PDF-Lock-7Kq2Zx9';
 const PROTECT_PASSWORD = 'Synthetic-Protect-Pw-3vR8tY1';
 // Invented for the wipe check (INT-19): typed, then stopped; typed, then failed; typed, then used.
 const WIPE_PASSWORDS = { stop: 'Invented-Stop-Pw-6hJ2xQ', fail: 'Invented-Fail-Pw-9tB4kW', used: 'Invented-Used-Pw-2mN7rZ' };
-// Redact (T-048): invented values written into the statements made here, and a word typed that no file holds.
+// Redact (T-052): invented values written into the statements made here, and a word typed that no file holds.
 const REDACT_PAN = 'QZXCV0000W';
 const REDACT_EMAIL = 'accounts.invented@example.com';
 const REDACT_ABSENT_WORD = 'Zephyrquill Marrow';
@@ -134,7 +134,7 @@ const FILES = {
   tiffStandard: 'Synthetic standard fax.tif',
   tiffCmyk: 'Synthetic CMYK.tif',
   heic: 'Synthetic phone photo.heic',
-  // Redact (T-048): a two-page statement with an invented PAN and e-mail address; a longer one for a Stop.
+  // Redact (T-052): a two-page statement with an invented PAN and e-mail address; a longer one for a Stop.
   redactShort: 'Synthetic statement to redact.pdf',
   redactLong: 'Synthetic long statement to redact.pdf',
   redactLetter: 'Synthetic letter to redact.pdf',
@@ -459,7 +459,7 @@ async function attachedPdf() {
   return doc.save();
 }
 
-/** Redact (T-048): A4 pages of a statement; the invented PAN on every page, the invented e-mail address on the first. */
+/** Redact (T-052): A4 pages of a statement; the invented PAN on every page, the invented e-mail address on the first. */
 async function statementPdf(pages) {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -471,7 +471,7 @@ async function statementPdf(pages) {
   return doc.save();
 }
 
-/** Redact (T-048): one A4 page with a labelled name and address, the invented PAN, and words that stay. */
+/** Redact (T-052): one A4 page with a labelled name and address, the invented PAN, and words that stay. */
 async function letterPdf() {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -2293,7 +2293,7 @@ async function scenarioBookmarksStageOne() {
 }
 
 /**
- * UX-GAP (T-048): a click on a shown page or on a row's thumbnail opens the viewer (T1-11), while Split's
+ * UX-GAP (T-052): a click on a shown page or on a row's thumbnail opens the viewer (T1-11), while Split's
  * chosen pages and Delete pages keep a click for choosing and a running tool keeps the viewer closed (and
  * says why); the order inside Images to PDF (T2-6); Page numbers' refusal says "Nothing was added."; the
  * Rotate wording. Mouse clicks and keys are real input events (CDP).
@@ -2697,12 +2697,12 @@ async function closeToolDialog() {
 }
 
 /**
- * T-048: Redact, switched on. A two-page statement made here (the invented PAN on both pages, the invented e-mail
+ * T-052: Redact, switched on. A two-page statement made here (the invented PAN on both pages, the invented e-mail
  * address on the first): the find, a typed word that is not in the file, the confirmation, a Searchable run whose
  * result is read back with pdf.js, the record, and a Stop during a run on a longer statement. No native window.
  */
 async function scenarioRedact() {
-  step('T-048: Redact');
+  step('T-052: Redact');
   const RD = byTestId('pdf-tools-redact-dialog');
   const rd = (id) => byTestId(`pdf-tools-redact-${id}`);
   const text = (selector) => evaluate(`document.querySelector(${q(selector)})?.innerText.replace(/\\s+/g, ' ').trim() ?? null`);

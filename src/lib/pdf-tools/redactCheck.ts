@@ -301,7 +301,7 @@ const NOT_WORD_CHAR = '[^\\p{L}\\p{N}]';
  * - email: the key with any white space between its characters;
  * - IP address: the dotted key with white space around its dots, no digit or digit-led dot joined;
  * - codes and numbers: the key's characters with any run of non-ASCII-letters/digits between, inside
- *   longer runs too, except a short number of a kind added in T-048 (no digit joined at either end).
+ *   longer runs too, except a short number of a kind added in T-052 (no digit joined at either end).
  */
 function looseRegExp(kind: RedactKind, form: string, whole = true): RegExp | null {
   if (kind === 'drawn' || kind === 'marked') return null;
@@ -363,7 +363,7 @@ type Rule = (v: Views) => CheckPass | null;
  * (`placesOfValue` with `keyOf`, redactPatterns.ts): codes and numbers with up to three separators,
  * email with white space around `.` `@` `-`, an IP address bounded by digits and digit-leading dots,
  * words as the find's whole words. The loose pass is THE loose rule (loosePlacesOf; fix wave 2, ruling
- * 4): codes and numbers with any punctuation between characters (a short number of a kind added in T-048
+ * 4): codes and numbers with any punctuation between characters (a short number of a kind added in T-052
  * with no digit joined to it); email without white space; an IP address with white space around its dots
  * (never without its dots); a phrase's words across any run of non-letters/non-digits, or none (this
  * replaces fix round 1's "white space and hyphens only"). The strict test runs only where a cheap test
@@ -393,13 +393,13 @@ function ruleOf(kind: RedactKind, form: string, whole: boolean): Rule | null {
   }
   if (!/^[A-Za-z0-9]+$/.test(key)) return null;
   const compact = key.toUpperCase();
-  // A short number of a kind added in T-048 (8 digits or fewer: PIN code, cheque, membership number,
+  // A short number of a kind added in T-052 (8 digits or fewer: PIN code, cheque, membership number,
   // director's DIN) has no digit joined to it in both passes (fix wave round 2, RX-PAT); the looseRegExp
   // carries that boundary.
   return (v) => (!v.compact.includes(compact) ? null : strict(v) ? 'strict' : loose(v) ? 'loose' : null);
 }
 
-/** A kind added in T-048 (redactPatterns.ts ADDED_KIND_NAMES) whose key is 8 digits or fewer: placesOfValue's short-number rule. */
+/** A kind added in T-052 (redactPatterns.ts ADDED_KIND_NAMES) whose key is 8 digits or fewer: placesOfValue's short-number rule. */
 const shortAddedNumber = (kind: RedactKind, key: string) => Object.prototype.hasOwnProperty.call(ADDED_KIND_NAMES, kind) && /^\d{1,8}$/.test(key);
 
 interface Compiled {

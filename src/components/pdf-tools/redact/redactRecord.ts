@@ -51,7 +51,7 @@ export const COUNT_NAMES: Readonly<Record<RedactKind, string>> = {
   'itr-ack': 'ITR ack',
   evc: 'EVC',
   ip: 'IP',
-  // The kinds RX-PAT added (T-048), in their own words for the counts.
+  // The kinds RX-PAT added (T-052), in their own words for the counts.
   ...ADDED_COUNT_NAMES,
   name: 'name',
   address: 'address',

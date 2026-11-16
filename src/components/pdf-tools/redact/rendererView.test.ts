@@ -35,7 +35,7 @@ async function pageWith(content: string, extra: (doc: PDFDocument, font: PDFRef)
 const read = async (bytes: Uint8Array) => (await env.renderer.renderPagePixels(bytes, 0, 1, { read: true })).textOps ?? [];
 const texts = (ops: TextOp[], flagged: Set<number>) => ops.filter((o) => flagged.has(o.index)).map((o) => o.text || o.inner);
 
-describe("the renderer-view reading (T-048 wave 3)", () => {
+describe("the renderer-view reading (T-052 wave 3)", () => {
   it('reads text where pdf.js draws it: a soft mask group writing the PAN in a font read by its glyph names (finding 7)', async () => {
     const bytes = await pageWith('BT /F1 11 Tf 60 780 Td (Ordinary words) Tj ET q /GM gs 0 g 50 590 300 30 re f Q', (doc) => {
       const ctx = doc.context;
