@@ -278,3 +278,63 @@
   line-height: 1.35;
   vertical-align: bottom;
 }
+
+/* T-048 Variance Analysis headings and T-049 Analytical Ratios text wrap despite VERA global table nowrap. */
+.fsg-root th.fsg-change-col,
+.fsg-root .fsg-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.fsg-root th.fsg-change-col { vertical-align: bottom; }
+
+/* T-050 Balance Sheet / Profit & Loss toolbar: one line, one button style, Previous Year controls grouped. */
+.fsg-root .fsg-stmt-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;            /* a narrow window wraps to a second tidy line; nothing is hidden */
+  column-gap: 0.5rem;
+  row-gap: 6px;
+  white-space: nowrap;
+}
+.fsg-root .fsg-stmt-toolbar > .ml-auto { flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
+.fsg-root .fsg-stmt-toolbar .fsg-stmt-title { font-size: 13px; font-weight: 600; color: #1e3a8a; }
+.fsg-root .fsg-stmt-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.fsg-root .fsg-stmt-toolbar select {
+  height: 28px;
+  max-width: 9.5rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+.fsg-root .fsg-stmt-toolbar label { font-size: 12px; white-space: nowrap; }
+.fsg-root .fsg-stmt-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+.fsg-root .fsg-stmt-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+/* T-050 every heading of a statement row with the variance columns sits on the same bottom line. */
+.fsg-root tr:has(> th.fsg-change-col) > th { vertical-align: bottom; }

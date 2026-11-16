@@ -45,6 +45,7 @@ const ITEM_SHORTCUTS = {
   'Mapping': { 'Rectification / Recategorisation': 'R', 'Mapped TB': 'M', 'Mapping Rules': 'U' },
   'Dep': { 'Dep (Books)': 'B', 'Dep (Income Tax)': 'I' },
   'Features': { 'ITR': 'I', 'Tax Computation': 'T', 'Deferred Tax': 'D', 'Ratio': 'R', 'Reco': 'C', 'Format': 'F' },
+  'Ratio': { 'Ratio: Form 26 (Old Name - 3CD)': 'F', 'Ratio: Company Additional Disclosure Ratio': 'C', 'Ratio: Analytical Ratios': 'A' },
   'ITR': { 'ITR: BS': 'B', 'ITR: PL': 'P', 'ITR: BS Details': 'D', 'ITR: PL Details': 'L' },
   'Format': { 'Format: Proprietorship': 'R', 'Format: Partnership': 'A', 'Format: LLP': 'L', 'Format: Company': 'C' },
 }

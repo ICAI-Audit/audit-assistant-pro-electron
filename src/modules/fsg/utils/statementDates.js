@@ -23,8 +23,10 @@ function endDate(period) {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? parts : null
 }
 const display = parts => parts ? `${parts[2]} ${months[parts[1] - 1]} ${parts[0]}` : ''
+// T-051 short form for a screen column heading: "31 Mar 26".
+const displayShort = parts => parts ? `${parts[2]} ${months[parts[1] - 1].slice(0, 3)} ${String(parts[0]).slice(-2)}` : ''
 
-export function statementDates(activeTB, prevTB = null) {
+export function statementDates(activeTB, prevTB = null, { short = false } = {}) {
   const cy = endDate(activeTB?.period)
   // An explicitly selected comparative supplies its own reporting end date.
   // Opening/manual PY figures otherwise relate to the preceding year end.
@@ -33,11 +35,13 @@ export function statementDates(activeTB, prevTB = null) {
     const [year, month, day] = cy
     py = [year - 1, month, Math.min(day, new Date(Date.UTC(year - 1, month, 0)).getUTCDate())]
   }
-  return { cy: display(cy), py: display(py) }
+  const show = short ? displayShort : display
+  return { cy: show(cy), py: show(py) }
 }
 
-export function statementColumnLabels(activeTB, prevTB = null, kind = 'bs') {
-  const dates = statementDates(activeTB, prevTB)
+// `short` gives "As at 31 Mar 26" for a screen column heading; titles, PDF and Excel keep the full date.
+export function statementColumnLabels(activeTB, prevTB = null, kind = 'bs', { short = false } = {}) {
+  const dates = statementDates(activeTB, prevTB, { short })
   const prefix = kind === 'bs' ? 'As at' : 'For the year ended'
   return { cy: dates.cy ? `${prefix} ${dates.cy}` : 'Current Year', py: dates.py ? `${prefix} ${dates.py}` : 'Previous Year' }
 }

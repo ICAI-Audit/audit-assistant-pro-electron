@@ -67,7 +67,7 @@ function fmtUploadedAt(v) {
 // label, same render case, just listed in more than one dropdown.
 // Screens whose figures come from the Trial Balance's closing balances: they say when those are revised by Adjustments.
 const ADJUSTMENT_NOTICE_TABS = new Set([
-  'BS', 'PL', 'CFS', 'Notes', 'Annex', 'Reco', 'Exception', 'Review Financials', 'Ratio', 'Inventory',
+  'BS', 'PL', 'CFS', 'Notes', 'Annex', 'Reco', 'Exception', 'Review Financials', 'Ratio: Form 26 (Old Name - 3CD)', 'Ratio: Company Additional Disclosure Ratio', 'Ratio: Analytical Ratios', 'Inventory',
   'Dep (Books)', 'Dep (Income Tax)', 'Tax Computation', 'Deferred Tax', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
   'Rectification / Recategorisation', 'Mapped TB (Remarks)',
 ])
@@ -76,7 +76,7 @@ const ADJUSTMENT_NOTICE_TABS = new Set([
 const LOCK_BANNER_TABS = new Set([
   'Upload TB', 'Actual TB', 'Mapped TB (Remarks)', 'Journal Entry', 'Inventory',
   'Dep (Books)', 'Dep (Income Tax)', 'BS', 'PL', 'CFS', 'Notes', 'Policy', 'Annex', 'Reco',
-  'Tax Computation', 'Deferred Tax', 'Ratio', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
+  'Tax Computation', 'Deferred Tax', 'Ratio: Form 26 (Old Name - 3CD)', 'Ratio: Company Additional Disclosure Ratio', 'Ratio: Analytical Ratios', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
   'Exception', 'Review Financials',
 ])
 // T-038: "General Notes" is shown as "Policy" (Ctrl+Shift+O); PPE removed from Features.
@@ -92,6 +92,8 @@ const TAB_GROUPS = {
   'Dep': ['Dep (Books)', 'Dep (Income Tax)'],
   // Features submenu with ITR, Ratio
   'Features': ['ITR', 'Tax Computation', 'Deferred Tax', 'Ratio', 'Reco', 'Format'],
+  // T-049: Ratio is a group of three screens (Form 3CD shown as Form 26 (Old Name - 3CD)).
+  'Ratio': ['Ratio: Form 26 (Old Name - 3CD)', 'Ratio: Company Additional Disclosure Ratio', 'Ratio: Analytical Ratios'],
   // Blank Schedule III format (BS, P&L, notes, Fill Details) per constitution.
   'Format': ['Format: Proprietorship', 'Format: Partnership', 'Format: LLP', 'Format: Company'],
   // ITR-format BS/PL editable form (opens the layout matching the entity's
@@ -785,12 +787,17 @@ export default function App({ context }) {
       case 'Format: Company':
         return <Format key={activeTab} kind={activeTab.replace(/^Format:\s*/, '')} />
       case 'Ratio':
+      case 'Ratio: Form 26 (Old Name - 3CD)':
+      case 'Ratio: Company Additional Disclosure Ratio':
+      case 'Ratio: Analytical Ratios':
         return (
           <div className="flex flex-col h-full overflow-hidden">
             <Ratio
+              view={activeTab === 'Ratio: Company Additional Disclosure Ratio' ? 'statutory' : activeTab === 'Ratio: Analytical Ratios' ? 'analytical' : 'form26'}
               entity={entity}
               activeTB={activeTB}
               prevTB={prevTB}
+              activeRsId={activeRsId}
               onPrevTBChange={handlePrevTBChange}
             />
           </div>
