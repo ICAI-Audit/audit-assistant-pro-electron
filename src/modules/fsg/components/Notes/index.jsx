@@ -7,8 +7,9 @@ import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
 import * as XLSX from 'xlsx-js-style'
-import { buildManualPyFilledWorkbook, parseManualPyWorkbook } from './manualPyWorkbook'
-import { buildFillDetailsWorkbook, parseFillDetailsWorkbook, parseFillDetailsStockSheet } from '../GenerateFinancials/fillDetailsWorkbook'
+import { buildManualPyFilledWorkbook, parseManualPyWorkbook, manualPyExcelSpec } from './manualPyWorkbook'
+import { buildFillDetailsWorkbook, parseFillDetailsWorkbook, parseFillDetailsStockSheet, fillDetailsExcelSpec } from '../GenerateFinancials/fillDetailsWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { loadStockMaps } from '../Stock/StockPage'
 import { buildCashFlow } from '../../utils/cashFlow'
 import { parseCfsSheet, applyCfsUpload } from '../CFS/cfsWorkbook'
@@ -1205,22 +1206,28 @@ function DisclosureNote({ tbId, entityId, note }) {
   }
 
   if (!scopeId || loading) return null
+  // T-046: one line when empty; grows with its text (up to 240px, then scrolls).
+  const fit = (el) => { if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight + 2, 240) + 'px' }
   return (
-    <div className="mt-4 pt-4 border-t border-gray-200 px-4 pb-4">
-      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
-        Disclosure Note <span className="normal-case font-normal text-gray-400">(optional — included in PDF/Excel when filled in)</span>
-      </label>
-      <textarea
-        value={text}
-        onChange={e => setText(e.target.value)}
-        onBlur={save}
-        rows={4}
-        placeholder="Add any additional disclosure for this note…"
-        className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-700 focus:ring-2 focus:ring-blue-400 focus:outline-none resize-y max-h-[240px] overflow-y-auto"
-      />
-      {saving && <span className="text-[10px] text-gray-400">Saving…</span>}
-      {!saving && !error && text && text === saved && <span className="text-[10px] text-green-600">Saved - printed below this note in the PDF and Excel</span>}
-      {error && <span className="text-[10px] text-red-600">{error}</span>}
+    <div className="mt-2 pt-2 border-t border-gray-200 px-4 pb-3">
+      <div className="flex items-start gap-3">
+        <label className="shrink-0 pt-1.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+          title="Optional. Printed below this note in the PDF and Excel when filled in.">
+          Disclosure Note
+        </label>
+        <textarea
+          ref={fit}
+          value={text}
+          onChange={e => { setText(e.target.value); fit(e.target) }}
+          onBlur={save}
+          rows={1}
+          placeholder="Optional — add any additional disclosure for this note (printed in the PDF/Excel when filled in)…"
+          className="fsg-disclosure flex-1 border border-gray-300 rounded px-2 py-1 text-xs leading-5 text-gray-700 focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none overflow-y-auto"
+        />
+      </div>
+      {saving && <span className="block text-right text-[10px] text-gray-400">Saving…</span>}
+      {!saving && !error && text && text === saved && <span className="block text-right text-[10px] text-green-600">Saved - printed below this note in the PDF and Excel</span>}
+      {error && <span className="block text-[10px] text-red-600">{error}</span>}
     </div>
   )
 }
@@ -1414,8 +1421,9 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
   ]
   const pickStock = (obj) => Object.fromEntries(STOCK_INVENTORY_TYPES.map(t => [t, obj[t] ?? '']).filter(([, v]) => v !== ''))
 
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells, fixed-list dropdowns).
   const saveFillDetailsWorkbook = async (wb, suffix) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const buf = await finishWorkbook(wb, fillDetailsExcelSpec(wb))
     const eName = (entity?.name || 'FS').replace(/[^A-Za-z0-9]+/g, '_')
     const result = await fsgApi?.saveFileDialog({
       defaultPath: `${eName}_FillDetails_${suffix}.xlsx`,
@@ -1695,7 +1703,7 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
     const eName = (entity?.name || 'FS').replace(/[^A-Za-z0-9]+/g, '_')
     const scopeName = (isConsolidatedManualPy ? 'Consolidated' : (activeTB?.branch_name || activeTB?.period || 'TB')).replace(/[^A-Za-z0-9]+/g, '_')
     const wb = buildManualPyFilledWorkbook(entries || [], { sheetLabel: 'Manual PY' })
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const buf = await finishWorkbook(wb, manualPyExcelSpec((entries || []).length))
     const result = await fsgApi?.saveFileDialog({
       defaultPath: `${eName}_ManualPY_${scopeName}.xlsx`,
       filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
@@ -1924,12 +1932,35 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Guard activeTB={activeTB} loading={loading} hasData={!!data} error={error}>
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-blue-100 shrink-0 bg-white flex-wrap">
-          <div>
+        {/* T-046: compact header — title line with count, search and expand/collapse; below it one wrapping line of labelled groups. */}
+        <div className="px-5 py-2 border-b border-blue-100 shrink-0 bg-white">
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="font-bold text-blue-900 text-sm">Notes to Financial Statements</h2>
-            {entity && <p className="text-xs text-gray-500">{entity.name}{period ? ` | ${period}` : ''}</p>}
+            {period && <span className="text-[11px] text-gray-400">{period}</span>}
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">{noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)} note{(noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)) !== 1 ? 's' : ''}</span>
+            <div className="ml-auto flex items-center gap-2">
+              <div className="relative">
+                <input type="text" placeholder="Search notes..." value={search} onChange={e => setSearch(e.target.value)}
+                  className="border border-gray-300 rounded pl-2.5 pr-6 py-1 text-xs w-44 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
+                {search && <button onClick={() => setSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs" title="Clear search">✕</button>}
+              </div>
+              <div className="flex items-center rounded border border-gray-300 overflow-hidden">
+                <button
+                  onClick={() => setExpandSignal(s => ({ v: true, n: s.n + 1 }))}
+                  className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
+                  title="Expand all notes"
+                >⊞ Expand All</button>
+                <button
+                  onClick={() => setExpandSignal(s => ({ v: false, n: s.n + 1 }))}
+                  className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
+                  title="Collapse all notes"
+                >⊟ Collapse All</button>
+              </div>
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-3 flex-wrap">
+          <div className="fsg-notes-toolbar flex items-center gap-x-3 gap-y-1.5 flex-wrap mt-2">
+          <div className="flex items-center gap-2 flex-wrap rounded border border-gray-200 bg-gray-50 px-2 py-1">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Previous Year</span>
             <PYModeSelect activeTB={activeTB} onChanged={refresh} />
             <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
               onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
@@ -1959,52 +1990,43 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
                 + Add PY-only Major Head
               </button>
             )}
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden">
+            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
+              disabled={!!data?.pyMode && data.pyMode !== 'required'}
+              disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
+          </div>
+          <div className="flex items-center gap-1.5 rounded border border-gray-200 bg-gray-50 px-2 py-1">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mr-0.5">Fill Details Excel</span>
+            <div className="flex items-center rounded border border-gray-300 overflow-hidden bg-white">
               <button onClick={downloadFillDetailsBlank}
                 className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Download a pristine consolidated Excel template — one sheet per Fill Details note plus Stock, ignoring anything already saved">
-                ⬇ Blank Template
+                title="Download a pristine consolidated Excel template — one sheet per Fill Details note plus Inventory, ignoring anything already saved">
+                ⬇ Blank
               </button>
               <button onClick={downloadFillDetailsFilled}
                 className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Download everything currently saved (Fill Details forms + Stock) — a backup/reference of your progress so far">
-                ⬇ Filled Template
+                title="Download everything currently saved (Fill Details forms + Inventory) — a backup/reference of your progress so far">
+                ⬇ Filled
               </button>
               <button onClick={uploadFillDetails}
                 className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
                 title="Upload a filled-in template — every non-blank sheet is saved at once, blank sheets are left untouched">
-                ⬆ Upload Fill Details
+                ⬆ Upload
               </button>
             </div>
-            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-              disabled={!!data?.pyMode && data.pyMode !== 'required'}
-              disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
-            <span className="text-xs text-gray-400">{noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)} note{(noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)) !== 1 ? 's' : ''}</span>
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden">
-              <button
-                onClick={() => setExpandSignal(s => ({ v: true, n: s.n + 1 }))}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Expand all notes"
-              >Expand All</button>
-              <button
-                onClick={() => setExpandSignal(s => ({ v: false, n: s.n + 1 }))}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
-                title="Collapse all notes"
-              >Collapse All</button>
-            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded border border-gray-200 bg-gray-50 px-2 py-1">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Show</span>
             <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
               <input type="checkbox" checked={showEmpty} onChange={e => setShowEmpty(e.target.checked)}
                 className="rounded border-gray-300" />
-              Show empty notes
+              Empty notes
             </label>
             <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
               <input type="checkbox" checked={showZeroRows} onChange={e => setShowZeroRows(e.target.checked)}
                 className="rounded border-gray-300" />
-              Show zero-balance rows
+              Zero-balance rows
             </label>
-            <input type="text" placeholder="Search notes..." value={search} onChange={e => setSearch(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1.5 text-xs w-40 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-            {search && <button onClick={() => setSearch('')} className="text-gray-400 text-xs">X</button>}
+          </div>
           </div>
         </div>
 

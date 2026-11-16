@@ -160,9 +160,73 @@ export function buildPolicyBlankWorkbook() { return styledWorkbook(EXAMPLE_ROWS)
 /** The Policy exactly as it currently reads. */
 export function buildPolicyFilledWorkbook(points) { return styledWorkbook(policyRowsFromPoints(points)) }
 
+// Sheets that never hold the Policy: the VERA "How to Fill" guide (T-047), the older
+// "How to fill" guide sheet of this builder, and the hidden dropdown Lists sheet.
+const isGuideSheet = (n) => ['how to fill', 'lists'].includes(norm(n))
+
+/**
+ * T-047: how utils/veraExcel.js finishes the Policy format: the How to Fill guide, the
+ * blue header, yellow cells to fill in, and a dropdown on Type (Paragraph / Bullet / Table,
+ * a fixed list). Section heading and Text are the firm's own wording: free text.
+ * Pass the workbook through withoutLegacyPolicyGuide() first: its own "How to fill"
+ * sheet is replaced by the VERA guide (Excel sheet names ignore case).
+ * @param {'template'|'filled'} mode
+ */
+export function policyExcelSpec(mode) {
+  return {
+    mode,
+    sheets: {
+      [POLICY_SHEET]: {
+        headerRow: 1,
+        inputCols: ['A', 'B', 'C'],
+        widths: [45, 14, 110],
+        // Room to add sections below the last row; the upload skips blank rows.
+        minRows: 60,
+        autoFilter: false,   // sorting would scramble the sections
+        dropdowns: [{
+          col: 'B', list: ['Paragraph', 'Bullet', 'Table'], openEnded: true,
+          name: 'Type',
+          prompt: 'Paragraph (normal text), Bullet (a bullet line) or Table (keeps the table this section already has in VERA).',
+          error: 'Choose Paragraph, Bullet or Table from the list.',
+        }],
+      },
+    },
+    howTo: {
+      title: mode === 'filled' ? 'Policy — saved wording' : 'Policy — format',
+      purpose: mode === 'filled'
+        ? 'The Policy note (significant accounting policies and other general notes) exactly as it reads in VERA for this year. Keep it as a copy, or edit the wording here and upload it back.'
+        : "Write your firm's own Policy note (significant accounting policies and other general notes) in Excel and upload it to VERA. The first rows show a worked example; replace them with your wording.",
+      steps: [
+        'Go to the "Policy" sheet. Write one row per paragraph or bullet line.',
+        'Write the Section heading only on the first row of a section. Leave it blank on the rows that continue that section.',
+        'Do not number the sections: VERA letters them (a), (b), (c) ... in the order they appear. A "(b)" or "2." typed before a heading is removed.',
+        'Choose the Type of each row from its dropdown: Paragraph (the default when blank), Bullet, or Table.',
+        "Save the file, then on VERA's Policy screen click \"Upload Policy Format\" and pick it. Uploading replaces every section of this year's Policy after you confirm.",
+      ],
+      columns: [
+        ['Section heading', 'The heading of a section, for example "Revenue Recognition (AS-9)". Only on its first row.', 'Text — fill in'],
+        ['Type', 'Paragraph: normal text. Bullet: a bullet line (several lines in one cell become several bullets). Table: keeps the table the same-named section already has in VERA.', 'Dropdown'],
+        ['Text', 'The wording. Leave a blank line inside the cell (Alt+Enter twice) to start a new paragraph.', 'Text — fill in'],
+      ],
+      tips: [
+        'Tables (for example the Financial Ratios table or the related-party grids) cannot be typed in Excel. A "Table" row keeps the table as it already is in VERA.',
+        'Bold, italics and alignment are not carried by Excel: set them in VERA afterwards.',
+        'Download "Policy Format (Filled)" first if you want a copy of the current wording before you upload.',
+      ],
+    },
+  }
+}
+
+/** The workbook without its own "How to fill" sheet (the VERA guide replaces it). */
+export function withoutLegacyPolicyGuide(wb) {
+  const out = XLSX.utils.book_new()
+  for (const n of wb.SheetNames.filter(n => !isGuideSheet(n))) XLSX.utils.book_append_sheet(out, wb.Sheets[n], n)
+  return out
+}
+
 /** Reads an uploaded Policy workbook (columns found by their headings). */
 export function parsePolicyWorkbook(wb, existingPoints = []) {
-  const name = wb.SheetNames.find(n => norm(n) === norm(POLICY_SHEET)) || wb.SheetNames[0]
+  const name = wb.SheetNames.find(n => norm(n) === norm(POLICY_SHEET)) || wb.SheetNames.find(n => !isGuideSheet(n)) || wb.SheetNames[0]
   const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' })
   const headerIdx = aoa.findIndex(r => r.some(v => /section heading|^heading$/i.test(String(v).trim())))
   if (headerIdx < 0) return { points: [], warnings: [], errors: ['This is not a Policy format: no "Section heading" column was found.'] }

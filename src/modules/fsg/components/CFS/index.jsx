@@ -5,7 +5,8 @@ import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
 import { buildCashFlow } from '../../utils/cashFlow'
 import * as XLSX from 'xlsx-js-style'
-import { buildCfsWorkbook, parseCfsSheet, applyCfsUpload } from './cfsWorkbook'
+import { buildCfsWorkbook, parseCfsSheet, applyCfsUpload, cfsExcelSpec } from './cfsWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
 
 // Cash Flow Statement as per AS 3 (indirect method). The Current Year column is drawn from the Balance Sheet and
@@ -105,7 +106,8 @@ export default function CFS({ entity, activeTB, prevTB, activeRsId, onPrevTBChan
   const flash = (msg) => { setStatus(msg); setTimeout(() => setStatus(''), 7000) }
   const downloadExcel = async () => {
     if (!cf) return
-    const buf = XLSX.write(buildCfsWorkbook(cf.rows, { cc: cf.cc }), { type: 'buffer', bookType: 'xlsx' })
+    // T-047: finished in the VERA style (How to Fill sheet, blue header, yellow input cells) — utils/veraExcel.js.
+    const buf = await finishWorkbook(buildCfsWorkbook(cf.rows, { cc: cf.cc }), cfsExcelSpec('filled', cf.rows, { cc: cf.cc }))
     const eName = (entity?.name || 'FS').replace(/[^A-Za-z0-9]+/g, '_')
     const result = await fsgApi?.saveFileDialog({ defaultPath: `${eName}_CFS_Filled.xlsx`, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }] })
     if (result?.filePath && buf) { await fsgApi?.writeFile(result.filePath, Array.from(new Uint8Array(buf))); flash(`Saved: ${result.filePath}`) }

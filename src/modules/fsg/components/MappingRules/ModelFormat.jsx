@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import MappingEntryTable from './MappingEntryTable'
 import { fsgApi } from '../../api.js'
+import { finishWorkbook } from '../../utils/veraExcel'
+import { mappingRulesExcelSpec, learnedRulesExcelSpec } from '../../utils/tbExcelSpecs'
 
 const CONSTITUTION_MAP = { 1: 'Individual/Prop./Partnership', 2: 'LLP', 3: 'Company' }
 
@@ -90,7 +92,8 @@ export default function ModelFormat({ entity, activeRsId, onRsChange }) {
       filters: [{ name: 'Excel', extensions: ['xlsx'] }]
     })
     if (!result?.canceled && result?.filePath) {
-      await fsgApi?.writeFile(result.filePath, buf)
+      // T-047: VERA style (How to Fill, Constitution / ALIE dropdowns) — utils/tbExcelSpecs.js.
+      await fsgApi?.writeFile(result.filePath, Array.from(await finishWorkbook(new Uint8Array(buf), mappingRulesExcelSpec())))
     }
   }
 
@@ -148,7 +151,7 @@ export default function ModelFormat({ entity, activeRsId, onRsChange }) {
         filters: [{ name: 'Excel', extensions: ['xlsx'] }],
       })
       if (!result?.canceled && result?.filePath) {
-        await fsgApi?.writeFile(result.filePath, Array.from(new Uint8Array(buffer)))
+        await fsgApi?.writeFile(result.filePath, Array.from(await finishWorkbook(new Uint8Array(buffer), learnedRulesExcelSpec())))
         setLearnedMsg(`Downloaded ${count} learned ledger rule${count !== 1 ? 's' : ''}.`)
       }
     } catch (err) {

@@ -34,8 +34,9 @@ import { computeRatios, fmtRatioCell, fmtVariance, fmtRatioAmount, RATIO_ROWS_ME
 import { withoutRatioIntro } from '../../utils/ratioNoteIntro'
 import { buildRatiosTableHtml, buildRatioSnapshot, refreshRatiosInNote } from '../../utils/ratioTable'
 import * as XLSX from 'xlsx-js-style'
-import { buildRatioBlankTemplate, buildRatioFilledWorkbook, parseRatioWorkbook } from './ratioWorkbook'
-import { buildPolicyBlankWorkbook, buildPolicyFilledWorkbook, parsePolicyWorkbook } from '../../utils/policyWorkbook'
+import { buildRatioBlankTemplate, buildRatioFilledWorkbook, parseRatioWorkbook, ratioExcelSpec } from './ratioWorkbook'
+import { buildPolicyBlankWorkbook, buildPolicyFilledWorkbook, parsePolicyWorkbook, policyExcelSpec, withoutLegacyPolicyGuide } from '../../utils/policyWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { pointLabel } from '../../utils/pointLabel'
 
 let _ptId = 0
@@ -508,8 +509,9 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
     persist(refreshRatiosInNote(note, finData))
   }
 
-  const saveRatioWorkbook = async (wb, defaultPath) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells) — utils/veraExcel.js.
+  const saveRatioWorkbook = async (wb, defaultPath, spec) => {
+    const buf = await finishWorkbook(wb, spec)
     const result = await fsgApi?.saveFileDialog({ defaultPath, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }] })
     if (result?.filePath && buf) {
       await fsgApi?.writeFile(result.filePath, Array.from(new Uint8Array(buf)))
@@ -524,8 +526,8 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
   const downloadPolicyFormat = async (filled) => {
     try {
       const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
-      const wb = filled ? buildPolicyFilledWorkbook(note.points) : buildPolicyBlankWorkbook()
-      const saved = await saveRatioWorkbook(wb, filled ? `${eName}_Policy.xlsx` : 'Policy_Format.xlsx')
+      const wb = withoutLegacyPolicyGuide(filled ? buildPolicyFilledWorkbook(note.points) : buildPolicyBlankWorkbook())
+      const saved = await saveRatioWorkbook(wb, filled ? `${eName}_Policy.xlsx` : 'Policy_Format.xlsx', policyExcelSpec(filled ? 'filled' : 'template'))
       if (saved) { setSaveStatus('Saved'); setTimeout(() => setSaveStatus(''), 1500) }
     } catch (e) { window.alert('Download failed: ' + (e?.message || '')) }
   }
@@ -553,7 +555,7 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
   // another Company.
   const downloadRatioTemplate = async () => {
     try {
-      const saved = await saveRatioWorkbook(buildRatioBlankTemplate(), 'Financial_Ratios_Template.xlsx')
+      const saved = await saveRatioWorkbook(buildRatioBlankTemplate(), 'Financial_Ratios_Template.xlsx', ratioExcelSpec('template'))
       if (saved) { setSaveStatus('Template saved'); setTimeout(() => setSaveStatus(''), 1500) }
     } catch (e) { window.alert('Download failed: ' + (e?.message || '')) }
   }
@@ -564,7 +566,7 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
   const downloadRatioFilled = async () => {
     try {
       const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
-      const saved = await saveRatioWorkbook(buildRatioFilledWorkbook(computeRatios(finData)), `${eName}_Financial_Ratios.xlsx`)
+      const saved = await saveRatioWorkbook(buildRatioFilledWorkbook(computeRatios(finData)), `${eName}_Financial_Ratios.xlsx`, ratioExcelSpec('filled'))
       if (saved) { setSaveStatus('Saved'); setTimeout(() => setSaveStatus(''), 1500) }
     } catch (e) { window.alert('Download failed: ' + (e?.message || '')) }
   }
@@ -608,6 +610,8 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
     signatoryName: primarySignatory ? `${primarySignatory.name || ''}${primarySignatory.designation ? ' (' + primarySignatory.designation + ')' : ''}` : '',
   }
 
+  const toolBtn = 'px-2.5 py-1 border border-gray-300 text-gray-600 rounded bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition text-xs font-medium'
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
       <div className="flex-shrink-0 bg-white border-b border-gray-300 px-6 py-4">
@@ -629,53 +633,60 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
             {saveStatus && (saveStatus.includes('Error')
               ? <span className="text-xs font-medium text-red-600">{saveStatus}</span>
               : <span className="text-[11px] text-gray-400 w-14 text-right" title="Changes are saved automatically">✓ {saveStatus}</span>)}
-            {entityNouns(entity).isCompany && (
-              <>
-                <button
-                  onClick={refreshRatios}
-                  disabled={finLoading}
-                  title="Recompute only the Financial Ratios table's Current Year / Previous Year / Variance % from the financial statements — every other point is left exactly as it is"
-                  className="px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium disabled:opacity-40"
-                >↻ Refresh Ratios from Financials</button>
-                <button
-                  onClick={downloadRatioTemplate}
-                  title="Download a blank Financial Ratios workbook — just the 11 rows and column headers, no figures"
-                  className="px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
-                >⬇ Ratio Template</button>
-                <button
-                  onClick={downloadRatioFilled}
-                  title="Download the Financial Ratios table exactly as it currently reads, to review or edit in Excel"
-                  className="px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
-                >⬇ Filled</button>
-                <button
-                  onClick={uploadRatioTemplate}
-                  title="Upload a filled-in Financial Ratios workbook — rebuilds only the Financial Ratios point from it, every other point is left exactly as it is"
-                  className="px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
-                >⬆ Upload Ratio Template</button>
-              </>
-            )}
-            <button
-              onClick={resetToDefault}
-              title="Discard every point below and reload the tool's current standard template for this constitution"
-              className="px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-red-600 hover:border-red-300 transition text-sm font-medium"
-            >↺ Reset to Default Template</button>
+            <button onClick={addPoint} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium">+ Add Point</button>
+          </div>
+        </div>
+        {/* Toolbar: grouped and wrapping, so every action stays visible at any window width (was one long unwrapped row). */}
+        <div className="fsg-policy-toolbar flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
+          <div className="flex flex-wrap items-center gap-1.5 rounded border border-gray-200 bg-gray-50 px-2 py-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mr-1">Policy Excel</span>
             <button
               onClick={() => downloadPolicyFormat(false)}
               title="Download a blank Policy format in Excel, with a worked example: one row per paragraph or bullet, under its section heading"
-              className="fsg-policy-blank px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
-            >⬇ Policy Format (Blank)</button>
+              className={`fsg-policy-blank ${toolBtn}`}
+            >⬇ Blank</button>
             <button
               onClick={() => downloadPolicyFormat(true)}
               title="Download this Policy as it reads now, in the same Excel format, to edit or reuse for another client"
-              className="fsg-policy-filled px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
-            >⬇ Policy Format (Filled)</button>
+              className={`fsg-policy-filled ${toolBtn}`}
+            >⬇ Filled</button>
             <button
               onClick={uploadPolicyFormat}
               title="Upload a filled Policy format: each Section heading becomes a section, lettered (a), (b), (c) ... automatically"
-              className="fsg-policy-upload px-3 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50 hover:text-blue-700 hover:border-blue-300 transition text-sm font-medium"
-            >⬆ Upload Policy Format</button>
-            <button onClick={addPoint} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium">+ Add Point</button>
+              className={`fsg-policy-upload ${toolBtn}`}
+            >⬆ Upload</button>
           </div>
+          {entityNouns(entity).isCompany && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded border border-gray-200 bg-gray-50 px-2 py-1.5">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mr-1">Financial Ratios</span>
+              <button
+                onClick={refreshRatios}
+                disabled={finLoading}
+                title="Recompute only the Financial Ratios table's Current Year / Previous Year / Variance % from the financial statements — every other point is left exactly as it is"
+                className={`${toolBtn} disabled:opacity-40`}
+              >↻ Refresh from Financials</button>
+              <button
+                onClick={downloadRatioTemplate}
+                title="Download a blank Financial Ratios workbook — just the 11 rows and column headers, no figures"
+                className={toolBtn}
+              >⬇ Blank</button>
+              <button
+                onClick={downloadRatioFilled}
+                title="Download the Financial Ratios table exactly as it currently reads, to review or edit in Excel"
+                className={toolBtn}
+              >⬇ Filled</button>
+              <button
+                onClick={uploadRatioTemplate}
+                title="Upload a filled-in Financial Ratios workbook — rebuilds only the Financial Ratios point from it, every other point is left exactly as it is"
+                className={toolBtn}
+              >⬆ Upload</button>
+            </div>
+          )}
+          <button
+            onClick={resetToDefault}
+            title="Discard every point below and reload the tool's current standard template for this constitution"
+            className="px-2.5 py-1 border border-gray-300 text-gray-600 rounded bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition text-xs font-medium"
+          >↺ Reset to Default Template</button>
         </div>
         <div className="flex items-center gap-4 mt-2">
           <span className="text-xs text-gray-500">

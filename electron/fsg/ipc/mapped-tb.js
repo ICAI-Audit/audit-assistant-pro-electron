@@ -1120,7 +1120,7 @@ export function registerMappedTBHandlers() {
 
   ipcMain.handle('learnedRules:upload', async (_, entityId, fileBytes) => {
     const wb = XLSX.read(new Uint8Array(fileBytes), { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames.find(n => /learned/i.test(n)) || wb.SheetNames[0]]
+    const ws = wb.Sheets[wb.SheetNames.find(n => /learned/i.test(n)) || wb.SheetNames.find(n => n !== 'How to Fill' && n !== 'Lists') || wb.SheetNames[0]]
     const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' })
     // Headers are matched loosely (case, spacing, the "(Broad)" suffixes) so a
     // file that was edited or re-saved in Excel, or an older export, still

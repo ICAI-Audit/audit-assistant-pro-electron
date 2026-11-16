@@ -1,5 +1,11 @@
 # Current status
 
+## T-045 to T-047 menu names, layout and Excel theme (15 November 2026)
+
+- Branch `FSG-AM` at `a15b4c3`; Financial Statement Review only (F-007, F-009). Uncommitted; no commit or push without the user's confirmation.
+- T-045 menu renames (TB, Inventory, Annex + Features > Reco, Review Financials); T-046 compact Notes header and Policy toolbar; T-047 VERA Excel theme on every template download (`utils/veraExcel.js`), real Excel dropdowns only for fixed predefined lists (owner decision, 15 November 2026). The shareholder Promoter/Non-Promoter dropdown never reached Excel before (SheetJS cannot write validations); it does now.
+- Checks: `npm run test:fsg` 282/282, 4 PDF text checks skipped (win32-arm64); `npm run test:fsg-ui` 100/100 (one non-FSG renderer message: "Failed to load materiality risk assessment"); Excel theme checks 19/19, 34/34 (Dep), 38/38 (CFS, tax, share capital, investments), 44/44 (Fill Details, Manual PY), 25/25 (Policy, Ratio), 29/29 (TB, Mapping Rules, learned rules, workings). Not run: opening the files in desktop Excel, a real upload through the desktop app, owner UAT. See [handoff](SESSION_HANDOFF.md#t-045-to-t-047-menu-names-layout-and-excel-theme-15-november-2026).
+
 ## T-042 to T-044 Mapping 1-7, Policy format and workings carry-over (15 November 2026)
 
 - Branch `FSG-AM` from `main` `36130e6`, updated to `e1fb062`; Financial Statement Review only (F-007, F-009). Committed and pushed on `FSG-AM`.
