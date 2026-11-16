@@ -364,20 +364,74 @@ async function main() {
   await screenshot('02a-reco');
   await evaluate(`(document.activeElement?.blur?.(), document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), true)`);
   await sleep(300);
+  // T-049: Features > Ratio has three screens; Form 3CD is shown as Form 26 (Old Name - 3CD).
+  const RATIO_ITEMS = ['Form 26 (Old Name - 3CD)', 'Company Additional Disclosure Ratio', 'Analytical Ratios'];
+  const RATIO_HEADS = [/Form 26 \(Old Name - 3CD\) : Details regarding turnover/, /Company Additional Disclosure Ratio/, /Analytical Ratios[\s\S]*Liquidity ratios[\s\S]*Profitability ratios/];
+  const subItems = `[...document.querySelectorAll('.fsg-root [role=menu] [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`;
+  const key = (k, mods = {}) => evaluate(`(document.activeElement?.blur?.(), document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, code: ${JSON.stringify('Key' + k.toUpperCase())}, bubbles: true, cancelable: true, ctrlKey: ${!!mods.ctrl}, shiftKey: ${!!mods.shift} })), true)`);
+  const openRatioMenu = async () => {
+    await key('U', { ctrl: true, shift: true });          // Features
+    await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+    await sleep(150);
+    await key('r');                                       // Ratio
+    return waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menu] [role=menuitem]').length > 0`, 5000);
+  };
+  await openRatioMenu();
+  const ratioItems = await evaluate(subItems);
+  check('T-049 Features > Ratio lists Form 26 (Old Name - 3CD), Company Additional Disclosure Ratio and Analytical Ratios', JSON.stringify(ratioItems) === JSON.stringify(RATIO_ITEMS),
+    { ratioItems, menu: await evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent + '|' + x.getAttribute('aria-expanded'))`) });
+  for (let i = 0; i < RATIO_ITEMS.length; i++) {
+    if (i > 0) await openRatioMenu();
+    await key(['f', 'c', 'a'][i]);
+    check(`T-049 Ratio > ${RATIO_ITEMS[i]} opens`, await waitFor(`${RATIO_HEADS[i]}.test(document.querySelector('.fsg-root')?.innerText || '') && !/Something went wrong/i.test(document.querySelector('.fsg-root').innerText)`, 15000),
+      (await evaluate(`document.querySelector('.fsg-root')?.innerText || ''`)).slice(0, 600));
+    if (i === 2) await screenshot('02b-analytical-ratios');
+  }
+  check('T-049 the Form 3CD name is no longer shown', await evaluate(`!/Form 3CD/.test(document.querySelector('.fsg-root')?.innerText || '')`) && !ratioItems.some(x => /^Form 3CD/.test(x)));
+  // T-048: Variance Analysis adds Amount / % / Reason of Variance after the Previous Year column.
+  const changeHeads = `['Amount of Variance', '% of Variance', 'Reason of Variance'].every(h => [...document.querySelectorAll('.fsg-root th')].some(t => t.textContent.trim() === h))`;
+  const analyseChange = async (screen, reasonText) => {
+    await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
+    check(`T-048 ${screen}: Variance Analysis shows the three change columns`, await waitFor(changeHeads, 10000));
+    check(`T-048 ${screen}: the change columns come right after the Previous Year column`, await evaluate(`(() => { const r = [...document.querySelectorAll('.fsg-root thead tr')].find(tr => [...tr.children].some(t => t.textContent.trim() === 'Amount of Variance')); const cells = [...r.children].map(t => t.textContent.trim()); const i = cells.indexOf('Amount of Variance'); return i > 0 && /2024|Mar 24/.test(cells[i - 1]) && cells[i + 1] === '% of Variance' && cells[i + 2] === 'Reason of Variance' })()`));
+    check(`T-050 ${screen}: every column heading of that row sits on the bottom line`, await evaluate(`(() => { const r = [...document.querySelectorAll('.fsg-root thead tr')].find(tr => [...tr.children].some(t => t.textContent.trim() === 'Amount of Variance')); return [...r.children].every(t => getComputedStyle(t).verticalAlign === 'bottom') })()`));
+    check(`T-048 ${screen}: amounts and percentages are filled in`, await evaluate(`[...document.querySelectorAll('.fsg-root td.fsg-change-col')].some(td => /%$|N\\.A\\./.test(td.textContent.trim()))`));
+    const box = `document.querySelector('.fsg-root td.fsg-change-col input[type=text]')`;
+    const key = await evaluate(`${box}?.getAttribute('aria-label') || ''`);
+    await evaluate(`(() => { const i = ${box}; i.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(reasonText)}); i.dispatchEvent(new Event('input', { bubbles: true })); i.blur(); return true })()`);
+    await sleep(1200);
+    await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
+    check(`T-048 ${screen}: Variance Analysis again hides the columns`, await waitFor(`!(${changeHeads})`, 5000));
+    await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
+    await waitFor(changeHeads, 10000);
+    check(`T-048 ${screen}: the typed reason is saved and shown again`, await waitFor(`[...document.querySelectorAll('.fsg-root td.fsg-change-col input[type=text]')].some(i => i.getAttribute('aria-label') === ${JSON.stringify(key)} && i.value === ${JSON.stringify(reasonText)})`, 10000), key);
+    await screenshot(`03x-analyse-change-${screen.toLowerCase()}`);
+    await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
+    await waitFor(`!(${changeHeads})`, 5000);
+  };
   check('BS tab can be opened', await clickFsgButton('BS'));
   const bs = await waitFor(`/Balance Sheet/i.test(document.querySelector('.fsg-root')?.innerText || '') && /Share capital|Shareholders/i.test(document.querySelector('.fsg-root').innerText)`, 30000);
-  check('T-027 Balance Sheet columns show reporting dates', await waitFor(`[...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='As at 31 March 2025') && [...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='As at 31 March 2024')`));
+  check('T-027 Balance Sheet columns show reporting dates', await waitFor(`[...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='As at 31 Mar 25') && [...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='As at 31 Mar 24')`));
+  check('T-051 the Balance Sheet title keeps the full date while its columns use the short one', await evaluate(`/BALANCE SHEET AS AT 31 MARCH 2025/i.test(document.querySelector('.fsg-root h2')?.textContent || '') && ![...document.querySelectorAll('.fsg-root th')].some(t=>/31 March/.test(t.textContent))`));
   await screenshot('02-balance-sheet');
   check('Balance Sheet renders mapped figures', bs, (await evaluate(`document.querySelector('.fsg-root')?.innerText || ''`)).slice(0, 1200));
+  await analyseChange('BS', 'Capital infusion of Rs 5 lakh in FY 2024-25');
+  check(`T-050 ${'BS'}: the toolbar is one line with every button in view`, await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); const r = t && t.getBoundingClientRect(); return !!t && t.scrollWidth <= t.clientWidth + 1 && r.height < 48 && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.left >= r.left - 1 && x.right <= r.right + 1 }) })()`),
+    await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); return t ? { scroll: t.scrollWidth, client: t.clientWidth, height: t.getBoundingClientRect().height, window: window.innerWidth } : null })()`));
+  check('T-050 BS: (i)-(iv) under (a) sit one step right, inside Particulars', await evaluate(`[...document.querySelectorAll('.fsg-root td')].some(td => /^i\\s*Tangible assets/.test(td.textContent.trim()) && td.querySelector('span.inline-block'))`));
   check('PL tab can be opened', await clickFsgButton('PL'));
   const pl = await waitFor(`/Profit/i.test(document.querySelector('.fsg-root')?.innerText || '') && /Revenue from operations/i.test(document.querySelector('.fsg-root').innerText)`, 30000);
   check('T-027 P&L columns show year-ended dates', await waitFor(`[...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2025') && [...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2024')`));
   await screenshot('03-profit-and-loss');
+  await analyseChange('PL', 'Sales up 12% - new dealer B2');
+  check(`T-050 ${'PL'}: the toolbar is one line with every button in view`, await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); const r = t && t.getBoundingClientRect(); return !!t && t.scrollWidth <= t.clientWidth + 1 && r.height < 48 && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.left >= r.left - 1 && x.right <= r.right + 1 }) })()`),
+    await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); return t ? { scroll: t.scrollWidth, client: t.clientWidth, height: t.getBoundingClientRect().height, window: window.innerWidth } : null })()`));
   await clickFsgButton('Notes');
   check('T-027 BS and PL notes show their respective dated column headings', await waitFor(`[...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='As at 31 March 2025') && [...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2025') && ![...document.querySelectorAll('.fsg-root th')].some(t=>/^(Current Year|Previous Year)$/.test(t.textContent.trim()))`),
     await evaluate(`[...new Set([...document.querySelectorAll('.fsg-root th')].map(t=>t.textContent.trim()).filter(t=>/Year|As at|For the year/.test(t)))].slice(0, 20)`));
   await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(b=>b.textContent.trim()==='Reviewed, Close')?.click(),true)`);
   await screenshot('03b-notes-dated');
+  await analyseChange('Notes', 'Reclassified 3 ledgers from Other expenses');
   await clickFsgButton('Annex');
   await waitFor(`document.querySelector('.fsg-root')?.innerText.includes('Each note with its individual ledger')`);
   check('T-045 Annex no longer shows the Trade Payables / Receivables reconciliation', await evaluate(`!/Books vs Balance Sheet Reconciliation/.test(document.querySelector('.fsg-root')?.innerText || '') && !document.querySelector('.fsg-root .fsg-reco')`));

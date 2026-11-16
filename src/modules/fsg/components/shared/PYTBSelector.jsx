@@ -5,7 +5,7 @@ import { fsgApi } from '../../api.js'
  * Dropdown to pick a Previous Year Trial Balance.
  * Fetches the entity's TB list, excludes the current TB.
  */
-export default function PYTBSelector({ entity, currentTBId, prevTB, onChange, disabled = false, disabledTitle }) {
+export default function PYTBSelector({ entity, currentTBId, prevTB, onChange, disabled = false, disabledTitle, label = 'Previous Year TB:' }) {
   const [tbList, setTbList] = useState([])
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export default function PYTBSelector({ entity, currentTBId, prevTB, onChange, di
 
   return (
     <div className="flex items-center gap-2 shrink-0" title={disabled ? disabledTitle : undefined}>
-      <label className="text-xs text-gray-500 whitespace-nowrap">Previous Year TB:</label>
+      <label className="text-xs text-gray-500 whitespace-nowrap">{label}</label>
       <select
         value={prevTB?.id || ''}
         disabled={disabled}
@@ -36,7 +36,7 @@ export default function PYTBSelector({ entity, currentTBId, prevTB, onChange, di
         ))}
       </select>
       {prevTB && (
-        <span className="text-xs text-green-700 font-medium">✓ PY mapped</span>
+        <span className="text-xs text-green-700 font-medium whitespace-nowrap">✓ PY mapped</span>
       )}
     </div>
   )

@@ -37,6 +37,8 @@ PDF Tools phase 1 (F-030, task T-031) was committed on `feat/pdf-tools` (base `8
 
 After fast-forwarding local `main` to `origin/main` at `99324ea`, the shared login/header label identifies the pulled snapshot date and PR #109 CAAT Tools / PR #110 FSG and RSF updates. Published on `origin/main` in `bf0b5bf`. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests pass; desktop visual fit and owner UAT are not established. See [T-030 status](CURRENT_STATUS.md#t-030-main-pull-status-on-login-13-november-2026).
 
+F-009 updates, 16 November 2026: T-048 "Variance Analysis" on BS, PL and Notes shows Amount, Percentage and Reason of Change after the Previous Year (screen only; reasons saved per Trial Balance). T-049 Features > Ratio is a submenu: Form 26 (Old Name - 3CD), Company Additional Disclosure Ratio and Analytical Ratios. Integration 305/305, desktop 120/120; owner UAT pending. See [status](CURRENT_STATUS.md#t-048-and-t-049-variance-analysis-and-ratio-submenu-16-november-2026).
+
 F-007/F-009, 13 November 2026: owner confirmed the reviewed T-023 through T-028 source commit on RSF after typecheck-debt disclosure. No further feature changes or UAT acceptance; known gaps remain. Full scope and validation: [RSF review](RSF_PRE_COMMIT_REVIEW.md).
 
 F-007/F-009 pre-commit verification, 13 November 2026:

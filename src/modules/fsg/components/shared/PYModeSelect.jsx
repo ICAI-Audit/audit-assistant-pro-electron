@@ -7,7 +7,7 @@ import { usePYMode } from '../../hooks/usePYMode'
  * so a first-year entity is a one-click choice wherever the CA is working. Changing it re-reads the statements
  * (`onChanged`); a locked Financial Year refuses, with the usual message.
  */
-export default function PYModeSelect({ activeTB, onChanged, className = '' }) {
+export default function PYModeSelect({ activeTB, onChanged, className = '', label = 'Previous Year figures:' }) {
   const epId = activeTB?.entity_period_id
   const { mode, setMode } = usePYMode(epId)
   if (!epId) return null
@@ -24,7 +24,7 @@ export default function PYModeSelect({ activeTB, onChanged, className = '' }) {
   return (
     <div className={`flex items-center gap-1.5 shrink-0 ${className}`}
       title="Required (the default): Previous Year figures are shown. Choose 'Not required' for a first year of operation, or when no comparative is wanted - the column then shows a dash, or is left out altogether.">
-      <label className="text-xs text-gray-500 whitespace-nowrap">Previous Year figures:</label>
+      {label && <label className="text-xs text-gray-500 whitespace-nowrap">{label}</label>}
       <select value={mode} onChange={change}
         className={`border rounded px-2 py-1 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none ${off ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-gray-300 bg-white text-gray-900'}`}>
         <option value="required">Required</option>
