@@ -51,21 +51,22 @@ Changes made for VERA, re-applied to the new file (the owner's file has none of 
 4. VERA look: theme stylesheet link; the two chart colours changed to the app's primary blue and success green; the bridge adds class `vera` to `<body>` (hides the tool's own logo inside VERA).
 5. Bridge: also saves whether the data type and statement type were detected or chosen by the user; on restore it no longer re-runs tests that Apply mapping already ran.
 
-Review findings in the owner's new code that were **not** changed (they alter test results, so they need the owner's decision):
+Review findings in the owner's new code, fixed on the owner's instruction of 17 November 2026 ("Yes, fix them"):
 
-- Check missing: choosing between "numbered per voucher type" and "one shared series" compares gap counts only. Where each voucher type has its own 1..N series, the shared series has no gaps but many duplicates and is chosen, reporting false duplicates.
-- With one amount column, the "side to analyse" (payments/receipts) leaves no lines out, yet the data log and screen say only that side was analysed.
-- Check missing drill-down for duplicates is empty when prefixes are not treated as separate series, and searches only rows on the chosen side.
-- Apply mapping silently overwrites "Show as positive" / "Treat as negative" when a side is chosen, and those values are then saved in profiles.
-- An imported profile with an unknown data type makes the Data view throw.
-- Demo data keeps the data type of a file loaded earlier.
-- Insights always says "all 11 tests run", even when some could not run.
-- (Already in v0.6) the MUS conclusion compares the upper misstatement limit, which excludes key-item misstatement, with tolerable misstatement.
-- Low risk: "Copy table" puts raw cell text on the clipboard; text beginning with `=`, `+`, `-` or `@` becomes a formula if pasted into Excel. The `.xlsx` export is not affected.
+1. **Check missing — numbering choice.** Choosing between "numbered per voucher type" and "one shared series" now counts gaps plus duplicate numbers, not gaps only, so separate 1..N series per voucher type are no longer reported as duplicates.
+2. **Side to analyse with one amount column.** One amount column cannot be split into debit and credit lines, so no side is applied; the Data screen shows a note and the data log says "All lines — with one amount column the sides cannot be told apart".
+3. **Duplicate drill-down.** Finds the rows by series and number, as they were counted, over every row analysed for the test.
+4. **Sign settings.** The side chosen sets the sign used in the tests without overwriting "Show as positive" / "Treat as negative" (those selects are disabled while a side applies); the working paper states the sign actually used.
+5. **Imported profiles.** An unknown data type, software or side in a profile is ignored, and the Data view no longer throws.
+6. **Demo data** starts as a general listing with detection on, whatever was loaded before.
+7. **Test count.** Insights and the messages say how many of the 11 tests produced a result.
+8. **MUS conclusion.** Overstatements found in key items are added to the sample's upper misstatement limit before comparing with tolerable misstatement; the screen and working paper show both "Upper misstatement limit (sample)" and "Upper limit incl. key-item overstatements". (This was already in v0.6.)
+
+Not changed: "Copy table" puts raw cell text on the clipboard; text beginning with `=`, `+`, `-` or `@` becomes a formula if pasted into Excel. The `.xlsx` export is not affected.
 
 Checked without findings: Benford expected values and critical values, GSTIN check digit and PAN rules, RSF, round and repeated amounts, outliers, MUS and attribute sample sizes and limits, seeded selection, parsing; all file-derived text is escaped; no network calls or `eval`.
 
-Verification: `npm run test:caat-ui` 29/29 (the large-ledger check now requires that no test fails with the call-stack error after Apply mapping runs all tests on 150,000 rows, and that stratification, Benford and Check missing produce results). Screenshots reviewed for the VERA look.
+Verification: `npm run test:caat-ui` 38/38 (one check per fixed finding added; the large-ledger check now requires that no test fails with the call-stack error after Apply mapping runs all tests on 150,000 rows, and that stratification, Benford and Check missing produce results). Screenshots reviewed for the VERA look.
 
 ## Saving and restoring
 

@@ -5,7 +5,7 @@
 - Owner instruction: add the revised CAAT Tools (`CAAT_Tools3.html`, v0.10) with the app's UI/UX, review the code, merge to `caat_tools`, pull before pushing. Branch `caat_tools`, base `6edb0e6` (origin/caat_tools after `git pull`).
 - Changed: `public/caat/caat-tools.html` (v0.10 with the re-applied approved fixes), new `public/caat/caat-vera-theme.css`, `public/caat/caat-bridge.js`, `scripts/test-caat-ui.cjs` (large-ledger check updated for v0.10), `docs/project/CAAT_TOOLS.md`, CURRENT_STATUS, NEXT_TASKS, FEATURE_REGISTER, this handoff.
 - Checks: `npm run test:caat-ui` 29/29 (includes `npm run build`). Not run: owner UAT with real ledgers, packaged installer.
-- Open: eight logic findings in the owner's new code are listed in CAAT_TOOLS.md and were not changed. First next step: owner decides which findings to fix.
+- Follow-up the same day: owner said "Yes, fix them"; all eight review findings fixed in `public/caat/caat-tools.html`, with one test check each. `npm run test:caat-ui` 38/38. Open: clipboard formula risk in Copy table (not changed); owner UAT. First next step: owner UAT with real ledgers.
 
 ## RSF GitHub publication authorised and completed (13 November 2026)
 

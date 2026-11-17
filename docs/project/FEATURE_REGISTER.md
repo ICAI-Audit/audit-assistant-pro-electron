@@ -95,4 +95,4 @@ F-002/F-009 update, 10 November 2026: [T-023](T023_FIRM_SIGNING_PLACE.md) adds t
 
 The original Phase I also requests searchable audit checklist and MRL formats and line-item workpaper linkage. Programmes, templates and evidence exist, but their exact coverage against those original requirements is not established. T-005 now has a documented trace and gap register prepared for owner review; this does not mean these capabilities are implemented or accepted. The tax guidance PDFs supplied in this conversation were not audited clause by clause during this documentation review.
 
-F-029 update, 17 November 2026: [T-030](CAAT_TOOLS.md) replaces the embedded tool with v0.10 in the VERA look; automated 29/29, owner UAT pending.
+F-029 update, 17 November 2026: [T-030](CAAT_TOOLS.md) replaces the embedded tool with v0.10 in the VERA look; review findings fixed; automated 38/38, owner UAT pending.
