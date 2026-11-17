@@ -1,9 +1,11 @@
 import { PDFDocument as CantooDocument } from '@cantoo/pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { makeFormPdf, makePdf } from '@/lib/pdf-tools/testPdf';
+import { bilevelPicture, jpegOf, makeTiff, packBits1, rgbPicture, type PageSpec } from '@/lib/pdf-tools/testTiff';
 import { PdfToolsError } from '@/lib/pdf-tools/types';
 import { unlockPdf } from '@/lib/pdf-tools/unlock';
-import { imageFormatOf, prepareFile, type IntakeDeps } from './intake';
+import { convertedNote, imageFormatOf, prepareFile, type IntakeDeps } from './intake';
 
 // Unlocking with @cantoo/pdf-lib is slow when the machine is busy; the cold import is paid in beforeAll.
 vi.setConfig({ testTimeout: 20_000 });
@@ -75,6 +77,14 @@ describe('prepareFile', () => {
     expect(unlocked).toMatchObject({ status: 'ready', file: { wasProtected: true, hasFormFields: true, hasBookmarks: true, hasPageLinks: true } });
   });
 
+  it("notes attachments in the document's list (Organise pages keeps them; Split, Delete pages and Merge do not)", async () => {
+    expect(await prepareFile({ name: 'a.pdf', bytes: plain, origin: 'computer' }, deps())).toMatchObject({ status: 'ready', file: { hasAttachments: false } });
+    const doc = await PDFDocument.load(plain);
+    await doc.attach(new TextEncoder().encode('synthetic attachment body'), 'notes.txt', { mimeType: 'text/plain' });
+    const attached = await prepareFile({ name: 'attached.pdf', bytes: await doc.save(), origin: 'computer' }, deps());
+    expect(attached).toMatchObject({ status: 'ready', file: { hasAttachments: true } });
+  });
+
   it('keeps the vault record id for vault input', async () => {
     const result = await prepareFile({ name: 'v.pdf', bytes: plain, origin: 'vault', evidenceId: 'ev-1' }, deps());
     expect(result.status === 'ready' && result.file.evidenceId).toBe('ev-1');
@@ -84,7 +94,7 @@ describe('prepareFile', () => {
     await expect(prepareFile({ name: 'e.pdf', bytes: new Uint8Array(), origin: 'computer' }, deps())).rejects.toMatchObject({ code: 'empty-file' });
     const error = await prepareFile({ name: 'x.docx', bytes: new TextEncoder().encode('PK\u0003\u0004 not a pdf'), origin: 'computer' }, deps()).catch((e) => e);
     expect(error).toBeInstanceOf(PdfToolsError);
-    expect(error.message).toBe('This file is not a PDF or a supported image (JPG, PNG, WebP, BMP or GIF).');
+    expect(error.message).toBe('This file is not a PDF or a supported image (JPG, PNG, TIFF, WebP, BMP or GIF).');
   });
 
   it('refuses a damaged PDF with the inspection message', async () => {
@@ -155,8 +165,13 @@ describe('prepareFile', () => {
     expect(result).toMatchObject({ status: 'ready', file: { name: 'scan.gif', mimeType: 'image/png', bytes: CONVERTED, size: CONVERTED.byteLength } });
   });
 
-  it('refuses TIFF with a plain message', async () => {
-    await expect(prepareFile({ name: 't.tif', bytes: TIFF, origin: 'computer' }, deps())).rejects.toThrow('TIFF images cannot be used');
+  it('still refuses HEIC, in one sentence that says how to get a JPG from the phone (owner, 15 November 2026)', async () => {
+    const heic = new TextEncoder().encode('\u0000\u0000\u0000\u0018ftypheic\u0000\u0000\u0000\u0000');
+    const error = await prepareFile({ name: 'p.heic', bytes: heic, origin: 'computer' }, deps()).catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      code: 'bad-image',
+      message: 'iPhone photos (HEIC) cannot be used here; send the photo from the phone as a JPG, or set Camera > Formats > Most Compatible, and add it again.',
+    });
   });
 
   it('passes a decode failure through', async () => {
@@ -167,6 +182,107 @@ describe('prepareFile', () => {
   });
 });
 
+describe('TIFF', () => {
+  const [W, H] = [61, 43];
+  const black = bilevelPicture(W, H, 3);
+  const g4Page = (): PageSpec => ({ width: W, height: H, bitsPerSample: 1, photometric: 0, samples: packBits1(black, W, H), compression: 'g4', resolution: { x: 300, y: 300 } });
+  // The JPEG pictures are made by pdf.js's canvas; its cold start took more than 20 s on a loaded
+  // machine, so it is paid here, with its own limit, and not inside a test.
+  let photoJpeg: Uint8Array;
+  let smallJpeg: Uint8Array;
+  beforeAll(async () => {
+    photoJpeg = await jpegOf(rgbPicture(32, 24, 1), 32, 24, 3);
+    smallJpeg = await jpegOf(rgbPicture(16, 16, 2), 16, 16, 3);
+  }, 120_000);
+
+  it('a one-page TIFF becomes a PNG image like a converted GIF: its name kept, marked as converted from TIFF', async () => {
+    const bytes = makeTiff([g4Page()]);
+    const before = Buffer.from(bytes).toString('hex');
+    const stages: string[] = [];
+    const d = deps({ onStage: (stage) => void stages.push(stage) });
+    const result = await prepareFile({ name: 'Scan 001.tif', bytes, origin: 'computer' }, d);
+    expect(result).toMatchObject({ status: 'ready', file: { name: 'Scan 001.tif', kind: 'image', mimeType: 'image/png', pageCount: null, origin: 'computer', convertedFrom: 'tiff' } });
+    if (result.status !== 'ready') return;
+    expect(result.notice).toBeUndefined();
+    expect(Array.from(result.file.bytes.subarray(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(result.file.size).toBe(result.file.bytes.byteLength);
+    expect(stages).toEqual(['converting']);
+    expect(d.decodeToPng).not.toHaveBeenCalled();
+    expect(Buffer.from(bytes).toString('hex')).toBe(before); // the TIFF itself is not changed
+    expect(convertedNote(result.file)).toBe('Converted from TIFF');
+  });
+
+  it('a one-page JPEG TIFF becomes its JPEG, checked by the same decoder as other JPEGs', async () => {
+    const bytes = makeTiff([{ width: 32, height: 24, photometric: 6, samplesPerPixel: 3, compression: 'jpeg', jpeg: { strip: photoJpeg } }], 'MM');
+    const d = deps();
+    const result = await prepareFile({ name: 'photo.tiff', bytes, origin: 'vault', evidenceId: 'ev-9' }, d);
+    expect(result).toMatchObject({ status: 'ready', file: { kind: 'image', mimeType: 'image/jpeg', evidenceId: 'ev-9', convertedFrom: 'tiff' } });
+    if (result.status !== 'ready') return;
+    expect(d.imageSize).toHaveBeenCalledWith(result.file.bytes, 'image/jpeg');
+  });
+
+  it('a several-page TIFF becomes one PDF with a page for each, marked as converted, with a notice', async () => {
+    const bytes = makeTiff([g4Page(), g4Page(), { ...g4Page(), compression: 'lzw' }]);
+    const pauses: { page: number; pages: number }[] = [];
+    const result = await prepareFile({ name: 'statement.tif', bytes, origin: 'computer' }, deps({ pause: async (p) => void pauses.push(p) }));
+    expect(result).toMatchObject({
+      status: 'ready',
+      notice: 'tiff-converted',
+      file: { name: 'statement.tif', kind: 'pdf', mimeType: 'application/pdf', pageCount: 3, convertedFrom: 'tiff', wasProtected: false, hasSignature: false, hasFormFields: false, hasBookmarks: false },
+    });
+    if (result.status !== 'ready') return;
+    expect((await PDFDocument.load(result.file.bytes)).getPageCount()).toBe(3);
+    expect(new Set(pauses.map((p) => p.page))).toEqual(new Set([1, 2, 3]));
+    expect(pauses.every((p) => p.pages === 3)).toBe(true);
+    expect(convertedNote(result.file)).toBe('Converted from a 3-page TIFF');
+  });
+
+  it('a one-page TIFF that is turned, or has uneven pixels (a fax), becomes a one-page PDF', async () => {
+    for (const extra of [{ orientation: 6 }, { resolution: { x: 204, y: 98 } }]) {
+      const result = await prepareFile({ name: 'fax.tif', bytes: makeTiff([{ ...g4Page(), ...extra }]), origin: 'computer' }, deps());
+      expect(result).toMatchObject({ status: 'ready', notice: 'tiff-converted', file: { kind: 'pdf', pageCount: 1, convertedFrom: 'tiff' } });
+      if (result.status === 'ready') expect(convertedNote(result.file)).toBe('Converted from TIFF');
+    }
+  });
+
+  it('stops when the pause throws (the list moved on), with that error', async () => {
+    const stop = new Error('abandoned');
+    const bytes = makeTiff([g4Page(), g4Page()]);
+    await expect(prepareFile({ name: 's.tif', bytes, origin: 'computer' }, deps({ pause: async () => { throw stop; } }))).rejects.toBe(stop);
+  });
+
+  it('refuses a TIFF it cannot read exactly, with one plain sentence saying what to do', async () => {
+    const plain = 'This TIFF is saved in a form PDF Tools cannot read; save it as PDF, JPG or PNG and add it again.';
+    const big = new Uint8Array([0x49, 0x49, 43, 0, 8, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0]);
+    await expect(prepareFile({ name: 'b.tif', bytes: big, origin: 'computer' }, deps())).rejects.toMatchObject({ code: 'bad-image', message: plain, detail: 'BigTIFF' });
+    const cmyk = makeTiff([{ width: 4, height: 4, photometric: 5, samplesPerPixel: 4, samples: new Uint8Array(64) }]);
+    const error = await prepareFile({ name: 'c.tif', bytes: cmyk, origin: 'computer' }, deps()).catch((e) => e);
+    expect(error).toBeInstanceOf(PdfToolsError);
+    expect(error.message).toBe(plain);
+    await expect(prepareFile({ name: 't.tif', bytes: TIFF, origin: 'computer' }, deps())).rejects.toMatchObject({
+      code: 'bad-image',
+      message: 'This TIFF file is damaged or incomplete; open it in the program that made it, save it again and add it again.',
+    });
+  });
+
+  it('a JPEG page of a several-page TIFF that does not decode refuses the file, naming the page', async () => {
+    const spec: PageSpec = { width: 16, height: 16, photometric: 6, samplesPerPixel: 3, compression: 'jpeg', jpeg: { strip: smallJpeg } };
+    const imageSize = vi.fn(async () => {
+      throw new PdfToolsError('bad-image', 'This image could not be read.');
+    });
+    const error = await prepareFile({ name: 'j.tif', bytes: makeTiff([spec, spec]), origin: 'computer' }, deps({ imageSize })).catch((e) => e);
+    expect(error.message).toMatch(/^Page 1 of this TIFF is damaged/);
+  });
+});
+
+describe('convertedNote', () => {
+  it('says nothing for a file that was not converted', () => {
+    expect(convertedNote({ kind: 'pdf', pageCount: 4 })).toBeNull();
+    expect(convertedNote({ kind: 'pdf', pageCount: 12, convertedFrom: 'tiff' })).toBe('Converted from a 12-page TIFF');
+    expect(convertedNote({ kind: 'image', pageCount: null, convertedFrom: 'tiff' })).toBe('Converted from TIFF');
+  });
+});
+
 describe('imageFormatOf', () => {
   it('recognises the supported and refused formats', () => {
     expect(imageFormatOf(PNG)).toBe('png');
@@ -174,6 +290,8 @@ describe('imageFormatOf', () => {
     expect(imageFormatOf(GIF)).toBe('gif');
     expect(imageFormatOf(new TextEncoder().encode('RIFF\0\0\0\0WEBPVP8 '))).toBe('webp');
     expect(imageFormatOf(TIFF)).toBe('tiff');
+    expect(imageFormatOf(new Uint8Array([0x4d, 0x4d, 0, 42, 0, 0, 0, 8]))).toBe('tiff');
+    expect(imageFormatOf(new Uint8Array([0x49, 0x49, 43, 0, 8, 0, 0, 0]))).toBe('tiff'); // BigTIFF: refused by the reader with its own sentence
     expect(imageFormatOf(new TextEncoder().encode('%PDF-1.7'))).toBeNull();
   });
 });

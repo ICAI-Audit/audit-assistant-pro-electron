@@ -572,7 +572,8 @@ describe('imagesToPdf fit mode page size limit', () => {
     const size = doc.getPage(0).getSize();
     expect(size.height).toBeCloseTo(14400, 3);
     expect(size.width).toBeCloseTo(72, 3);
-  });
+    // A 2-megapixel PNG decoded and embedded: 5-10 s on a loaded machine, half the file's 20 s. A hang guard only.
+  }, 60_000);
   it('leaves an image of exactly 14,400 pt alone', async () => {
     const doc = await load(await imagesToPdf([jpg('x.jpg', 14400, 10)], { pageSize: 'fit', marginPt: 0 }));
     expect(doc.getPage(0).getSize()).toEqual({ width: 14400, height: 10 });

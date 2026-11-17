@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cleanFileName, pageImageName, partName, stripExtension } from './fileNames';
+import { cleanFileName, cutMiddle, pageImageName, partName, stripExtension } from './fileNames';
 
 // One property-style test takes most of a second on a loaded machine; the default 5 s is too close.
 vi.setConfig({ testTimeout: 20_000 });
@@ -44,14 +44,16 @@ describe('cleanFileName', () => {
   });
   it('caps the total length at 120 characters', () => {
     expect(cleanFileName('x'.repeat(300), 'pdf')).toHaveLength(120);
-    expect(cleanFileName('x'.repeat(300), 'pdf')).toBe(`${'x'.repeat(116)}.pdf`);
+    // A long name keeps its start and its end; the middle is cut (QA-FIX G).
+    expect(cleanFileName('x'.repeat(300), 'pdf')).toBe(`${'x'.repeat(58)}…${'x'.repeat(57)}.pdf`);
     expect(cleanFileName('x'.repeat(116), 'pdf')).toBe(`${'x'.repeat(116)}.pdf`);
     expect(cleanFileName('x'.repeat(120), 'png')).toHaveLength(120);
     expect(cleanFileName('ब'.repeat(200), 'pdf').length).toBeLessThanOrEqual(120);
   });
-  it('does not leave trailing dots or spaces after truncating', () => {
-    const out = cleanFileName(`${'x'.repeat(115)}. .tail`, 'pdf');
-    expect(out).toBe(`${'x'.repeat(115)}.pdf`);
+  it('does not leave dots or spaces at the cut or at the end', () => {
+    // The cut falls on the dots and spaces: they go, on both sides of it.
+    const out = cleanFileName(`${'x'.repeat(56)}. . . .${'y'.repeat(70)}. `, 'pdf');
+    expect(out).toBe(`${'x'.repeat(56)}…${'y'.repeat(57)}.pdf`);
   });
   it('keeps reserved-name handling inside the 120 limit', () => {
     expect(cleanFileName('CON.backup', 'pdf')).toBe('CON_.backup.pdf');
@@ -62,9 +64,12 @@ describe('cleanFileName', () => {
     expect(out.startsWith('NUL_.')).toBe(true);
   });
   it('does not let a reserved name reappear after trimming', () => {
-    expect(cleanFileName('CON' + ' '.repeat(200) + '.x', 'pdf')).toBe('CON_.pdf');
-    expect(cleanFileName('CON' + ' '.repeat(200) + 'y', 'pdf')).toBe('CON_.pdf');
-    expect(cleanFileName('CON' + ' '.repeat(113) + '_xxxxx', 'pdf')).toBe('CON_.pdf');
+    // A middle cut keeps the end, so these are no longer only "CON" (QA-FIX G); the start that stays is
+    // still never a reserved name on its own.
+    expect(cleanFileName('CON' + ' '.repeat(200) + '.x', 'pdf')).toBe('CON…x.pdf');
+    expect(cleanFileName('CON' + ' '.repeat(200) + 'y', 'pdf')).toBe('CON…y.pdf');
+    expect(cleanFileName('CON' + ' '.repeat(113) + '_xxxxx', 'pdf')).toBe('CON…_xxxxx.pdf');
+    expect(cleanFileName('CON' + ' '.repeat(200) + '.', 'pdf')).toBe('CON_.pdf');
   });
   it('keeps both invariants for generated hostile names', () => {
     const reserved = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM9', 'LPT1', 'LPT9', 'con', 'Nul'];
@@ -83,10 +88,11 @@ describe('cleanFileName', () => {
         }
       }
     }
-  });
+    // 3,360 names: 8-13 s on a loaded machine, more than half the file's 20 s. A hang guard only.
+  }, 60_000);
   it('handles a long name ending in .PDF', () => {
     const out = cleanFileName('x'.repeat(300) + '.PDF', 'pdf');
-    expect(out).toBe(`${'x'.repeat(116)}.pdf`);
+    expect(out).toBe(`${'x'.repeat(58)}…${'x'.repeat(57)}.pdf`);
   });
   it('replaces lone surrogates but keeps paired ones', () => {
     expect(cleanFileName('a\uD800b', 'pdf')).toBe('a_b.pdf');
@@ -94,10 +100,13 @@ describe('cleanFileName', () => {
     expect(cleanFileName('a\uD800', 'pdf')).toBe('a_.pdf');
     expect(cleanFileName('a\u{1F600}b', 'pdf')).toBe('a\u{1F600}b.pdf');
   });
-  it('never splits an emoji at the length cut', () => {
-    const out = cleanFileName('x'.repeat(115) + '\u{1F600}tail', 'pdf');
-    expect(out).toBe(`${'x'.repeat(115)}.pdf`);
-    expect(out).not.toMatch(/[\uD800-\uDFFF]/);
+  it('never splits an emoji at the cut', () => {
+    // The emoji sits where the head ends, then where the tail starts.
+    for (const input of ['x'.repeat(57) + '\u{1F600}' + 'y'.repeat(100), 'x'.repeat(100) + '\u{1F600}' + 'y'.repeat(56)]) {
+      const out = cleanFileName(input, 'pdf');
+      expect(out.length).toBeLessThanOrEqual(120);
+      expect(out.replace(/\u{1F600}/gu, '')).not.toMatch(/[\uD800-\uDFFF]/);
+    }
   });
   it('stays safe for a long hostile name', () => {
     const out = cleanFileName(`..${'a/b:c*'.repeat(40)}  `, 'pdf');
@@ -149,9 +158,30 @@ describe('part and page names', () => {
   });
   it('keeps the name valid after the cut: no trailing dot or space, no split emoji', () => {
     // 108 characters fit before "_part_01.pdf"; the cut falls right after the dots and spaces
-    expect(partName(`${'x'.repeat(103)}. . .${'y'.repeat(50)}`, 1, 2)).toBe(`${'x'.repeat(103)}_part_01.pdf`);
-    const emoji = pageImageName(`${'x'.repeat(106)}\u{1F600}tail`, 1, 5, 'png');
-    expect(emoji).toBe(`${'x'.repeat(106)}_page_001.png`);
+    expect(partName(`${'x'.repeat(103)}. . .${'y'.repeat(50)}`, 1, 2)).toBe(`${'x'.repeat(54)}…${'y'.repeat(50)}_part_01.pdf`);
+    const emoji = pageImageName(`${'x'.repeat(53)}\u{1F600}${'y'.repeat(60)}tail`, 1, 5, 'png');
+    expect(emoji.endsWith('tail_page_001.png')).toBe(true);
     expect(emoji).not.toMatch(/[\uD800-\uDFFF]/);
+  });
+});
+
+describe('cutMiddle (QA-FIX G: a long name keeps its end)', () => {
+  it('leaves a name that fits alone', () => {
+    expect(cutMiddle('Bank statement', 20)).toBe('Bank statement');
+  });
+  it('keeps the start and the end, with one "…" in the middle', () => {
+    const name = 'Synthetic M-s Gamma Traders Private Limited - Tax Audit Report u-s 44AB - Form 3CA 3CD with Annexures for AY 2025-26 - final copy v3 revised';
+    const cut = cutMiddle(name, 106);
+    expect(cut.length).toBeLessThanOrEqual(106);
+    expect(cut.startsWith('Synthetic M-s Gamma Traders')).toBe(true);
+    expect(cut.endsWith('AY 2025-26 - final copy v3 revised')).toBe(true);
+    expect(cut.match(/…/g)).toHaveLength(1);
+  });
+  it('cuts again at the same place, never adding a second "…"', () => {
+    const once = cutMiddle('a'.repeat(100) + 'b'.repeat(100), 120);
+    const twice = cutMiddle(once, 110);
+    expect(twice).toHaveLength(110);
+    expect(twice.match(/…/g)).toHaveLength(1);
+    expect(twice.endsWith('b'.repeat(59))).toBe(true);
   });
 });

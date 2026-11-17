@@ -71,8 +71,20 @@ describe('nextPaint', () => {
 
   it('does not stall when the window is hidden and frames never come', async () => {
     vi.stubGlobal('requestAnimationFrame', () => 0);
-    const started = Date.now();
-    await nextPaint(30);
-    expect(Date.now() - started).toBeLessThan(1000);
+    // On the test's own clock, not the machine's: it ends at its 30 ms, however busy the machine is.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let done = false;
+      const painted = nextPaint(30).then(() => {
+        done = true;
+      });
+      await vi.advanceTimersByTimeAsync(29);
+      expect(done).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await painted;
+      expect(done).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -171,6 +171,22 @@ describe('addToVault', () => {
     ]);
   });
 
+  it('leaves nothing of the file names it cleaned once a batch settles (vault, working paper, computer)', async () => {
+    const input = () => (RegExp as unknown as { input: string }).input;
+    const files = [result('r1', 'Synthetic BNZPM statement.pdf')];
+    const t = setup(files);
+    await addToVault(files, { ...FORM, names: { r1: 'BNZPM: typed name?' } }, t.scope, t.deps);
+    expect(input()).toBe('');
+    const target: AttachTarget = { programId: 'p1', programName: 'Programme' };
+    const t2 = setup([result('r2', 'Synthetic BNZPM ledger.pdf')]);
+    /BNZPM/.exec('Synthetic BNZPM ledger.pdf');
+    await attachToWorkingPaper(t2.store.getState().files, FORM, target, t2.scope, t2.deps);
+    expect(input()).toBe('');
+    /BNZPM/.exec('Synthetic BNZPM ledger.pdf');
+    await recordComputerSave({ files: t2.store.getState().files, markIds: ['r2'], download: false, zip: false, hashes: [null] }, t2.scope, t2.deps);
+    expect(input()).toBe('');
+  });
+
   it('gives repeated names within one batch a number, ignoring case', async () => {
     const files = [result('r1', 'A.pdf'), result('r2', 'a.PDF'), result('r3', 'Other.pdf')];
     const { scope, deps, uploads } = setup(files);
@@ -840,6 +856,18 @@ describe('recordComputerSave', () => {
     expect(logs[1].metadata.tool).toBeNull();
   });
 
+  it('says that a TIFF added as it is was converted, and to what', async () => {
+    const files = [
+      result('t1', 'statement.tif', { origin: 'computer', operation: undefined, convertedFrom: 'tiff' }),
+      result('t2', 'scan.tif', { origin: 'vault', evidenceId: 'ev-7', operation: undefined, convertedFrom: 'tiff', kind: 'image', mimeType: 'image/png', pageCount: null }),
+    ];
+    const { scope, deps, logs } = setup(files);
+    await recordComputerSave({ files, markIds: ['t1', 't2'], download: false, zip: false, hashes: [sha, sha] }, scope, deps);
+    expect(logs[0].details.startsWith('Copy of a file from the computer, converted from TIFF to PDF → statement.tif')).toBe(true);
+    expect(logs[0].details).toContain('Sources: statement.tif [computer].');
+    expect(logs[1].details.startsWith('Copy of a file from the Evidence Vault, converted from TIFF to PNG → scan.tif')).toBe(true);
+  });
+
   it('after a change of engagement: marks nothing, but writes the entries of the files saved, silently, in their own engagement', async () => {
     const files = [result('r1', 'One.pdf')];
     const { store, scope, deps, logs } = setup(files);
@@ -973,7 +1001,7 @@ describe('summaries', () => {
 
   it('has the exact wording the brief asks for', () => {
     expect(ATTACH_FAILED).toBe('Attachment failed. The file is in the Evidence Vault; you can retry.');
-    expect(LOG_FAILED).toBe('Saved, but the activity record could not be written.');
+    expect(LOG_FAILED).toBe('Saved, but this step could not be recorded in the Audit Trail.');
   });
 });
 

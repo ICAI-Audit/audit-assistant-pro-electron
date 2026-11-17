@@ -51,9 +51,18 @@ export class BatchRunner {
     this.control = control;
     this.set({ phase: 'running', progress: null, message: null });
     // The batch functions report every failure in their result; a throw is a defect, and the dialog
-    // (if it is still there) says only that something went wrong.
+    // (if it is still there) says only that something went wrong. That includes a throw in `finish` (the
+    // screen's summary): the dialog must never be left busy, refusing every way to close (REV-B S14).
     running.then(
-      (result) => this.settle(control, finish(result)),
+      (result) => {
+        let message: SummaryToast | null;
+        try {
+          message = finish(result);
+        } catch {
+          message = UNEXPECTED;
+        }
+        this.settle(control, message);
+      },
       () => this.settle(control, UNEXPECTED),
     );
     return true;

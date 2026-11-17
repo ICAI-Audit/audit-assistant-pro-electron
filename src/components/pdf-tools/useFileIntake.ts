@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { LIST_MAX_BYTES, LIST_WARN_BYTES, newFileId, workingListStore } from '@/lib/pdf-tools/workingList';
 import { nextPaint } from './canvasUtils';
+import { fileMessageId } from './fileMessages';
 import { formatBytes, plural } from './format';
 import { prepareFile, type IntakeNotice } from './intake';
 import { IntakeRunner, type FileLike, type IntakeProgress, type PasswordAnswer } from './intakeRunner';
@@ -17,17 +18,22 @@ export interface PasswordRequest {
 }
 
 function notAdded(name: string, description: string): void {
-  toast.error(`"${name}" was not added`, { description });
+  toast.error(`"${name}" was not added`, { id: fileMessageId(), description });
 }
 
 const NOTICES: Record<IntakeNotice, { title: (name: string) => string; description: string }> = {
   'opened-without-password': {
     title: (name) => `"${name}" opened without a password`,
-    description: 'Its protection was removed in the copy in this list, and results made from it are not protected.',
+    // It had restrictions (copying, printing), not a password (QA-FIX E); design 5.1 asks for the entitlement reminder.
+    description: 'It restricts things such as copying or printing. The copy in this list has no restrictions; use it only if you are entitled to.',
   },
   'first-frame': {
     title: (name) => `"${name}" is animated`,
     description: 'Only its first frame was added.',
+  },
+  'tiff-converted': {
+    title: (name) => `"${name}" was converted to PDF`,
+    description: 'Its pages are in the list as one PDF. The TIFF itself is not changed.',
   },
 };
 
@@ -65,7 +71,7 @@ export function useFileIntake(contextKey: string | null) {
       onProgress: setProgress,
       report: {
         notAdded,
-        notice: (name, notice) => toast.info(NOTICES[notice].title(name), { description: NOTICES[notice].description }),
+        notice: (name, notice) => toast.info(NOTICES[notice].title(name), { id: fileMessageId(), description: NOTICES[notice].description }),
         listLarge: () =>
           toast.warning('The file list is getting large', {
             description: `The files now come to more than ${formatBytes(LIST_WARN_BYTES)}. PDF Tools may slow down; the limit is ${formatBytes(LIST_MAX_BYTES)}.`,

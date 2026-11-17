@@ -1,14 +1,15 @@
-import { PDFArray, PDFCheckBox, PDFDict, PDFDocument, PDFName, PDFRef, PDFSignature, PDFTextField } from 'pdf-lib';
+import { PDFArray, PDFCheckBox, PDFDict, PDFDocument, PDFName, PDFRef, PDFSignature, PDFString, PDFTextField } from 'pdf-lib';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { inspectPdf } from './inspect';
-import { deletePages, extractPages, mergePdfs, splitEvery } from './organise';
+import { deletePages, extractPages, mergePdfs, splitAtBookmarks, splitEvery, splitParts } from './organise';
+import { isStop } from './pace';
 import { danglingReferences, everythingIn, makeFormPdf, makePdf, pageTexts, pdfjsDrawnFieldText, pdfjsFieldValues } from './testPdf';
 
 // The first pdfjs import is slow and the suite runs alongside others, so pay for it here, with room to spare.
 vi.setConfig({ testTimeout: 30_000 });
 beforeAll(async () => {
   await import('pdfjs-dist/legacy/build/pdf.mjs');
-}, 30_000);
+}, 120_000); // a hang guard only: a cold import takes seconds alone and passed 30 s on a loaded machine
 
 describe('organise', () => {
   it('merges in the order given', async () => {
@@ -366,4 +367,186 @@ describe('splitEvery: a one-page file', () => {
     expect(err.message).toMatch(/one page/i);
     expect(err.message).not.toMatch(/1 to 0/);
   });
+});
+
+describe('T-052: annotations that pointed at a left-out page leave no null entry', () => {
+  async function source(): Promise<Uint8Array> {
+    const doc = await PDFDocument.create();
+    const p1 = doc.addPage([200, 200]);
+    const p2 = doc.addPage([200, 200]);
+    const ctx = doc.context;
+    const annot = (entry: Record<string, unknown>) => ctx.register(ctx.obj({ Type: 'Annot', Rect: [10, 10, 30, 30], ...entry } as never));
+    const gone = annot({ Subtype: 'Text', Contents: PDFString.of('on the left-out page') });
+    p2.node.addAnnot(gone);
+    // on the kept page: a popup of the left-out comment, a reply to it, and a comment whose popup is on the left-out page
+    const popup = annot({ Subtype: 'Popup', Parent: gone });
+    const reply = annot({ Subtype: 'Text', IRT: gone, RT: 'R', Contents: PDFString.of('a reply') });
+    const lonePopup = annot({ Subtype: 'Popup' });
+    const withPopup = annot({ Subtype: 'Text', Popup: lonePopup });
+    p2.node.addAnnot(lonePopup);
+    for (const a of [popup, reply, withPopup]) p1.node.addAnnot(a);
+    return doc.save();
+  }
+  const check = async (bytes: Uint8Array) => {
+    const doc = await PDFDocument.load(bytes);
+    const stored = (d: PDFDict, key: string) => d.entries().find(([k]) => k === PDFName.of(key))?.[1];
+    const annots = doc.getPage(0).node.Annots();
+    const found: string[] = [];
+    for (let i = 0; i < (annots?.size() ?? 0); i++) {
+      const a = annots!.lookup(i, PDFDict);
+      for (const key of ['Parent', 'IRT', 'Popup']) {
+        const value = stored(a, key);
+        if (value === undefined) continue;
+        const target = value instanceof PDFRef ? doc.context.lookup(value) : undefined;
+        if (target === undefined) found.push(key);
+      }
+    }
+    return found;
+  };
+  it('Split and Delete pages leave no /Parent, /IRT or /Popup that is null or points at nothing', async () => {
+    const bytes = await source();
+    expect(await check(await extractPages(bytes, [0]))).toEqual([]);
+    expect(await check(await deletePages(bytes, [1]))).toEqual([]);
+  });
+});
+
+// REV-A (15 November 2026): Merge and Split every N give Stop a place on every page (B6); a damaged page
+// tree or a very deep chain of references is refused plainly, never the generic failure (S2, S3).
+describe('REV-A fixes in Split, Delete pages and Merge', () => {
+  const enc = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
+  function rawPdf(objects: string[]): Uint8Array {
+    let out = '%PDF-1.7\n';
+    const offsets: number[] = [];
+    objects.forEach((o, i) => {
+      offsets.push(out.length);
+      out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+    });
+    const xref = out.length;
+    out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
+    out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    return enc(out);
+  }
+  /** Two pages; the first holds /PieceInfo leading to a chain of `depth` dictionaries (REV-A p1.ts deep). */
+  function deepChain(depth: number): Uint8Array {
+    const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /PieceInfo 5 0 R >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>'];
+    for (let i = 0; i < depth; i++) objects.push(i === depth - 1 ? '<< /End true >>' : `<< /N ${6 + i} 0 R >>`);
+    return rawPdf(objects);
+  }
+  const cycle = () => rawPdf(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 /Parent 2 0 R >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>']);
+  const DAMAGED = { name: 'PdfToolsError', code: 'not-a-pdf', message: 'This file could not be read as a PDF. It may be damaged.' };
+
+  it('B6: Merge calls its page hook before every page of every file, and stops when it throws', async () => {
+    const calls: string[] = [];
+    const out = await mergePdfs([await makePdf('A', 2), await makePdf('B', 3)], { onPage: (file, done, total) => void calls.push(`${file}:${done}/${total}`) });
+    expect(calls).toEqual(['0:0/2', '0:1/2', '1:0/3', '1:1/3', '1:2/3']);
+    expect(await pageTexts(out)).toEqual(['A p1', 'A p2', 'B p1', 'B p2', 'B p3']);
+    await expect(mergePdfs([await makePdf('A', 2), await makePdf('B', 3)], { onPage: (file, done) => { if (file === 1 && done === 1) throw new Error('stop'); } })).rejects.toThrow('stop');
+  });
+
+  it('B6: Merge copies what pages share once, as pdf-lib copyPages does (a font shared by every page)', async () => {
+    const a = await makePdf('A', 4);
+    const merged = await PDFDocument.load(await mergePdfs([a, a]));
+    const fonts = merged.context.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFDict && o.get(PDFName.of('Type')) === PDFName.of('Font'));
+    const once = (await PDFDocument.load(a)).context.enumerateIndirectObjects().filter(([, o]) => o instanceof PDFDict && o.get(PDFName.of('Type')) === PDFName.of('Font'));
+    expect(fonts.length).toBe(2 * once.length); // once per source file, not once per page
+  });
+
+  it('B6: Split every N calls its page hook before every page of every part, and stops when it throws', async () => {
+    const calls: string[] = [];
+    const parts = await splitEvery(await makePdf('S', 5), 2, { onPage: (part, done, total) => void calls.push(`${part}:${done}/${total}`) });
+    expect(parts).toHaveLength(3);
+    expect(calls).toEqual(['0:0/2', '0:1/2', '1:0/2', '1:1/2', '2:0/1']);
+    await expect(splitEvery(await makePdf('S', 5), 2, { onPage: (part) => { if (part === 1) throw new Error('stop'); } })).rejects.toThrow('stop');
+  });
+
+  it('S3: a chain of 3,000 references from a kept page is refused plainly by Split and Delete pages, and by Merge naming the file', async () => {
+    const file = deepChain(3000);
+    await expect(extractPages(file, [0])).rejects.toMatchObject(DAMAGED);
+    await expect(deletePages(file, [1])).rejects.toMatchObject(DAMAGED);
+    await expect(mergePdfs([await makePdf('A', 1), file])).rejects.toMatchObject({ code: 'not-a-pdf', message: 'File 2 in the list could not be read as a PDF. It may be damaged.' });
+    // A chain of 300 is ordinary: copied.
+    expect((await PDFDocument.load(await extractPages(deepChain(300), [0]))).getPageCount()).toBe(1);
+  });
+
+  it('S2: a page tree node that is its own parent is refused plainly by Split, Delete pages, Split every N and Merge', async () => {
+    await expect(extractPages(cycle(), [0])).rejects.toMatchObject(DAMAGED);
+    await expect(splitEvery(rawPdf(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 /Parent 2 0 R >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>']), 1)).rejects.toMatchObject(DAMAGED);
+    await expect(mergePdfs([cycle(), await makePdf('B', 1)])).rejects.toMatchObject({ code: 'not-a-pdf', message: 'File 1 in the list could not be read as a PDF. It may be damaged.' });
+  });
+});
+
+// FIX-A2 follow-up (INT3 concern 1): a Stop pressed while the source is still being read ends the run within
+// the read, with the run's own error, never "could not be read"; a check that never stops changes no byte.
+describe('Split, Delete pages and Merge: Stop while the file is read', () => {
+  class Stopped extends Error {}
+  /** A clock that runs 60 ms between two looks at it: every look finds a turn due, so the read waits often. */
+  function runningClock(): () => void {
+    let clock = 0;
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => (clock += 60));
+    return () => spy.mockRestore();
+  }
+
+  it('each tool stops with the run’s own error, before any page is copied', async () => {
+    const file = await makePdf('S', 6);
+    const runs: [string, (check: () => void, onPage: () => void) => Promise<unknown>][] = [
+      ['split one range', (check, onPage) => extractPages(file, [0, 1], { check, onPage })],
+      ['delete pages', (check, onPage) => deletePages(file, [0], { check, onPage })],
+      ['split every N', (check, onPage) => splitEvery(file, 2, { check, onPage })],
+      ['split into ranges', (check, onPage) => splitParts(file, [{ from: 1, to: 2 }], { check, onPage })],
+      ['split at bookmarks', (check, onPage) => splitAtBookmarks(file, { check, onPage })],
+      ['merge', (check, onPage) => mergePdfs([file, file], { check, onPage })],
+    ];
+    const restore = runningClock();
+    try {
+      for (const [name, run] of runs) {
+        const stop = new Stopped(name);
+        let pages = 0;
+        const error = await run(() => { throw stop; }, () => void pages++).catch((e: unknown) => e);
+        expect(error, name).toBe(stop);
+        expect(isStop(error), name).toBe(true);
+        expect(pages, name).toBe(0);
+      }
+    } finally {
+      restore();
+    }
+  });
+
+  it('Merge: a Stop while the second file is read ends it there, with the run’s own error', async () => {
+    const restore = runningClock();
+    try {
+      const stop = new Stopped('second file');
+      const filesCopied = new Set<number>();
+      let stopNow = false;
+      const error = await mergePdfs([await makePdf('A', 3), await makePdf('B', 3)], {
+        onPage: (file) => {
+          filesCopied.add(file);
+          if (file === 0) stopNow = true; // the first file is being copied: the next read is the second file's
+        },
+        check: () => { if (stopNow) throw stop; },
+      }).catch((e: unknown) => e);
+      expect(error).toBe(stop);
+      expect([...filesCopied]).toEqual([0]);
+    } finally {
+      restore();
+    }
+  });
+
+  it('a check that never stops changes no byte of any result', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-16T06:00:00Z'));
+    const restore = runningClock();
+    try {
+      const file = await makePdf('B', 5);
+      const never = () => undefined;
+      const same = (a: Uint8Array, b: Uint8Array) => Buffer.from(a).equals(Buffer.from(b));
+      expect(same(await extractPages(file, [1, 3], { check: never }), await extractPages(file, [1, 3]))).toBe(true);
+      expect(same(await deletePages(file, [0], { check: never }), await deletePages(file, [0]))).toBe(true);
+      expect(same(await mergePdfs([file, file], { check: never }), await mergePdfs([file, file]))).toBe(true);
+      const [a, b] = [await splitEvery(file, 2, { check: never }), await splitEvery(file, 2)];
+      expect(a.every((part, i) => same(part, b[i]))).toBe(true);
+    } finally {
+      restore();
+      vi.useRealTimers();
+    }
+  }, 180_000); // the running clock makes every read wait often: slow by design, not by load
 });

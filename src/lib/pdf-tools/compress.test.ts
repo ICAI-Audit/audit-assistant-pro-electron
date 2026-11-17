@@ -224,7 +224,8 @@ async function makeEveryOtherKind(): Promise<{ bytes: Uint8Array; onPage: number
   const flate = (entries: Record<string, unknown>, length: number, seed: number) =>
     doc.context.register(doc.context.flateStream(noise(length, seed), { Type: 'XObject', Subtype: 'Image', ...(entries as object) }));
   const stencil = addImageObject(doc, { ...size, ImageMask: true, BitsPerComponent: 1 }, noise(350, 20));
-  const icc = doc.context.register(doc.context.flateStream(noise(200, 21), { N: 3 }));
+  // A CMYK profile (N 4): CMYK is left as it is, profile or not.
+  const icc = doc.context.register(doc.context.flateStream(noise(200, 21), { N: 4 }));
   const tint = doc.context.obj({ FunctionType: 2, Domain: [0, 1], C0: [1], C1: [0], N: 1 });
   const onPage = [
     addImageObject(doc, { ...dct, Mask: [0, 10, 0, 10, 0, 10] }, noise(4000, 1)),
@@ -287,9 +288,9 @@ async function makeEncryptedLike(): Promise<Uint8Array> {
 describe('compressPdf', () => {
   it('defines the three levels', () => {
     expect(COMPRESS_LEVELS).toEqual({
-      low: { dpi: 200, quality: 0.82, label: 'Low compression' },
-      recommended: { dpi: 150, quality: 0.68, label: 'Recommended' },
-      extreme: { dpi: 96, quality: 0.45, label: 'Extreme' },
+      low: { dpi: 200, quality: 0.82, label: 'Light' },
+      recommended: { dpi: 150, quality: 0.68, label: 'Balanced' },
+      extreme: { dpi: 96, quality: 0.45, label: 'Strong' },
     });
   });
 
@@ -389,6 +390,13 @@ describe('compressPdf: which images are recoded', () => {
     for (const ref of untouched) expectSameStream(after, before, ref);
   });
 
+  it('says how many images it could recode, so that "a stronger level" is offered only when there is something to work on', async () => {
+    const { bytes, onPage } = await makeEveryOtherKind();
+    expect(await compressPdf(bytes, 'recommended', async () => null)).toMatchObject({ imagesFound: onPage + 1, imagesRecodable: 1 });
+    expect(await compressPdf(await makePdf('Text only', 3), 'recommended', half)).toMatchObject({ imagesFound: 0, imagesRecodable: 0 });
+    expect(await compressPdf(await bigScan(), 'low', async () => null)).toMatchObject({ imagesFound: 2, imagesRecodable: 2 });
+  });
+
   it('never recodes the soft mask or mask of another image, even when a page also draws it', async () => {
     const doc = await PDFDocument.create();
     const grey = { Width: 2480, Height: 3508, BitsPerComponent: 8, ColorSpace: 'DeviceGray', Filter: 'DCTDecode' };
@@ -477,6 +485,98 @@ describe('compressPdf: which images are recoded', () => {
   });
 });
 
+describe('compressPdf: images with a colour profile (user Q&A, 15 November 2026)', () => {
+  const A4_SCAN = { Width: 2480, Height: 3508, BitsPerComponent: 8, Filter: 'DCTDecode' };
+  const profile = (doc: PDFDocument, n: number, extra: Record<string, unknown> = {}) =>
+    doc.context.register(doc.context.flateStream(noise(3000, 70 + n), { N: n, ...(extra as object) }));
+  async function scanIn(colorSpace: (doc: PDFDocument) => unknown): Promise<{ bytes: Uint8Array; ref: PDFRef; space: string }> {
+    const doc = await PDFDocument.create();
+    const space = colorSpace(doc);
+    const ref = addImageObject(doc, { ...A4_SCAN, ColorSpace: space }, noise(400_000, 7));
+    draw(doc.addPage(A4), 'Im1', ref, [0, 0, ...A4]);
+    const bytes = await doc.save();
+    const loaded = await PDFDocument.load(bytes);
+    return { bytes, ref, space: rawStream(loaded, ref).dict.get(PDFName.of('ColorSpace'))!.toString() };
+  }
+
+  it('recodes a scan in an ICC RGB space (an sRGB scan with its profile) and keeps its profile: same numbers, same profile', async () => {
+    let iccRef!: PDFRef;
+    const { bytes, ref, space } = await scanIn((doc) => {
+      iccRef = profile(doc, 3);
+      return ['ICCBased', iccRef];
+    });
+    const seen: RecodeRequest[] = [];
+    const res = await compressPdf(bytes, 'recommended', async (r) => { seen.push(r); return half(r); });
+    expect(res).toMatchObject({ imagesFound: 1, imagesRecodable: 1, imagesReplaced: 1 });
+    expect(seen[0]).toMatchObject({ targetWidth: 1240, targetHeight: 1754, grayscale: false, source: { kind: 'jpeg' } });
+    const before = await PDFDocument.load(bytes);
+    const after = await PDFDocument.load(res.bytes!);
+    const stream = rawStream(after, ref);
+    expect(stream.dict.get(PDFName.of('ColorSpace'))!.toString()).toBe(space);
+    expect(stream.dict.get(PDFName.of('Width'))!.toString()).toBe('1240');
+    expect(stream.getContentsSize()).toBe(200_000);
+    expectSameStream(after, before, iccRef); // the profile itself is not touched
+  });
+
+  it('keeps an ICC space that is a reference, and recodes CalRGB the same way', async () => {
+    for (const make of [
+      (doc: PDFDocument) => doc.context.register(doc.context.obj(['ICCBased', profile(doc, 3)])),
+      () => ['CalRGB', { WhitePoint: [0.9505, 1, 1.089], Gamma: [2.2, 2.2, 2.2] }],
+    ]) {
+      const { bytes, ref, space } = await scanIn(make);
+      const res = await compressPdf(bytes, 'recommended', half);
+      expect(res.imagesReplaced).toBe(1);
+      expect(rawStream(await PDFDocument.load(res.bytes!), ref).dict.get(PDFName.of('ColorSpace'))!.toString()).toBe(space);
+    }
+  });
+
+  it('recodes grey images with a profile (ICC N 1, CalGray): kept with one component, written as DeviceRGB with three', async () => {
+    for (const make of [(doc: PDFDocument) => ['ICCBased', profile(doc, 1)], () => ['CalGray', { WhitePoint: [0.9505, 1, 1.089], Gamma: 2.2 }]]) {
+      const { bytes, ref, space } = await scanIn(make);
+      const seen: RecodeRequest[] = [];
+      const three = await compressPdf(bytes, 'recommended', async (r) => { seen.push(r); return half(r); });
+      expect(seen[0].grayscale).toBe(true);
+      expect(rawStream(await PDFDocument.load(three.bytes!), ref).dict.get(PDFName.of('ColorSpace'))).toBe(PDFName.of('DeviceRGB'));
+      const one = await compressPdf(bytes, 'recommended', async (r) => fakeJpeg(r.targetWidth, r.targetHeight, 100_000, 1));
+      expect(rawStream(await PDFDocument.load(one.bytes!), ref).dict.get(PDFName.of('ColorSpace'))!.toString()).toBe(space);
+    }
+  });
+
+  it('passes the pixels of a Flate image in an ICC space with its channel count', async () => {
+    const doc = await PDFDocument.create();
+    const pixels = noise(300 * 200 * 3, 5);
+    const ref = doc.context.register(doc.context.flateStream(pixels, {
+      Type: 'XObject', Subtype: 'Image', Width: 300, Height: 200, BitsPerComponent: 8, ColorSpace: ['ICCBased', profile(doc, 3)],
+    }));
+    draw(doc.addPage([72, 48]), 'Im1', ref, [0, 0, 72, 48]);
+    const [req] = await requests(await doc.save());
+    expect(req).toMatchObject({ grayscale: false, source: { kind: 'raw', channels: 3 } });
+    expect(sameBytes(req.source.bytes, pixels)).toBe(true);
+  });
+
+  it('leaves CMYK (ICC N 4), an ICC space with an unusual range, Lab, Indexed over a profile and DeviceN as they are', async () => {
+    for (const make of [
+      (doc: PDFDocument) => ['ICCBased', profile(doc, 4)],
+      (doc: PDFDocument) => ['ICCBased', profile(doc, 3, { Range: [0, 100, -128, 127, -128, 127] })],
+      (doc: PDFDocument) => ['ICCBased', doc.context.obj({ N: 3 })], // not a stream
+      () => ['Lab', { WhitePoint: [0.9505, 1, 1.089] }],
+      (doc: PDFDocument) => ['Indexed', ['ICCBased', profile(doc, 3)], 1, PDFHexString.of('000000FFFFFF')],
+      () => 'DeviceCMYK',
+    ]) {
+      const { bytes } = await scanIn(make);
+      let calls = 0;
+      const res = await compressPdf(bytes, 'extreme', async () => { calls++; return null; });
+      expect(calls).toBe(0);
+      expect(res).toMatchObject({ imagesFound: 1, imagesRecodable: 0 });
+    }
+  });
+
+  it('accepts an ICC space whose range is the usual 0 to 1', async () => {
+    const { bytes } = await scanIn((doc) => ['ICCBased', profile(doc, 3, { Range: [0, 1, 0, 1, 0, 1] })]);
+    expect((await compressPdf(bytes, 'recommended', half)).imagesReplaced).toBe(1);
+  });
+});
+
 describe('compressPdf: what the recoder is given', () => {
   it('hands over JPEG data without its EXIF and ICC segments, and only those, leaving the document stream as it was', async () => {
     const { tagged, clean } = taggedJpeg();
@@ -505,7 +605,7 @@ describe('compressPdf: what the recoder is given', () => {
 
 describe('compressPdf: a malformed EXIF segment', () => {
   it('leaves the JPEG untouched when the APP1 length lands in the middle of the data', async () => {
-    const exif = segment(0xe1, [...ascii('Exif  '), ...ascii('MM *'), 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0]);
+    const exif = segment(0xe1, [...ascii('Exif\u0000\u0000'), ...ascii('MM\u0000*'), 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0]);
     const dqt = segment(0xdb, [0, ...new Array(64).fill(1)]);
     const sof = segment(0xc0, [8, 0, 100, 0, 200, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]);
     const sos = segment(0xda, [3, 1, 0, 2, 0x11, 3, 0x11, 0, 63, 0]);
@@ -818,6 +918,37 @@ describe('compressPdf: refusals', () => {
   it('refuses an unknown level', async () => {
     await expect(compressPdf(await bigScan(), 'medium' as unknown as CompressLevel, half)).rejects.toMatchObject({ code: 'invalid-level' });
   });
+
+  // REV-A S2 (INT3): a page-tree node that is its own parent (or two that are each other's) ran the page's
+  // inherited-attribute lookup round for ever: a raw RangeError, not the plain sentence.
+  it('refuses a page tree whose node is its own parent, or one of a pair that are each other’s, as damaged', async () => {
+    const enc = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
+    const rawPdf = (objects: string[]) => {
+      let out = '%PDF-1.7\n';
+      const offsets: number[] = [];
+      objects.forEach((o, i) => {
+        offsets.push(out.length);
+        out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+      });
+      const xref = out.length;
+      out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
+      return enc(`${out}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    };
+    const page = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>';
+    const selfParent = rawPdf(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 /Parent 2 0 R >>', page]);
+    const pair = rawPdf(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [4 0 R] /Count 1 /Parent 3 0 R >>', '<< /Type /Pages /Kids [2 0 R] /Count 1 /Parent 2 0 R >>', page]);
+    const healthy = rawPdf(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', page]);
+    for (const [label, file] of [['self', selfParent], ['pair', pair]] as const) {
+      for (const level of ['low', 'recommended', 'extreme'] as CompressLevel[]) {
+        await expect(compressPdf(file, level, half), `${label} ${level}`).rejects.toMatchObject({
+          code: 'not-a-pdf',
+          message: 'This file could not be read as a PDF. It may be damaged.',
+        });
+      }
+    }
+    // control: the same file with a page tree that ends is read (nothing to gain, so no file)
+    expect((await compressPdf(healthy, 'recommended', half)).bytes).toBeNull();
+  });
 });
 
 describe('compressPdf: recoder failures', () => {
@@ -918,4 +1049,80 @@ describe('compressPdf: input and cancellation', () => {
     expect(calls).toBe(1);
     expect(sameBytes(big, copy)).toBe(true);
   });
+});
+
+// Lane CT (Fit to a size) shares compress.ts's image decisions: the three levels must give the same bytes as before
+// it. These SHA-256 values were taken from compress.ts as it stood before Fit to a size was added, with the clock
+// pinned (the result carries a modification date) and a recoder whose output length follows pixels and quality.
+describe('compressPdf: the three levels give the same bytes as before Fit to a size', () => {
+  const GOLDEN: Record<string, string> = {
+    'loose-text/extreme': '89836d581ec4baedb150a128be97fbb503826fe0a21d91b12aa545bb7dc65f1d 3070 0/0',
+    'loose-text/low': '89836d581ec4baedb150a128be97fbb503826fe0a21d91b12aa545bb7dc65f1d 3070 0/0',
+    'loose-text/recommended': '89836d581ec4baedb150a128be97fbb503826fe0a21d91b12aa545bb7dc65f1d 3070 0/0',
+    // Taken again from the code before Fit to a size when this file's profile became CMYK (N 4), which stays
+    // untouched; an RGB profile is recoded since the colour-profile fix and is tested on its own above.
+    'other-kinds/extreme': 'abfb4f85a31115f9223945a1b64da39436dea96d60061c96fb6b3abb8fa20542 99935 19/1',
+    'other-kinds/low': 'null 186616 19/0',
+    'other-kinds/recommended': 'b4e7814c646d7a88f4e626cecb80245b84461590bddd24d7cb1deb091dc51323 135862 19/1',
+    'raw-grey/extreme': 'a8c30ebb3b03e16e191808267e090a8447398c53ea756d7cf50906abcae65d00 14230 1/1',
+    'raw-grey/low': 'edc28bb2d236edfdd2f4a9747c433d3fd857a982b4c6f3242d6ed23d95704130 56632 1/1',
+    'raw-grey/recommended': 'cff3b37b5862331dcc772682dc4cc3479f887499944e2263a425da0682781b4c 47112 1/1',
+    'raw-rgb/extreme': 'b974dca084e7a658787065acc346b3d2db31a96d3cb053dc7e4d678ec0253d43 27862 2/2',
+    'raw-rgb/low': 'a481ba8a78fe188080361c1a40638cda5204c80210990e9b2903b9cfb7ca270f 63669 2/2',
+    'raw-rgb/recommended': 'b921464b5c12f9b862c0f5d48b322295e1cf291049236b768f820d346577b410 53000 2/2',
+    'rich/extreme': '9c87e2202daddd329015d9132897e46b72528d3f4fcdf68c788dee7cc64905c0 18016 2/2',
+    'rich/low': '0eaa6aec7a1794a6e0c0051e6331295a060b70096467fb7737e3251d45a4bf8e 112057 2/2',
+    'rich/recommended': '91074e3a94291474e9ccb4e59bf4f017128f2176e1cd52013d43b3b7baee9d22 54975 2/2',
+    'scan/extreme': '697d80d8e1a3ee7c763c22434b18f1d5ea53ec3f7b00010a1fec6bb5a057ca3a 27932 2/2',
+    'scan/low': '5d9b0716597869ea9b642a549300b30098178f8c5ebe12c24ddde3a25438d0ae 212684 2/2',
+    'scan/recommended': '8fc5d9bd5a0bb045439fae978e7a5f001802877cdcbc665da34c17e225f42fb7 99790 2/2',
+    'shared/extreme': 'cb5f853e0831080d2e8c5cdbbd627baabbefe673bdff495f5a41ddfb4f9cca8d 14378 1/1',
+    'shared/low': 'e7d457b965a627856457cd434a0f14a2018d8eff8a181c5db94350b4addd58d8 106756 1/1',
+    'shared/recommended': '037cd9ec6ce409be16222ea3f55fb73754595b57c0639f3ee978995892b3dd7a 50304 1/1',
+    'text-and-image/extreme': '0b780c3eac61bd1ae4f66bb65e77e4882caa863898ffdf8bbd2aa66debaefd65 27919 2/2',
+    'text-and-image/low': 'd22628556c7612c605b6eb933f5ae699e8110162d54540692b656b83514d714b 77972 2/2',
+    'text-and-image/recommended': '305a208146949302809cde36671319a92cc00e04b8e82ebd96e4491fcb51c153 64901 2/2',
+  };
+  const sized: ImageRecoder = async (r) => fakeJpeg(r.targetWidth, r.targetHeight, Math.max(64, Math.floor((r.targetWidth * r.targetHeight * r.quality) / 30)));
+  const sha = async (bytes: Uint8Array | null) => {
+    if (!bytes) return 'null';
+    const { createHash } = await import('node:crypto');
+    return createHash('sha256').update(bytes).digest('hex');
+  };
+
+  it('matches every level on scans, raw and grey images, text with images, a rich file, a shared image, other kinds and a loose text file', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-15T10:00:00Z'));
+    try {
+      const loose = async () => {
+        const doc = await PDFDocument.create();
+        const font = await doc.embedFont(StandardFonts.Helvetica);
+        for (let n = 1; n <= 12; n++) doc.addPage(A4).drawText(`Ledger page ${n}`, { x: 50, y: 700, size: 12, font });
+        return doc.save({ useObjectStreams: false });
+      };
+      const inputs: [string, () => Promise<Uint8Array>][] = [
+        ['scan', bigScan],
+        ['raw-rgb', () => makeImagePdf({ pages: 2, image: { kind: 'raw', width: 900, height: 1270 } })],
+        ['raw-grey', () => makeImagePdf({ pages: 1, image: { kind: 'raw', width: 1200, height: 1700, colorSpace: 'DeviceGray' } })],
+        ['text-and-image', makeTextAndImage],
+        ['rich', makeRichPdf],
+        ['shared', makeSharedImagePdf],
+        ['other-kinds', async () => (await makeEveryOtherKind()).bytes],
+        ['loose-text', loose],
+      ];
+      const seen: Record<string, string> = {};
+      for (const [name, make] of inputs) {
+        const file = await make();
+        for (const level of ['low', 'recommended', 'extreme'] as CompressLevel[]) {
+          const res = await compressPdf(file, level, sized);
+          seen[`${name}/${level}`] = `${await sha(res.bytes)} ${res.newSize} ${res.imagesFound}/${res.imagesReplaced}`;
+        }
+      }
+      expect(seen).toEqual(GOLDEN);
+    } finally {
+      vi.useRealTimers();
+    }
+    // 24 compressions: 37 s on a loaded machine against the file's 30 s (WRAP's survey). The limit is a hang
+    // guard only; the bytes decide (the clock is pinned for Date).
+  }, 180_000);
 });

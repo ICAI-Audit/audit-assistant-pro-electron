@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { FileWarning } from 'lucide-react';
+import { FileWarning, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PdfToolsError, type WorkingFile } from '@/lib/pdf-tools/types';
-import { isAbortError, RENDER_UNAVAILABLE, renderImageThumbnail, renderThumbnail } from './pdfRenderer';
+import { isAbortError, RENDER_UNAVAILABLE, renderImageThumbnail, renderThumbnail, thumbnails, whenRendererIdle } from './pdfRenderer';
 import type { Priority } from './renderQueue';
 
 interface ThumbProps {
@@ -16,34 +16,51 @@ interface ThumbProps {
   /**
    * The scrolling box the preview sits in (the page panel). With it, the preview is rendered when
    * it comes near the visible area, a render that has not started is dropped when it scrolls away,
-   * and the image is released when it is far out of view (drawn again on return). Without it, the
-   * preview is rendered straight away and kept until the box goes away.
+   * and the image is let go when it is far out of view (shown again on return, from the shared
+   * drawing when it is still kept). Without it, the preview is rendered straight away.
    */
   scrollRoot?: RefObject<Element>;
   priority?: Priority;
+  /** Offer a Try again button when the preview failed; off where the box sits inside a button itself. */
+  retryButton?: boolean;
 }
 
 type ThumbState = { status: 'waiting' } | { status: 'ready'; url: string } | { status: 'failed' };
 
 const NEAR_MARGIN = '400px 0px';
 const KEEP_MARGIN = '800px 0px';
+/** From this box width the waiting and failed states say so in words; smaller ones show an icon. */
+const WORDS_FROM = 80;
 
-/** A page or image preview in a box of fixed size, so nothing moves when it arrives. */
-export default function Thumb({ file, pageIndex = 0, width, alt, className, scrollRoot, priority = 'normal' }: ThumbProps) {
+/**
+ * A page or image preview in a box of fixed size, so nothing moves when it arrives. Previews are shared
+ * (pdfRenderer.ts `thumbnails`): a page drawn for the page panel shows at once in Organise pages at the
+ * same size (QA-FIX C). A box that is waiting says so; a preview that failed is tried once more when the
+ * renderer is idle, and then offers Try again (QA-FIX D).
+ */
+export default function Thumb({ file, pageIndex = 0, width, alt, className, scrollRoot, priority = 'normal', retryButton = true }: ThumbProps) {
   const box = useRef<HTMLDivElement>(null);
   const lazy = Boolean(scrollRoot);
   const [near, setNear] = useState(!lazy);
   const [kept, setKept] = useState(true);
   const [state, setState] = useState<ThumbState>({ status: 'waiting' });
+  // The drawing has started (it may wait in the queue first): the box says "Drawing…" rather than "Waiting…".
+  const [drawing, setDrawing] = useState(false);
+  // Bumped to draw again: the automatic retry and Try again.
+  const [attempt, setAttempt] = useState(0);
+  const retried = useRef(false);
   const job = useRef<{ controller: AbortController; started: boolean } | null>(null);
-  const url = useRef<string | null>(null);
+  // The shared drawing this box shows, given back when it is no longer shown.
+  const held = useRef<{ bytes: Uint8Array; key: string } | null>(null);
   const { bytes, kind, mimeType } = file;
+  const pixels = Math.round(width * 2);
+  const key = kind === 'pdf' ? `p${pageIndex}:${pixels}` : `i:${mimeType}:${pixels}`;
 
   const release = useCallback(() => {
     job.current?.controller.abort();
     job.current = null;
-    if (url.current) URL.revokeObjectURL(url.current);
-    url.current = null;
+    if (held.current) thumbnails.give(held.current.bytes, held.current.key);
+    held.current = null;
   }, []);
 
   useEffect(() => release, [release]);
@@ -69,9 +86,11 @@ export default function Thumb({ file, pageIndex = 0, width, alt, className, scro
     };
   }, [lazy, scrollRoot]);
 
-  // Another file or page: start again.
+  // Another file or page: start again (and the automatic retry is due again).
   useEffect(() => {
     release();
+    retried.current = false;
+    setDrawing(false);
     setState((s) => (s.status === 'waiting' ? s : { status: 'waiting' }));
   }, [bytes, kind, mimeType, pageIndex, width, release]);
 
@@ -83,7 +102,7 @@ export default function Thumb({ file, pageIndex = 0, width, alt, className, scro
     }
   }, [lazy, near]);
 
-  // Far out of view: give the image's memory back.
+  // Far out of view: let the image go (the shared drawing may still be kept for its return).
   useEffect(() => {
     if (!lazy || kept) return;
     release();
@@ -91,49 +110,124 @@ export default function Thumb({ file, pageIndex = 0, width, alt, className, scro
   }, [lazy, kept, release]);
 
   useEffect(() => {
-    if (!near || state.status !== 'waiting' || job.current) return;
+    if (!near || state.status !== 'waiting' || job.current || held.current) return;
+    // Drawn already (by the page panel, or before it scrolled away): shown at once.
+    const ready = thumbnails.take(bytes, key);
+    if (ready) {
+      held.current = { bytes, key };
+      setState({ status: 'ready', url: ready });
+      return;
+    }
     const controller = new AbortController();
     const entry = { controller, started: false };
     job.current = entry;
-    const options = { signal: controller.signal, priority, onStart: () => (entry.started = true) };
-    const pixels = Math.round(width * 2);
-    const render =
+    setDrawing(false);
+    const render = (options: Parameters<typeof renderThumbnail>[3]) =>
       kind === 'pdf' ? renderThumbnail(bytes, pageIndex, pixels, options) : renderImageThumbnail(bytes, mimeType, pixels, options);
-    render.then(
-      (made) => {
-        if (controller.signal.aborted || job.current !== entry) {
-          URL.revokeObjectURL(made);
-          return;
-        }
-        job.current = null;
-        url.current = made;
-        setState({ status: 'ready', url: made });
-      },
-      (error) => {
-        if (job.current === entry) job.current = null;
-        if (controller.signal.aborted || isAbortError(error)) return;
-        // Previews that cannot run at all are announced once, not only shown as icons.
-        if (error instanceof PdfToolsError && error.code === RENDER_UNAVAILABLE) toast.error(error.message, { id: RENDER_UNAVAILABLE });
-        setState({ status: 'failed' });
-      },
-    );
-  }, [near, state.status, bytes, kind, mimeType, pageIndex, width, priority]);
+    thumbnails
+      .draw(bytes, key, (options) => render(options), {
+        priority,
+        signal: controller.signal,
+        onStart: () => {
+          entry.started = true;
+          if (job.current === entry) setDrawing(true);
+        },
+      })
+      .then(
+        (made) => {
+          if (controller.signal.aborted || job.current !== entry) {
+            thumbnails.give(bytes, key); // it was counted as shown here
+            return;
+          }
+          job.current = null;
+          held.current = { bytes, key };
+          setState({ status: 'ready', url: made });
+        },
+        (error) => {
+          if (job.current === entry) job.current = null;
+          if (controller.signal.aborted || isAbortError(error)) return;
+          // Previews that cannot run at all are announced once, not only shown as icons.
+          if (error instanceof PdfToolsError && error.code === RENDER_UNAVAILABLE) {
+            toast.error(error.message, { id: RENDER_UNAVAILABLE });
+            setState({ status: 'failed' });
+            return;
+          }
+          // Usually the renderer was busy (a time limit, a restart): tried once more when it is idle,
+          // still looking like a preview on its way, so a good file never keeps a warning (QA-FIX D).
+          if (!retried.current) {
+            retried.current = true;
+            void whenRendererIdle().then(() => setAttempt((n) => n + 1));
+            return;
+          }
+          setState({ status: 'failed' });
+        },
+      );
+  }, [near, state.status, bytes, kind, mimeType, pageIndex, pixels, key, priority, attempt]);
+
+  const tryAgain = () => {
+    retried.current = true; // a press of Try again is the user's own retry
+    setDrawing(false);
+    setState({ status: 'waiting' });
+    setAttempt((n) => n + 1);
+  };
+  const words = width >= WORDS_FROM;
 
   return (
     <div
       ref={box}
       className={cn('relative flex shrink-0 items-center justify-center overflow-hidden rounded border bg-muted/60', className)}
       style={{ width }}
+      data-thumb-state={state.status === 'waiting' ? (drawing ? 'drawing' : 'waiting') : state.status}
     >
       {state.status === 'ready' && (
         <img data-testid="pdf-tools-thumb" src={state.url} alt={alt} className="h-full w-full object-contain" draggable={false} />
       )}
-      {state.status === 'waiting' && <div className="absolute inset-1 animate-pulse rounded-sm bg-muted" aria-hidden="true" />}
-      {state.status === 'failed' && (
+      {state.status === 'waiting' && (
         <>
-          <FileWarning className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <span className="sr-only">Preview not available</span>
+          {/* Only a box whose drawing is due pulses. A long file's page panel holds hundreds of boxes far out of
+              view that never draw: pulsing, they made every frame restyle and re-layer them all (about 80 ms a
+              frame on a busy machine, all the time), and each turn a run gives the screen paid for one such frame. */}
+          <div className={cn('absolute inset-1 rounded-sm bg-muted', near && 'animate-pulse')} aria-hidden="true" />
+          {words && (
+            <span className="relative text-[11px] text-muted-foreground" aria-hidden="true">
+              {drawing ? 'Drawing…' : 'Waiting…'}
+            </span>
+          )}
         </>
+      )}
+      {state.status === 'failed' && (
+        <div className="flex flex-col items-center gap-1 px-1 text-center">
+          {words && <FileWarning className="h-5 w-5 text-muted-foreground" aria-hidden="true" />}
+          {words && <span className="text-[11px] leading-tight text-muted-foreground">Preview not drawn</span>}
+          {!words && !retryButton && <FileWarning className="h-5 w-5 text-muted-foreground" aria-hidden="true" />}
+          <span className="sr-only">Preview not drawn</span>
+          {retryButton && (
+          <button
+            type="button"
+            data-testid="pdf-tools-thumb-retry"
+            aria-label={`Try again to draw the preview${alt ? ` (${alt})` : ''}`}
+            title="Try again"
+            onClick={(event) => {
+              // Inside a page tile or a row thumbnail: only this, not the tile's choice or the viewer.
+              event.stopPropagation();
+              tryAgain();
+            }}
+            onDoubleClick={(event) => event.stopPropagation()}
+            // Only the button's own keys stay here: the grid's keys (arrows, Delete, R, Ctrl+Z) still reach the
+            // page it sits on (REV-B minor 19).
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+            }}
+            className={cn(
+              'inline-flex items-center justify-center gap-1 rounded border bg-background font-medium text-foreground shadow-sm ring-offset-background hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              words ? 'h-6 px-1.5 text-[11px]' : 'h-6 w-6',
+            )}
+          >
+            <RotateCw className="h-3 w-3" aria-hidden="true" />
+            {words && 'Try again'}
+          </button>
+          )}
+        </div>
       )}
     </div>
   );

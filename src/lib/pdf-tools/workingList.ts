@@ -1,3 +1,4 @@
+import { forgetMatchedText } from './matchedText';
 import { PdfToolsError, type Destination, type VaultRecord, type WorkingFile } from './types';
 
 export const LIST_WARN_BYTES = 150 * 1024 * 1024;
@@ -47,6 +48,38 @@ export function contextKeyFor(userId: string, engagementId: string): string {
 
 export function newFileId(): string {
   return crypto.randomUUID();
+}
+
+/**
+ * The memory a row holds: its file, plus the unprotected preview bytes a Protect result keeps for its
+ * thumbnails and the page viewer (design 5.18). The list's limits (design 5.14) are about memory, so
+ * they count both. `size` stays the file's own size, the one the row shows and the saved file has.
+ */
+export function heldBytes(file: Pick<WorkingFile, 'size' | 'previewBytes'>): number {
+  return file.size + (file.previewBytes?.byteLength ?? 0);
+}
+
+/** What the rows hold together (heldBytes of each). */
+export function listHeldBytes(files: readonly Pick<WorkingFile, 'size' | 'previewBytes'>[]): number {
+  return files.reduce((sum, f) => sum + heldBytes(f), 0);
+}
+
+const views = new WeakMap<WorkingFile, WorkingFile>();
+
+/**
+ * What thumbnails, the page panel and the page viewer show for a row (design 5.18): a Protect result's
+ * unprotected preview bytes (never its password), else the row itself. The same view object is given for
+ * the same row, so renderers keyed on the file do not start again. Only for showing: saving, sending and
+ * running always use the row's own bytes.
+ */
+export function viewableFile(file: WorkingFile): WorkingFile {
+  if (!file.protectedOutput || !file.previewBytes) return file;
+  let view = views.get(file);
+  if (!view) {
+    view = { ...file, bytes: file.previewBytes };
+    views.set(file, view);
+  }
+  return view;
 }
 
 /** Selected files in list order (the merge order), not in the order they were ticked. */
@@ -123,15 +156,16 @@ export function createWorkingListStore(options: WorkingListOptions = {}): Workin
     setContext(contextKey) {
       if (contextKey === state.contextKey) return;
       commit({ contextKey, session: state.session + 1, files: [], selectedIds: [] });
+      forgetMatchedText(); // the last document text or file name a pattern read goes with the files
     },
 
     addFiles(contextKey, files, session) {
       if (!isCurrent(contextKey, session)) return { added: 0, refused: 0, overWarn: false };
-      let total = state.files.reduce((sum, f) => sum + f.size, 0);
+      let total = listHeldBytes(state.files);
       const accepted: WorkingFile[] = [];
       let refused = 0;
       for (const file of files) {
-        const length = file.bytes.byteLength;
+        const length = file.bytes.byteLength + (file.previewBytes?.byteLength ?? 0);
         if (total + length > maxBytes) {
           refused += 1;
         } else {
@@ -147,8 +181,8 @@ export function createWorkingListStore(options: WorkingListOptions = {}): Workin
 
     addResults(contextKey, files, session) {
       if (!isCurrent(contextKey, session)) return false;
-      const held = state.files.reduce((sum, f) => sum + f.size, 0);
-      const incoming = files.reduce((sum, f) => sum + f.bytes.byteLength, 0);
+      const held = listHeldBytes(state.files);
+      const incoming = files.reduce((sum, f) => sum + f.bytes.byteLength + (f.previewBytes?.byteLength ?? 0), 0);
       if (held + incoming > maxBytes) {
         throw new PdfToolsError('list-full', `The list is full: ${Math.round(maxBytes / 1048576)} MB is the most PDF Tools can hold. Remove some files and try again.`);
       }

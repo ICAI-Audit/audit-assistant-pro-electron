@@ -2,13 +2,18 @@
 // result names, Split and Delete pages checks, the page-number form, the Images to PDF margin,
 // the PDF to images size check, progress throttling and the page-number preview. Messages repeat
 // the lib's own words where the lib checks the same thing (the tests compare them).
-import { cleanFileName } from '@/lib/pdf-tools/fileNames';
+import { cleanFileName, cutMiddle } from '@/lib/pdf-tools/fileNames';
 import {
   defaultPageNumberOptions,
+  formatNumber,
   pageNumberLabel,
+  tokenError,
+  type DateFormat,
   type NumberFormat,
   type NumberPosition,
-  type PageNumberOptions,
+  type NumberStyle,
+  type PageNumberRunOptions,
+  type Slot,
 } from '@/lib/pdf-tools/pageNumbers';
 import { formatBytes } from './format';
 import { readPageList } from './pageSelection';
@@ -34,12 +39,9 @@ export const MAX_STEM_LENGTH = 90;
 
 /** The stem that Split's parts and PDF to images' pictures are named from, cleaned the same way. */
 export function resolveStem(input: string, fallback: string): string {
-  let stem = resolveResultName(input, `${fallback}.pdf`, 'pdf').slice(0, -'.pdf'.length);
-  if (stem.length > MAX_STEM_LENGTH) {
-    stem = stem.slice(0, MAX_STEM_LENGTH);
-    if (/[\uD800-\uDBFF]$/.test(stem)) stem = stem.slice(0, -1);
-  }
-  return stem;
+  const stem = resolveResultName(input, `${fallback}.pdf`, 'pdf').slice(0, -'.pdf'.length);
+  // In the middle, so the stem's end stays (QA-FIX G).
+  return cutMiddle(stem, MAX_STEM_LENGTH);
 }
 
 const whole = (text: string) => (/^\d+$/.test(text.trim()) ? Number(text.trim()) : Number.NaN);
@@ -94,7 +96,39 @@ export interface PageNumberForm {
   marginPt: string;
   /** #rrggbb */
   color: string;
+  // Phase 2 (design 5.17): the defaults below give phase 1's result and record.
+  /** 1, 2, 3 (default); i, ii; I, II; a, b; numbers in circles (only with the plain format). */
+  style: NumberStyle;
+  font: PageNumberFont;
+  bold: boolean;
+  italic: boolean;
+  /** False: no page number, only the header and footer texts. */
+  numbersOn: boolean;
+  /** The header and footer lines as typed, by place, tokens and all; '' (or only spaces) is no text there. */
+  texts: Record<Slot, string>;
+  /** How {date} is written. */
+  dateFormat: DateFormat;
 }
+
+export type PageNumberFont = NonNullable<PageNumberRunOptions['font']>;
+
+/** The six places in the order the dialog lists them (top row, then bottom row). */
+export const TEXT_SLOTS: readonly Slot[] = ['top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'];
+
+/** A place as the messages name it, in pageNumbers.ts's words. */
+export const SLOT_NAMES: Readonly<Record<Slot, string>> = {
+  'top-left': 'top left',
+  'top-center': 'top centre',
+  'top-right': 'top right',
+  'bottom-left': 'bottom left',
+  'bottom-center': 'bottom centre',
+  'bottom-right': 'bottom right',
+};
+
+/** A header or footer line holds 1 to this many characters (pageNumbers.ts). */
+export const TEXT_MAX_CHARACTERS = 120;
+
+const noTexts = (): Record<Slot, string> => ({ 'top-left': '', 'top-center': '', 'top-right': '', 'bottom-left': '', 'bottom-center': '', 'bottom-right': '' });
 
 /** The bounds addPageNumbers accepts, used for the inputs' min and max. */
 export const PAGE_NUMBER_LIMITS = {
@@ -129,15 +163,36 @@ export function defaultPageNumberForm(pageCount: number): PageNumberForm {
     fontSize: String(d.fontSize),
     marginPt: String(d.marginPt),
     color: rgbToHex(d.color),
+    style: 'arabic',
+    font: 'helvetica',
+    bold: false,
+    italic: false,
+    numbersOn: true,
+    texts: noTexts(),
+    dateFormat: 'dd-mm-yyyy',
   };
 }
 
-/** The page-number field an error belongs to ('range' covers both From and To). */
-export type PageNumberField = 'startNumber' | 'range' | 'fontSize' | 'marginPt' | 'color';
+/**
+ * The page-number field an error belongs to ('range' covers both From and To; `text-<place>` is the
+ * header or footer line at that place; 'numbersOn' is the page-number switch).
+ */
+export type PageNumberField = 'startNumber' | 'range' | 'fontSize' | 'marginPt' | 'color' | 'style' | 'numbersOn' | `text-${Slot}`;
 
+/**
+ * `options` are what the run takes, without `tokens`: the dialog adds `{ file, client, fy, today }` when
+ * Run is pressed (read with the engagement's scope, design 5.17). A phase 2 field left at its default is
+ * left out, so phase 1 choices give exactly phase 1's options, result and record.
+ */
 export type FormReading =
-  | { options: PageNumberOptions; error: null; field: null }
+  | { options: PageNumberRunOptions; error: null; field: null }
   | { options: null; error: string; field: PageNumberField };
+
+/** The header and footer lines that hold text, in pageNumbers.ts's order of places. */
+export function usedTexts(texts: Readonly<Record<Slot, string>>): [Slot, string][] {
+  const order: Slot[] = ['bottom-center', 'bottom-left', 'bottom-right', 'top-center', 'top-left', 'top-right'];
+  return order.flatMap((slot) => (texts[slot] !== undefined && texts[slot].trim() !== '' ? [[slot, texts[slot]] as [Slot, string]] : []));
+}
 
 /** Reads the form in the order addPageNumbers checks it, with the same messages. */
 export function readPageNumberForm(form: PageNumberForm, pageCount: number): FormReading {
@@ -160,27 +215,54 @@ export function readPageNumberForm(form: PageNumberForm, pageCount: number): For
   const color = hexToRgb(form.color);
   if (!color) return fail('color', 'Choose a valid colour for the page number.');
 
-  return {
-    options: { position: form.position, format: form.format, prefix: form.prefix, suffix: form.suffix, startNumber, fromPage, toPage, fontSize, marginPt, color },
-    error: null,
-    field: null,
-  };
+  // Phase 2, in pageNumbers.ts's order and words.
+  const style = form.style ?? 'arabic';
+  if (style === 'circled' && form.format !== 'n') {
+    return fail('style', 'A number in a circle goes with the plain number format. Choose "1, 2, 3" or another style.');
+  }
+  const numbersOn = form.numbersOn !== false;
+  const texts = usedTexts(form.texts ?? noTexts());
+  if (!numbersOn && texts.length === 0) return fail('numbersOn', 'Turn on the page number or add header or footer text.');
+  for (const [slot, text] of texts) {
+    const field = `text-${slot}` as const;
+    if (Array.from(text).length > TEXT_MAX_CHARACTERS) return fail(field, `The text at the ${SLOT_NAMES[slot]} needs 1 to ${TEXT_MAX_CHARACTERS} characters.`);
+    const token = tokenError(text);
+    if (token) return fail(field, `The text at the ${SLOT_NAMES[slot]}: ${token}`);
+    if (numbersOn && slot === form.position && !/\{page\}/i.test(text)) {
+      return fail(field, `The page number is already at the ${SLOT_NAMES[slot]}. Choose another place for this text, or write {page} in the text.`);
+    }
+  }
+
+  const options: PageNumberRunOptions = { position: form.position, format: form.format, prefix: form.prefix, suffix: form.suffix, startNumber, fromPage, toPage, fontSize, marginPt, color };
+  if (style !== 'arabic') options.style = style;
+  if (form.font && form.font !== 'helvetica') options.font = form.font;
+  if (form.bold) options.bold = true;
+  if (form.italic) options.italic = true;
+  if (!numbersOn) options.numbersOn = false;
+  if (texts.length > 0) options.texts = Object.fromEntries(texts);
+  if (texts.length > 0 && form.dateFormat && form.dateFormat !== 'dd-mm-yyyy') options.dateFormat = form.dateFormat;
+  return { options, error: null, field: null };
 }
 
 /**
  * The preview numbers a one-page extract of the first numbered page. On one page, "of N" would
  * count one page, so those formats become the equivalent custom text with the real total.
  */
-export function previewPlan(options: PageNumberOptions): { pageIndex: number; options: PageNumberOptions; label: string } {
+export function previewPlan<O extends PageNumberRunOptions>(options: O): { pageIndex: number; options: O; label: string } {
   const total = options.toPage - options.fromPage + 1 + options.startNumber - 1;
   const label = pageNumberLabel(options, options.startNumber, total);
+  const written = formatNumber(total, options.style ?? 'arabic');
   let { format, prefix, suffix } = options;
   if (format === 'n-of-total' || format === 'page-n-of-total') {
     prefix = format === 'page-n-of-total' ? 'Page ' : '';
-    suffix = ` of ${total}`;
+    suffix = ` of ${written}`;
     format = 'custom';
   }
-  return { pageIndex: options.fromPage - 1, options: { ...options, format, prefix, suffix, fromPage: 1, toPage: 1 }, label };
+  // {pages} in a header or footer line would count the one page of the extract: write the real total in.
+  const texts = options.texts
+    ? Object.fromEntries(Object.entries(options.texts).map(([slot, text]) => [slot, typeof text === 'string' ? text.replace(/\{pages\}/gi, written) : text]))
+    : undefined;
+  return { pageIndex: options.fromPage - 1, options: { ...options, format, prefix, suffix, fromPage: 1, toPage: 1, ...(texts ? { texts } : {}) }, label };
 }
 
 /** The preview's page is page 1 of the extract: say which page of the file it really is. */

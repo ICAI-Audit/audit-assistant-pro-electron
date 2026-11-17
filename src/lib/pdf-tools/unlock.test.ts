@@ -79,7 +79,7 @@ const XMP = new TextEncoder().encode(
 
 /**
  * AES-256 file with /EncryptMetadata false: the document's XMP stream is stored unencrypted, as
- * Acrobat's "do not encrypt metadata" and qpdf --cleartext-metadata write it. The library's encrypt()
+ * Acrobat's "do not encrypt metadata" option writes it. The library's encrypt()
  * cannot do this, so the XMP object is left out of encryption and the flag is set afterwards
  * (for AES-256 the flag does not enter the file key).
  */
@@ -195,7 +195,7 @@ beforeAll(async () => {
     fixtures.set(scheme, await makeProtectedPdf('U', 3, PASSWORD, scheme, { ownerPassword: OWNER }));
     classicFixtures.set(scheme, await makeProtectedPdf('U', 3, PASSWORD, scheme, { ownerPassword: OWNER, classicXref: true }));
   }
-}, 30_000);
+}, 120_000); // a hang guard only: cold imports and ten protected files passed 30 s on a loaded machine (FIX-C, WRAP)
 
 describe('unlockPdf and tryOpenWithoutPassword', () => {
   it('opens each scheme with its password, refuses a wrong one, and needs a password (brief)', async () => {
@@ -410,7 +410,7 @@ describe('unlockPdf and tryOpenWithoutPassword', () => {
   });
 
   // How other programs store a non-Latin password in an RC4 or AES-128 file (one byte per character):
-  // in PDFDocEncoding when every character has a code there, otherwise as its UTF-8 bytes (qpdf does this).
+  // in PDFDocEncoding when every character has a code there, otherwise as its UTF-8 bytes.
   const utf8Spelling = (text: string) => String.fromCharCode(...new TextEncoder().encode(text.normalize('NFC')));
   const storedSpellings: [string, string][] = [
     ['पासवर्ड१२३', utf8Spelling('पासवर्ड१२३')], // Devanagari: not in PDFDocEncoding
@@ -558,5 +558,55 @@ describe('unlockPdf and tryOpenWithoutPassword', () => {
         }
       }
     });
+  });
+});
+
+// Protect's check (review F2): the screen must be able to repaint and take Stop while a large file is
+// opened. The options are new; without them unlockPdf behaves exactly as before (the tests above).
+describe('unlockPdf in slices (objectsPerTick and onStep)', () => {
+  let locked: Uint8Array;
+  beforeAll(async () => {
+    locked = await makeProtectedPdf('Y', 30, PASSWORD, 'aes-256');
+  });
+
+  it('gives the same bytes in slices as in one go, and calls onStep between its three steps', async () => {
+    const steps: number[] = [];
+    const sliced = await unlockPdf(locked, PASSWORD, { objectsPerTick: 1, onStep: () => void steps.push(steps.length) });
+    expect(sliced).toEqual(await unlockPdf(locked, PASSWORD));
+    expect(steps).toEqual([0, 1, 2]);
+    expect(await pageTexts(sliced)).toHaveLength(30);
+  });
+
+  it('lets the event loop turn while it decrypts', async () => {
+    let turns = 0;
+    const timer = setInterval(() => void (turns += 1), 0);
+    try {
+      await unlockPdf(locked, PASSWORD, { objectsPerTick: 1 });
+    } finally {
+      clearInterval(timer);
+    }
+    expect(turns).toBeGreaterThan(10);
+  });
+
+  it('a PdfToolsError thrown by onStep stops it and comes back as it is', async () => {
+    const stop = new PdfToolsError('cancelled', 'Stopped.');
+    for (const at of [0, 1, 2]) {
+      let calls = 0;
+      const error = await caught(
+        unlockPdf(locked, PASSWORD, {
+          onStep: () => {
+            if (calls++ === at) throw stop;
+          },
+        }),
+      );
+      expect(error, `step ${at}`).toBe(stop);
+    }
+  });
+
+  it('an unprotected file comes back as the same array, with no step', async () => {
+    const plain = await makePdf('Plain', 2);
+    const steps: number[] = [];
+    expect(await unlockPdf(plain, '', { objectsPerTick: 1, onStep: () => void steps.push(1) })).toBe(plain);
+    expect(steps).toEqual([]);
   });
 });

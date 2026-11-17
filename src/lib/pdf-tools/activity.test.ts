@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildActivityEntry } from './activity';
+import { buildActivityEntry, HEADER_TEXT_TOKENS, isTokenTemplate, MARK_TEXT_TOKENS, typedTextRecord, WATERMARK_CHOICES } from './activity';
 import { PdfToolsError, type WorkingFile } from './types';
 
 // Built from code points so the pattern holds no literal control characters.
@@ -157,12 +157,12 @@ describe('buildActivityEntry', () => {
   it('also cleans the Arabic letter mark, C1 controls and the zero-width space', () => {
     const e = buildActivityEntry({
       file: result({
-        name: 'a؜b\u0085c\u009Fd​e.pdf',
+        name: 'a\u061Cb\u0085c\u009Fd\u200Be.pdf',
         operation: {
           tool: 'merge',
-          summary: 'x؜y\u0080z​!',
-          sources: [{ name: 'p؜q\u0090r​s.pdf', origin: 'computer' }],
-          options: { note: 'n؜o\u0095p​q' },
+          summary: 'x\u061Cy\u0080z\u200B!',
+          sources: [{ name: 'p\u061Cq\u0090r\u200Bs.pdf', origin: 'computer' }],
+          options: { note: 'n\u061Co\u0095p\u200Bq' },
         },
       }),
       destination: 'computer',
@@ -409,7 +409,7 @@ describe('buildActivityEntry', () => {
 
   it('keeps what was not carried in a long summary that is cut, in the entry and in an earlier step', () => {
     const pages = Array.from({ length: 60 }, (_, i) => String(i * 2 + 1)).join(', ');
-    const summary = `Extracted pages ${pages}; bookmarks not carried; signature no longer valid`;
+    const summary = `Extracted pages ${pages}; some bookmarks not carried; signature no longer valid`;
     const e = buildActivityEntry({
       file: result({
         operation: {
@@ -427,11 +427,243 @@ describe('buildActivityEntry', () => {
     });
     const first = e.details.split(' → ')[0];
     expect(Array.from(first).length).toBeLessThanOrEqual(120);
-    expect(first).toMatch(/^Extracted pages 1, 3, 5, .+…; bookmarks not carried; signature no longer valid$/);
-    expect(e.details).toMatch(/Earlier steps: Extracted pages 1, 3, .+…; bookmarks not carried; signature no longer valid → x\.pdf\./);
+    expect(first).toMatch(/^Extracted pages 1, 3, 5, .+…; some bookmarks not carried; signature no longer valid$/);
+    expect(e.details).toMatch(/Earlier steps: Extracted pages 1, 3, .+…; some bookmarks not carried; signature no longer valid → x\.pdf\./);
     // a long summary without notes is cut as before
     const plain = buildActivityEntry({ file: result({ operation: { tool: 'split', summary: `Extracted pages ${pages}`, sources: [], options: {} } }), destination: 'computer', sha256: SHA });
     expect(plain.details.split(' → ')[0]).toBe(Array.from(`Extracted pages ${pages}`).slice(0, 120).join(''));
+  });
+
+  it('carries every phase 2 flag as a metadata key, and its note survives a cut', () => {
+    const flags = { redactedValuesLeftVisible: true, textLayerIncomplete: true, markMayBeMisplaced: true } as const;
+    const long = `Added header and footer ${'x'.repeat(150)}; some chosen values left visible; some text on redacted pages is not searchable; a mark may be misplaced`;
+    const e = buildActivityEntry({ file: result({ operation: { tool: 'page-numbers', summary: long, sources: [], options: {}, flags } }), destination: 'computer', sha256: SHA });
+    expect(e.metadata).toMatchObject(flags);
+    expect(e.details.split(' → ')[0]).toMatch(/…; some chosen values left visible; some text on redacted pages is not searchable; a mark may be misplaced$/);
+  });
+
+  it('keeps only counts and choices in a Redact record: never a value, a term or a token', () => {
+    const options = {
+      areas: 14,
+      pagesRebuilt: 3,
+      pagesRebuiltHidden: 1,
+      counts: 'PAN 6, Aadhaar 2, typed 3, drawn 3',
+      mode: 'replace',
+      replacement: 'token-custom',
+      output: 'searchable',
+      dpi: 200,
+      valuesLeftVisible: 1,
+      textLayerCharsOmitted: 18,
+      autoBoxesDropped: 0,
+      bookmarksRemoved: 1,
+      // what must never reach the record, under any key
+      value: 'BNZPM2501F',
+      term: 'Sharma',
+      token: 'NOTE',
+      counts2: 'BNZPM2501F 1',
+    };
+    const e = buildActivityEntry({ file: result({ operation: { tool: 'redact', summary: 'Redacted 14 areas on 3 pages', sources: [], options, flags: {} } }), destination: 'vault', sha256: SHA });
+    expect(Object.keys(e.metadata.options as object).sort()).toEqual(
+      ['areas', 'autoBoxesDropped', 'bookmarksRemoved', 'counts', 'dpi', 'mode', 'output', 'pagesRebuilt', 'pagesRebuiltHidden', 'replacement', 'textLayerCharsOmitted', 'valuesLeftVisible'].sort(),
+    );
+    const text = JSON.stringify(e);
+    for (const secret of ['BNZPM2501F', 'Sharma', 'NOTE']) expect(text).not.toContain(secret);
+    // a value of the wrong shape under an allowed key is left out too
+    const odd = buildActivityEntry({
+      file: result({ operation: { tool: 'redact', summary: 'Redacted 1 area on 1 page', sources: [], options: { counts: 'BNZPM2501F', mode: 'BNZPM2501F', areas: -1 } } }),
+      destination: 'computer',
+      sha256: SHA,
+    });
+    expect(odd.metadata.options).toEqual({});
+  });
+
+  it('keeps only the algorithm in a Protect record, in the entry and as an earlier step', () => {
+    const protectedOp = { tool: 'protect' as const, summary: 'Protected with a password (AES-256)', sources: [], options: { protection: 'AES-256', length: 12, hint: 'my dog', strength: 'strong' } };
+    const e = buildActivityEntry({ file: result({ operation: protectedOp }), destination: 'computer', sha256: SHA });
+    expect(e.metadata.options).toEqual({ protection: 'AES-256' });
+    expect(e.details.startsWith('Protected with a password (AES-256) → A_merged.pdf')).toBe(true);
+    const later = buildActivityEntry({
+      file: result({
+        operation: {
+          tool: 'merge',
+          summary: 'Merged 2 files',
+          sources: [],
+          options: {},
+          earlier: [{ tool: 'protect', summary: protectedOp.summary, resultName: 'a_protected.pdf', options: protectedOp.options, resultId: 'p1' }],
+          originalSources: [{ name: 'a.pdf', origin: 'computer' }],
+        },
+      }),
+      destination: 'computer',
+      sha256: SHA,
+    });
+    expect((later.metadata.earlierSteps as { options: object }[])[0].options).toEqual({ protection: 'AES-256' });
+    expect(JSON.stringify(later)).not.toContain('my dog');
+    // a PDF/A source: the record says the copy is no longer archival, and nothing else
+    const archival = buildActivityEntry({ file: result({ operation: { ...protectedOp, options: { protection: 'AES-256', noLongerArchival: true, hint: 'x' } } }), destination: 'computer', sha256: SHA });
+    expect(archival.metadata.options).toEqual({ protection: 'AES-256', noLongerArchival: true });
+  });
+
+  it('keeps only counts and choices in a Resize or crop pages record', () => {
+    const resized = buildActivityEntry({
+      file: result({
+        operation: {
+          tool: 'resize-crop',
+          summary: 'Resized 7 pages to A4, 1 already A4',
+          sources: [],
+          options: { mode: 'resize', size: 'A4', direction: 'keep', enlarge: false, marginMm: 0, pages: 'all', changed: 7, unchanged: 1, pagesToCheck: 0, title: 'Bank of Somewhere' },
+        },
+      }),
+      destination: 'computer',
+      sha256: SHA,
+    });
+    expect(resized.metadata.options).toEqual({ mode: 'resize', size: 'A4', direction: 'keep', enlarge: false, marginMm: 0, pages: 'all', changed: 7, unchanged: 1, pagesToCheck: 0 });
+    const own = buildActivityEntry({
+      file: result({ operation: { tool: 'resize-crop', summary: 'Resized 1 page to 200 × 300 mm', sources: [], options: { mode: 'resize', size: '200 × 300 mm', pages: '2-5' } } }),
+      destination: 'computer',
+      sha256: SHA,
+    });
+    expect(own.metadata.options).toEqual({ mode: 'resize', size: '200 × 300 mm', pages: '2-5' });
+    const trimmed = buildActivityEntry({
+      file: result({
+        operation: {
+          tool: 'resize-crop',
+          summary: 'Trimmed 8 pages: 10 mm on every edge',
+          sources: [],
+          options: { mode: 'trim', leftMm: 10, topMm: 10, rightMm: 10, bottomMm: -1, mirror: true, pages: 'page 3 of Bank.pdf', changed: 8, size: 'Bank.pdf' },
+        },
+      }),
+      destination: 'computer',
+      sha256: SHA,
+    });
+    expect(trimmed.metadata.options).toEqual({ mode: 'trim', leftMm: 10, topMm: 10, rightMm: 10, mirror: true, changed: 8 });
+  });
+
+  it('keeps only choices in a Watermark record: a ready-made text, a token template or "custom", never the text or the logo file name (REV-B B1)', () => {
+    const options = {
+      pages: 'all',
+      watermark: 'ACME LTD - DRAFT',
+      watermarkFont: 'helvetica bold',
+      watermarkSize: 'auto',
+      watermarkAngle: 'diagonal',
+      watermarkColour: '#808080',
+      watermarkOpacity: 25,
+      watermarkLayer: 'front',
+      watermarkPosition: 'point 25.5% across, 10% down',
+      stamp: 'Checked by Acme {date}',
+      stampSize: 20,
+      stampAngle: 0,
+      stampColour: '#a00000',
+      stampOpacity: 78,
+      stampPosition: 'top-right',
+      logo: 'AcmeLtd_logo.png',
+      logoWidth: 18,
+      logoOpacity: 100,
+      logoPosition: 'top-left',
+    };
+    const typed = buildActivityEntry({ file: result({ operation: { tool: 'watermark', summary: 'Watermark (custom text), all pages', sources: [], options } }), destination: 'computer', sha256: SHA });
+    expect(typed.metadata.options).toEqual({
+      pages: 'all',
+      watermarkFont: 'helvetica bold',
+      watermarkSize: 'auto',
+      watermarkAngle: 'diagonal',
+      watermarkColour: '#808080',
+      watermarkOpacity: 25,
+      watermarkLayer: 'front',
+      watermarkPosition: 'point 25.5% across, 10% down',
+      stampSize: 20,
+      stampAngle: 0,
+      stampColour: '#a00000',
+      stampOpacity: 78,
+      stampPosition: 'top-right',
+      logoWidth: 18,
+      logoOpacity: 100,
+      logoPosition: 'top-left',
+    });
+    expect(JSON.stringify(typed)).not.toMatch(/acme/i);
+    const chosen = buildActivityEntry({
+      file: result({
+        operation: {
+          tool: 'watermark',
+          summary: 'Watermark DRAFT, stamp (custom text), logo, all pages',
+          sources: [],
+          options: { watermark: 'DRAFT', stamp: 'custom', stampLength: 21, stampUses: '{date}', logo: true, logoPixelWidth: 600, logoPixelHeight: 200 },
+        },
+      }),
+      destination: 'computer',
+      sha256: SHA,
+    });
+    expect(chosen.metadata.options).toEqual({ watermark: 'DRAFT', stamp: 'custom', stampLength: 21, stampUses: '{date}', logo: true, logoPixelWidth: 600, logoPixelHeight: 200 });
+    const template = buildActivityEntry({ file: result({ operation: { tool: 'watermark', summary: 'Watermark {client}', sources: [], options: { watermark: '{client}', stamp: '{date} - {CLIENT}', stampUses: '{fy}' } } }), destination: 'computer', sha256: SHA });
+    expect(template.metadata.options).toEqual({ watermark: '{client}', stamp: '{date} - {CLIENT}' });
+  });
+
+  it('keeps only choices in a Page numbers record: the typed texts as "custom" with a length, or a template of tokens (REV-B B1)', () => {
+    const options = {
+      position: 'bottom-right',
+      format: 'custom',
+      prefix: 'WP-A1 / ',
+      suffix: ' -',
+      startNumber: 1,
+      fromPage: 1,
+      toPage: 3,
+      fontSize: 10,
+      marginPt: 28,
+      color: '#000000',
+      style: 'arabic',
+      font: 'helvetica',
+      bold: false,
+      italic: false,
+      dateFormat: 'dd-mm-yyyy',
+      numbersOn: true,
+      text_top_left: 'Acme Ltd FY 2025-26',
+      text_top_right: '{client} - {fy}',
+      text_bottom_left: 'custom',
+      text_bottom_left_length: 19,
+      text_bottom_left_uses: '{page} {pages}',
+      text_bottom_center: 'Page {page}',
+    };
+    const e = buildActivityEntry({ file: result({ operation: { tool: 'page-numbers', summary: 'Added page numbers, header and footer', sources: [], options } }), destination: 'computer', sha256: SHA });
+    expect(e.metadata.options).toEqual({
+      position: 'bottom-right',
+      format: 'custom',
+      suffix: '-', // punctuation only, a choice (spaces trimmed as every option text is)
+      startNumber: 1,
+      fromPage: 1,
+      toPage: 3,
+      fontSize: 10,
+      marginPt: 28,
+      color: '#000000',
+      style: 'arabic',
+      font: 'helvetica',
+      bold: false,
+      italic: false,
+      dateFormat: 'dd-mm-yyyy',
+      numbersOn: true,
+      text_top_right: '{client} - {fy}',
+      text_bottom_left: 'custom',
+      text_bottom_left_length: 19,
+      text_bottom_left_uses: '{page} {pages}',
+    });
+    expect(JSON.stringify(e)).not.toMatch(/acme|WP-A1|Page \{page\}/i);
+  });
+
+  it('typedTextRecord: the text only when it is a ready-made text or a template of tokens and punctuation', () => {
+    expect(typedTextRecord('DRAFT', WATERMARK_CHOICES, MARK_TEXT_TOKENS)).toEqual({ value: 'DRAFT' });
+    expect(typedTextRecord('{client}', WATERMARK_CHOICES, MARK_TEXT_TOKENS)).toEqual({ value: '{client}' });
+    expect(typedTextRecord('{Date} · {client}', [], MARK_TEXT_TOKENS)).toEqual({ value: '{Date} · {client}' });
+    expect(typedTextRecord('Draft', WATERMARK_CHOICES, MARK_TEXT_TOKENS)).toEqual({ value: 'custom', length: 5, uses: '' });
+    expect(typedTextRecord('ACME {client} {date} {client}', WATERMARK_CHOICES, MARK_TEXT_TOKENS)).toEqual({ value: 'custom', length: 29, uses: '{client} {date}' });
+    // a token the tool does not fill is text; digits are text; punctuation alone is not a template
+    expect(typedTextRecord('{fy}', [], MARK_TEXT_TOKENS).value).toBe('custom');
+    expect(typedTextRecord('{page} of {pages}', [], HEADER_TEXT_TOKENS)).toEqual({ value: 'custom', length: 17, uses: '{page} {pages}' });
+    expect(typedTextRecord('{fy} 2025', [], HEADER_TEXT_TOKENS).value).toBe('custom');
+    expect(typedTextRecord('{client} - {fy}', [], HEADER_TEXT_TOKENS)).toEqual({ value: '{client} - {fy}' });
+    // punctuation around a page number is a choice too; spaces alone are not
+    expect(typedTextRecord(' - ', [], HEADER_TEXT_TOKENS)).toEqual({ value: ' - ' });
+    expect(typedTextRecord('   ', [], HEADER_TEXT_TOKENS)).toEqual({ value: 'custom', length: 3, uses: '' });
+    expect(isTokenTemplate('{file}', HEADER_TEXT_TOKENS)).toBe(true);
+    expect(isTokenTemplate('{file}x', HEADER_TEXT_TOKENS)).toBe(false);
+    expect(isTokenTemplate('No. 1', HEADER_TEXT_TOKENS)).toBe(false);
   });
 
   it('copes with a file that has no operation record', () => {

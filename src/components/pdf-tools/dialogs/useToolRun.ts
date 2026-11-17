@@ -174,6 +174,18 @@ export function toolNameInSentence(tool: ToolId): string {
 }
 
 /**
+ * The Stop confirmation (UX audit C6.2, principle 2): the title names the tool as its button does
+ * ("Stop Page numbers?"), the body says what stopping means; its buttons are "Keep running" and "Stop".
+ */
+export function stopTitle(tool: ToolId): string {
+  return `Stop ${toolInfo(tool).label}?`;
+}
+
+export function stopQuestion(tool: ToolId): string {
+  return `${toolInfo(tool).label} is still running. If you stop now, nothing is added to the list.`;
+}
+
+/**
  * An editable result name that follows its default (for example a page range) until the user
  * types, and is cleaned when the field is left. `kind: 'stem'` is for the names parts and page
  * images are made from.
@@ -192,13 +204,20 @@ export function useResultName(fallback: string, kind: 'pdf' | 'stem' = 'pdf') {
     setValue(text);
   }, []);
 
-  /** On leaving the field: clean it, and follow the default again if that is what it now holds. */
+  /**
+   * On leaving the field: clean it, and follow the default again if that is what it now holds. Done once
+   * focus has landed on the next control: the cleaning removes the "Will be saved as..." line, and nodes
+   * removed while focus is between two controls make the dialog's focus trap (Radix) pull focus back to
+   * the dialog, so Tab would never reach the next field (W2-OG's finding; W2-B and W2-OG defer the same way).
+   */
   const commit = useCallback(() => {
-    setValue((text) => {
-      const cleaned = resolve(text);
-      edited.current = cleaned !== fallback;
-      return cleaned;
-    });
+    window.setTimeout(() => {
+      setValue((text) => {
+        const cleaned = resolve(text);
+        edited.current = cleaned !== fallback;
+        return cleaned;
+      });
+    }, 0);
   }, [resolve, fallback]);
 
   return { value, change, commit, resolved: resolve(value), fallback };

@@ -1,12 +1,29 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ComponentType, type DragEvent, type KeyboardEvent } from 'react';
+import {
+  Component,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ComponentType,
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { toast } from 'sonner';
-import { Archive, FilePlus2, Loader2, ShieldCheck, Upload } from 'lucide-react';
+import { Archive, FilePlus2, Info, Loader2, Save, ShieldCheck, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { stripExtension } from '@/lib/pdf-tools/fileNames';
 import { sha256Hex } from '@/lib/pdf-tools/hash';
-import { contextKeyFor, LIST_MAX_BYTES, LIST_WARN_BYTES, selectedInOrder } from '@/lib/pdf-tools/workingList';
+import { forgetMatchedText } from '@/lib/pdf-tools/matchedText';
+import { contextKeyFor, LIST_MAX_BYTES, LIST_WARN_BYTES, listHeldBytes, selectedInOrder, viewableFile } from '@/lib/pdf-tools/workingList';
 import type { ToolId, WorkingFile } from '@/lib/pdf-tools/types';
 import CompressDialog from './dialogs/CompressDialog';
 import DeletePagesDialog from './dialogs/DeletePagesDialog';
@@ -25,6 +42,7 @@ import {
   attachSummary,
   attachToWorkingPaper,
   dropMissingVaultRecords,
+  isUnsavedResult,
   LOG_FAILED,
   recordComputerSave,
   resultsOf,
@@ -35,14 +53,16 @@ import {
   type SummaryToast,
 } from './destinations';
 import FileList from './FileList';
+import { fileMessageId, RESULT_MESSAGE } from './fileMessages';
 import { formatBytes, plainMessage } from './format';
 import HintButton from './HintButton';
 import PagePanel from './PagePanel';
-import { releasePdfRenderer } from './pdfRenderer';
+import { clearThumbnails, releasePdfRenderer } from './pdfRenderer';
 import type { RunResult } from './runTool';
 import { FOCUS_GRACE_MS, FOLDER_NOT_CHOSEN, PICKER_STALL_MS, planSaveResult, watchSave, type SaveReport } from './savePlan';
 import { cleanedName, saveAsZip, saveManyToFolder, saveOne, SaveFailedError, type SaveOutcome } from './saveToComputer';
 import ToolBar from './ToolBar';
+import { toolFlags, toolIsBuilt, useBuiltTools } from './toolModules';
 import { shouldDropContext } from './contextGuard';
 import { delayedBusy } from './delayedBusy';
 import { focusAfterListChange } from './listFocus';
@@ -50,9 +70,13 @@ import { ENGAGEMENT_STORAGE_KEY } from './engagementWatch';
 import { useDestinationServices } from './useDestinationServices';
 import { useFileIntake, type IntakeStage } from './useFileIntake';
 import { useWorkingList } from './useWorkingList';
+import { selectionAfterAdding, startBatch, type AddBatch } from './addedSelection';
+import { WHY_LINE_MS, whyLineText, WhyContext } from './whyLine';
+import { focusQuietly } from './quietFocus';
 import { vaultChoices, vaultFileLike } from './vaultBytes';
+import PageViewer from './viewer/PageViewer';
 
-const ACCEPT = '.pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp,.bmp,image/bmp,.gif,image/gif';
+const ACCEPT = '.pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.tif,.tiff,image/tiff,.webp,image/webp,.bmp,image/bmp,.gif,image/gif';
 
 const STAGE_TEXT: Record<IntakeStage, string> = {
   reading: 'Reading',
@@ -67,8 +91,18 @@ function zipNameFor(files: WorkingFile[]): string {
   return files.length === 1 ? first : `${first} and ${files.length - 1} more`;
 }
 
-const RESULT_TOAST = 'pdf-tools-result';
+// Messages that name a file carry an id from fileMessages.ts: they go when the list does (REV-B S3).
+const RESULT_TOAST = RESULT_MESSAGE;
+/** Long enough to reach its buttons (UX audit C6.10). */
+const RESULT_TOAST_MS = 10_000;
 
+// Which phase 2 tools are built is read as soon as this screen's code loads (toolModules.ts).
+void toolFlags.load();
+
+/**
+ * Each tool's dialog. Phase 2's are loaded when first opened (each is its own chunk, owned by its dialog
+ * lane); until its run module says BUILT, a tool is "Soon" on the toolbar and its dialog never opens.
+ */
 const TOOL_DIALOGS: Record<ToolId, ComponentType<ToolDialogProps>> = {
   merge: MergeDialog,
   split: SplitDialog,
@@ -77,16 +111,62 @@ const TOOL_DIALOGS: Record<ToolId, ComponentType<ToolDialogProps>> = {
   'page-numbers': PageNumbersDialog,
   'images-to-pdf': ImagesToPdfDialog,
   'pdf-to-images': PdfToImagesDialog,
+  bookmarks: lazy(() => import('./dialogs/BookmarksDialog')),
+  'organise-pages': lazy(() => import('./dialogs/OrganisePagesDialog')),
+  'resize-crop': lazy(() => import('./dialogs/PageBoxDialog')),
+  watermark: lazy(() => import('./dialogs/WatermarkDialog')),
+  protect: lazy(() => import('./dialogs/ProtectDialog')),
+  redact: lazy(() => import('./dialogs/RedactDialog')),
 };
+
+/** The read-only bookmark list beside the page panel (lane W2-B's), loaded with the first file that has bookmarks. */
+const BookmarkList = lazy(() => import('./BookmarkList'));
+
+/**
+ * In place of a tool's dialog while its code loads (UX audit C7, T1-10): nothing at first, so a quick load
+ * never flashes; after a moment (delayedBusy) the tool's button shows a spinner, until the dialog opens or
+ * fails to.
+ */
+function DialogLoading({ tool, onBusy }: { tool: ToolId; onBusy: (tool: ToolId | null) => void }) {
+  useEffect(
+    () =>
+      delayedBusy(
+        () => onBusy(tool),
+        () => onBusy(null),
+      ),
+    [tool, onBusy],
+  );
+  return null;
+}
+
+/**
+ * A tool's dialog that fails (its code could not be loaded, or it broke while showing) closes and says so,
+ * instead of taking the screen and the list with it. Nothing about the files is said or logged.
+ */
+class ToolDialogBoundary extends Component<{ onFailed: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    this.props.onFailed();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 /** The open destination dialog. The files are the selection as it was when the dialog opened. */
 type DestinationDialog =
   | { kind: 'picker'; key: number }
   | { kind: 'vault' | 'attach'; key: number; files: WorkingFile[]; leftOut: number };
 
-const NOT_RESULTS_VAULT = 'Only results can be added to the Evidence Vault from here. Select a file made by a tool.';
+const NOT_RESULTS_VAULT = 'Only results can be added to the Evidence Vault from here. Upload originals in the Evidence Vault itself.';
 const NOT_RESULTS_ATTACH = 'Only results can be attached from here. Select a file made by a tool.';
-const NO_PROGRAMME = 'This engagement has no audit programme yet';
+const NO_PROGRAMME = 'This engagement has no audit programme yet. Create one in Audit Execution (New Execution).';
 
 function showSummary(summary: SummaryToast | null): void {
   if (!summary) return;
@@ -100,12 +180,18 @@ function showFolderNotChosen(): void {
 }
 
 export default function PdfTools() {
+  // First, before any hook: the screen waits (its Suspense) until it knows which tools are built.
+  const builtTools = useBuiltTools();
   const { state, contextKey, store } = useWorkingList();
   const selected = useMemo(() => selectedInOrder(state), [state]);
   const { progress, passwordRequest, addFiles, settlePassword, summary } = useFileIntake(contextKey);
   const services = useDestinationServices();
   const [activeTool, setActiveTool] = useState<{ tool: ToolId; files: WorkingFile[]; key: number } | null>(null);
+  // The tool whose dialog's code is still loading after a moment (its button shows a spinner).
+  const [dialogLoading, setDialogLoading] = useState<ToolId | null>(null);
   const [destination, setDestination] = useState<DestinationDialog | null>(null);
+  // The page viewer opened from a row's View action, and the control that opened it.
+  const [viewing, setViewing] = useState<{ fileId: string; opener: HTMLElement | null; placeholder: string | null; key: number } | null>(null);
   // Which destination button is waiting for its vault check (shown only after a moment).
   const [checking, setChecking] = useState<'vault' | 'attach' | null>(null);
   const [reveal, setReveal] = useState<{ id: string; token: number } | null>(null);
@@ -129,7 +215,8 @@ export default function PdfTools() {
   // The hooks' functions of the latest render: taken at the click that confirms a destination.
   const latestServices = useRef(services);
   latestServices.current = services;
-  const listBytes = useMemo(() => state.files.reduce((sum, f) => sum + f.size, 0), [state.files]);
+  // What the list holds, preview bytes of protected results included (workingList.ts heldBytes).
+  const listBytes = useMemo(() => listHeldBytes(state.files), [state.files]);
 
   /**
    * The scope a destination is tied to, taken at the confirming click before anything is awaited:
@@ -158,15 +245,47 @@ export default function PdfTools() {
     return !shouldDropContext(live.contextKey, saved);
   }, [store]);
 
-  useEffect(() => () => releasePdfRenderer(), []);
+  useEffect(
+    () => () => {
+      releasePdfRenderer();
+      clearThumbnails(); // the previews drawn for this screen's files go with it
+      toast.dismiss(RESULT_TOAST); // its buttons act on this screen's list
+    },
+    [],
+  );
 
-  // A tool or destination dialog belongs to the engagement and session it was opened in.
+  // A tool or destination dialog, and the page viewer, belong to the engagement and session they
+  // were opened in.
   useEffect(() => {
     setActiveTool(null);
     setDestination(null);
+    setViewing(null);
+    toast.dismiss(RESULT_TOAST);
+    addBatch.current = null;
+    clearThumbnails(); // another engagement's (or user's) previews are not kept
   }, [contextKey, state.session]);
 
   const closeTool = useCallback(() => setActiveTool(null), []);
+  // A page the bookmark list asked the page panel to show.
+  const [showPage, setShowPage] = useState<{ fileId: string; page: number; token: number } | null>(null);
+  const toolFailed = useCallback(() => {
+    setActiveTool(null);
+    toast.error('The tool could not be opened', { description: 'Try again; if this keeps happening, restart the application.' });
+  }, []);
+  const viewFile = useCallback((fileId: string, opener: HTMLElement) => {
+    toast.dismiss(RESULT_TOAST); // it would sit over the viewer
+    // The row's first-page thumbnail, if drawn, is shown enlarged until the sharp drawing arrives.
+    const thumb = opener.closest('[data-testid="pdf-tools-row"]')?.querySelector<HTMLImageElement>('img[data-testid="pdf-tools-thumb"]');
+    setViewing({ fileId, opener, placeholder: thumb?.src ?? null, key: Date.now() });
+  }, []);
+  const closeViewer = useCallback(() => setViewing(null), []);
+  // The page panel's viewer (a click on a page, T1-11): the result message would sit over it too.
+  const dismissResultToast = useCallback(() => toast.dismiss(RESULT_TOAST), []);
+  // Looked up in the guarded list: a file that has left it (or another engagement's) is never shown.
+  const viewed = viewing ? (state.files.find((f) => f.id === viewing.fileId) ?? null) : null;
+  useEffect(() => {
+    if (viewing && !viewed) setViewing(null);
+  }, [viewing, viewed]);
   const closeDestination = useCallback(() => setDestination(null), []);
 
   // Results are added by then; show them selected, in view, and say what was made.
@@ -176,8 +295,34 @@ export default function PdfTools() {
       if (result.status !== 'added' || store.getState().session !== session) return;
       store.setSelected(result.ids);
       setReveal({ id: result.ids[0], token: Date.now() });
-      // One result toast at a time: a newer one replaces it, and opening a tool dismisses it.
-      if (result.message) toast[result.tone === 'warning' ? 'warning' : 'success'](result.message, { id: RESULT_TOAST, description: result.detail });
+      // One result toast at a time: a newer one replaces it, and opening a tool dismisses it. It offers
+      // the next step for the results just made (UX audit C6.10): the buttons act on those rows, looked
+      // up again when clicked, through the same paths (and checks) as the list bar's buttons.
+      const ids = result.ids;
+      const { contextKey: key } = scope.current;
+      const act = (what: 'save' | 'vault') => () => {
+        toast.dismiss(RESULT_TOAST);
+        resultActions.current[what](ids, key, session);
+      };
+      // The buttons sit under the message (Sonner's own action buttons squeeze a long file name into a column).
+      const description = (
+        <div className="space-y-2">
+          {result.detail && <p>{result.detail}</p>}
+          <div className="flex flex-wrap gap-1.5">
+            <Button type="button" size="sm" variant="outline" className="h-7 gap-1.5 px-2 text-xs text-foreground" data-testid="pdf-tools-result-save" onClick={act('save')}>
+              <Save />
+              Save to computer
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 gap-1.5 px-2 text-xs text-foreground" data-testid="pdf-tools-result-vault" onClick={act('vault')}>
+              <Archive />
+              Add to Evidence Vault
+            </Button>
+          </div>
+        </div>
+      );
+      if (result.message) {
+        toast[result.tone === 'warning' ? 'warning' : 'success'](result.message, { id: RESULT_TOAST, description, duration: RESULT_TOAST_MS });
+      }
       // Spec 5.14: say so when results take the list past the warning size (intake says the same).
       if (result.listLarge) {
         toast.warning('The file list is getting large', {
@@ -188,6 +333,26 @@ export default function PdfTools() {
     [store],
   );
 
+  // An adding in progress (addedSelection.ts): the files it brings become the selection as they arrive.
+  const addBatch = useRef<AddBatch | null>(null);
+  const addAndSelect: typeof addFiles = (files) => {
+    if (files.length === 0) return;
+    addBatch.current ??= startBatch(store.getState().files);
+    addFiles(files);
+  };
+  useEffect(() => {
+    const batch = addBatch.current;
+    if (!batch) return;
+    const live = store.getState();
+    const next = selectionAfterAdding(batch, live.files, live.selectedIds);
+    if (next) {
+      addBatch.current = next.batch;
+      store.setSelected(next.selectedIds);
+    }
+    // The batch ends when the adding has stopped.
+    if (!progress) addBatch.current = null;
+  }, [state.files, progress, store]);
+
   const chooseFiles = () => {
     lastAddedFrom.current = 'computer';
     inputRef.current?.click();
@@ -196,13 +361,7 @@ export default function PdfTools() {
   const onInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
-    addFiles(files);
-  };
-
-  const onZoneKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    chooseFiles();
+    addAndSelect(files);
   };
 
   const onDrag = (event: DragEvent<HTMLDivElement>) => {
@@ -224,22 +383,26 @@ export default function PdfTools() {
     const fileItems = Array.from(event.dataTransfer.items ?? []).filter((item) => item.kind === 'file');
     const isFolder = fileItems.map((item) => Boolean(item.webkitGetAsEntry?.()?.isDirectory));
     if (isFolder.some(Boolean)) toast.error('Folders cannot be added', { description: 'Select the files inside instead.' });
-    addFiles(Array.from(event.dataTransfer.files).filter((_, i) => !isFolder[i]));
+    addAndSelect(Array.from(event.dataTransfer.files).filter((_, i) => !isFolder[i]));
   };
 
   // The dialog works on the selection, in list order, as it was when the tool was chosen.
   const onToolSelected = useCallback(
     (tool: ToolId) => {
+      if (!toolIsBuilt(tool, builtTools)) return;
       toast.dismiss(RESULT_TOAST); // it would sit over the dialog's Run button
-      setActiveTool({ tool, files: selected, key: Date.now() });
+      // A second click while the same dialog is still loading, for the same files, waits for it (no restart).
+      const same = (files: WorkingFile[]) => files.length === selected.length && files.every((f, i) => f.id === selected[i].id);
+      setActiveTool((open) => (open && open.tool === tool && same(open.files) ? open : { tool, files: selected, key: Date.now() }));
     },
-    [selected],
+    [selected, builtTools],
   );
+  const isBuilt = useCallback((tool: ToolId) => toolIsBuilt(tool, builtTools), [builtTools]);
   const ActiveDialog = activeTool ? TOOL_DIALOGS[activeTool.tool] : null;
 
   // Runs from the click itself: the save dialogs only open in response to the user's click.
-  const saveToComputer = (asZip: boolean) => {
-    const files = selected;
+  const saveToComputer = (asZip: boolean, chosen?: WorkingFile[]) => {
+    const files = chosen ?? selected;
     if (files.length === 0 || saving) return;
     // Taken before anything is awaited: the marks and the activity entries belong to this scope.
     const { session } = store.getState();
@@ -250,22 +413,26 @@ export default function PdfTools() {
     // The fingerprints for the activity record are worked out while the user picks where to save.
     const hashing = Promise.all(files.map((f) => sha256Hex(f.bytes).catch(() => null)));
     const report = async (result: Pick<SaveReport, 'outcome' | 'written' | 'errorMessage'>) => {
-      const hashes = await hashing;
-      const planned = (sameSession: boolean) =>
-        planSaveResult({
-          mode,
-          files: files.map((f, i) => ({ id: f.id, intendedName: cleanedName(entries[i]), wasProtected: f.wasProtected })),
-          sameSession,
-          ...result,
-        });
-      const plan = planned(store.getState().session === session);
-      if (plan.toast) toast[plan.toast.tone](plan.toast.title, plan.toast.description ? { description: plan.toast.description } : undefined);
-      // The files written, whether or not the scope has moved on: recordComputerSave marks them only
-      // while it is current, and writes their entries (silently after a change) for the same user.
-      const written = planned(true).markIds;
-      if (written.length === 0 || !target) return;
-      const logged = await recordComputerSave({ files, markIds: written, download: result.outcome === 'downloaded', zip: mode === 'zip', hashes }, target, deps);
-      if (logged.status === 'done' && logged.logFailures > 0) toast.warning(LOG_FAILED);
+      try {
+        const hashes = await hashing;
+        const planned = (sameSession: boolean) =>
+          planSaveResult({
+            mode,
+            files: files.map((f, i) => ({ id: f.id, intendedName: cleanedName(entries[i]), wasProtected: f.wasProtected })),
+            sameSession,
+            ...result,
+          });
+        const plan = planned(store.getState().session === session);
+        if (plan.toast) toast[plan.toast.tone](plan.toast.title, { id: fileMessageId(), ...(plan.toast.description ? { description: plan.toast.description } : {}) });
+        // The files written, whether or not the scope has moved on: recordComputerSave marks them only
+        // while it is current, and writes their entries (silently after a change) for the same user.
+        const written = planned(true).markIds;
+        if (written.length === 0 || !target) return;
+        const logged = await recordComputerSave({ files, markIds: written, download: result.outcome === 'downloaded', zip: mode === 'zip', hashes }, target, deps);
+        if (logged.status === 'done' && logged.logFailures > 0) toast.warning(LOG_FAILED);
+      } finally {
+        forgetMatchedText(); // the save batch has settled, written or not (matchedText.ts)
+      }
     };
 
     // "Saving…" and the folder note follow watchSave (savePlan.ts). Only this click's save may change
@@ -325,7 +492,7 @@ export default function PdfTools() {
     destinationOpener.current = null;
     for (const target of [back, document.querySelector<HTMLElement>(`[data-testid="${testId}"]`), addButton.current, stripAddButton.current]) {
       if (!target?.isConnected) continue;
-      target.focus({ preventScroll: true });
+      focusQuietly(target, { preventScroll: true }); // no tooltip on focus given back (QA-FIX F)
       if (document.activeElement === target) return;
     }
   };
@@ -347,7 +514,7 @@ export default function PdfTools() {
     setDestination(null);
     lastAddedFrom.current = 'vault';
     // Read one at a time when its turn comes, with the same checks and password prompt as files from the computer.
-    addFiles(chosen.map((choice) => vaultFileLike(choice)));
+    addAndSelect(chosen.map((choice) => vaultFileLike(choice)));
   };
 
   /**
@@ -368,11 +535,11 @@ export default function PdfTools() {
    * vault mark first, so the dialog offers the vault form for them and never reuses a dead record.
    */
   const opening = useRef(false);
-  const openSendDialog = (kind: 'vault' | 'attach') => {
+  const openSendDialog = (kind: 'vault' | 'attach', chosen?: WorkingFile[]) => {
     const target = destinationScope();
     if (!target || opening.current) return;
-    const picked = results;
-    const leftOut = selected.length - results.length;
+    const picked = chosen ? resultsOf(chosen) : results;
+    const leftOut = chosen ? chosen.length - picked.length : selected.length - results.length;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const open = (files: WorkingFile[]) => {
       destinationOpener.current = opener;
@@ -407,6 +574,25 @@ export default function PdfTools() {
       });
   };
 
+  const resultRows = (ids: string[], key: string | null, session: number): WorkingFile[] | null => {
+    const live = store.getState();
+    if (!key || live.contextKey !== key || live.session !== session || !stillCurrent()) return null;
+    const rows = live.files.filter((f) => ids.includes(f.id));
+    return rows.length > 0 ? rows : null;
+  };
+  type ResultAction = (ids: string[], key: string | null, session: number) => void;
+  const resultActions = useRef<{ save: ResultAction; vault: ResultAction }>({ save: () => undefined, vault: () => undefined });
+  resultActions.current = {
+    save: (ids, key, session) => {
+      const rows = resultRows(ids, key, session);
+      if (rows) saveToComputer(false, rows);
+    },
+    vault: (ids, key, session) => {
+      const rows = resultRows(ids, key, session);
+      if (rows) openSendDialog('vault', rows);
+    },
+  };
+
   const finishBatch = (result: BatchResult, summary: SummaryToast | null): SummaryToast | null => {
     // Another engagement or session: the dialog has gone with it, and nothing is said. The vault
     // list is fetched again for the engagement now shown: an upload started in the old one ends by
@@ -422,6 +608,15 @@ export default function PdfTools() {
     if (result.logFailures > 0) toast.warning(LOG_FAILED);
     return null;
   };
+
+  const [why, setWhy] = useState<{ text: string; key: number } | null>(null);
+  const sayWhy = useCallback((text: string) => setWhy({ text, key: Date.now() }), []);
+  useEffect(() => {
+    if (!why) return;
+    const timer = window.setTimeout(() => setWhy(null), WHY_LINE_MS);
+    return () => window.clearTimeout(timer);
+  }, [why]);
+  const whyText = whyLineText(why?.text ?? null, state.files.length, selected.length);
 
   const empty = state.files.length === 0;
   const single = selected.length === 1 && selected[0].kind === 'pdf' ? selected[0] : null;
@@ -484,25 +679,51 @@ export default function PdfTools() {
     </>
   );
 
-  const vaultButton = (className?: string, ref?: typeof stripVaultButton) => (
-    <HintButton
-      ref={ref}
-      type="button"
-      variant="outline"
-      data-testid="pdf-tools-add-from-vault"
-      className={className}
-      enabled={Boolean(contextKey)}
-      hint="Choose an engagement first."
-      onClick={() => openDestination({ kind: 'picker', key: Date.now() })}
-    >
-      <Archive />
-      Add from Evidence Vault
-    </HintButton>
-  );
+  // `compact`: the list bar's icon half of "Add files"; its name stays "Add from Evidence Vault" (tooltip and screen readers).
+  const vaultButton = (className?: string, ref?: typeof stripVaultButton, compact = false) => {
+    const button = (
+      <HintButton
+        ref={ref}
+        type="button"
+        variant="outline"
+        data-testid="pdf-tools-add-from-vault"
+        className={className}
+        enabled={Boolean(contextKey)}
+        hint="Choose an engagement first."
+        aria-label={compact ? 'Add from Evidence Vault' : undefined}
+        onClick={() => openDestination({ kind: 'picker', key: Date.now() })}
+      >
+        <Archive />
+        {compact ? null : 'Add from Evidence Vault'}
+      </HintButton>
+    );
+    if (!compact || !contextKey) return button;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          Add from Evidence Vault
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
 
   return (
+    <WhyContext.Provider value={sayWhy}>
     <div ref={root} data-testid="pdf-tools-root" className="space-y-2.5">
-      <ToolBar selected={selected} onToolSelected={onToolSelected} />
+      <div className="space-y-1">
+        <ToolBar selected={selected} onToolSelected={onToolSelected} built={isBuilt} onUnavailable={sayWhy} loading={dialogLoading} />
+        {/* Always present, so it is read out when its text changes; empty, it takes no room. */}
+        <p
+          role="status"
+          aria-live="polite"
+          data-testid="pdf-tools-why"
+          className={cn(whyText ? 'flex items-center gap-1.5 px-1 text-xs text-foreground' : 'sr-only')}
+        >
+          {whyText && <Info className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />}
+          {whyText}
+        </p>
+      </div>
 
       {empty ? (
         // One block: the whole area takes dropped files and a click on its background opens the
@@ -532,7 +753,7 @@ export default function PdfTools() {
               <>
                 <p className="text-sm font-semibold text-foreground">Drop PDFs or images here, or click to choose them</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  PDF, JPG, PNG, WebP, BMP or GIF. Then tick the files you want and pick a tool above. Password-protected PDFs open
+                  PDF, JPG, PNG, TIFF, WebP, BMP or GIF. Then tick the files you want and pick a tool above. Password-protected PDFs open
                   once you give the password.
                 </p>
               </>
@@ -551,41 +772,14 @@ export default function PdfTools() {
           </p>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2" onDragEnter={onDrag} onDragOver={onDrag} onDragLeave={onDrag} onDrop={onDrop}>
-          {progress ? (
-            // While adding, the strip shows progress as plain content, not inside a button.
-            <div
-              id="pdf-tools-add-status"
-              className="flex h-11 min-w-[220px] flex-1 items-center gap-2.5 rounded-md border border-dashed border-primary/40 bg-card px-3"
-            >
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
-              {progressLine}
-            </div>
-          ) : (
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="Add files from your computer: drop PDF or image files here, or press Enter to choose them"
-              onClick={chooseFiles}
-              onKeyDown={onZoneKeyDown}
-              className={cn(
-                'flex h-11 min-w-[220px] flex-1 cursor-pointer items-center gap-2.5 rounded-md border border-dashed px-3 transition-colors',
-                'ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                dragging ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50 hover:bg-muted/30',
-              )}
-            >
-              <Upload className={cn('h-4 w-4 shrink-0', dragging ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
-              <p className="truncate text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Drop more files here</span> or click to choose them
-              </p>
-            </div>
-          )}
-          <Button ref={stripAddButton} type="button" className="h-9" onClick={chooseFiles}>
-            <FilePlus2 />
-            Add from computer
-          </Button>
-          {vaultButton('h-9', stripVaultButton)}
-        </div>
+        // With files in the list (UX audit C13, T2-5): no drop strip; "Add files" sits in the list bar, and the
+        // whole list takes dropped files. While files are being added, their progress shows here.
+        progress && (
+          <div id="pdf-tools-add-status" className="flex h-9 items-center gap-2.5 rounded-md border border-dashed border-primary/40 bg-card px-3">
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
+            {progressLine}
+          </div>
+        )
       )}
 
       <p className="sr-only" role="status" aria-live="polite">
@@ -605,7 +799,30 @@ export default function PdfTools() {
       />
 
       {!empty && (
+        <div
+          onDragEnter={onDrag}
+          onDragOver={onDrag}
+          onDragLeave={onDrag}
+          onDrop={onDrop}
+          className={cn('rounded-lg transition-[outline-color]', dragging && 'outline-dashed outline-2 outline-offset-2 outline-primary')}
+        >
         <FileList
+          addControls={
+            <div className="flex items-center">
+              <Button
+                ref={stripAddButton}
+                type="button"
+                size="sm"
+                className="h-8 gap-1.5 rounded-r-none px-2.5 text-xs"
+                aria-label="Add files from your computer (or drop them on the list)"
+                onClick={chooseFiles}
+              >
+                <FilePlus2 />
+                Add files
+              </Button>
+              {vaultButton('h-8 rounded-l-none border-l-0 px-2', stripVaultButton, true)}
+            </div>
+          }
           files={state.files}
           selectedIds={state.selectedIds}
           onSelectionChange={(ids) => store.setSelected(ids)}
@@ -620,23 +837,64 @@ export default function PdfTools() {
           checking={checking}
           reveal={reveal}
           onListEmptied={focusAddButton}
+          onView={viewFile}
+          // The list bar's "N not saved": one click saves them all (QA-FIX K).
+          onSaveUnsaved={() => saveToComputer(false, state.files.filter(isUnsavedResult))}
         />
+        </div>
       )}
 
-      {single && <PagePanel key={single.id} file={single} />}
+      {single && (
+        // The read-only bookmark list sits beside the page panel when the file has bookmarks (design section 4);
+        // choosing one shows its page in the panel.
+        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start">
+          <PagePanel
+            key={single.id}
+            file={viewableFile(single)}
+            className="min-w-0 lg:flex-1"
+            showPage={showPage?.fileId === single.id ? showPage : null}
+            onViewerOpen={dismissResultToast}
+          />
+          {single.hasBookmarks && toolIsBuilt('bookmarks', builtTools) && (
+            <Suspense fallback={null}>
+              <BookmarkList
+                key={single.id}
+                file={viewableFile(single)}
+                className="lg:w-[300px] lg:shrink-0"
+                onChoosePage={(page) => setShowPage({ fileId: single.id, page, token: Date.now() })}
+              />
+            </Suspense>
+          )}
+        </div>
+      )}
+
+      {viewing && viewed && (
+        <PageViewer
+          key={viewing.key}
+          file={viewableFile(viewed)}
+          startPage={1}
+          onClose={closeViewer}
+          returnFocusTo={viewing.opener}
+          placeholder={viewed.kind === 'pdf' ? viewing.placeholder : null}
+        />
+      )}
 
       {passwordRequest && <PasswordDialog key={passwordRequest.id} request={passwordRequest} onAnswer={settlePassword} onFocusLost={focusAddedFrom} />}
 
       {activeTool && ActiveDialog && (
-        <ActiveDialog
-          key={activeTool.key}
-          files={activeTool.files}
-          scope={getScope}
-          store={store}
-          listBytes={listBytes}
-          onFinished={finishRun}
-          onClose={closeTool}
-        />
+        <ToolDialogBoundary key={activeTool.key} onFailed={toolFailed}>
+          {/* A phase 2 dialog's code arrives in a moment: nothing is shown meanwhile, then a spinner on its button. */}
+          <Suspense fallback={<DialogLoading tool={activeTool.tool} onBusy={setDialogLoading} />}>
+            <ActiveDialog
+              files={activeTool.files}
+              scope={getScope}
+              store={store}
+              listBytes={listBytes}
+              onFinished={finishRun}
+              onClose={closeTool}
+            />
+          </Suspense>
+        </ToolDialogBoundary>
       )}
 
       {destination?.kind === 'picker' && (
@@ -687,5 +945,6 @@ export default function PdfTools() {
         />
       )}
     </div>
+    </WhyContext.Provider>
   );
 }

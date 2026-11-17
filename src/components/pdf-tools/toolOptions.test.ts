@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { deletePages, splitEvery } from '@/lib/pdf-tools/organise';
-import { addPageNumbers, defaultPageNumberOptions, pageNumberLabel, type PageNumberOptions } from '@/lib/pdf-tools/pageNumbers';
+import { addPageNumbers, defaultPageNumberOptions, pageNumberLabel, type PageNumberOptions, type PageNumberRunOptions } from '@/lib/pdf-tools/pageNumbers';
 import { makePdf } from '@/lib/pdf-tools/testPdf';
 import {
   closeUpOffset,
@@ -22,6 +22,7 @@ import {
   rgbToHex,
   splitSizeError,
   throttleProgress,
+  type PageNumberField,
   type PageNumberForm,
 } from './toolOptions';
 
@@ -30,7 +31,7 @@ vi.setConfig({ testTimeout: 20_000 });
 let pdf3: Uint8Array;
 beforeAll(async () => {
   pdf3 = await makePdf('T', 3); // also pays the cold pdf-lib import
-}, 30_000);
+}, 120_000); // a hang guard only: a cold import takes seconds alone and passed 30 s on a loaded machine
 
 describe('resolveResultName', () => {
   it('cleans a typed name and ensures the extension', () => {
@@ -61,6 +62,8 @@ describe('resolveStem', () => {
     expect(resolveStem('', 'Bank')).toBe('Bank');
     expect(resolveStem('***', 'Bank')).toBe('Bank');
     expect(resolveStem('a'.repeat(300), 'Bank').length).toBe(90);
+    // The stem keeps its end too (QA-FIX G).
+    expect(resolveStem(`${'a'.repeat(100)}${'b'.repeat(100)}`, 'Bank')).toBe(`${'a'.repeat(32)}…${'b'.repeat(57)}`);
   });
 });
 
@@ -157,6 +160,47 @@ describe('page number form', () => {
     expect(readPageNumberForm(form({ marginPt: '1' }), 3).field).toBe('marginPt');
     expect(readPageNumberForm(form({ color: 'red' }), 3).field).toBe('color');
     expect(readPageNumberForm(form(), 3).field).toBeNull();
+  });
+
+  it('phase 2: leaves out the choices left at their defaults, so phase 1 choices give phase 1 options', () => {
+    expect(Object.keys(readPageNumberForm(form({ texts: { ...form().texts, 'top-left': '   ' } }), 3).options!).sort()).toEqual(Object.keys(defaultPageNumberOptions(3)).sort());
+    const read = readPageNumberForm(
+      form({ style: 'roman-lower', font: 'times', bold: true, italic: true, dateFormat: 'long', texts: { ...form().texts, 'top-left': '{client} {date}', 'bottom-right': 'WP {page}' } }),
+      3,
+    );
+    expect(read.error).toBeNull();
+    expect(read.options).toMatchObject({ style: 'roman-lower', font: 'times', bold: true, italic: true, dateFormat: 'long', texts: { 'top-left': '{client} {date}', 'bottom-right': 'WP {page}' } });
+    expect(read.options!.numbersOn).toBeUndefined();
+    expect(read.options!.tokens).toBeUndefined();
+    const footerOnly = readPageNumberForm(form({ numbersOn: false, texts: { ...form().texts, 'bottom-center': 'Page {page} of {pages}' } }), 3);
+    expect(footerOnly.options).toMatchObject({ numbersOn: false, texts: { 'bottom-center': 'Page {page} of {pages}' } });
+  });
+
+  const phaseTwoCases: [Partial<PageNumberForm>, PageNumberField, Partial<PageNumberRunOptions>][] = [
+    [{ style: 'circled', format: 'page-n' }, 'style', { style: 'circled', format: 'page-n' }],
+    [{ numbersOn: false }, 'numbersOn', { numbersOn: false }],
+    [{ texts: { ...defaultPageNumberForm(3).texts, 'top-right': '{pge} here' } }, 'text-top-right', { texts: { 'top-right': '{pge} here' } }],
+    [{ texts: { ...defaultPageNumberForm(3).texts, 'top-left': 'x'.repeat(121) } }, 'text-top-left', { texts: { 'top-left': 'x'.repeat(121) } }],
+    [{ texts: { ...defaultPageNumberForm(3).texts, 'bottom-center': 'Draft' } }, 'text-bottom-center', { texts: { 'bottom-center': 'Draft' } }],
+  ];
+
+  it.each(phaseTwoCases)('phase 2: rejects %o at its field with the message addPageNumbers gives', async (change, field, libChange) => {
+    const read = readPageNumberForm(form(change), 3);
+    expect(read.options).toBeNull();
+    expect(read.field).toBe(field);
+    await expect(addPageNumbers(pdf3, { ...defaultPageNumberOptions(3), ...libChange })).rejects.toThrow(read.error!);
+  });
+
+  it('phase 2: text at the number\'s own place is accepted when it holds {page}', () => {
+    expect(readPageNumberForm(form({ texts: { ...form().texts, 'bottom-center': 'Page {page}' } }), 3).error).toBeNull();
+    expect(readPageNumberForm(form({ numbersOn: false, texts: { ...form().texts, 'bottom-center': 'Draft' } }), 3).error).toBeNull();
+  });
+
+  it('phase 2: the preview writes the real total into {pages} and into "of N", in the chosen style', () => {
+    const read = readPageNumberForm(form({ style: 'roman-upper', format: 'n-of-total', texts: { ...form().texts, 'top-right': 'Sheet {page} of {pages}' } }), 3);
+    const plan = previewPlan(read.options!);
+    expect(plan.options).toMatchObject({ format: 'custom', suffix: ' of III', fromPage: 1, toPage: 1, style: 'roman-upper', texts: { 'top-right': 'Sheet {page} of III' } });
+    expect(plan.label).toBe('I of III');
   });
 
   it('accepts the limits themselves', () => {

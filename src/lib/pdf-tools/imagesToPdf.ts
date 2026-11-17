@@ -1,4 +1,5 @@
 import { concatTransformationMatrix, drawObject, PDFDocument, popGraphicsState, pushGraphicsState, type PDFImage } from 'pdf-lib';
+import { savePaced } from './pace';
 import { PdfToolsError } from './types';
 
 export type ImagePageSize = 'fit' | 'a4-portrait' | 'a4-landscape' | 'a4-auto';
@@ -210,5 +211,6 @@ export async function imagesToPdf(images: ImageInput[], opts: ImagesToPdfOptions
   out.setCreator(PRODUCER);
   out.setCreationDate(now);
   out.setModificationDate(now);
-  return out.save({ useObjectStreams: true });
+  // pdf-lib's own save with object streams, its waits taken by the clock (the same bytes; pace.ts).
+  return savePaced(out, { useObjectStreams: true });
 }

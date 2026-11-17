@@ -5,6 +5,8 @@
 // the result is plain bytes for pdf-lib 1.17.1. The password is handed straight to the library;
 // it is never stored, logged, or put into an error.
 import type { PDFDocument as CantooDocument } from '@cantoo/pdf-lib';
+import { PARSE_OBJECTS_PER_TICK } from './inspect';
+import { withClockWaits } from './pace';
 import { PdfToolsError } from './types';
 
 type Library = typeof import('@cantoo/pdf-lib');
@@ -160,15 +162,43 @@ function checkSecurityHandler(lib: Library, encrypt: unknown): PdfToolsError | u
 }
 
 /** Decrypting load, trying each spelling of the password in turn. The spellings live only here. */
-async function loadWithPassword(lib: Library, file: Uint8Array, password: string, oneBytePerCharacter: boolean): Promise<CantooDocument> {
+async function loadWithPassword(lib: Library, file: Uint8Array, password: string, oneBytePerCharacter: boolean, slices: SliceOptions): Promise<CantooDocument> {
   for (const spelling of passwordSpellings(password, oneBytePerCharacter)) {
     try {
-      return await lib.PDFDocument.load(file, { password: spelling, updateMetadata: false });
+      // The library's own decrypting load, waiting by the clock, and also every `objectsPerTick` objects
+      // when the caller asked for its own slices (pace.ts; the same bytes).
+      return await withClockWaits(lib, file, () => lib.PDFDocument.load(file, { password: spelling, updateMetadata: false, ...slices.parse }), { keepCount: slices.ownSlices });
     } catch (error) {
       if (!(error instanceof Error && WRONG_PASSWORD_MESSAGES.has(error.message))) throw unlockFailed();
     }
   }
   throw wrongPassword();
+}
+
+/**
+ * For a caller on the screen's thread with a large file (Protect's check): how often the work gives
+ * the event loop a turn, so the screen can repaint and a Stop can land. Every read and write here gives
+ * the window a turn by the clock anyway, at least every 50 ms of work (pace.ts withClockWaits); the
+ * bytes returned are the same with or without these options.
+ */
+export interface UnlockOptions {
+  /**
+   * Also a turn every this many objects decrypted (the library's parseSpeed for the decrypting read, the
+   * step that holds the screen). One object is the smallest slice: a single large image is decrypted in
+   * one go. Unset: the clock alone decides (the count passed to the library is PARSE_OBJECTS_PER_TICK).
+   */
+  objectsPerTick?: number;
+  /**
+   * Called between the steps of opening a protected file (after reading it, after decrypting it,
+   * before writing the unprotected copy). Throwing a PdfToolsError stops it; that error comes back as it is.
+   */
+  onStep?: () => void | Promise<void>;
+}
+
+interface SliceOptions {
+  parse: { parseSpeed?: number };
+  /** The caller gave objectsPerTick: its count makes the decrypting read wait too, besides the clock. */
+  ownSlices: boolean;
 }
 
 /**
@@ -178,15 +208,23 @@ async function loadWithPassword(lib: Library, file: Uint8Array, password: string
  * Throws PdfToolsError 'wrong-password' (also for an empty password that does not open it),
  * or 'unlock-failed' for a damaged file, a file that is not a PDF, or unsupported protection.
  */
-export async function unlockPdf(file: Uint8Array, password: string): Promise<Uint8Array> {
+export async function unlockPdf(file: Uint8Array, password: string, options: UnlockOptions = {}): Promise<Uint8Array> {
   const lib = await import('@cantoo/pdf-lib');
   const { PDFBool, PDFDict, PDFInvalidObject, PDFName, PDFNumber, PDFRawStream, PDFRef, PDFStream } = lib;
+  // Waits by the clock (pace.ts); the count passed is PARSE_OBJECTS_PER_TICK unless the caller gave its own.
+  // The library's default (100 objects a read, 50 a write) waited for a timer hundreds of times on a
+  // text-heavy file (QA-FIX I).
+  const perTick = options.objectsPerTick ?? PARSE_OBJECTS_PER_TICK;
+  const slices: SliceOptions = { parse: { parseSpeed: perTick }, ownSlices: options.objectsPerTick !== undefined };
+  const step = async () => {
+    if (options.onStep) await options.onStep();
+  };
 
   // A plain parse tells whether the file is protected, and holds what the decrypting parse
   // below loses or garbles: the trailer /Info link and clear-text XMP metadata.
   let plain: CantooDocument;
   try {
-    plain = await lib.PDFDocument.load(file, { ignoreEncryption: true, updateMetadata: false });
+    plain = await withClockWaits(lib, file, () => lib.PDFDocument.load(file, { ignoreEncryption: true, updateMetadata: false, parseSpeed: PARSE_OBJECTS_PER_TICK }));
   } catch {
     throw unlockFailed();
   }
@@ -205,7 +243,9 @@ export async function unlockPdf(file: Uint8Array, password: string): Promise<Uin
   const oneBytePerCharacter = revision instanceof PDFNumber && revision.asNumber() <= 4;
   const infoRef = plain.context.trailerInfo.Info;
 
-  const doc = await loadWithPassword(lib, file, password, oneBytePerCharacter);
+  await step();
+  const doc = await loadWithPassword(lib, file, password, oneBytePerCharacter, slices);
+  await step();
 
   try {
     const context = doc.context;
@@ -243,7 +283,8 @@ export async function unlockPdf(file: Uint8Array, password: string): Promise<Uin
     }
 
     if (doc.isEncrypted || !hasPages(doc)) throw damaged();
-    return await doc.save();
+    await step();
+    return await withClockWaits(lib, doc.context, () => doc.save({ objectsPerTick: Math.max(perTick, PARSE_OBJECTS_PER_TICK) }));
   } catch (error) {
     throw error instanceof PdfToolsError ? error : unlockFailed();
   }

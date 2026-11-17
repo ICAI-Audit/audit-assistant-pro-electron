@@ -31,12 +31,40 @@ export function cleanFileName(name: string, extension: string): string {
   return base + suffix;
 }
 
-/** Cuts to `limit` UTF-16 units without splitting a surrogate pair, then trims dots and spaces. */
+const ELLIPSIS = '…';
+/** Below this many characters before an earlier cut, a fresh cut is made instead of shortening it. */
+const MIN_HEAD = 8;
+
+/** Joins the two ends of a cut: no half of a character pair, no dot or space either side of the "…". */
+function joinCut(head: string, tail: string): string {
+  const start = head.replace(/[\uD800-\uDBFF]$/, '').replace(/[. ]+$/, '');
+  const end = tail.replace(/^[\uDC00-\uDFFF]/, '').replace(/^[. ]+/, '');
+  return `${start}${ELLIPSIS}${end}`;
+}
+
+/**
+ * Shortens `text` to at most `limit` UTF-16 units by cutting its middle, so that its start and its end
+ * stay (QA-FIX G: "…for AY 2025-26 - final copy v3 revised" is the part that tells two files apart). A
+ * name cut before is cut again at the same place: its end stays and there is never a second "…".
+ */
+export function cutMiddle(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  if (limit < 3) return text.slice(0, limit).replace(/[\uD800-\uDBFF]$/, '');
+  const at = text.indexOf(ELLIPSIS);
+  if (at > 0 && at < text.length - 1) {
+    const tail = text.slice(at + 1);
+    const room = limit - 1 - tail.length;
+    if (room >= MIN_HEAD) return joinCut(text.slice(0, room), tail);
+  }
+  const keep = limit - 1;
+  const headLength = Math.ceil(keep / 2);
+  return joinCut(text.slice(0, headLength), text.slice(text.length - (keep - headLength)));
+}
+
+/** Cuts to `limit` UTF-16 units in the middle (cutMiddle), then trims dots and spaces at the ends. */
 function fit(base: string, limit: number): string {
-  let out = base.slice(0, limit);
-  if (/[\uD800-\uDBFF]$/.test(out)) out = out.slice(0, -1);
-  out = trimDotsAndSpaces(out);
-  return out === '' ? FALLBACK_BASE : out;
+  const out = trimDotsAndSpaces(cutMiddle(base, limit));
+  return out === '' || out === ELLIPSIS ? FALLBACK_BASE : out;
 }
 
 /** Removes the last extension; a leading dot alone is not an extension. */

@@ -8,6 +8,8 @@ import { unlockPdf } from '@/lib/pdf-tools/unlock';
 import { PdfToolsError } from '@/lib/pdf-tools/types';
 import { nextPaint } from '../canvasUtils';
 import type { PasswordAnswer, PasswordRequest } from '../useFileIntake';
+import { useDialogKeys } from '../useDialogKeys';
+import { fieldRef, useSecretFields } from './secretFields';
 
 interface PasswordDialogProps {
   request: PasswordRequest;
@@ -22,16 +24,27 @@ interface PasswordDialogProps {
 
 /**
  * Asks for the password of one protected PDF and opens it. The password lives only in this
- * component's state: it goes once to unlockPdf, is cleared after every attempt, and disappears
- * when the dialog closes (it is mounted per file). It is never logged or shown.
+ * component's state: it goes once to unlockPdf, and is cleared after every attempt and when the
+ * dialog closes (it is mounted per file). It is never logged or shown. As in Protect with password
+ * (secretFields.ts), clearing the state is not enough: the field itself is wiped as it leaves, and on
+ * every attempt and on Skip it is wiped and rebuilt under a new key, so neither the detached field nor
+ * React's previous copy of it keeps the password.
  */
 export default function PasswordDialog({ request, onAnswer, onFocusLost }: PasswordDialogProps) {
   const [password, setPassword] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const field = useSecretFields();
+  // Made once, outside this component's scope (fieldRef): the field's ref holds the node only.
+  const [passwordRef] = useState(() => fieldRef(field.nodes, inputRef));
   const mounted = useRef(true);
+  const content = useRef<HTMLDivElement>(null);
+  // The application's shortcuts never act behind it (useDialogKeys.ts); an Escape no layer took skips, as Escape does.
+  useDialogKeys(content, () => {
+    if (!busy) skip();
+  });
   // Taken on the first render, before the dialog moves focus into itself.
   const [opener] = useState(() => (document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null));
 
@@ -42,8 +55,22 @@ export default function PasswordDialog({ request, onAnswer, onFocusLost }: Passw
     [],
   );
 
-  const skip = () => {
+  // After a wrong password the field (made afresh, and enabled again only by this render) takes the focus for
+  // the next try. Done once the render is committed: the field is still disabled before it.
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (wasBusy.current && !busy) inputRef.current?.focus();
+    wasBusy.current = busy;
+  }, [busy]);
+
+  /** The password goes from the state and from the field, which is made afresh. */
+  const clearPassword = () => {
+    field.clear();
     setPassword('');
+  };
+
+  const skip = () => {
+    clearPassword();
     onAnswer(null);
   };
 
@@ -51,7 +78,7 @@ export default function PasswordDialog({ request, onAnswer, onFocusLost }: Passw
     event.preventDefault();
     if (busy || password === '') return;
     const attempt = password;
-    setPassword('');
+    clearPassword();
     setMessage(null);
     setBusy(true);
     // Unlocking a large file blocks the window for a while: let "Unlocking…" paint first.
@@ -68,7 +95,6 @@ export default function PasswordDialog({ request, onAnswer, onFocusLost }: Passw
         setAttempts(count);
         setMessage(count >= 3 ? `${error.message} If you do not have the password, skip this file.` : error.message);
         setBusy(false);
-        requestAnimationFrame(() => inputRef.current?.focus());
         return;
       }
       onAnswer(error instanceof PdfToolsError ? error : new PdfToolsError('unlock-failed', 'This file could not be unlocked.'));
@@ -83,6 +109,7 @@ export default function PasswordDialog({ request, onAnswer, onFocusLost }: Passw
       }}
     >
       <DialogContent
+        ref={content}
         className="sm:max-w-md"
         onInteractOutside={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => {
@@ -108,8 +135,9 @@ export default function PasswordDialog({ request, onAnswer, onFocusLost }: Passw
           <div className="grid gap-2">
             <Label htmlFor="pdf-tools-password">Password</Label>
             <Input
+              key={`password-${field.generation}`}
               id="pdf-tools-password"
-              ref={inputRef}
+              ref={passwordRef}
               data-testid="pdf-tools-password-input"
               type="password"
               autoComplete="off"

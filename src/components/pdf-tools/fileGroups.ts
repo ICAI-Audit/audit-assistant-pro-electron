@@ -1,6 +1,7 @@
 // How the file list shows results that belong together (the page images of one PDF to images
 // run, the parts of one split): one row for the group, which opens to show its files. A group
 // moves as one, and a row moves past a whole group. No React here.
+import { cutMiddle } from '@/lib/pdf-tools/fileNames';
 import type { WorkingFile } from '@/lib/pdf-tools/types';
 
 export type ListUnit =
@@ -110,9 +111,8 @@ export function numberedResultName(name: string, n: number): string {
   const match = /^(.*?)((?:_part_\d+|_page_\d+)?)(\.[A-Za-z0-9]+)?$/s.exec(name)!;
   const [, stem, ending, extension = ''] = match;
   const tail = `${ending} (${n})${extension}`;
-  let cut = stem.slice(0, Math.max(1, MAX_NAME_LENGTH - tail.length));
-  if (/[\uD800-\uDBFF]$/.test(cut)) cut = cut.slice(0, -1);
-  cut = cut.replace(/[. ]+$/, '');
+  // In the middle, so the stem's end stays (QA-FIX G); a name cut before is cut at the same place.
+  const cut = cutMiddle(stem, Math.max(1, MAX_NAME_LENGTH - tail.length)).replace(/[. ]+$/, '');
   return `${cut || 'document'}${tail}`;
 }
 

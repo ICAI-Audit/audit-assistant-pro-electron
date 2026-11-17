@@ -41,7 +41,9 @@ import {
   type PDFDocument,
   type PDFObject,
 } from 'pdf-lib';
+import { namedDestinationPage } from './outline';
 import { ACRO_FORM, asArray, asDict, FIELDS, isFieldNode, isSignatureField, KIDS, MAX_FIELD_DEPTH, PARENT } from './formFields';
+import { pacer, runPaced, type Pace, type Work } from './pace';
 
 export interface OrganiseReport {
   /**
@@ -629,12 +631,18 @@ export class PageCopier {
 
 // ---- after the pages are copied ------------------------------------------------------------------
 
-/** A link whose explicit destination is a page that is not in the result. */
-function linkGoesNowhere(context: PDFContext, annotation: PDFDict): boolean {
+/**
+ * A link whose destination is a page that is not in the result: an explicit destination whose page was
+ * left out, or a named one (`goneName`) that the source resolves to a page that was left out. A name
+ * that cannot be resolved is kept as it is.
+ */
+function linkGoesNowhere(context: PDFContext, annotation: PDFDict, goneName: (key: PDFObject) => boolean): boolean {
   const lookedUp = (object: PDFObject | undefined) => (object instanceof PDFRef ? context.lookup(object) : object);
   if (lookedUp(annotation.get(SUBTYPE)) !== LINK) return false;
   const action = asDict(context, annotation.get(ACTION));
   const destination = annotation.get(DEST) ?? (action && lookedUp(action.get(ACTION_TYPE)) === GO_TO ? action.get(ACTION_DEST) : undefined);
+  const target = lookedUp(destination);
+  if (target instanceof PDFName || target instanceof PDFString || target instanceof PDFHexString) return goneName(target);
   return asArray(context, destination)[0] === PDFNull;
 }
 
@@ -642,20 +650,23 @@ function linkGoesNowhere(context: PDFContext, annotation: PDFDict): boolean {
  * On the result's pages: links to left-out pages and popups whose comment was on a left-out page go;
  * a reply to a comment of a left-out page loses its /IRT (it stays, as a comment of its own).
  */
-function tidyAnnotations(out: PDFDocument): void {
+function* tidyAnnotations(out: PDFDocument, goneName: (key: PDFObject) => boolean): Work<void> {
   const { context } = out;
+  // PDFDict.get answers undefined for an entry whose value is null, so an entry is read as stored.
+  const stored = (dict: PDFDict, key: PDFName) => dict.entries().find(([k]) => k === key)?.[1];
   for (const page of out.getPages()) {
+    yield;
     const annotations = asArray(context, page.node.get(ANNOTS));
     const kept = annotations.filter((entry) => {
       const annotation = asDict(context, entry);
       if (!annotation) return false;
-      if (annotation.get(IN_REPLY_TO) === PDFNull) {
+      if (stored(annotation, IN_REPLY_TO) === PDFNull) {
         annotation.delete(IN_REPLY_TO);
         annotation.delete(REPLY_TYPE);
       }
-      if (annotation.get(POPUP) === PDFNull) annotation.delete(POPUP);
-      if (annotation.get(SUBTYPE) === POPUP && annotation.get(PARENT) === PDFNull) return false;
-      return !linkGoesNowhere(context, annotation);
+      if (stored(annotation, POPUP) === PDFNull) annotation.delete(POPUP);
+      if (annotation.get(SUBTYPE) === POPUP && stored(annotation, PARENT) === PDFNull) return false;
+      return !linkGoesNowhere(context, annotation, goneName);
     });
     if (kept.length !== annotations.length) page.node.set(ANNOTS, context.obj(kept));
   }
@@ -729,11 +740,12 @@ function rebuildForm(out: PDFDocument, source: PDFDocument, copier: PageCopier, 
  * now null, or one only its field lists), and so does a field left with no kids, up the tree. This
  * covers signature fields and fields missing from /Fields, which rebuildForm does not walk.
  */
-function pruneFieldKids(out: PDFDocument): void {
+function* pruneFieldKids(out: PDFDocument): Work<void> {
   const { context } = out;
   const pages = new Set<PDFObject>();
   const onPages = new Set<PDFObject>();
   for (const page of out.getPages()) {
+    yield;
     pages.add(page.ref);
     for (const entry of asArray(context, page.node.get(ANNOTS))) onPages.add(entry);
   }
@@ -746,6 +758,7 @@ function pruneFieldKids(out: PDFDocument): void {
   for (let changed = true; changed; ) {
     changed = false;
     for (const [, object] of context.enumerateIndirectObjects()) {
+      yield;
       if (!(object instanceof PDFDict) || object instanceof PDFPageTree || object.get(TYPE) === PAGES || !object.has(KIDS)) continue;
       const kids = asArray(context, object.get(KIDS));
       const alive = kids.filter((kid) => !dead(kid));
@@ -758,11 +771,12 @@ function pruneFieldKids(out: PDFDocument): void {
 }
 
 /** The references reachable from the trailer's /Root and /Info. */
-function reachableRefs(doc: PDFDocument): Set<PDFRef> {
+function* reachableRefs(doc: PDFDocument): Work<Set<PDFRef>> {
   const { context } = doc;
   const reachable = new Set<PDFRef>();
   const stack: PDFObject[] = [context.trailerInfo.Root, context.trailerInfo.Info].filter((x): x is PDFObject => x !== undefined);
   while (stack.length > 0) {
+    yield;
     const object = stack.pop()!;
     if (object instanceof PDFRef) {
       if (reachable.has(object)) continue;
@@ -787,12 +801,12 @@ function reachableRefs(doc: PDFDocument): Set<PDFRef> {
  * not use is named, except through a setting this copy does not know: that is carried as it is, and
  * the report says so.
  */
-function carryLayers(out: PDFDocument, source: PDFDocument, copier: PageCopier): void {
+function* carryLayers(out: PDFDocument, source: PDFDocument, copier: PageCopier): Work<void> {
   const src = source.context;
   const dest = out.context;
   const properties = asDict(src, source.catalog.get(OC_PROPERTIES));
   if (!properties) return;
-  const reachable = reachableRefs(out);
+  const reachable = yield* reachableRefs(out);
   const kept = new Map<PDFRef, PDFRef>();
   for (const entry of asArray(src, properties.get(OCGS))) {
     const copy = entry instanceof PDFRef ? copier.copyOf(entry) : undefined;
@@ -850,8 +864,8 @@ function carryLayers(out: PDFDocument, source: PDFDocument, copier: PageCopier):
 }
 
 /** Removes every object nothing in the document refers to. */
-function dropUnreachable(doc: PDFDocument): void {
-  const reachable = reachableRefs(doc);
+function* dropUnreachable(doc: PDFDocument): Work<void> {
+  const reachable = yield* reachableRefs(doc);
   for (const [ref] of doc.context.enumerateIndirectObjects()) if (!reachable.has(ref)) doc.context.delete(ref);
 }
 
@@ -860,6 +874,11 @@ export interface CopyOptions {
   scans?: SourceScans;
   /** Called before each page is copied, with the pages copied so far; it stops the copy by throwing (a cancel). */
   onPage?: (done: number, total: number) => void | Promise<void>;
+  /**
+   * Turns for the window during the copy (pace.ts); a run that makes several files shares one. Default: a
+   * pacer of the copy's own. Between pages, `onPage` is the Stop check.
+   */
+  pace?: Pace;
 }
 
 /**
@@ -867,6 +886,7 @@ export interface CopyOptions {
  * copies then share its annotations), with the form fields, links and layers that go with them.
  */
 export async function copyPagesOf(out: PDFDocument, source: PDFDocument, indices: number[], report: OrganiseReport, options: CopyOptions = {}): Promise<void> {
+  const pace = options.pace ?? pacer();
   const pages = source.getPages();
   const copier = new PageCopier(source.context, out.context, report, options.scans);
   const copyRefs = new Map<PDFRef, PDFRef>();
@@ -881,6 +901,7 @@ export async function copyPagesOf(out: PDFDocument, source: PDFDocument, indices
   const placed = new Set<PDFRef>();
   for (const [done, index] of indices.entries()) {
     if (options.onPage) await options.onPage(done, indices.length);
+    await pace();
     const leaf = copier.copyPage(pages[index].node);
     const first = copyRefs.get(pages[index].ref)!;
     let ref = first;
@@ -893,9 +914,34 @@ export async function copyPagesOf(out: PDFDocument, source: PDFDocument, indices
     out.addPage(PDFPage.of(leaf, ref, out));
   }
 
-  tidyAnnotations(out);
+  const nameTarget = namedDestinationPage(source.context, source.catalog);
+  const leftOutPages = new Set(pages.filter((page) => !copyRefs.has(page.ref)).map((page) => page.ref));
+  // The passes over the whole result give the window its turns too (REV-A B6).
+  await runPaced(
+    tidyAnnotations(out, (key) => {
+      const target = nameTarget(key);
+      return target !== undefined && leftOutPages.has(target);
+    }),
+    pace,
+  );
   rebuildForm(out, source, copier, onKeptPages);
-  pruneFieldKids(out);
-  carryLayers(out, source, copier);
-  dropUnreachable(out);
+  await runPaced(pruneFieldKids(out), pace);
+  await runPaced(carryLayers(out, source, copier), pace);
+  await runPaced(dropUnreachable(out), pace);
+}
+
+/** Where a page of the source lands in a copy: its new index, or undefined when it is left out. */
+export type PageMapping = (oldIndex: number) => number | undefined;
+
+/**
+ * The page mapping of a copy made from `indices` (the source pages in result order, as given to
+ * `copyPagesOf`): a page that appears twice maps to its first copy, a page not listed to undefined.
+ * Bookmarks use it (outline.ts `carryOutline`); so do the tools that reorder or merge pages.
+ */
+export function pageMapping(indices: readonly number[]): PageMapping {
+  const first = new Map<number, number>();
+  indices.forEach((old, index) => {
+    if (!first.has(old)) first.set(old, index);
+  });
+  return (oldIndex) => first.get(oldIndex);
 }

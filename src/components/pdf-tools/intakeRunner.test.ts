@@ -6,6 +6,18 @@ import { IntakeRunner, type FileLike, type IntakeEnvironment } from './intakeRun
 
 const file = (name: string, size = 10): FileLike => ({ name, size, arrayBuffer: async () => new ArrayBuffer(size) });
 
+/**
+ * Waits until `ready()` holds, checking after every timer turn (by then every pending promise step has run),
+ * instead of a fixed sleep (INT3: WRAP's list of load-sensitive waits). The bound is a hang guard only.
+ */
+async function until(ready: () => boolean, what: string): Promise<void> {
+  for (let turn = 0; turn < 10_000; turn++) {
+    if (ready()) return;
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  throw new Error(`never reached: ${what}`);
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((res) => {
@@ -96,12 +108,14 @@ describe('IntakeRunner', () => {
 
   it('adds nothing and stays silent when the engagement changes during a file', async () => {
     const gate = deferred<void>();
+    const preparing: string[] = [];
     const { runner, idle, store, report } = setup(async (source) => {
+      preparing.push(source.name);
       await gate.promise;
       return ready(source);
     });
     runner.enqueue([file('a.pdf'), file('b.pdf')]);
-    await new Promise((r) => setTimeout(r, 5));
+    await until(() => preparing.includes('a.pdf'), 'a.pdf being prepared');
     store.setContext('u1:B');
     gate.resolve();
     await idle();
@@ -113,12 +127,14 @@ describe('IntakeRunner', () => {
 
   it('is silent when the list refuses a file because its session moved on', async () => {
     const gate = deferred<void>();
+    const preparing: string[] = [];
     const { runner, idle, store, report } = setup(async (source) => {
+      preparing.push(source.name);
       await gate.promise;
       return ready(source);
     });
     runner.enqueue([file('a.pdf')]);
-    await new Promise((r) => setTimeout(r, 5));
+    await until(() => preparing.includes('a.pdf'), 'a.pdf being prepared');
     store.setContext(null);
     store.setContext('u1:A'); // same engagement again, but a new session
     gate.resolve();
@@ -130,12 +146,14 @@ describe('IntakeRunner', () => {
 
   it('reports how many files were not added when the screen is left', async () => {
     const gate = deferred<void>();
+    const preparing: string[] = [];
     const { runner, idle, store, report, env } = setup(async (source) => {
+      preparing.push(source.name);
       await gate.promise;
       return ready(source);
     });
     runner.enqueue([file('a.pdf'), file('b.pdf'), file('c.pdf')]);
-    await new Promise((r) => setTimeout(r, 5));
+    await until(() => preparing.includes('a.pdf'), 'a.pdf being prepared');
     runner.abandon('left-screen');
     expect(report.stoppedOnLeave).toHaveBeenCalledWith(3);
     expect(env.cancelPassword).toHaveBeenCalled();
@@ -147,9 +165,13 @@ describe('IntakeRunner', () => {
   it("never names a file of the old engagement when it changes while the screen paints", async () => {
     const paint = deferred<void>();
     const { runner, idle, store, report, env } = setup(undefined, { maxBytes: 100, warnBytes: 80 });
-    env.nextPaint = () => paint.promise;
+    let painting = false;
+    env.nextPaint = () => {
+      painting = true;
+      return paint.promise;
+    };
     runner.enqueue([file('A secret.pdf', 101)]); // too large: would be reported as not added
-    await new Promise((r) => setTimeout(r, 5));
+    await until(() => painting, 'the run waiting for the screen to paint');
     store.setContext('u1:B');
     paint.resolve();
     await idle();
@@ -160,22 +182,30 @@ describe('IntakeRunner', () => {
   it('keeps each run to its own current file, so an old run finishing cannot hide a new one', async () => {
     const firstPaint = deferred<void>();
     const gate = deferred<void>();
-    const paints = [firstPaint.promise];
+    let oldWoke = false;
+    const paints = [firstPaint.promise.then(() => void (oldWoke = true))];
+    let paintsAsked = 0;
+    const preparing: string[] = [];
     const { runner, report, env } = setup(
       async (source) => {
+        preparing.push(source.name);
         await gate.promise;
         return ready(source);
       },
       { maxBytes: 100, warnBytes: 80 },
     );
-    env.nextPaint = () => paints.shift() ?? Promise.resolve();
+    env.nextPaint = () => {
+      paintsAsked += 1;
+      return paints.shift() ?? Promise.resolve();
+    };
     runner.enqueue([file('old.pdf', 101)]); // refused for its size without another await
-    await new Promise((r) => setTimeout(r, 5));
+    await until(() => paintsAsked === 1, 'the old run waiting for its paint');
     runner.abandon('context-changed'); // the old run is waiting for its paint
     runner.enqueue([file('new.pdf')]); // a new run starts and waits in prepare
-    await new Promise((r) => setTimeout(r, 5));
+    await until(() => preparing.includes('new.pdf'), 'the new run waiting in prepare');
     firstPaint.resolve(); // the old run wakes up after the new one has started
-    await new Promise((r) => setTimeout(r, 5));
+    await until(() => oldWoke, 'the old run waking up');
+    await new Promise((r) => setTimeout(r, 0)); // and running on to its end (promise steps only)
     runner.abandon('left-screen');
     expect(report.stoppedOnLeave).toHaveBeenCalledWith(1); // new.pdf is still counted
     gate.resolve();
@@ -245,6 +275,53 @@ describe('IntakeRunner', () => {
     expect(report.notAdded.mock.calls[0][1]).toMatch(/^This file is larger than/);
   });
 
+  it('refuses a vault file by its real length when its recorded size was wrong, before anything reads its content', async () => {
+    // A row with no recorded size counts as 0; a file replaced outside VERA can be far larger than its record.
+    const prepare = vi.fn(async (source: IntakeSource) => ready(source));
+    const { runner, idle, report, names } = setup(prepare, { maxBytes: 1000, warnBytes: 800 });
+    const wrongRecord = (name: string, size: number, real: number): FileLike => ({ name, size, origin: 'vault', evidenceId: name, arrayBuffer: async () => new ArrayBuffer(real) });
+    runner.enqueue([wrongRecord('Scan recorded small.pdf', 10, 50_000), wrongRecord('Scan with no size.pdf', 0, 50_000), file('b.pdf')]);
+    await idle();
+    expect(prepare.mock.calls.map(([source]) => source.name)).toEqual(['b.pdf']);
+    expect(report.notAdded.mock.calls).toEqual([
+      ['Scan recorded small.pdf', 'This file is larger than 1000 B, the most PDF Tools can hold at once.'],
+      ['Scan with no size.pdf', 'This file is larger than 1000 B, the most PDF Tools can hold at once.'],
+    ]);
+    expect(names()).toEqual(['b.pdf']);
+    expect(report.finished).toHaveBeenCalledWith({ added: 1, notAdded: 2 });
+  });
+
+  it('refuses a vault file by its real length when the list would go over the limit, before anything reads its content', async () => {
+    const prepare = vi.fn(async (source: IntakeSource) => ready(source));
+    const { runner, idle, report, names } = setup(prepare, { maxBytes: 100, warnBytes: 80 });
+    runner.enqueue([file('a.pdf', 60), { name: 'Statement.pdf', size: 0, origin: 'vault', evidenceId: 'ev-3', arrayBuffer: async () => new ArrayBuffer(60) }]);
+    await idle();
+    expect(prepare.mock.calls.map(([source]) => source.name)).toEqual(['a.pdf']);
+    expect(report.notAdded).toHaveBeenCalledWith('Statement.pdf', expect.stringMatching(/^The files in the list would come to more than .*Remove some files first\.$/));
+    expect(names()).toEqual(['a.pdf']);
+  });
+
+  it('says nothing of an oversized vault file when the list moved on while it was read', async () => {
+    const prepare = vi.fn(async (source: IntakeSource) => ready(source));
+    const { runner, idle, report, store } = setup(prepare, { maxBytes: 1000, warnBytes: 800 });
+    runner.enqueue([
+      {
+        name: 'A secret scan.pdf',
+        size: 10,
+        origin: 'vault',
+        evidenceId: 'ev-4',
+        arrayBuffer: async () => {
+          store.setContext('u1:B');
+          return new ArrayBuffer(50_000);
+        },
+      },
+    ]);
+    await idle();
+    expect(prepare).not.toHaveBeenCalled();
+    expect(report.notAdded).not.toHaveBeenCalled();
+    expect(report.finished).not.toHaveBeenCalled();
+  });
+
   it('gives a file larger than the whole limit its own message', async () => {
     const { runner, idle, report } = setup(undefined, { maxBytes: 100, warnBytes: 80 });
     runner.enqueue([file('huge.pdf', 101)]);
@@ -269,5 +346,52 @@ describe('IntakeRunner', () => {
     await idle();
     expect(report.notice).toHaveBeenCalledWith('a.gif', 'first-frame');
     expect(report.listLarge).toHaveBeenCalledTimes(1);
+  });
+
+  it('a TIFF conversion: its pauses say the page once each, and the result is added', async () => {
+    const yields = vi.fn(async () => undefined);
+    const { runner, idle, env, names } = setup(async (source, hooks) => {
+      for (let page = 1; page <= 3; page++) for (let slice = 0; slice < 4; slice++) await hooks.pause!({ page, pages: 3 });
+      return ready(source);
+    });
+    env.yieldNow = yields;
+    runner.enqueue([file('statement.tif')]);
+    await idle();
+    const shown = vi.mocked(env.onProgress).mock.calls.map(([p]) => p?.current).filter((c) => c?.includes('page'));
+    expect(shown).toEqual(['statement.tif (page 1 of 3)', 'statement.tif (page 2 of 3)', 'statement.tif (page 3 of 3)']);
+    expect(yields).toHaveBeenCalledTimes(12);
+    expect(names()).toEqual(['statement.tif']);
+  });
+
+  it('a TIFF conversion stops at the pause during which the list moved on, doing no more work', async () => {
+    let workAfter = 0;
+    const { runner, idle, env, store, names } = setup(async (source, hooks) => {
+      await hooks.pause!({ page: 1, pages: 2 });
+      workAfter += 1; // the rest of the conversion
+      return ready(source);
+    });
+    env.yieldNow = async () => store.setContext('u1:B'); // another engagement while the screen had the turn
+    runner.enqueue([file('statement.tif')]);
+    await idle();
+    expect(workAfter).toBe(0);
+    expect(names()).toEqual([]);
+  });
+
+  it('a TIFF conversion stops at its next pause, silently, when the list moves on, and adds nothing', async () => {
+    let reached = 0;
+    const { runner, idle, report, names, store } = setup(async (source, hooks) => {
+      for (let page = 1; page <= 5; page++) {
+        await hooks.pause!({ page, pages: 5 });
+        reached = page;
+        if (page === 2) store.setContext('u1:B');
+      }
+      return ready(source);
+    });
+    runner.enqueue([file('statement.tif'), file('next.pdf')]);
+    await idle();
+    expect(reached).toBe(2);
+    expect(names()).toEqual([]);
+    expect(report.notAdded).not.toHaveBeenCalled();
+    expect(report.finished).not.toHaveBeenCalled();
   });
 });

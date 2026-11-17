@@ -1,5 +1,6 @@
 // What happens on screen after a save to the computer: which rows are marked "Saved to computer"
 // and what the toast says. Plain functions, so the wording rules are tested without a browser.
+import { plural } from './format';
 import type { SaveOutcome } from './saveToComputer';
 
 export interface SaveReport {
@@ -27,7 +28,6 @@ export function renamedNames(intended: string[], written: string[]): string[] {
 }
 
 const UNPROTECTED_NOTE = ' Files that were password-protected are saved without a password.';
-const plural = (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`;
 
 /**
  * The folder window ended without a folder. That is a cancel, or the user chose a system folder the
@@ -68,8 +68,8 @@ export function planSaveResult(report: SaveReport): { markIds: string[]; toast: 
   switch (outcome) {
     case 'saved': {
       const markIds = files.map((f) => f.id);
-      if (mode === 'one') return { markIds, toast: { tone: 'success', title: 'Saved to your computer', description: `${files[0].intendedName}${note}` } };
-      if (mode === 'zip') return { markIds, toast: { tone: 'success', title: 'Saved as one zip', description: `${plural(files.length)} in one zip file.${note}` } };
+      if (mode === 'one') return { markIds, toast: { tone: 'success', title: 'Saved to computer', description: `${files[0].intendedName}${note}` } };
+      if (mode === 'zip') return { markIds, toast: { tone: 'success', title: 'Saved as one zip', description: `${plural(files.length, 'file')} in one zip file.${note}` } };
       const renamed = renamedNames(
         files.map((f) => f.intendedName),
         written,
@@ -78,13 +78,13 @@ export function planSaveResult(report: SaveReport): { markIds: string[]; toast: 
         renamed.length > 0
           ? `Names already in the folder were kept; new copies were numbered, for example "${renamed[0]}".`
           : 'Each file was saved into the folder you chose.';
-      return { markIds, toast: { tone: 'success', title: `Saved ${plural(files.length)}`, description: description + note } };
+      return { markIds, toast: { tone: 'success', title: `Saved ${plural(files.length, 'file')}`, description: description + note } };
     }
     // The fallback when no save dialog is available: Electron may show its own Save As, which the
     // user can cancel or point elsewhere, and its completion cannot be seen. The rows are marked
     // "Sent to download" and the record says the completion is not confirmed.
     case 'downloaded': {
-      const what = mode === 'one' ? files[0].intendedName : mode === 'zip' ? `${plural(files.length)} in one zip file` : plural(files.length);
+      const what = mode === 'one' ? files[0].intendedName : mode === 'zip' ? `${plural(files.length, 'file')} in one zip file` : plural(files.length, 'file');
       return {
         markIds: files.map((f) => f.id),
         toast: {

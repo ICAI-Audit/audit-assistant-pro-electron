@@ -16,54 +16,85 @@
 // - A result made from results carries their history (provenance.ts).
 // - Sources' bytes are passed to the lib functions as they are: they never change them, and the
 //   renderer copies what it gives to its worker.
+import { HEADER_TEXT_TOKENS, typedTextRecord } from '@/lib/pdf-tools/activity';
 import { compressPdf, COMPRESS_LEVELS, type CompressLevel, type ImageRecoder } from '@/lib/pdf-tools/compress';
+import { compressToTarget } from '@/lib/pdf-tools/compressTarget';
 import { pageImageName, partName, stripExtension } from '@/lib/pdf-tools/fileNames';
 import { imagesToPdf, sniffImageFormat, type ImageInput, type ImagePageSize } from '@/lib/pdf-tools/imagesToPdf';
-import { inspectPdf, type PdfInfo } from '@/lib/pdf-tools/inspect';
-import { deletePages, extractPages, mergePdfs, splitEvery, type OrganiseReport } from '@/lib/pdf-tools/organise';
+import { inspectPdf } from '@/lib/pdf-tools/inspect';
+import { emptyMarkReport } from '@/lib/pdf-tools/marks';
+import { forgetMatchedText } from '@/lib/pdf-tools/matchedText';
+import { deletePages, extractPages, mergePdfs, splitEvery, type BookmarkReport, type MergeOptions, type OrganiseReport } from '@/lib/pdf-tools/organise';
 import { formatPageList, parsePageList } from '@/lib/pdf-tools/pageList';
-import { addPageNumbers, type PageNumberOptions } from '@/lib/pdf-tools/pageNumbers';
-import { historyOf, sourceRef } from '@/lib/pdf-tools/provenance';
-import { defaultResultName, operationSummary, summaryWithNotes } from '@/lib/pdf-tools/resultNames';
-import { LIST_MAX_BYTES, LIST_WARN_BYTES, newFileId, type WorkingListStore } from '@/lib/pdf-tools/workingList';
-import { PdfToolsError, type OperationFlags, type OperationRecord, type ToolId, type WorkingFile } from '@/lib/pdf-tools/types';
+import { addPageNumbers, type PageNumberRunOptions } from '@/lib/pdf-tools/pageNumbers';
+import { defaultResultName, operationSummary } from '@/lib/pdf-tools/resultNames';
+import { LIST_MAX_BYTES, LIST_WARN_BYTES, listHeldBytes, newFileId } from '@/lib/pdf-tools/workingList';
+import { PdfToolsError, PHASE_TWO_ERROR_MESSAGES, type PhaseTwoToolId, type ToolId, type WorkingFile } from '@/lib/pdf-tools/types';
 import { nextPaint, yieldToUi } from './canvasUtils';
 import { formatBytes, plural } from './format';
+import { compressToFit, sizesText, type CompressFitOptions } from './compressFit';
 import { browserImageRecoder } from './imageRecoder';
 import { IMAGE_ENCODE_FAILED, OUT_OF_MEMORY } from './canvasUtils';
 import { numberedResultName } from './fileGroups';
+import { carriedFilesNotice } from './carriedNotice';
 import { OPEN_TIMEOUT, RENDER_UNAVAILABLE, RENDERER_RESTARTED, renderPage, type RenderedImage } from './pdfRenderer';
 import { RenderTimeoutError, type Priority } from './renderQueue';
 import { resolveResultName, resolveStem, rgbToHex } from './toolOptions';
+import { splitIntoFiles, type SplitPartsRunOptions } from './splitRun';
+import { RUN_MODULES, type PhaseTwoRunOptions } from './toolModules';
+import {
+  Cancelled,
+  markFlags,
+  markNotes,
+  onePdf,
+  pageByPage,
+  Run as StepRun,
+  Stale,
+  unverified,
+  wrongInput,
+  type Made,
+  type RunContext,
+  type RunModule,
+  type StepDeps,
+} from './toolStep';
 
-export interface RunContext {
-  contextKey: string;
-  /** The list's session when Run was pressed (from the screen's guarded state). */
-  session: number;
-  store: Pick<WorkingListStore, 'getState' | 'addResults'>;
-  signal: AbortSignal;
-  /** `total` 0 means the step cannot be measured; `label` says what is happening. */
-  onProgress: (done: number, total: number, label?: string) => void;
-}
+// The step contract (what a step receives and returns, and what a phase 2 run module exports) is at the
+// top of toolStep.ts. The phase 2 tools' options types live in their run modules (toolModules.ts).
+export type { RunContext } from './toolStep';
+export type { PhaseTwoRunOptions } from './toolModules';
 
 export interface MergeRunOptions {
   name?: string;
+  /** "Add a bookmark for each file" (design 5.2): one bookmark per input, images included, at its first page. Off when absent. */
+  fileBookmarks?: boolean;
+  /** "Keep each file's own bookmarks under it": the inputs' bookmarks are carried (under their file's bookmark when there is one). Off when absent. */
+  keepOwnBookmarks?: boolean;
 }
 export type SplitRunOptions =
   | { mode: 'range'; from: number; to: number; name?: string }
   | { mode: 'selected'; pages: string; name?: string }
-  | { mode: 'every'; every: number; stem?: string };
+  | { mode: 'every'; every: number; stem?: string }
+  // Phase 2: a separate file for each range, or one file per main bookmark (splitRun.ts).
+  | SplitPartsRunOptions;
 export interface DeletePagesRunOptions {
   pages: string;
   name?: string;
 }
-export interface CompressRunOptions {
-  level: CompressLevel;
-  /** One per input, in order; an empty or unusable name falls back to the default. */
-  names?: string[];
-}
+/** A level, or (lane CT) Fit to a size: `{ fit: { value, unit } }`, run by compressFit.ts. */
+export type CompressRunOptions =
+  | {
+      level: CompressLevel;
+      /** One per input, in order; an empty or unusable name falls back to the default. */
+      names?: string[];
+    }
+  | CompressFitOptions;
 export interface PageNumbersRunOptions {
-  numbers: PageNumberOptions;
+  /**
+   * Phase 1 fields plus the optional phase 2 ones (style, font, bold, italic, texts, dateFormat, numbersOn,
+   * tokens): pageNumbers.ts PageNumberRunOptions. `tokens` (file, client, financial year, today) are read
+   * by the dialog when Run is pressed; they fill the texts and are never recorded.
+   */
+  numbers: PageNumberRunOptions;
   name?: string;
 }
 export interface ImagesToPdfRunOptions {
@@ -79,7 +110,7 @@ export interface PdfToImagesRunOptions {
   stem?: string;
 }
 
-export interface ToolRunOptions {
+export interface ToolRunOptions extends PhaseTwoRunOptions {
   merge: MergeRunOptions;
   split: SplitRunOptions;
   'delete-pages': DeletePagesRunOptions;
@@ -89,15 +120,17 @@ export interface ToolRunOptions {
   'pdf-to-images': PdfToImagesRunOptions;
 }
 
-export interface RunDeps {
+/** The run's own needs (toolStep.ts StepDeps) and the phase 1 libraries its steps call; tests replace any of them. */
+export interface RunDeps extends StepDeps {
   mergePdfs: typeof mergePdfs;
   extractPages: typeof extractPages;
   splitEvery: typeof splitEvery;
   deletePages: typeof deletePages;
   compressPdf: typeof compressPdf;
+  /** Compress, Fit to a size (compressTarget.ts). */
+  compressToTarget: typeof compressToTarget;
   addPageNumbers: typeof addPageNumbers;
   imagesToPdf: typeof imagesToPdf;
-  inspectPdf: typeof inspectPdf;
   recoder: ImageRecoder;
   renderPage: (
     file: Uint8Array,
@@ -106,14 +139,6 @@ export interface RunDeps {
     format: 'png' | 'jpg',
     options: { signal?: AbortSignal; priority?: Priority },
   ) => Promise<RenderedImage>;
-  /** Lets the busy state paint before a slow step on the main thread. */
-  paint: () => Promise<void>;
-  /** Lets the window handle input between pages. */
-  yieldToUi: () => Promise<void>;
-  newId: () => string;
-  maxBytes: number;
-  /** Above this the list is large: the screen warns once when results take it past. */
-  warnBytes: number;
 }
 
 export interface RunResult {
@@ -144,6 +169,7 @@ const defaultDeps: RunDeps = {
   splitEvery,
   deletePages,
   compressPdf,
+  compressToTarget,
   addPageNumbers,
   imagesToPdf,
   inspectPdf,
@@ -156,169 +182,22 @@ const defaultDeps: RunDeps = {
   warnBytes: LIST_WARN_BYTES,
 };
 
-class Stale extends Error {}
-class Cancelled extends Error {}
-
-const unverified = () => new PdfToolsError('unverified', 'The result could not be verified and was not added.');
-const wrongInput = (message: string) => new PdfToolsError('wrong-input', message);
-
-interface Description {
-  message: string;
-  detail?: string;
-  tone?: 'success' | 'warning';
-}
+/** Phase 1's steps call the phase 1 libraries through `run.deps`, so tests can replace them. */
+type Run = StepRun<RunDeps>;
 
 /**
- * What a tool made. The names are settled only when the results are added (a name the list
- * already holds gets a number), so the message is written from the final files.
+ * From this size a Merge or Images to PDF result says why it is large and what makes it smaller (user QA
+ * 1.8 and 1.27: portals often allow 5 MB). Only then: a small result needs no word.
  */
-interface Made {
-  files: WorkingFile[];
-  describe(files: WorkingFile[]): Description;
-}
-
-/** Shared by the tool steps below: the run's checks and how a result row is built. */
-class Run {
-  constructor(
-    readonly tool: ToolId,
-    readonly ctx: RunContext,
-    readonly deps: RunDeps,
-  ) {}
-
-  live(): boolean {
-    const state = this.ctx.store.getState();
-    return state.session === this.ctx.session && state.contextKey === this.ctx.contextKey;
-  }
-
-  /** Stops the run when the list moved on or the user cancelled. */
-  check(): void {
-    if (!this.live()) throw new Stale();
-    if (this.ctx.signal.aborted) throw new Cancelled();
-  }
-
-  progress(done: number, total: number, label?: string): void {
-    this.check();
-    this.ctx.onProgress(done, total, label);
-  }
-
-  /** Shows the step, lets it paint, then checks again before the slow work starts. */
-  async slowStep(label: string): Promise<void> {
-    this.progress(0, 0, label);
-    await this.deps.paint();
-    this.check();
-  }
-
-  listBytes(): number {
-    this.check(); // only this session's files are counted
-    return this.ctx.store.getState().files.reduce((sum, f) => sum + f.size, 0);
-  }
-
-  /**
-   * Refuses before the slow work when the outcome is already known: the list is full, or `adding`
-   * bytes (a fair lower bound of what will be made) would not fit. The real size is checked again
-   * before the results are added.
-   */
-  ensureRoom(adding = 0, what = 'The result'): void {
-    const list = this.listBytes();
-    const max = this.deps.maxBytes;
-    if (list >= max) {
-      throw new PdfToolsError('list-full', `The list is full: ${formatBytes(max)} is the most PDF Tools can hold. Remove some files and try again.`);
-    }
-    if (list + adding > max) {
-      throw new PdfToolsError('list-full', `${what} would take the list over ${formatBytes(max)}. Remove some files from the list and try again.`);
-    }
-  }
-
-  async verifyPdf(bytes: Uint8Array, expectedPages: number | null): Promise<PdfInfo & { pageCount: number }> {
-    let info;
-    try {
-      info = await this.deps.inspectPdf(bytes);
-    } catch {
-      throw unverified();
-    }
-    if (info.encrypted || info.pageCount === null) throw unverified();
-    if (expectedPages !== null && info.pageCount !== expectedPages) throw unverified();
-    return { ...info, pageCount: info.pageCount };
-  }
-
-  result(
-    made: Pick<WorkingFile, 'name' | 'bytes' | 'kind' | 'mimeType' | 'pageCount'> &
-      Partial<Pick<WorkingFile, 'signatureInvalid' | 'hasFormFields' | 'hasBookmarks' | 'hasPageLinks'>>,
-    sources: WorkingFile[],
-    record: Pick<OperationRecord, 'summary' | 'options' | 'flags'>,
-    groupId?: string,
-  ): WorkingFile {
-    const operation: OperationRecord = { tool: this.tool, summary: record.summary, sources: sources.map(sourceRef), options: record.options, ...historyOf(sources) };
-    if (record.flags && Object.keys(record.flags).length > 0) operation.flags = record.flags;
-    const file: WorkingFile = {
-      ...made,
-      id: this.deps.newId(),
-      origin: 'result',
-      size: made.bytes.byteLength,
-      wasProtected: sources.some((f) => f.wasProtected),
-      hasRestrictions: false,
-      hasSignature: false, // a result never carries a valid signature
-      operation,
-      sentTo: [],
-    };
-    if (groupId) file.groupId = groupId;
-    return file;
-  }
-
-  async pdfResult(
-    name: string,
-    bytes: Uint8Array,
-    expectedPages: number | null,
-    sources: WorkingFile[],
-    record: Pick<OperationRecord, 'summary' | 'options'>,
-    extra: { groupId?: string; report?: OrganiseReport } = {},
-  ): Promise<WorkingFile> {
-    this.check();
-    const info = await this.verifyPdf(bytes, expectedPages);
-    this.check();
-    // Every result of a signed file (or of a result marked so) may still hold the signature, no longer valid.
-    const signatureInvalid = sources.some((f) => f.hasSignature || f.signatureInvalid);
-    const sharedResourcesKept = extra.report?.sharedResourcesKept === true;
-    const flags: OperationFlags = {
-      ...notCarried(this.tool, sources),
-      ...(signatureInvalid ? { signatureInvalid: true } : {}),
-      ...(sharedResourcesKept ? { sharedResourcesKept: true } : {}),
-    };
-    const made = {
-      name,
-      bytes,
-      kind: 'pdf' as const,
-      mimeType: 'application/pdf',
-      pageCount: info.pageCount,
-      hasFormFields: info.hasFormFields,
-      hasBookmarks: info.hasBookmarks,
-      hasPageLinks: info.hasPageLinks,
-      ...(signatureInvalid ? { signatureInvalid: true } : {}),
-      ...(sharedResourcesKept ? { sharedResourcesKept: true } : {}),
-    };
-    return this.result(made, sources, { summary: summaryWithNotes(record.summary, flags), options: record.options, flags }, extra.groupId);
-  }
-}
+const LARGE_RESULT_BYTES = 5 * 1024 * 1024;
+const MERGE_SIZE_NOTE = 'Merging does not make files smaller; Compress can make scans smaller.';
+const IMAGES_SIZE_NOTE = 'Photos are kept as they are; Compress can make this PDF smaller.';
 
 /** Said in the run's message when a Split or Delete pages result kept some page's resources whole. */
 const RESOURCES_KEPT_NOTE = 'Some pages could not be read with certainty. The file may still contain images or fonts from pages that were left out.';
 
-/** What a tool does not carry over from its sources (the dialogs say so before the run). */
-function notCarried(tool: ToolId, sources: WorkingFile[]): OperationFlags {
-  const flags: OperationFlags = {};
-  if (tool === 'merge' && sources.some((f) => f.hasFormFields)) flags.formFieldsDropped = true;
-  if ((tool === 'merge' || tool === 'split' || tool === 'delete-pages') && sources.some((f) => f.hasBookmarks)) flags.bookmarksDropped = true;
-  return flags;
-}
-
 function imageInput(file: WorkingFile): ImageInput {
   return { bytes: file.bytes, format: file.mimeType === 'image/png' ? 'png' : 'jpeg', name: file.name };
-}
-
-function onePdf(inputs: WorkingFile[]): WorkingFile & { pageCount: number } {
-  const [file] = inputs;
-  if (inputs.length !== 1 || file.kind !== 'pdf' || file.pageCount === null) throw wrongInput('Choose exactly one PDF.');
-  return file as WorkingFile & { pageCount: number };
 }
 
 function percentSmaller(before: number, after: number): number {
@@ -326,6 +205,17 @@ function percentSmaller(before: number, after: number): number {
 }
 
 // ---- the tools ---------------------------------------------------------------------------------
+
+/**
+ * The bookmarks Merge writes (design 5.2): with "a bookmark for each file", one per input in list order,
+ * images included (each image is one page), titled with its name without the extension; with "keep each
+ * file's own bookmarks", the inputs' own bookmarks, under their file's bookmark when there is one.
+ */
+export function mergeBookmarkOptions(inputs: readonly WorkingFile[], opts: Pick<MergeRunOptions, 'fileBookmarks' | 'keepOwnBookmarks'>): MergeOptions['fileBookmarks'] {
+  const keepOwn = opts.keepOwnBookmarks === true;
+  if (opts.fileBookmarks === true) return { titles: inputs.map((f) => stripExtension(f.name)), keepOwn };
+  return keepOwn ? { keepOwn: true } : undefined;
+}
 
 async function merge(run: Run, inputs: WorkingFile[], opts: MergeRunOptions): Promise<Made> {
   if (inputs.length < 2) throw new PdfToolsError('merge-needs-two', 'Choose at least two files to merge.');
@@ -346,7 +236,14 @@ async function merge(run: Run, inputs: WorkingFile[], opts: MergeRunOptions): Pr
     }
   }
   await run.slowStep('Merging…');
-  const bytes = await run.deps.mergePdfs(parts);
+  // One part per input, in input order, so the file bookmarks' titles line up with their first pages.
+  const report: BookmarkReport = {};
+  const fileBookmarks = mergeBookmarkOptions(inputs, opts);
+  // Before each page is copied: a Stop (or a change of engagement) lands between pages (REV-A B6).
+  const onPage = () => run.check();
+  // While each file is still being read too (FIX-A2 follow-up): the read asks the same check at each wait.
+  const check = () => run.check();
+  const bytes = await run.deps.mergePdfs(parts, fileBookmarks ? { fileBookmarks, report, onPage, check } : { report, onPage, check });
   const expected = inputs.every((f) => f.kind === 'image' || f.pageCount !== null)
     ? inputs.reduce((sum, f) => sum + (f.kind === 'image' ? 1 : (f.pageCount as number)), 0)
     : null;
@@ -356,32 +253,26 @@ async function merge(run: Run, inputs: WorkingFile[], opts: MergeRunOptions): Pr
     options.imagePageSize = MERGE_IMAGE_OPTIONS.pageSize;
     options.imageMarginPt = MERGE_IMAGE_OPTIONS.marginPt;
   }
-  const file = await run.pdfResult(name, bytes, expected, inputs, { summary: operationSummary('merge', { files: inputs.length }), options });
+  options.fileBookmarks = opts.fileBookmarks === true;
+  options.keepOwnBookmarks = opts.keepOwnBookmarks === true;
+  const flags = inputs.some((f) => f.hasFormFields) ? { formFieldsDropped: true } : {};
+  const file = await run.pdfResult(name, bytes, expected, inputs, { summary: operationSummary('merge', { files: inputs.length }), options }, { report, flags });
   return {
     files: [file],
-    describe: ([made]) => ({ message: `Merged ${plural(inputs.length, 'file')} into ${made.name}`, detail: `${plural(made.pageCount ?? 0, 'page')}.` }),
-  };
-}
-
-/**
- * Page-by-page progress for Split (one result) and Delete pages on the main thread: the bar moves,
- * and a cancel takes effect between pages, about a hundred times in a run however long the file.
- */
-function pageByPage(run: Run, label: (page: number, total: number) => string) {
-  return async (done: number, total: number) => {
-    if (done % Math.max(1, Math.ceil(total / 100)) !== 0) return;
-    run.progress(done, total, label(done + 1, total));
-    await run.deps.yieldToUi();
-    run.check();
+    describe: ([made]) => ({
+      message: `Merged ${plural(inputs.length, 'file')} into ${made.name}`,
+      detail: `${plural(made.pageCount ?? 0, 'page')}.${made.size >= LARGE_RESULT_BYTES ? ` ${MERGE_SIZE_NOTE}` : ''}`,
+    }),
   };
 }
 
 async function split(run: Run, inputs: WorkingFile[], opts: SplitRunOptions): Promise<Made> {
   const source = onePdf(inputs);
+  if (opts.mode === 'ranges' || opts.mode === 'bookmarks') return splitIntoFiles(run, source, opts);
   if (opts.mode === 'every') {
     await run.slowStep('Splitting…');
-    const reports: OrganiseReport[] = [];
-    // Part by part: the bar moves, and a cancel takes effect before the next part.
+    const reports: (OrganiseReport & BookmarkReport)[] = [];
+    // Part by part: the bar moves; a cancel takes effect before the next page (REV-A B6).
     const parts = await run.deps.splitEvery(source.bytes, opts.every, {
       reports,
       onPart: async (done, total) => {
@@ -389,6 +280,8 @@ async function split(run: Run, inputs: WorkingFile[], opts: SplitRunOptions): Pr
         await run.deps.yieldToUi();
         run.check();
       },
+      onPage: () => run.check(),
+      check: () => run.check(), // while the source is still being read (FIX-A2 follow-up)
     });
     const stem = resolveStem(opts.stem ?? '', stripExtension(source.name));
     const groupId = run.deps.newId();
@@ -410,9 +303,9 @@ async function split(run: Run, inputs: WorkingFile[], opts: SplitRunOptions): Pr
   const range = opts.mode === 'range';
   const indices = parsePageList(range ? `${opts.from}-${opts.to}` : opts.pages, source.pageCount);
   await run.slowStep('Taking out the pages…');
-  const report: OrganiseReport = {};
+  const report: OrganiseReport & BookmarkReport = {};
   const onPage = pageByPage(run, (page, total) => `Taking out the pages (${page} of ${total})…`);
-  const bytes = await run.deps.extractPages(source.bytes, indices, { report, onPage });
+  const bytes = await run.deps.extractPages(source.bytes, indices, { report, onPage, check: () => run.check() });
   const written = formatPageList(indices);
   const fallback = range ? defaultResultName('split', source.name, { from: opts.from, to: opts.to }) : defaultResultName('split', source.name);
   const name = resolveResultName(opts.name ?? '', fallback, 'pdf');
@@ -428,9 +321,9 @@ async function removePages(run: Run, inputs: WorkingFile[], opts: DeletePagesRun
   // A page typed twice is removed once.
   const indices = parsePageList(opts.pages, source.pageCount, { unique: true }).sort((a, b) => a - b);
   await run.slowStep('Removing the pages…');
-  const report: OrganiseReport = {};
+  const report: OrganiseReport & BookmarkReport = {};
   const onPage = pageByPage(run, (page, total) => `Copying the remaining pages (${page} of ${total})…`);
-  const bytes = await run.deps.deletePages(source.bytes, indices, { report, onPage });
+  const bytes = await run.deps.deletePages(source.bytes, indices, { report, onPage, check: () => run.check() });
   const remaining = source.pageCount - indices.length;
   const name = resolveResultName(opts.name ?? '', defaultResultName('delete-pages', source.name), 'pdf');
   const written = formatPageList(indices);
@@ -438,13 +331,34 @@ async function removePages(run: Run, inputs: WorkingFile[], opts: DeletePagesRun
   return { files: [file], describe: ([made]) => ({ message: `Made ${made.name}`, detail: `${plural(remaining, 'page')} ${remaining === 1 ? 'remains' : 'remain'}.` }) };
 }
 
+/**
+ * What a level that made nothing says (user Q&A 1.20): why, and "a stronger level" only when a file has images
+ * a level can recode. `recodable` and `withImages` count the files with such images, and with any image.
+ */
+function nothingMade(label: string, level: CompressLevel, several: boolean, recodable: number, withImages: number): { message: string; detail: string } {
+  // One plain sentence (owner, 15 November 2026); which kinds of image are left alone is in PDF_TOOLS.md 5.5.
+  const nothingAdded = 'so no level can make it smaller; nothing was added.';
+  if (several) {
+    if (recodable === 0) return { message: 'No images to reduce', detail: `${label} would not make these files smaller: none of them has images Compress can reduce.` };
+    return { message: 'Already compact at this level', detail: `${label} would not make these files smaller.${level === 'extreme' ? '' : ' A stronger level may still make them smaller.'}` };
+  }
+  if (withImages === 0) return { message: 'No images to reduce', detail: `This file has no images to reduce, ${nothingAdded}` };
+  if (recodable === 0) return { message: 'Its images cannot be reduced', detail: `Its images are of a kind Compress cannot reduce, ${nothingAdded}` };
+  return { message: 'Already compact at this level', detail: `${label} would not make this file smaller.${level === 'extreme' ? '' : ' A stronger level may still make it smaller.'}` };
+}
+
 async function compress(run: Run, inputs: WorkingFile[], opts: CompressRunOptions): Promise<Made> {
+  if ('fit' in opts) return compressToFit(run, inputs, opts);
   if (inputs.length === 0 || inputs.some((f) => f.kind !== 'pdf')) throw wrongInput('Only PDFs can be compressed.');
   const label = COMPRESS_LEVELS[opts.level]?.label ?? opts.level;
   const STEPS = 1000; // per file, so several files share one bar
   const several = inputs.length > 1;
   const files: WorkingFile[] = [];
   const compact: string[] = [];
+  // How many of the compact files have images a level can recode, and whether any has images at all (user Q&A
+  // 1.20: "a stronger level may still make it smaller" only when one has something to work on).
+  let compactRecodable = 0;
+  let compactWithImages = 0;
   const failed: { name: string; reason: string }[] = [];
   let before = 0;
   let after = 0;
@@ -462,10 +376,14 @@ async function compress(run: Run, inputs: WorkingFile[], opts: CompressRunOption
       run.check();
       if (!outcome.bytes) {
         compact.push(source.name);
+        if ((outcome.imagesRecodable ?? outcome.imagesFound) > 0) compactRecodable += 1;
+        if (outcome.imagesFound > 0) compactWithImages += 1;
         continue;
       }
       const saved = percentSmaller(outcome.originalSize, outcome.newSize);
-      const summary = operationSummary('compress', { level: opts.level, saved, from: formatBytes(outcome.originalSize), to: formatBytes(outcome.newSize) });
+      // Sizes that read differently: never "1.0 MB → 1.0 MB" for a result 1% smaller (user Q&A 5.8).
+      const [from, to] = sizesText(outcome.originalSize, outcome.newSize).split(' → ');
+      const summary = operationSummary('compress', { level: opts.level, saved, from, to });
       const name = resolveResultName(opts.names?.[i] ?? '', defaultResultName('compress', source.name), 'pdf');
       files.push(await run.pdfResult(name, outcome.bytes, source.pageCount, [source], { summary, options: { level: opts.level } }));
       before += outcome.originalSize;
@@ -482,13 +400,9 @@ async function compress(run: Run, inputs: WorkingFile[], opts: CompressRunOption
   const failedNote = failed.length > 0 ? `Not compressed: ${failed.map((f) => `${f.name} (${f.reason})`).join('; ')}` : '';
   if (files.length === 0) {
     if (failed.length > 0) throw new PdfToolsError('compress-failed', ['No file was compressed.', failedNote, compactNote].filter(Boolean).join(' '));
-    const stronger = opts.level === 'extreme' ? '' : ' A stronger level may still make it smaller.';
-    return {
-      files,
-      describe: () => ({ message: 'Already compact at this level', detail: `${label} would not make ${several ? 'these files' : 'this file'} smaller.${stronger}` }),
-    };
+    return { files, describe: () => nothingMade(label, opts.level, several, compactRecodable, compactWithImages) };
   }
-  const sizes = `${percentSmaller(before, after)}% smaller: ${formatBytes(before)} → ${formatBytes(after)}`;
+  const sizes = `${percentSmaller(before, after)}% smaller: ${sizesText(before, after)}`;
   if (!several) return { files, describe: ([made]) => ({ message: `Compressed ${made.name}`, detail: sizes }) };
   return {
     files,
@@ -500,17 +414,80 @@ async function compress(run: Run, inputs: WorkingFile[], opts: CompressRunOption
   };
 }
 
+/** "text_top_left" for the record: the slot of a header or footer line as an option key. */
+const textKey = (slot: string) => `text_${slot.replace(/-/g, '_')}`;
+
+/**
+ * Page numbers' record, flat (strings, numbers, booleans): the phase 1 fields and the phase 2 choices, counts
+ * and choices only (lead's ruling on REV-B B1). A header or footer line is recorded as it is only when it is a
+ * template of tokens and punctuation ("{client} - {fy}"), else as custom text with its length and the tokens
+ * it uses (activity.ts typedTextRecord); the text around a custom number the same way (it fills no tokens).
+ * Never a typed text, and never the token values (file, client, financial year, date).
+ */
+export function pageNumberRecord(numbers: PageNumberRunOptions): Record<string, string | number | boolean> {
+  const { color, texts, tokens, prefix, suffix, ...rest } = numbers;
+  void tokens;
+  const options: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(rest)) {
+    if (typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) options[key] = value;
+  }
+  options.color = rgbToHex(color);
+  const put = (key: string, text: string, lengthKey: string, usesKey: string, tokenNames: readonly string[]) => {
+    const typed = typedTextRecord(text, [], tokenNames);
+    options[key] = typed.value;
+    if (typed.length !== undefined) options[lengthKey] = typed.length;
+    if (typed.uses) options[usesKey] = typed.uses;
+  };
+  if (numbers.format === 'custom') {
+    if (prefix) put('prefix', prefix, 'prefixLength', 'prefixUses', []);
+    if (suffix) put('suffix', suffix, 'suffixLength', 'suffixUses', []);
+  }
+  for (const [slot, text] of Object.entries(texts ?? {})) {
+    if (typeof text === 'string' && text !== '') put(textKey(slot), text, `${textKey(slot)}_length`, `${textKey(slot)}_uses`, HEADER_TEXT_TOKENS);
+  }
+  return options;
+}
+
+const NOTHING_ADDED = 'Nothing was added.';
+
+/**
+ * A refusal of the library (a text that does not fit on a page, a character the font cannot print) says
+ * that nothing changed, as Watermark's does (UX principle 9). A Stop or a change of engagement is not a
+ * PdfToolsError and passes through as it is.
+ */
+function saysNothingAdded(error: unknown): unknown {
+  if (!(error instanceof PdfToolsError) || error.message.endsWith(NOTHING_ADDED)) return error;
+  return new PdfToolsError(error.code, `${error.message} ${NOTHING_ADDED}`);
+}
+
 async function numberPages(run: Run, inputs: WorkingFile[], opts: PageNumbersRunOptions): Promise<Made> {
   const source = onePdf(inputs);
-  await run.slowStep('Adding page numbers…');
-  const bytes = await run.deps.addPageNumbers(source.bytes, opts.numbers);
-  const name = resolveResultName(opts.name ?? '', defaultResultName('page-numbers', source.name), 'pdf');
-  const { color, ...rest } = opts.numbers;
-  const options: Record<string, string | number | boolean> = { ...rest, prefix: rest.prefix ?? '', suffix: rest.suffix ?? '', color: rgbToHex(color) };
-  const file = await run.pdfResult(name, bytes, source.pageCount, [source], { summary: operationSummary('page-numbers', {}), options });
-  const { fromPage, toPage } = opts.numbers;
+  // The numbered copy is about the size of the source: refuse now if the list cannot take it (as Watermark does).
+  run.ensureRoom(source.size, 'The numbered file');
+  const numbers = opts.numbers;
+  const headerFooter = Object.values(numbers.texts ?? {}).some((text) => typeof text === 'string' && text !== '');
+  const numbersOn = numbers.numbersOn !== false;
+  const what = numbersOn ? (headerFooter ? 'page numbers, header and footer' : 'page numbers') : 'the header and footer';
+  await run.slowStep(`Adding ${what}…`);
+  const report = emptyMarkReport();
+  const onPage = pageByPage(run, (page, total) => `Adding ${what} (page ${page} of ${total})…`);
+  let bytes: Uint8Array;
+  try {
+    bytes = await run.deps.addPageNumbers(source.bytes, numbers, { onPage, report, check: () => run.check() });
+  } catch (error) {
+    throw saysNothingAdded(error);
+  }
+  const name = resolveResultName(opts.name ?? '', defaultResultName('page-numbers', source.name, { headerFooter }), 'pdf');
+  const summary = operationSummary('page-numbers', headerFooter ? { headerFooter: numbersOn ? 'with' : 'only' } : {});
+  const file = await run.pdfResult(name, bytes, source.pageCount, [source], { summary, options: pageNumberRecord(numbers) }, { flags: markFlags(report) });
+  const { fromPage, toPage } = numbers;
   const which = fromPage === 1 && toPage === source.pageCount ? 'every page' : `pages ${fromPage} to ${toPage}`;
-  return { files: [file], describe: ([made]) => ({ message: `Made ${made.name}`, detail: `Numbers added to ${which}.` }) };
+  const added = numbersOn ? (headerFooter ? 'Numbers, header and footer' : 'Numbers') : 'Header and footer';
+  const notes = markNotes(report, 'page-numbers');
+  return {
+    files: [file],
+    describe: ([made]) => ({ message: `Made ${made.name}`, detail: [`${added} added to ${which}.`, ...notes].join(' '), tone: notes.length > 0 ? 'warning' : 'success' }),
+  };
 }
 
 async function imagesIntoPdf(run: Run, inputs: WorkingFile[], opts: ImagesToPdfRunOptions): Promise<Made> {
@@ -521,7 +498,10 @@ async function imagesIntoPdf(run: Run, inputs: WorkingFile[], opts: ImagesToPdfR
   const name = resolveResultName(opts.name ?? '', defaultResultName('images-to-pdf', inputs[0].name), 'pdf');
   const record = { summary: operationSummary('images-to-pdf', { images: inputs.length }), options: { pageSize: opts.pageSize, marginPt: opts.marginPt } };
   const file = await run.pdfResult(name, bytes, inputs.length, inputs, record);
-  return { files: [file], describe: ([made]) => ({ message: `Made ${made.name}`, detail: `${plural(inputs.length, 'image')}, one per page.` }) };
+  return {
+    files: [file],
+    describe: ([made]) => ({ message: `Made ${made.name}`, detail: `${plural(inputs.length, 'image')}, one per page.${made.size >= LARGE_RESULT_BYTES ? ` ${IMAGES_SIZE_NOTE}` : ''}` }),
+  };
 }
 
 /** What a PDF-to-images run can still change to make lighter images: only what it is not using yet. */
@@ -629,6 +609,25 @@ async function pdfIntoImages(run: Run, inputs: WorkingFile[], opts: PdfToImagesR
   return { files, describe: (made) => ({ message: made.length === 1 ? `Made ${made[0].name}` : `Made ${made.length} page images`, detail: notes.join(' ') }) };
 }
 
+/**
+ * A phase 2 tool's step, from its run module (loaded the first time the tool runs). A module that is still
+ * the integration stub, or that cannot be loaded, runs nothing and says why.
+ */
+function phaseTwoStep<T extends PhaseTwoToolId>(tool: T) {
+  return async (run: Run, inputs: WorkingFile[], opts: PhaseTwoRunOptions[T]): Promise<Made> => {
+    let module: RunModule<PhaseTwoRunOptions[T]>;
+    try {
+      module = await RUN_MODULES[tool]();
+    } catch {
+      run.check(); // a change of engagement or a Stop while loading is not a failure to load
+      throw new PdfToolsError('tool-load-failed', PHASE_TWO_ERROR_MESSAGES['tool-load-failed'] ?? 'This tool could not be loaded.');
+    }
+    run.check();
+    if (module.BUILT !== true) throw new PdfToolsError('tool-not-built', 'This tool is still being built, so it cannot run yet.');
+    return module.step(run, inputs, opts);
+  };
+}
+
 const STEPS_BY_TOOL: { [T in ToolId]: (run: Run, inputs: WorkingFile[], opts: ToolRunOptions[T]) => Promise<Made> } = {
   merge,
   split,
@@ -637,6 +636,12 @@ const STEPS_BY_TOOL: { [T in ToolId]: (run: Run, inputs: WorkingFile[], opts: To
   'page-numbers': numberPages,
   'images-to-pdf': imagesIntoPdf,
   'pdf-to-images': pdfIntoImages,
+  bookmarks: phaseTwoStep('bookmarks'),
+  'organise-pages': phaseTwoStep('organise-pages'),
+  'resize-crop': phaseTwoStep('resize-crop'),
+  watermark: phaseTwoStep('watermark'),
+  protect: phaseTwoStep('protect'),
+  redact: phaseTwoStep('redact'),
 };
 
 /**
@@ -714,7 +719,7 @@ export async function runTool<T extends ToolId>(
   ctx: RunContext,
   overrides: Partial<RunDeps> = {},
 ): Promise<RunResult> {
-  const run = new Run(tool, ctx, { ...defaultDeps, ...overrides });
+  const run: Run = new StepRun(tool, ctx, { ...defaultDeps, ...overrides });
   try {
     run.check();
     run.ensureRoom();
@@ -727,7 +732,7 @@ export async function runTool<T extends ToolId>(
 
     // From here to addResults nothing is awaited, so the list cannot change in between.
     const before = run.listBytes();
-    const adding = made.files.reduce((sum, f) => sum + f.size, 0);
+    const adding = listHeldBytes(made.files); // a Protect result's preview bytes count too
     if (before + adding > run.deps.maxBytes) {
       throw new PdfToolsError(
         'list-full',
@@ -738,12 +743,14 @@ export async function runTool<T extends ToolId>(
     if (!ctx.store.addResults(ctx.contextKey, files, ctx.session)) return { status: 'stale', added: 0, ids: [] };
     const said = made.describe(files);
     const kept = files.some((f) => f.sharedResourcesKept);
+    // What the copies still carry (comments, attachments, properties): one sentence, only when there is any.
+    const detail = [said.detail, kept ? RESOURCES_KEPT_NOTE : null, carriedFilesNotice(files)].filter(Boolean).join(' ');
     return {
       status: 'added',
       added: files.length,
       ids: files.map((f) => f.id),
       message: said.message,
-      detail: kept ? [said.detail, RESOURCES_KEPT_NOTE].filter(Boolean).join(' ') : said.detail,
+      detail: detail === '' ? said.detail : detail,
       tone: kept ? 'warning' : (said.tone ?? 'success'),
       listLarge: before <= run.deps.warnBytes && before + adding > run.deps.warnBytes,
     };
@@ -752,6 +759,10 @@ export async function runTool<T extends ToolId>(
     if (error instanceof Stale || !run.live()) return { status: 'stale', added: 0, ids: [] };
     if (error instanceof Cancelled || ctx.signal.aborted) return { status: 'cancelled', added: 0, ids: [] };
     if (error instanceof PdfToolsError) throw error;
-    throw new PdfToolsError('run-failed', 'The tool could not finish. The file may be damaged or use features that are not supported.');
+    throw new PdfToolsError('run-failed', 'The tool could not finish, and nothing was added. Open the file in a PDF reader, save a fresh copy and add that.');
+  } finally {
+    // Added, nothing made, failed, stopped or overtaken: the engine forgets the document text or file
+    // name a pattern read last (matchedText.ts).
+    forgetMatchedText();
   }
 }
