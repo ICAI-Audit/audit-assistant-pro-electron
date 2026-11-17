@@ -100,8 +100,10 @@ function ReasonInput({ tbId, scope, scopeKey, initial, onSaved, dark }) {
   const [text, setText] = useState(initial)
   const [saving, setSaving] = useState(false)
   useEffect(() => { setText(initial) }, [initial])
-  const commit = async () => {
-    const next = text.trim()
+  // Reads the box itself, not the `text` of the last render: a blur that follows the typing (or a paste) before React
+  // re-renders would otherwise see the old text, think nothing changed and skip the save.
+  const commit = async (e) => {
+    const next = String(e?.currentTarget?.value ?? text).trim()
     if (next === (initial || '').trim()) return
     setSaving(true)
     try {

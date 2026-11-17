@@ -393,9 +393,8 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
   return (
     <AnalyseChangeProvider on={changeOn && !pyOff} tbId={tbId} scope="pl" getRemark={getRemark} onRemarkSaved={onRemarkSaved}>
     <div className="flex flex-col h-full overflow-hidden">
-      {/* T-050: one-line toolbar, same layout as the Balance Sheet. */}
+      {/* T-050: one-line toolbar, same layout as the Balance Sheet (T-060: no repeated title). */}
       <div className="fsg-stmt-toolbar px-5 py-1.5 border-b border-blue-100 bg-gray-50 shrink-0">
-        <span className="fsg-stmt-title">Profit &amp; Loss</span>
         <FormatRefButton entity={entity} url={SCHEDULE3_SECTIONS.PL.url} label={SCHEDULE3_SECTIONS.PL.label} />
         <div className="ml-auto flex items-center gap-2">
           <AnalyseChangeButton on={changeOn && !pyOff} onToggle={setChangeOn} disabled={pyOff} disabledTitle={pyOffTitle} />

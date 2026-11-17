@@ -46,6 +46,9 @@ function parseAmt(n) {
 }
 
 /** Indian number format. Negative → parentheses. Zero → '—'. */
+// T-061: the line of "Changes in inventories" holding ledgers mapped there that are not Opening / Closing Stock.
+export const STOCK_OTHER_LEDGERS_LABEL = 'Add / (Less): Other ledgers mapped to this head'
+
 export function fmtINR(n) {
   // Number('') is 0 (not NaN), but parseFloat('') IS NaN — checking the
   // guard with Number() while formatting with parseFloat() let a blank
@@ -1100,7 +1103,7 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
   // live UI, PDF, and Excel (which all read section/note totals from this
   // shared processRows() output) agree automatically. See utils/inventorySplit.js.
   {
-    const materialsSec = expenseSections.find(s => /^cost of materials consumed/i.test(s.level1 || ''))
+    let materialsSec = expenseSections.find(s => /^cost of materials consumed/i.test(s.level1 || ''))
     let changesSec = expenseSections.find(s => /changes in inventor/i.test(s.level1 || ''))
     const legacyOpenSec = expenseSections.find(s => /^opening stock/i.test(s.level1 || ''))
     const legacyCloseSec = incomeSections.find(s => /^closing stock/i.test(s.level1 || ''))
@@ -1113,10 +1116,22 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
     // gets its Changes-in-Inventories / Other-Expenses split computed instead
     // of the whole block being skipped.
     if (materialsSec || changesSec || legacyOpenSec || legacyCloseSec) {
-      // Raw Materials stock is adjusted in "Cost of materials consumed". An entity with no such line (a Service Provider; a Manufacturer
-      // with no purchase ledger mapped there) has nowhere to put it, so it is adjusted in "Changes in inventories" with the other stock -
-      // it used to be left out of the P&L altogether, and profit and the Balance Sheet were both out by the year's movement.
-      const split = computeInventorySplit({ expenseSections, incomeSections }, businessType, !!prevMap, prevMap?.rows, { rawToChange: !materialsSec })
+      // Raw Materials stock is always adjusted in "Cost of materials consumed" (T-061, owner 17 November 2026: Raw Materials are
+      // consumed, so they belong to the cost of materials, never to "Changes in inventories of finished goods, WIP and Stock-in-Trade").
+      // An entity with no such line yet (no purchase ledger mapped there) gets one, holding the Opening / Less: Closing Raw Materials
+      // lines. Before T-061 (0.1.93) the Raw Materials were moved into "Changes in inventories" instead, which put them under the
+      // wrong head and the wrong caption. A Trader is still presumed to hold no Raw Materials (inventorySplit.js classify()).
+      const split = computeInventorySplit({ expenseSections, incomeSections }, businessType, !!prevMap, prevMap?.rows, { rawToChange: false })
+      if (!materialsSec && (split.rawMaterialOpeningRows.length || split.rawMaterialClosingRows.length || split.prevRawMaterialRows.length)) {
+        const MATERIALS_TITLE = 'Cost of materials consumed'
+        materialsSec = { level1: MATERIALS_TITLE, lines: [], total: 0, prevTotal: 0, noteNum: null }
+        expenseSections.push(materialsSec)
+        const newNum = allocNoteNum()
+        const note = { num: newNum, title: MATERIALS_TITLE, level1: MATERIALS_TITLE, alie: 'Expenses', isPL: true, lines: [], rows: [], total: 0, prevTotal: 0 }
+        notes[newNum] = note
+        noteByTitle.set(MATERIALS_TITLE.toLowerCase(), note)
+        materialsSec.noteNum = newNum
+      }
 
       // Legacy "Opening Stock (PL)" / "Closing Stock (PL)" buckets (older
       // rule sets only): their full value is now folded into materialsSec/
@@ -1201,9 +1216,16 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
             total: -split.otherStockClosing.cy, prevTotal: -split.otherStockClosing.py,
             rows: split.otherStockClosingRows, minSortOrder: 1 },
           // (no "Change in Inventory of ..." row: it repeated the Total, and the Total is that figure)
+          // T-061: ledgers of the Trial Balance mapped to this head that are not Opening / Closing Stock (for example a
+          // "stock adjustment" or "change in stock" ledger). They are part of the head, so they stay in the Total, but
+          // the line says what they are and is flagged for review: it used to read "Net Change in Inventory", which looks
+          // like the Opening - Closing result line, and when the Stock tab is filled such a ledger often repeats it.
           ...(split.otherStockNetRows.length ? [{
-            level2: 'Net Change in Inventory', total: split.otherStockNet.cy, prevTotal: split.otherStockNet.py,
-            rows: split.otherStockNetRows, minSortOrder: 9989,
+            level2: STOCK_OTHER_LEDGERS_LABEL, total: split.otherStockNet.cy, prevTotal: split.otherStockNet.py,
+            rows: split.otherStockNetRows, minSortOrder: 9989, needsReview: true,
+            reviewNote: split.otherStockOpeningRows.some(r => r.upload_nature === 'Stock Entry') || split.otherStockClosingRows.some(r => r.upload_nature === 'Stock Entry')
+              ? 'Added to Opening less Closing. The Stock tab already gives the Opening and Closing values, so check that these ledgers do not repeat that movement; re-categorise them if they do.'
+              : 'Added to Opening less Closing. Check that these ledgers belong under this head.',
           }] : []),
         ]
         if (changesSec.noteNum && notes[changesSec.noteNum]) {
@@ -2272,6 +2294,7 @@ function previousYearEntries(note, comparativeRows) {
 // without "Add:". DISPLAY only: the row keeps its own label, which Manual PY entries, saved remarks and the
 // Annexures link are keyed on.
 const SURPLUS_NO_OPENING_LABEL = 'Surplus / (Deficit) during the year'
+export const OPENING_SURPLUS_LABEL = 'Opening Surplus / (Deficit)'
 const hasOpeningBalance = (cy, py) => Math.abs(Number(cy) || 0) >= 0.005 || Math.abs(Number(py) || 0) >= 0.005
 
 export function buildNoteTemplateRows(note, lfRows, depData, msmeData = null, cashBankData = null, comparativeRows = null) {
@@ -2326,6 +2349,10 @@ export function buildNoteTemplateRows(note, lfRows, depData, msmeData = null, ca
         label: first.mapping3_resultant || first.level3 || first.name,
         // the year's surplus, with no opening balance in either year to add it to
         ...(idx === 1 && !hasOpeningBalance(openingCY, openingPY) ? { displayLabel: SURPLUS_NO_OPENING_LABEL } : {}),
+        // T-058 (owner, 17 November 2026): the opening line reads "Opening Surplus / (Deficit)" on screen, PDF, Excel and
+        // Annexures. Display only: the ledger's Mapping 3 stays "Opening Profit & Loss", which the Closing line, Manual PY,
+        // remarks and the mapping engine recognise.
+        ...(idx === 0 ? { displayLabel: OPENING_SURPLUS_LABEL } : {}),
         cy: matched.reduce((s, r) => s + rowAmt(r, 'closing_balance'), 0),
         py: pySum(pyMatched),
         isSubtotal: matched.some(r => r.isSubtotal),
@@ -2363,6 +2390,7 @@ export function buildNoteTemplateRows(note, lfRows, depData, msmeData = null, ca
     const l3CY = l3Ledgers.reduce((s, r) => s + rowAmt(r, 'closing_balance'), 0)
     const l3PY = pySum(l3PYEntries)
     rows.push({ type: 'l3', label: l3Label, cy: l3CY, py: l3PY, lf,
+      ...(isReservesSurplus && /^opening profit\s*&?\s*loss$/i.test(l3Label) ? { displayLabel: OPENING_SURPLUS_LABEL } : {}),   // T-058
       // the ledgers behind this line (Current / Previous Year) — what its "Fix" opens
       ledgerIds: ledgerIdsOf(l3Ledgers), pyLedgerIds: ledgerIdsOf(l3PYEntries.map(e => e.row)) })
 

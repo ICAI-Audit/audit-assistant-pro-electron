@@ -1,25 +1,39 @@
 import React, { useState, useEffect } from 'react'
 import { fsgApi } from '../../api.js'
 
-// Row keys and Schedule III labels for Trade Payables ageing
+// T-063: Trade Payables ageing in the owner's layout. Seven columns: Unbilled and
+// Not Due, then the four periods from the due date, then Total. Rows (i) to (iv)
+// are aged dues, so their Unbilled and Not Due cells are blocked; an Undue row
+// takes Not Due only and an Unbilled row takes Unbilled only. Total Due and Total
+// are worked out, never typed.
+const DUE_ROWS = ['msme', 'others', 'disputed_msme', 'disputed_others']
+const NOT_AGED_ROWS = ['msme_undue', 'others_undue', 'msme_unbilled', 'others_unbilled']
 export const TP_AGEING_ROWS = [
-  { key: 'msme',            label: '(i) MSME' },
-  { key: 'others',          label: '(ii) Others' },
-  { key: 'disputed_msme',   label: '(iii) Disputed dues- MSME' },
-  { key: 'disputed_others', label: '(iv) Disputed dues- Others' },
-  { key: 'total_due',       label: 'Total Due', isTotal: true },
-  { key: 'msme_undue',      label: 'MSME - Undue' },
-  { key: 'others_undue',    label: 'Others - Undue' },
-  { key: 'msme_unbilled',   label: 'MSME - Unbilled dues' },
-  { key: 'others_unbilled', label: 'Others - Unbilled dues' },
-  { key: 'total',           label: 'Total', isTotal: true },
+  { key: 'msme',            label: '(i) MSME', kind: 'due' },
+  { key: 'others',          label: '(ii) Others', kind: 'due' },
+  { key: 'disputed_msme',   label: '(iii) Disputed dues- MSME', kind: 'due' },
+  { key: 'disputed_others', label: '(iv) Disputed dues- Others', kind: 'due' },
+  { key: 'total_due',       label: 'Total Due', isTotal: true, sumOf: DUE_ROWS },
+  { key: 'msme_undue',      label: 'MSME - Undue', kind: 'notAged' },
+  { key: 'others_undue',    label: 'Others - Undue', kind: 'notAged' },
+  { key: 'msme_unbilled',   label: 'MSME - Unbilled dues', kind: 'notAged' },
+  { key: 'others_unbilled', label: 'Others - Unbilled dues', kind: 'notAged' },
+  { key: 'total',           label: 'Total', isTotal: true, sumOf: [...DUE_ROWS, ...NOT_AGED_ROWS] },
 ]
 
-export const TP_AGEING_BUCKETS = [
+// The four periods from the due date.
+export const TP_AGED_BUCKETS = [
   { key: 'less1y', label: 'Less than 1 yr.' },
   { key: '1y2y',   label: '1-2 yrs.' },
   { key: '2y3y',   label: '2-3 yrs.' },
   { key: 'more3y', label: 'More than 3 yrs.' },
+]
+// Every amount column, in the order shown. `notAged` columns sit outside the
+// "Outstanding for following periods from due date of payment" heading.
+export const TP_AGEING_BUCKETS = [
+  { key: 'unbilled', label: 'Unbilled', notAged: true },
+  { key: 'notdue',   label: 'Not Due', notAged: true },
+  ...TP_AGED_BUCKETS,
 ]
 const BUCKETS = TP_AGEING_BUCKETS
 
@@ -29,6 +43,52 @@ export const TP_OTHERS_ROWS = ['others', 'disputed_others', 'others_undue', 'oth
 const MSME_ROWS   = TP_MSME_ROWS
 const OTHERS_ROWS = TP_OTHERS_ROWS
 const ROWS = TP_AGEING_ROWS
+
+const rowOf = (row) => (typeof row === 'string' ? ROWS.find(r => r.key === row) : row)
+
+/** True when a cell of the ageing table takes no entry (grey in the form and the Fill Details Excel). */
+export function tpCellBlocked(row, colKey) {
+  const r = rowOf(row)
+  if (!r || r.isTotal) return false
+  const col = BUCKETS.find(b => b.key === colKey)
+  if (!col) return true
+  if (r.kind === 'due') return !!col.notAged
+  return col.key !== (r.key.endsWith('_unbilled') ? 'unbilled' : 'notdue')
+}
+
+/**
+ * One period of saved ageing data as it is shown and printed: blocked cells
+ * empty, Total Due and Total worked out. Data saved before T-063 kept the
+ * Undue and Unbilled rows in the four period columns; such a row is moved
+ * into its Not Due (Undue rows) or Unbilled (Unbilled rows) column.
+ */
+export function tpPeriodView(pd) {
+  if (!pd) return pd
+  const n = (v) => parseFloat(v) || 0
+  const out = {}
+  for (const r of ROWS) {
+    if (r.isTotal) continue
+    const src = pd[r.key] || {}
+    const cell = {}
+    for (const b of BUCKETS) cell[b.key] = tpCellBlocked(r, b.key) ? '' : (src[b.key] ?? '')
+    if (r.kind === 'notAged' && !n(src.unbilled) && !n(src.notdue)) {
+      const legacy = TP_AGED_BUCKETS.reduce((s, b) => s + n(src[b.key]), 0)
+      if (legacy) cell[r.key.endsWith('_unbilled') ? 'unbilled' : 'notdue'] = legacy
+    }
+    out[r.key] = cell
+  }
+  for (const r of ROWS) {
+    if (!r.isTotal) continue
+    out[r.key] = Object.fromEntries(BUCKETS.map(b => {
+      const s = r.sumOf.reduce((t, k) => t + n(out[k]?.[b.key]), 0)
+      return [b.key, Math.round(s * 100) / 100]
+    }))
+  }
+  return out
+}
+
+/** The saved shape of a period: what tpPeriodView shows, totals included (so older readers still see them). */
+export const tpPeriodForSave = (pd) => tpPeriodView(pd)
 
 // ── MSME Act, 2006 disclosure items ─────────────────────────────────────────
 // Item (a) is a Principal/Interest/Total break-up (per the Schedule III
@@ -52,7 +112,7 @@ const fmt = (n) => {
 function emptyPeriod() {
   const p = {}
   for (const r of ROWS) {
-    p[r.key] = { less1y: '', '1y2y': '', '2y3y': '', more3y: '' }
+    p[r.key] = Object.fromEntries(BUCKETS.map(b => [b.key, '']))
   }
   return p
 }
@@ -83,49 +143,59 @@ const TDL = 'border border-gray-200 px-2 py-1 text-left'
 const TD = 'border border-gray-200 px-2 py-1 text-right'
 
 // ── Ageing Schedule tab (Company only — see constitution gate in the main form) ──
-function AgeingTab({ ageing, setAgeing, noteTotal, notePrevTotal }) {
+function AgeingTab({ ageing, setAgeing, noteTotal, notePrevTotal, periodLabels }) {
   const setCell = (period, rowKey, bucketKey, val) => {
     setAgeing(prev => ({
       ...prev,
       [period]: { ...prev[period], [rowKey]: { ...prev[period][rowKey], [bucketKey]: val } },
     }))
   }
-  const rowTotal = (period, rowKey) => BUCKETS.reduce((s, b) => s + num(ageing[period]?.[rowKey]?.[b.key]), 0)
+  // Blocked cells count as nil and the two total rows are worked out (tpPeriodView).
+  const view = { cy: tpPeriodView(ageing.cy), py: tpPeriodView(ageing.py) }
+  const rowTotal = (period, rowKey) => BUCKETS.reduce((s, b) => s + num(view[period]?.[rowKey]?.[b.key]), 0)
   const categoryTotal = (period, rowKeys) => rowKeys.reduce((s, rk) => s + rowTotal(period, rk), 0)
 
   const renderTable = (period, heading) => (
     <div className="mb-4">
-      <p className="text-sm font-bold text-blue-900 mb-2">Trade Payables ageing schedule ({heading})</p>
+      <p className="text-sm font-bold text-blue-900 mb-2">
+        Trade Payables ageing schedule ({heading}) <span className="font-semibold">— Outstanding for following periods from due date of payment</span>
+      </p>
       <div className="overflow-x-auto border border-gray-200 rounded">
-        <table className="w-full text-xs border-collapse">
+        <table className="w-full text-xs border-collapse" data-tp-ageing={period}>
           <thead>
             <tr className="bg-blue-50">
-              <th rowSpan={2} className="border border-gray-300 px-2 py-1 text-left font-semibold align-bottom w-[28%]">Particulars</th>
-              <th colSpan={4} className="border border-gray-300 px-2 py-1 text-center font-semibold">Outstanding for following periods from due date of payment</th>
-              <th rowSpan={2} className="border border-gray-300 px-2 py-1 text-right font-semibold align-bottom">Total</th>
-            </tr>
-            <tr className="bg-blue-50">
-              {BUCKETS.map(b => <th key={b.key} className="border border-gray-300 px-2 py-1 text-right font-semibold">{b.label}</th>)}
+              <th className="border border-gray-300 px-2 py-1 text-left font-semibold w-[22%]">Particulars</th>
+              {BUCKETS.map(b => <th key={b.key} className="border border-gray-300 px-2 py-1 text-right font-semibold whitespace-nowrap">{b.label}</th>)}
+              <th className="border border-gray-300 px-2 py-1 text-right font-semibold">Total</th>
             </tr>
           </thead>
           <tbody>
             {ROWS.map(row => (
-              <tr key={row.key} className={`border-b ${row.isTotal ? 'bg-blue-50 font-semibold' : 'hover:bg-gray-50'}`}>
+              <tr key={row.key} className={row.isTotal ? 'bg-blue-50 font-semibold border-t-2 border-b-2 border-gray-500' : 'hover:bg-gray-50'}>
                 <td className="border border-gray-200 px-2 py-1">{row.label}</td>
-                {BUCKETS.map(b => (
-                  <td key={b.key} className="border border-gray-200 px-1 py-0.5">
-                    <input type="number" className={NUM}
-                      value={ageing[period]?.[row.key]?.[b.key] || ''}
-                      onChange={e => setCell(period, row.key, b.key, e.target.value)}
-                      placeholder="0" step="0.01" />
-                  </td>
-                ))}
+                {BUCKETS.map(b => {
+                  if (row.isTotal) {
+                    return <td key={b.key} className="border border-gray-200 px-2 py-1 text-right font-mono" title="Worked out from the rows above">{fmt(view[period]?.[row.key]?.[b.key])}</td>
+                  }
+                  if (tpCellBlocked(row, b.key)) {
+                    return <td key={b.key} className="border border-gray-300 bg-gray-300" data-blocked="1" aria-label={`${row.label}, ${b.label}: not applicable`} />
+                  }
+                  return (
+                    <td key={b.key} className="border border-gray-200 px-1 py-0.5">
+                      <input type="number" className={NUM} aria-label={`${row.label}, ${b.label}`}
+                        value={ageing[period]?.[row.key]?.[b.key] || ''}
+                        onChange={e => setCell(period, row.key, b.key, e.target.value)}
+                        placeholder="0" step="0.01" />
+                    </td>
+                  )
+                })}
                 <td className="border border-gray-200 px-2 py-1 text-right font-mono font-semibold">{fmt(rowTotal(period, row.key))}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <p className="text-[10px] text-gray-400 mt-1">Grey cells take no entry. Total Due and Total are worked out from the rows above.</p>
     </div>
   )
 
@@ -187,9 +257,9 @@ function AgeingTab({ ageing, setAgeing, noteTotal, notePrevTotal }) {
 
   return (
     <>
-      {renderTable('cy', 'Current Year')}
+      {renderTable('cy', periodLabels?.cy || 'Current Year')}
       {renderCheck('cy', 'tbCY', noteTotal)}
-      {renderTable('py', 'Previous Year')}
+      {renderTable('py', periodLabels?.py || 'Previous Year')}
       {renderCheck('py', 'tbPY', notePrevTotal)}
       <div className="p-3 bg-blue-50 border border-blue-200 rounded">
         <label className="flex items-center gap-2 cursor-pointer">
@@ -271,7 +341,7 @@ function MSMETab({ msme, setMsme }) {
   )
 }
 
-export default function TradePayablesDisclosureForm({ tbId, entityId, useEntityLevel, noteNum, noteTitle, noteTotal = 0, notePrevTotal = 0, constitution, onClose, onSaved }) {
+export default function TradePayablesDisclosureForm({ tbId, entityId, useEntityLevel, noteNum, noteTitle, noteTotal = 0, notePrevTotal = 0, constitution, periodLabels, onClose, onSaved }) {
   // Branch entities keep this disclosure once for the whole entity.
   const scopeId = useEntityLevel ? entityId : tbId
   const isCompany = parseInt(constitution) === 3
@@ -297,7 +367,7 @@ export default function TradePayablesDisclosureForm({ tbId, entityId, useEntityL
         if (ag && ag.cy) {
           setAgeing(prev => ({
             ...prev, ...ag,
-            cy: { ...emptyPeriod(), ...ag.cy }, py: { ...emptyPeriod(), ...ag.py },
+            cy: { ...emptyPeriod(), ...tpPeriodView(ag.cy) }, py: { ...emptyPeriod(), ...tpPeriodView(ag.py || {}) },
             tbCY: ag.tbCY || { msme: '', others: '' }, tbPY: ag.tbPY || { msme: '', others: '' },
           }))
         }
@@ -318,14 +388,15 @@ export default function TradePayablesDisclosureForm({ tbId, entityId, useEntityL
     try {
       setLoading(true)
       setError('')
+      const savedAgeing = { ...ageing, cy: tpPeriodForSave(ageing.cy), py: tpPeriodForSave(ageing.py) }
       if (useEntityLevel) {
         // One record holds both parts, as on the Trial Balance side.
         const existing = await Promise.resolve(fsgApi?.getEntityNoteDetails?.(entityId, noteNum, noteTitle)).catch(() => null)
         const next = { ...(existing || {}), msme }
-        if (isCompany) next.ageing = ageing
+        if (isCompany) next.ageing = savedAgeing
         await fsgApi?.saveEntityNoteDetails?.({ entityId, noteNum, noteTitle, data: next })
       } else {
-        if (isCompany) await fsgApi?.notesSaveTradePayablesAging?.(tbId, noteNum, noteTitle, ageing)
+        if (isCompany) await fsgApi?.notesSaveTradePayablesAging?.(tbId, noteNum, noteTitle, savedAgeing)
         await fsgApi?.notesSaveMSME?.(tbId, noteNum, noteTitle, msme)
       }
       setSaved(true)
@@ -373,7 +444,7 @@ export default function TradePayablesDisclosureForm({ tbId, entityId, useEntityL
           ) : (
             <>
               {activeTab === 'ageing' && isCompany && (
-                <AgeingTab ageing={ageing} setAgeing={setAgeing} noteTotal={noteTotal} notePrevTotal={notePrevTotal} />
+                <AgeingTab ageing={ageing} setAgeing={setAgeing} noteTotal={noteTotal} notePrevTotal={notePrevTotal} periodLabels={periodLabels} />
               )}
               {activeTab === 'msme' && (
                 <MSMETab msme={msme} setMsme={setMsme} />

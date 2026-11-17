@@ -205,7 +205,7 @@ function DynamicBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
           </tbody>
           <tfoot>
             <tr className="bg-blue-800 text-white">
-              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL EQUITY AND LIABILITIES</td>
+              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL</td>
               <td className="py-2 text-right font-mono font-bold pr-2 text-xs">{fmtINR(data.totalEL)}</td>
               <td className="py-col py-2 text-right font-mono opacity-70 pr-2 text-xs">{fmtINR(grandPrevEL)}</td>
               <ChangeCells cy={data.totalEL} py={grandPrevEL} rowKey='TOTAL EQUITY AND LIABILITIES' dark />
@@ -222,7 +222,7 @@ function DynamicBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
           </tbody>
           <tfoot>
             <tr className="bg-blue-800 text-white">
-              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL ASSETS</td>
+              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL</td>
               <td className="py-2 text-right font-mono font-bold pr-2 text-xs">{fmtINR(data.totalAssets)}</td>
               <td className="py-col py-2 text-right font-mono opacity-70 pr-2 text-xs">{fmtINR(grandPrevAssets)}</td>
               <ChangeCells cy={data.totalAssets} py={grandPrevAssets} rowKey='TOTAL ASSETS' dark />
@@ -398,7 +398,7 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
           </tbody>
           <tfoot>
             <tr className="bg-blue-800 text-white">
-              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL EQUITY AND LIABILITIES</td>
+              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL</td>
               <td className="py-2 text-right font-mono font-bold pr-2 text-xs">{fmtINR(totalEL)}</td>
               <td className="py-col py-2 text-right font-mono opacity-70 pr-2 text-xs">{fmtINR(prevEL)}</td>
               <ChangeCells cy={totalEL} py={prevEL} rowKey='TOTAL EQUITY AND LIABILITIES' dark />
@@ -440,7 +440,7 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
           </tbody>
           <tfoot>
             <tr className="bg-blue-800 text-white">
-              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL ASSETS</td>
+              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL</td>
               <td className="py-2 text-right font-mono font-bold pr-2 text-xs">{fmtINR(totalAsset)}</td>
               <td className="py-col py-2 text-right font-mono opacity-70 pr-2 text-xs">{fmtINR(prevAsset)}</td>
               <ChangeCells cy={totalAsset} py={prevAsset} rowKey='TOTAL ASSETS' dark />
@@ -488,9 +488,9 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
   return (
     <AnalyseChangeProvider on={changeOn && !pyOff} tbId={activeTB?.id} scope="bs" getRemark={getRemark} onRemarkSaved={onRemarkSaved}>
     <div className="flex flex-col h-full overflow-hidden">
-      {/* T-050: one-line toolbar - title and Format, then Variance Analysis, the Previous Year group and P&L closed to capital. */}
+      {/* T-050: one-line toolbar - Format, then Variance Analysis, the Previous Year group and P&L closed to capital.
+          T-060: no "Balance Sheet" title here: the statement's own heading below already says it. */}
       <div className="fsg-stmt-toolbar px-5 py-1.5 border-b border-blue-100 bg-gray-50 shrink-0">
-        <span className="fsg-stmt-title">Balance Sheet</span>
         <FormatRefButton entity={entity} url={SCHEDULE3_SECTIONS.BS.url} label={SCHEDULE3_SECTIONS.BS.label} />
         <div className="ml-auto flex items-center gap-2">
           <AnalyseChangeButton on={changeOn && !pyOff} onToggle={setChangeOn} disabled={pyOff} disabledTitle={pyOffTitle} />

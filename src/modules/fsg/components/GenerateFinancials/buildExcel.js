@@ -3,7 +3,7 @@ import { auditorForDenomination } from '../../utils/signingRules'
 import * as XLSX from 'xlsx-js-style'  // fork of xlsx that preserves cell styles
 import { netCreditPurchasesWorking } from '../../utils/ratios'
 import { DENOMINATIONS, displayAmt, processRows } from '../../hooks/useFinancials'
-import { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from '../Notes/TradePayablesDisclosureForm'
+import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../Notes/TradePayablesDisclosureForm'
 import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell } from '../Notes/TradeReceivablesAgingForm'
 // Single source of truth for the Schedule III BS layout — shared with the
 // live BS screen so Excel always matches the UI exactly (numbering,
@@ -614,7 +614,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
     elLastLineRow = rows.length - 1
     grandTotalRows.push(rows.length)
     elTotalRow = rows.length
-    rows.push(['TOTAL EQUITY AND LIABILITIES', '', scale(totalEL), scale(prevEL)])
+    rows.push(['TOTAL', '', scale(totalEL), scale(prevEL)])   // T-056: Schedule III caption
     rows.push([])
     rows.push([])
 
@@ -640,7 +640,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
     asLastLineRow = rows.length - 1
     grandTotalRows.push(rows.length)
     asTotalRow = rows.length
-    rows.push(['TOTAL ASSETS', '', scale(totalAsset), scale(prevAsset)])
+    rows.push(['TOTAL', '', scale(totalAsset), scale(prevAsset)])
   } else {
     // ── Non-corporate: dynamic sections, zero-value uncategorised suppressed
     // (computeDynamicBSLayout mirrors DynamicBS in the live BS screen).
@@ -662,7 +662,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
     elLastLineRow = rows.length - 1
     grandTotalRows.push(rows.length)
     elTotalRow = rows.length
-    rows.push(['TOTAL EQUITY AND LIABILITIES', '', scale(totalEL), scale(prevEL)])
+    rows.push(['TOTAL', '', scale(totalEL), scale(prevEL)])   // T-056: Schedule III caption
     rows.push([])
     rows.push([])
 
@@ -680,7 +680,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
     asLastLineRow = rows.length - 1
     grandTotalRows.push(rows.length)
     asTotalRow = rows.length
-    rows.push(['TOTAL ASSETS', '', scale(totalAsset), scale(prevAsset)])
+    rows.push(['TOTAL', '', scale(totalAsset), scale(prevAsset)])
   }
 
   pushMissingAlieRows(rows, data.missingAlie, alieWarningRows)
@@ -1734,8 +1734,10 @@ function buildNoteDetailRows(noteTitle, details, noteNum, scale, cyTotal, period
       const AG_BUCKETS = isTP ? TP_AGEING_BUCKETS : TR_AGEING_BUCKETS
       const cellVal = (pd, row, bKey) =>
         row.computed ? trComputedCell(pd, row.computed, bKey) : num(pd?.[row.key]?.[bKey])
-      const buildPeriod = (pd, heading) => {
-        if (!pd) return
+      const buildPeriod = (rawPd, heading) => {
+        if (!rawPd) return
+        // T-063: Trade Payables blocked cells are nil and Total Due / Total are worked out.
+        const pd = isTP ? tpPeriodView(rawPd) : rawPd
         const any = AG_ROWS.some(r => AG_BUCKETS.some(b => Math.abs(cellVal(pd, r, b.key)) > 0.005))
         if (!any && !ag.includeInOutput && !details.includeInOutput) return
         rows.push([])
