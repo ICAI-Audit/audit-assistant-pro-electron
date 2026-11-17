@@ -5,9 +5,9 @@
 export const BUILD_MESSAGE = {
   lines: [
     'Welcome to ICAI Audit Tool',
-    'Code baseline: 11 November 2026',
+    'Repository sync: origin/main (15 November 2026)',
   ],
-  updateNote: 'GSTIN normalization and validation (PR #108)',
+  updateNote: 'PDF Tools phase 2',
   sourceBranch: 'main' as string,
 };
 

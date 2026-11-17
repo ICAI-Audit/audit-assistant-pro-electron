@@ -27,7 +27,8 @@ import * as XLSX from 'xlsx-js-style'
 import { fmtINR } from '../../hooks/useFinancials'
 import { depStoreFor, EMPTY_WIP, wipHasFigures, wipCYTotal } from '../../utils/depStore'
 import { joinDepITSchedules } from '../../utils/depJoin'
-import { buildDepITBlankTemplate, buildDepITFilledWorkbook, parseDepITWorkbook } from './depITWorkbook'
+import { buildDepITBlankTemplate, buildDepITFilledWorkbook, parseDepITWorkbook, depITExcelSpec } from './depITWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
 
 // ── Style constants (matches Depreciation/index.jsx) ─────────────────────────
@@ -532,7 +533,7 @@ export default function DepreciationIT({ entity, activeTB }) {
   // actual entries instead of needing to be retyped from scratch.
   const pullFromBranches = async () => {
     if (!store.consolidated || pulling || !entity?.id) return
-    if (!window.confirm('This refreshes the branch-total rows below with each branch\'s current Dep (IT) figures. Any other row you\'ve added yourself is left as it is. Continue?')) return
+    if (!window.confirm('This refreshes the branch-total rows below with each branch\'s current Dep (Income Tax) figures. Any other row you\'ve added yourself is left as it is. Continue?')) return
     setPulling(true)
     try {
       const branches = await fsgApi?.getBranches(entity.id) || []
@@ -678,14 +679,15 @@ export default function DepreciationIT({ entity, activeTB }) {
         const compSaved = await compStore.get()
         if (compSaved?.includeInPPENote) {
           await compStore.save({ ...compSaved, includeInPPENote: false })
-          showToast('Included in PPE Note. Dep (Comp)\'s inclusion was turned off — only one schedule can show in the note.')
+          showToast('Included in PPE Note. Dep (Books)\'s inclusion was turned off — only one schedule can show in the note.')
         }
       } catch (_) {}
     }
   }
 
-  const saveWorkbook = async (wb, defaultPath) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells, dropdowns) — utils/veraExcel.js.
+  const saveWorkbook = async (wb, defaultPath, mode) => {
+    const buf = await finishWorkbook(wb, depITExcelSpec(mode, blocks))
     const result = await fsgApi?.saveFileDialog({
       defaultPath, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
     })
@@ -698,7 +700,7 @@ export default function DepreciationIT({ entity, activeTB }) {
 
   const downloadBlankTemplate = async () => {
     try {
-      const path = await saveWorkbook(buildDepITBlankTemplate(blocks), 'Dep_IT_Template.xlsx')
+      const path = await saveWorkbook(buildDepITBlankTemplate(blocks), 'Dep_IT_Template.xlsx', 'template')
       if (path) showToast('Blank template saved.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
@@ -706,7 +708,7 @@ export default function DepreciationIT({ entity, activeTB }) {
   const downloadFilled = async () => {
     try {
       const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
-      const path = await saveWorkbook(buildDepITFilledWorkbook(ledgers, inputs, blocks, wip), `${eName}_Dep_IT_Filled.xlsx`)
+      const path = await saveWorkbook(buildDepITFilledWorkbook(ledgers, inputs, blocks, wip), `${eName}_Dep_IT_Filled.xlsx`, 'filled')
       if (path) showToast('Filled form saved — keep this safe before re-uploading a Trial Balance.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
@@ -804,7 +806,7 @@ export default function DepreciationIT({ entity, activeTB }) {
           {store.consolidated && (
             <button onClick={pullFromBranches} disabled={pulling}
               className="px-3 py-1.5 text-xs border border-amber-400 rounded text-amber-800 bg-amber-50 hover:bg-amber-100 transition disabled:opacity-40"
-              title="Sum every branch's own Dep (IT) figures, block by block, into this Consolidated schedule">
+              title="Sum every branch's own Dep (Income Tax) figures, block by block, into this Consolidated schedule">
               {pulling ? 'Pulling…' : '⇩ Pull from Branches'}
             </button>
           )}
@@ -824,7 +826,7 @@ export default function DepreciationIT({ entity, activeTB }) {
       </div>
       {isCompany && (
         <div className="px-5 py-1 bg-blue-50 border-b border-blue-200 text-[11px] text-blue-800 shrink-0">
-          Company — fill the Income Tax block schedule yourself: <strong>+ Add Row</strong>, choose the Block, enter Opening WDV, Additions and Deduction. Fixed-asset ledgers are not mapped here (Dep (Comp) is separate). Use ↓ Blank Template / ↑ Upload Filled to fill it in Excel.
+          Company — fill the Income Tax block schedule yourself: <strong>+ Add Row</strong>, choose the Block, enter Opening WDV, Additions and Deduction. Fixed-asset ledgers are not mapped here (Dep (Books) is separate). Use ↓ Blank Template / ↑ Upload Filled to fill it in Excel.
         </div>
       )}
       {store.consolidated && (

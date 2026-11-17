@@ -116,9 +116,9 @@ export default function JournalEntryPage({ entity, activeTB, activeRsId }) {
       if (!e.ledgerName.trim()) { setError(`Row ${i + 1}: Ledger name is required`); return }
       if (!e.amount || parseFloat(e.amount) <= 0) { setError(`Row ${i + 1}: Amount must be positive`); return }
       if (e.isNew) {
-        if (!e.mapping1) { setError(`Row ${i + 1}: New ledger "${e.ledgerName}" requires Level 1`); return }
-        if (!e.mapping2) { setError(`Row ${i + 1}: New ledger "${e.ledgerName}" requires Level 2`); return }
-        if ((m3ByM1M2[`${e.mapping1}||${e.mapping2}`] || []).length && !e.mapping3) { setError(`Row ${i + 1}: New ledger "${e.ledgerName}" requires Level 3`); return }
+        if (!e.mapping1) { setError(`Row ${i + 1}: New ledger "${e.ledgerName}" requires Mapping 1`); return }
+        if (!e.mapping2) { setError(`Row ${i + 1}: New ledger "${e.ledgerName}" requires Mapping 2`); return }
+        if ((m3ByM1M2[`${e.mapping1}||${e.mapping2}`] || []).length && !e.mapping3) { setError(`Row ${i + 1}: New ledger "${e.ledgerName}" requires Mapping 3`); return }
       }
     }
 
@@ -179,9 +179,9 @@ export default function JournalEntryPage({ entity, activeTB, activeRsId }) {
             <tr>
               <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[5%]">#</th>
               <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[22%]">Ledger Name</th>
-              <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[14%]">Level 1</th>
-              <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[14%]">Level 2</th>
-              <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[16%]">Level 3</th>
+              <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[14%]">Mapping 1</th>
+              <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[14%]">Mapping 2</th>
+              <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[16%]">Mapping 3</th>
               <th className="text-left py-1.5 px-2 font-semibold text-blue-900 w-[9%]">Dr / Cr</th>
               <th className="text-right py-1.5 px-2 font-semibold text-blue-900 w-[14%]">Amount</th>
               <th className="py-1.5 px-2 w-[6%]"></th>
@@ -209,7 +209,7 @@ export default function JournalEntryPage({ entity, activeTB, activeRsId }) {
                       ))}
                     </datalist>
                     {e.isNew && (
-                      <div className="text-[10px] text-amber-600 mt-0.5">NEW ledger — map Level 1, Level 2 and Level 3</div>
+                      <div className="text-[10px] text-amber-600 mt-0.5">NEW ledger — map Mapping 1, Mapping 2 and Mapping 3</div>
                     )}
                   </td>
                   <td className="py-1 px-2">
@@ -344,7 +344,7 @@ export default function JournalEntryPage({ entity, activeTB, activeRsId }) {
 
       <p className="text-xs text-gray-400 mb-3" style={{ maxWidth: '1100px' }}>
         Dr entries are stored as negative closing balance. Cr entries as positive.
-        Totals must match before saving. New ledgers require Level 1 and Level 2 for mapping.
+        Totals must match before saving. New ledgers require Mapping 1 and Mapping 2.
       </p>
 
       <div className="flex gap-2" style={{ maxWidth: '1100px' }}>

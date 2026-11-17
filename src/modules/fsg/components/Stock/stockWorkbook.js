@@ -49,6 +49,53 @@ export function buildStockFilledWorkbook(opening, closing, pyOpening, pyClosing,
 }
 
 /**
+ * T-047: how utils/veraExcel.js finishes these files — the How to Fill guide, the blue
+ * header and yellow cells to fill in. Sheet names and cell positions are unchanged, so
+ * parseStockWorkbook reads old and new files alike. "Adjusted in" has no dropdown: its
+ * choices are the client's own Other expenses lines (owner, 15 Nov 2026: no dropdown
+ * for a long list that is not predefined); only its three rows are yellow.
+ * @param {'template'|'filled'} mode
+ */
+export function stockExcelSpec(mode) {
+  const sheet = {
+    headerRow: 1,
+    lastRow: 1 + INVENTORY_TYPES.length,
+    inputCols: ['B', 'C', 'D', 'E'],
+    amountCols: ['B', 'C', 'D', 'E'],
+    // The head column is yellow only on the rows that take one.
+    inputCells: HEAD_TYPES.map(t => `F${2 + INVENTORY_TYPES.indexOf(t)}`),
+    widths: [26, 20, 20, 20, 20, 44],
+    autoFilter: false,
+  }
+  return {
+    mode,
+    sheets: { 'Stock*': sheet },
+    howTo: {
+      title: mode === 'filled' ? 'Inventory — saved figures' : 'Inventory — template',
+      purpose: mode === 'filled'
+        ? 'The Opening and Closing inventory saved in VERA for this Trial Balance, by type of inventory. Keep it as a backup, or correct it here and upload it back.'
+        : 'Enter the Opening and Closing inventory of the Current and Previous Year, by type of inventory, and upload it on the Inventory screen.',
+      steps: [
+        'Go to the "' + (mode === 'filled' ? 'Stock Filled' : 'Stock Template') + '" sheet.',
+        'Enter the amounts in the pale-yellow cells, in rupees (for example 125000.50). Leave a cell blank if there is no inventory of that type.',
+        'For Stores & Spares, Loose Tools and Others, type in the last column the line of the Other expenses note their stock is adjusted in (for example Consumption of stores and spare parts).',
+        'Save the file, then on VERA\'s Inventory screen click "Upload Filled" and pick it. Review the figures and click Save.',
+      ],
+      columns: [
+        ['Type of Inventory', 'The eight types VERA uses. Do not rename or reorder them.', 'Fixed'],
+        ['Opening / Closing (Current Year)', 'Inventory at the start and end of this year.', 'Amount — fill in'],
+        ['Opening / Closing (Previous Year)', 'The same for last year, used for the comparative column.', 'Amount — fill in'],
+        ['Adjusted in (Other Expenses head)', 'Only for Stores & Spares, Loose Tools and Others: the Other expenses line their stock is adjusted in.', 'Text — fill in'],
+      ],
+      tips: [
+        'Raw Materials go to Cost of materials consumed; the other fixed types go to Changes in inventories. VERA does this by itself.',
+        'Uncategorised Stock is for inventory whose type is not yet known; the Exception screen will remind you of it.',
+      ],
+    },
+  }
+}
+
+/**
  * @param {XLSX.WorkBook} wb
  * @returns {{ opening: Record<string,string>, closing: Record<string,string>, pyOpening: Record<string,string>, pyClosing: Record<string,string>, heads: Record<string,string>, unrecognised: string[] }}
  */

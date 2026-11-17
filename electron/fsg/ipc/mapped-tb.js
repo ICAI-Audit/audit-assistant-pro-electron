@@ -1060,13 +1060,13 @@ export function registerMappedTBHandlers() {
       'Mapping 1 (Broad)': r.mapping1_resultant,
       'Mapping 2 (Category)': r.mapping2_resultant,
       'Mapping 3 (Specific)': r.mapping3_resultant,
-      'Level 1': r.level1,
-      'Level 2': r.level2,
-      'Level 3': r.level3,
-      'Level 4': r.level4_value || r.lf_level4,
-      'Level 5': r.level5_value || r.lf_level5,
-      'Level 6': r.level6_value || r.lf_level6,
-      'Level 7': r.level7_value || r.lf_level7,
+      'Mapping 1 (Format)': r.level1,
+      'Mapping 2 (Format)': r.level2,
+      'Mapping 3 (Format)': r.level3,
+      'Mapping 4': r.level4_value || r.lf_level4,
+      'Mapping 5': r.level5_value || r.lf_level5,
+      'Mapping 6': r.level6_value || r.lf_level6,
+      'Mapping 7': r.level7_value || r.lf_level7,
       'Status': r.status,
       'Confidence': r.confidence,
       'Override Note': r.override_note,
@@ -1104,10 +1104,10 @@ export function registerMappedTBHandlers() {
       'Mapping 1 (Broad)': r.mapping1_resultant,
       'Mapping 2 (Category)': r.mapping2_resultant,
       'Mapping 3 (Specific)': r.mapping3_resultant,
-      'Level 4': r.level4_value,
-      'Level 5': r.level5_value,
-      'Level 6': r.level6_value,
-      'Level 7': r.level7_value,
+      'Mapping 4': r.level4_value,
+      'Mapping 5': r.level5_value,
+      'Mapping 6': r.level6_value,
+      'Mapping 7': r.level7_value,
       // SQLite returns the timestamp as ISO text; node-pg gave a Date (an Excel date cell)
       'Last Updated': r.updated_at ? new Date(r.updated_at) : r.updated_at,
     }))
@@ -1120,13 +1120,13 @@ export function registerMappedTBHandlers() {
 
   ipcMain.handle('learnedRules:upload', async (_, entityId, fileBytes) => {
     const wb = XLSX.read(new Uint8Array(fileBytes), { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames.find(n => /learned/i.test(n)) || wb.SheetNames[0]]
+    const ws = wb.Sheets[wb.SheetNames.find(n => /learned/i.test(n)) || wb.SheetNames.find(n => n !== 'How to Fill' && n !== 'Lists') || wb.SheetNames[0]]
     const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' })
     // Headers are matched loosely (case, spacing, the "(Broad)" suffixes) so a
     // file that was edited or re-saved in Excel, or an older export, still
     // imports; every value is trimmed. Blank cells become NULL, never ''.
     const norm = (h) => h.toString().toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
-    const WANT = { ledger: /^ledger name$/, alie: /^alie$/, m1: /^mapping ?1$/, m2: /^mapping ?2$/, m3: /^mapping ?3$/, l4: /^level ?4$/, l5: /^level ?5$/, l6: /^level ?6$/, l7: /^level ?7$/ }
+    const WANT = { ledger: /^ledger name$/, alie: /^alie$/, m1: /^mapping ?1$/, m2: /^mapping ?2$/, m3: /^mapping ?3$/, l4: /^(level|mapping) ?4$/, l5: /^(level|mapping) ?5$/, l6: /^(level|mapping) ?6$/, l7: /^(level|mapping) ?7$/ }
     const colOf = {}
     for (const h of Object.keys(rawRows[0] || {})) {
       const n = norm(h)
@@ -1400,19 +1400,28 @@ export function registerMappedTBHandlers() {
         )
       )`
       // Mapping 1/2 are both genuinely resolved here — only a deeper
-      // "specify nature" (level4/level5) detail is missing. This narrower
-      // case keeps the original behaviour: once the user has explicitly
-      // reviewed/saved it (user_override), stop re-flagging it.
+      // "specify nature" (level4/level5/level6) option is missing or invalid.
+      // Since T-040 this applies whether or not the ledger was saved before.
       // Postgres: "IS NOT" only compares against NULL/TRUE/FALSE, not an
       // arbitrary string — that needs IS DISTINCT FROM (also NULL-safe).
+      // T-040: the queue now follows the SAME rule the Notes screen uses to show
+      // "Unclassified - Level N" with a Fix (useFinancials.js buildNoteTemplateRows):
+      // a Level 4, 5 or 6 option list whose chosen value is blank or not one of
+      // the options, WHATEVER the ledger's status. The earlier exemption for
+      // user_override / user_approved rows (and the missing Level 6 test) let
+      // this screen say "every ledger is fully categorised" while Notes still
+      // showed Fix for the same ledgers. A saved ledger with a still-blank
+      // option is not finished; one whose option is chosen leaves the queue.
+      const optionUnresolved = (n) => `(
+        lf.level${n} IS NOT NULL AND TRIM(lf.level${n}) <> ''
+        AND STRPOS(lf.level${n}, '/') > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM json_each('[' || REPLACE(json_quote(lf.level${n}), '/', '","') || ']') AS v${n}
+          WHERE TRIM(v${n}.value) <> '' AND TRIM(v${n}.value) = TRIM(COALESCE(mt.level${n}_value, ''))
+        )
+      )`
       const level45Unresolved = `(
         mt.mapping1_resultant IS NOT NULL AND mt.mapping2_resultant IS NOT NULL
-        -- Both statuses are explicit user decisions. Carry-forward and learned
-        -- rules re-write an override as user_approved on every re-run, so
-        -- exempting only user_override re-queued 43 PPE / Sale / Other
-        -- non-current-asset ledgers the CA had already reviewed, each time the
-        -- mapping was re-run - "rectified but never vanishes".
-        AND COALESCE(mt.status, '') NOT IN ('user_override', 'user_approved')
         AND EXISTS (
           SELECT 1 FROM level_format lf
           WHERE lf.level1 = mt.mapping1_resultant
@@ -1433,20 +1442,17 @@ export function registerMappedTBHandlers() {
                 WHERE TRIM(o.value) <> '' AND ${SPEC_NATURE_SQL('o.value')} = ${SPEC_NATURE_SQL(`COALESCE(mt.mapping3_resultant, '')`)}
               )
             )
-            AND (
-              (
-                lf.level4 IS NOT NULL AND TRIM(lf.level4) <> ''
-                AND STRPOS(lf.level4, '/') > 0
-                AND (mt.level4_value IS NULL OR TRIM(mt.level4_value) = '')
-              )
-              OR
-              (
-                lf.level5 IS NOT NULL AND TRIM(lf.level5) <> ''
-                AND STRPOS(lf.level5, '/') > 0
-                AND (mt.level5_value IS NULL OR TRIM(mt.level5_value) = '')
-              )
-            )
+            AND (${optionUnresolved(4)} OR ${optionUnresolved(5)} OR ${optionUnresolved(6)})
         )
+      )`
+      // T-040: a Revenue from operations "Sale" ledger whose Level 3 is neither
+      // Sale of Products/Goods nor Sale of Services - the Notes screen asks to
+      // "Bifurcate" it (utils/revenueLines.js unsplitSaleLine).
+      const saleUnsplit = `(
+        ${SPEC_NATURE_SQL('COALESCE(mt.mapping1_resultant, \'\')')} IN ('revenue from operations', 'revenue from operation')
+        AND ${SPEC_NATURE_SQL('COALESCE(mt.mapping2_resultant, \'\')')} IN ('sale', 'sales')
+        AND ${SPEC_NATURE_SQL('COALESCE(mt.mapping3_resultant, \'\')')} NOT IN
+          ('sale of products', 'sale of product', 'sale of goods', 'sale of good', 'sale of services', 'sale of service')
       )`
       // Discrepancy and conflict rows are shown on Mapped TB but were absent
       // here, because the engine gives them a full Mapping 1/2/3 and so they
@@ -1485,16 +1491,16 @@ export function registerMappedTBHandlers() {
             AND (mt.rule_set_id IS NULL OR l2.rule_set_id = mt.rule_set_id)
         )
       )`
-      const queuePredicate = `(${coreUncat} OR ${level45Unresolved} OR ${flaggedByEngine} OR ${foreignLevel2})`
+      const queuePredicate = `(${coreUncat} OR ${level45Unresolved} OR ${saleUnsplit} OR ${flaggedByEngine} OR ${foreignLevel2})`
       if (filter.perLedger) {
         // The original strategy - every ledger runs the tests itself. Kept only so tools/selftest-large-branch.mjs can prove that the
         // combination strategy below lists exactly the same ledgers. The screen never asks for it.
         conds.push(`(${queuePredicate} OR tr.upload_nature = 'Manual Ledger')`)
       } else {
-        // The tests above depend only on these eight columns of a ledger, and most ledgers of a branch share their captions. So they are
+        // The tests above depend only on these nine columns of a ledger, and most ledgers of a branch share their captions. So they are
         // run once per DISTINCT combination (a few hundred), not once per ledger - for 67,000 ledgers that took about a minute, each one
         // searching the Level Format several times - and every ledger is then matched, through its combination, to that answer.
-        const KEY = ['alie', 'mapping1_resultant', 'mapping2_resultant', 'mapping3_resultant', 'level4_value', 'level5_value', 'status', 'rule_set_id']
+        const KEY = ['alie', 'mapping1_resultant', 'mapping2_resultant', 'mapping3_resultant', 'level4_value', 'level5_value', 'level6_value', 'status', 'rule_set_id']
         const keyOf = (a) => `concat_ws(char(1), ${KEY.map(c => `COALESCE(CAST(${a}.${c} AS TEXT), char(2))`).join(', ')})`
         withCombos = `WITH combos AS MATERIALIZED (SELECT DISTINCT ${KEY.map(c => `k.${c}`).join(', ')} FROM mapped_tb k WHERE k.tb_id = $1),
           flagged AS MATERIALIZED (SELECT ${keyOf('mt')} AS k FROM combos mt WHERE ${queuePredicate})
@@ -1534,41 +1540,6 @@ export function registerMappedTBHandlers() {
     const { rows } = await query(sql, params)
     return rows
   })
-
-  // ── Diagnostic bucket counts ──────────────────────────────────────────────
-  // COUNT(*) FILTER (WHERE ...) → SUM(CASE WHEN ... THEN 1 ELSE 0 END)
-  ipcMain.handle('mappedTB:diagnostics', async (_, tbId) => {
-    const { rows: [counts] } = await query(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN mapping1_resultant IS NULL OR mapping1_resultant = '' THEN 1 ELSE 0 END) AS m1_null,
-        SUM(CASE WHEN mapping2_resultant IS NULL OR mapping2_resultant = '' THEN 1 ELSE 0 END) AS m2_null,
-        SUM(CASE WHEN mapping3_resultant IS NULL OR mapping3_resultant = '' THEN 1 ELSE 0 END) AS m3_null,
-        SUM(CASE WHEN LOWER(COALESCE(mapping1_resultant,'')) LIKE '%uncategorised%' THEN 1 ELSE 0 END) AS m1_uncat,
-        SUM(CASE WHEN LOWER(COALESCE(mapping2_resultant,'')) LIKE '%uncategorised%' THEN 1 ELSE 0 END) AS m2_uncat,
-        SUM(CASE WHEN LOWER(COALESCE(mapping3_resultant,'')) LIKE '%uncategorised%' THEN 1 ELSE 0 END) AS m3_uncat,
-        SUM(CASE WHEN status = 'user_approved' THEN 1 ELSE 0 END) AS user_approved,
-        SUM(CASE WHEN status = 'user_override' THEN 1 ELSE 0 END) AS user_override
-      FROM mapped_tb WHERE tb_id = $1
-    `, [tbId])
-    const { rows: byStatus } = await query(
-      `SELECT status, COUNT(*) c FROM mapped_tb WHERE tb_id = $1 GROUP BY status ORDER BY c DESC`,
-      [tbId]
-    )
-    const { rows: sample } = await query(`
-      SELECT
-        tr.name, mt.alie, mt.mapping1_resultant AS m1, mt.mapping2_resultant AS m2,
-        mt.mapping3_resultant AS m3, mt.level5_value AS l5, mt.status, mt.rule_set_id
-      FROM mapped_tb mt JOIN tb_rows tr ON tr.id = mt.tb_row_id
-      WHERE mt.tb_id = $1 AND (
-        mt.mapping1_resultant IS NULL OR
-        LOWER(COALESCE(mt.mapping1_resultant,'')) LIKE '%uncategorised%' OR
-        mt.mapping2_resultant IS NULL OR
-        LOWER(COALESCE(mt.mapping2_resultant,'')) LIKE '%uncategorised%' OR
-        LOWER(COALESCE(mt.mapping3_resultant,'')) LIKE '%uncategorised%'
-      )
-      ORDER BY tr.name LIMIT 50
-    `, [tbId])
-    return { counts, byStatus, sample }
-  })
+  // T-041: the "Diagnose" developer snapshot (mappedTB:diagnostics) was removed;
+  // the queue itself lists every ledger and what it still needs.
 }

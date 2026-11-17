@@ -42,6 +42,52 @@ function buildWorkbook(ratios, sheetName) {
   return wb
 }
 
+/**
+ * T-047: how utils/veraExcel.js finishes these files: the How to Fill guide, the blue
+ * header and yellow cells for the figures. Particulars, Numerator and Denominator are the
+ * fixed Schedule III wording (the upload matches rows by Particulars), so they are not
+ * inputs and need no dropdown; no column here has a list to choose from.
+ * @param {'template'|'filled'} mode
+ */
+export function ratioExcelSpec(mode) {
+  return {
+    mode,
+    sheets: {
+      'Financial Ratios*': {
+        headerRow: 1,
+        lastRow: 1 + RATIO_ROWS_META.length,
+        inputCols: ['C', 'E', 'F', 'G', 'H'],
+        amountCols: ['C', 'E', 'F', 'G', 'H'],
+        widths: [34, 30, 18, 34, 18, 14, 14, 12],
+        autoFilter: false,
+      },
+    },
+    howTo: {
+      title: mode === 'filled' ? 'Financial Ratios — saved figures' : 'Financial Ratios — template',
+      purpose: mode === 'filled'
+        ? 'The Financial Ratios table (Schedule III) as it currently reads in VERA. Review or adjust the figures here and upload the file back; only the Financial Ratios table is rebuilt from it.'
+        : "The eleven Schedule III ratios with their numerator and denominator wording, and no figures. Fill in the figures and upload the file on VERA's Policy screen.",
+      steps: [
+        'Go to the "Financial Ratios" sheet.',
+        'Enter the figures in the pale-yellow cells. Leave a cell blank if it does not apply.',
+        'Do not rename the Particulars: VERA matches each row by it. Reordering the rows is fine.',
+        "Save the file, then on VERA's Policy screen click \"Upload Ratio Template\" and pick it. The rest of the Policy note is not touched.",
+      ],
+      columns: [
+        ['Particulars', 'The name of the ratio. Do not change it.', 'Fixed'],
+        ['Numerator / Denominator', 'What the ratio is worked out from (Schedule III wording).', 'Fixed'],
+        ['Numerator Value / Denominator Value', 'The amounts, in rupees.', 'Amount — fill in'],
+        ['Current Year / Previous Year', 'The ratio. Turnover and other ratios as a multiple (1.81); percentage ratios as a plain number (9.13 for 9.13%).', 'Number — fill in'],
+        ['Variance %', 'Leave blank to have VERA work it out from Current Year and Previous Year, or fill it in to override.', 'Number — fill in'],
+      ],
+      tips: [
+        'Percentage ratios are Return on Equity, Net Profit, Return on Capital Employed and Return on Investment.',
+        'On the Policy screen, "Refresh Ratios from Financials" recomputes the figures from the financial statements instead.',
+      ],
+    },
+  }
+}
+
 export function buildRatioBlankTemplate() {
   return buildWorkbook(null, 'Financial Ratios')
 }
@@ -73,7 +119,8 @@ function parseNum(v) {
  * reordering rows in Excel is fine; renaming one is not.
  */
 export function parseRatioWorkbook(wb) {
-  const sheetName = wb.SheetNames.find(n => n.startsWith('Financial Ratios')) || wb.SheetNames[0]
+  // Never fall back to the T-047 guide or dropdown-list sheets.
+  const sheetName = wb.SheetNames.find(n => n.startsWith('Financial Ratios')) || wb.SheetNames.find(n => !['how to fill', 'lists'].includes(n.trim().toLowerCase()))
   const ws = wb.Sheets[sheetName]
   if (!ws) return { rows: RATIO_ROWS_META.map(m => ({ ...m, numeratorValue: null, denominatorValue: null, cy: null, py: null, variancePct: null })), matched: 0, unmatched: RATIO_ROWS_META.map(m => m.label), extraRows: [] }
 

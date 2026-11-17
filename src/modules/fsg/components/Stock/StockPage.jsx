@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx-js-style'
 import PYTBSelector from '../shared/PYTBSelector'
-import { buildStockBlankTemplate, buildStockFilledWorkbook, parseStockWorkbook } from './stockWorkbook'
+import { buildStockBlankTemplate, buildStockFilledWorkbook, parseStockWorkbook, stockExcelSpec } from './stockWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
 import {
   INVENTORY_TYPES, HEAD_TYPES, cleanHead, headKey, hasFigures, typesNeedingHead, headsToSave,
@@ -479,8 +480,9 @@ export default function StockPage({ entity, activeTB, prevTB, onPrevTBChange }) 
     }
   }
 
-  const saveWorkbook = async (wb, defaultPath) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells) — utils/veraExcel.js.
+  const saveWorkbook = async (wb, defaultPath, mode) => {
+    const buf = await finishWorkbook(wb, stockExcelSpec(mode))
     const result = await fsgApi?.saveFileDialog({
       defaultPath, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
     })
@@ -493,7 +495,7 @@ export default function StockPage({ entity, activeTB, prevTB, onPrevTBChange }) 
 
   const downloadBlankTemplate = async () => {
     try {
-      const path = await saveWorkbook(buildStockBlankTemplate(), 'Stock_Template.xlsx')
+      const path = await saveWorkbook(buildStockBlankTemplate(), 'Inventory_Template.xlsx', 'template')
       if (path) setSuccess('Blank template saved.')
     } catch (err) { setError('Download failed: ' + (err?.message || '')) }
   }
@@ -503,7 +505,7 @@ export default function StockPage({ entity, activeTB, prevTB, onPrevTBChange }) 
       const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
       const path = await saveWorkbook(
         buildStockFilledWorkbook(opening, closing, pyOpening, pyClosing, true, heads),
-        `${eName}_Stock_Filled.xlsx`
+        `${eName}_Inventory_Filled.xlsx`, 'filled'
       )
       if (path) setSuccess('Filled stock form saved — keep this safe before re-uploading a Trial Balance.')
     } catch (err) { setError('Download failed: ' + (err?.message || '')) }

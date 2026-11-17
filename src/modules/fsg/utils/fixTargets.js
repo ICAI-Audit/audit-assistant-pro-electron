@@ -11,6 +11,8 @@
 // The caption filter is still sent alongside, as the fallback for a flag with no ledger
 // behind it (e.g. a row that comes from a depreciation schedule).
 
+import { revenueLevel2, SALE_UNSPLIT } from './revenueLines.js'
+
 const toId = (v) => { const n = Number(v); return v !== null && v !== undefined && v !== '' && Number.isInteger(n) ? n : null }
 
 /** Unique mapped_tb ids of a list of ledger rows (rows carry `mapped_id`). */
@@ -213,12 +215,18 @@ export function ledgerNeeds(levelFormat, row) {
     } else {
       const m2 = normCap(row.mapping2_resultant)
       if (ix.realL3.get(m1 + SEP + m2) && isUncategorised(row.mapping3_resultant)) needs.push({ what: 'Mapping 3' })
+      // T-040: a sales ledger not yet split into Sale of Products/Goods or Sale of Services - the
+      // Notes screen asks to "Bifurcate" it, so it is not finished here either.
+      else if (revenueLevel2(row.mapping1_resultant, row.mapping2_resultant, row.mapping3_resultant) === SALE_UNSPLIT
+        && /^sales?$/i.test(String(row.mapping2_resultant || '').trim())) {
+        needs.push({ what: 'Mapping 3', hint: 'bifurcate: Sale of Products / Sale of Services' })
+      }
     }
   }
   for (const n of natureLevelsFor(levelFormat, row)) {
     if (n.ok) continue
     const shown = n.options.slice(0, 3).join(' / ') + (n.options.length > 3 ? ' …' : '')
-    needs.push({ what: `Level ${n.level}`, hint: n.outdated ? `“${n.value}” is not an option` : `choose ${shown}` })
+    needs.push({ what: `Mapping ${n.level}`, hint: n.outdated ? `“${n.value}” is not an option` : `choose ${shown}` })
   }
   if (foreignLevel2(ix, row)) needs.push({ what: 'Mapping 2', hint: 'belongs to the other statement' })
   if (/^(discrepancy|conflict)$/i.test(String(row.status || ''))) needs.push({ what: 'Engine review', hint: 'more than one possible match — pick the right one' })

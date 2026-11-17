@@ -32,6 +32,7 @@ import { registerRatioHandlers } from './ipc/ratio.js'
 import { registerGeneralNotesHandlers } from './ipc/general-notes.js'
 import { registerCfsHandlers } from './ipc/cfs.js'
 import { registerInvestmentHandlers } from './ipc/investments.js'
+import { registerWorkingsHandlers } from './ipc/workings.js'
 import { summarizeEngagement } from './engagement-summary.js'
 import { AuthorizationError, CHANNEL_POLICY, authorizeCall, createPathGuard, filterResult } from './authorization.js'
 
@@ -219,6 +220,7 @@ export async function initFsg({ db, ipcMain, getAuthorizedSession, isTrustedRend
   registerGeneralNotesHandlers()
   registerCfsHandlers()
   registerInvestmentHandlers()
+  registerWorkingsHandlers()
 
   const handlers = getRegisteredHandlers()
   const missingPolicy = [...handlers.keys()].filter((channel) => !CHANNEL_POLICY[channel])

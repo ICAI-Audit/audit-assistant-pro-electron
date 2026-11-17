@@ -1,6 +1,6 @@
 # CAAT Tools (T-024)
 
-CAAT Tools adds data analytics tests and SA 530 audit sampling to VERA at `/caat-tools` (sidebar: **CAAT Tools**, after VERA Tools). It embeds the owner-supplied standalone tool, now `CAAT_Tools3.html` (v0.10, T-030, 17 November 2026; previously `CAAT_Tools2.html` Prototype v0.6) and saves its work per engagement in the VERA database.
+CAAT Tools adds data analytics tests and SA 530 audit sampling to VERA at `/caat-tools` (sidebar: **CAAT Tools**, after VERA Tools). It embeds the owner-supplied standalone tool, now `CAAT_Tools3.html` (v0.10, T-053, 17 November 2026; previously `CAAT_Tools2.html` Prototype v0.6) and saves its work per engagement in the VERA database.
 
 Approval source: the owner's instruction of 11 November 2026, given after reviewing the findings below: fix the large-ledger crash, upgrade the bundled SheetJS if possible, save values in the database, fix the sampling wording, leave the disclaimer as it is, and leave statutory limits as user-configured settings.
 
@@ -37,7 +37,7 @@ Only these changes were made to the tested HTML; no test, sampling or export log
 
 The disclaimer was left unchanged at the owner's instruction.
 
-## v0.10 update (T-030, 17 November 2026)
+## v0.10 update (T-053, 17 November 2026; called T-030 in its first two commits)
 
 Owner instruction of 17 November 2026: add the revised version to CAAT Tools with the same UI/UX as the application, review the code, merge to `caat_tools` and push after a pull.
 

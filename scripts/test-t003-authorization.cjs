@@ -406,6 +406,39 @@ async function testHarness(t) {
     const result = await query({ table: 'engagements', action: 'select' });
     console.log(`[T003 ${result.error ? 'DENIED' : 'ALLOWED'}] database read after logout; expected=deny; rows=${result.data?.length}; error=${result.error?.message || 'none'}`);
     assert.ok(result.error, 'database read succeeded after logout');
+    const permanent = await evaluate(`globalThis.electronAPI.permanentFile.request({ action: 'list', clientId: ${JSON.stringify(clientA.id)} })`);
+    assert.equal(permanent.success, false, 'permanent file opened after logout');
+  });
+
+  await t.test('permanent-file IPC restricts client and document versions', async () => {
+    await login(staffEmail, password);
+    const denied = await evaluate(`globalThis.electronAPI.permanentFile.request({ action: 'list', clientId: ${JSON.stringify(clientB.id)} })`);
+    assert.equal(denied.success, false, 'unassigned client permanent file was accessible');
+    const upload = await evaluate(`globalThis.electronAPI.permanentFile.request({
+      action: 'upload',
+      clientId: ${JSON.stringify(clientA.id)},
+      category: 'PF-02',
+      name: 'Synthetic Deed',
+      fileName: 'deed.txt',
+      bytes: new Uint8Array([1, 2, 3]),
+      engagementIds: [${JSON.stringify(engagementA.id)}]
+    })`);
+    assert.equal(upload.success, true, upload.error);
+    const list = await evaluate(`globalThis.electronAPI.permanentFile.request({ action: 'list', clientId: ${JSON.stringify(clientA.id)} })`);
+    assert.equal(list.success, true, list.error);
+    assert.equal(list.data.documents.length, 1);
+    assert.equal(list.data.documents[0].versionId, upload.data.versionId);
+    const download = await evaluate(`(async () => {
+      const result = await globalThis.electronAPI.permanentFile.request({
+        action: 'download', clientId: ${JSON.stringify(clientA.id)}, versionId: ${JSON.stringify(upload.data.versionId)}
+      });
+      return result.success ? Array.from(result.data.bytes) : result;
+    })()`);
+    assert.deepEqual(download, [1, 2, 3]);
+    const forged = await evaluate(`globalThis.electronAPI.permanentFile.request({
+      action: 'download', clientId: ${JSON.stringify(clientB.id)}, versionId: ${JSON.stringify(upload.data.versionId)}
+    })`);
+    assert.equal(forged.success, false, 'cross-client download succeeded');
   });
 
   await t.test('staff listing is filtered to assigned engagement', async () => {
@@ -885,6 +918,34 @@ async function testHarness(t) {
     console.log(`[T003 OBSERVED] export without session; path=${exportedPath}`);
     assert.equal(path.dirname(exportedPath), downloadsPath);
     assert.deepEqual([...fs.readFileSync(exportedPath)], [84, 51, 45, 69]);
+  });
+
+  await t.test('ledger analysis Tally handlers require a signed-in user (T-033)', async () => {
+    // Placed at the end of the run: the app's startup sign-out (AuthContext) has long happened by then.
+    // A free port with nothing listening: a call that passes the sign-in check reaches the Tally client
+    // and fails to connect, so the test never needs (or touches) a real Tally.
+    const closedPort = await getFreePort();
+    const opts = `{ host: '127.0.0.1', port: ${closedPort}, from: '2025-04-01', to: '2025-04-30', includeDayBook: true }`;
+    const callBoth = (signIn) => evaluate(`(async () => {
+      const api = globalThis.electronAPI;
+      ${signIn ? `await api.sqliteAuth({ action: 'login', email: ${JSON.stringify(staffEmail)}, password: ${JSON.stringify(password)} });`
+        : "await api.sqliteAuth({ action: 'logout' });"}
+      return { companies: await api.ledgerAnalysis.tallyCompanies(${opts}), fetch: await api.ledgerAnalysis.tallyFetch(${opts}) };
+    })()`);
+
+    const out = await callBoth(false);
+    console.log(`[T003 ${out.companies.success || out.fetch.success ? 'ALLOWED' : 'DENIED'}] ledger-analysis handlers signed out; expected=deny; result=${JSON.stringify(out)}`);
+    assert.deepEqual(out.companies, { success: false, error: 'Sign in first.' });
+    assert.deepEqual(out.fetch, { success: false, error: 'Sign in first.' });
+
+    const inn = await callBoth(true);
+    console.log(`[T003 ALLOWED-TO-TALLY] ledger-analysis handlers signed in as staff; expected=reach Tally client; result=${JSON.stringify(inn)}`);
+    for (const r of [inn.companies, inn.fetch]) {
+      assert.equal(r.success, false);
+      assert.notEqual(r.error, 'Sign in first.');
+      assert.match(r.error, /Nothing is listening/);
+    }
+    await evaluate('globalThis.electronAPI.sqliteAuth({ action: "logout" })');
   });
 
   await t.test('test profile remains isolated', async () => {

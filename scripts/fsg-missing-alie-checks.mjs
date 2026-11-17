@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { buildMissingAlieReport, missingAlieMessages, hasMissingAlie } from '../src/modules/fsg/utils/missingAlie.js'
+import { pdfPageTexts } from './fsg-pdf-text.mjs'
 const require = createRequire(import.meta.url)
 export async function checkMissingAlie({ db, root, userData, check, staff, partner, entityId, periodId, defaultRs }) {
   const tb = db.prepare('INSERT INTO trial_balances (entity_id,entity_period_id,period) VALUES (?,?,?) RETURNING *').get(entityId, periodId, '2024-25')
@@ -112,13 +113,12 @@ export async function checkMissingAlie({ db, root, userData, check, staff, partn
       const datedPdf = await partner('financials:renderPDF', dateHTML)
       if (!datedPdf.ok) throw new Error(datedPdf.error)
       writeFileSync(`${userData}-dated-notes.pdf`, new Uint8Array(datedPdf.result))
-      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-      const document = await pdfjs.getDocument({ data: new Uint8Array(datedPdf.result), useSystemFonts: true }).promise
-      let text = ''
-      for (let p = 1; p <= document.numPages; p++) text += (await (await document.getPage(p)).getTextContent()).items.map(x => x.str).join(' ')
-      const compact = text.replace(/\s+/g, '')
-      check('T-027 actual PDF notes and annexures retain dated BS and PL headings after pagination', compact.includes('Asat31March2026-Ledger') && compact.includes('Fortheyearended31March2026-Ledger') && compact.includes('31March2025-Sub-noteTotal'))
-      await document.destroy()
+      const datedCheck = 'T-027 actual PDF notes and annexures retain dated BS and PL headings after pagination'
+      const datedPages = await pdfPageTexts(datedPdf.result, datedCheck)
+      if (datedPages) {
+        const compact = datedPages.join('').replace(/\s+/g, '')
+        check(datedCheck, compact.includes('Asat31March2026-Ledger') && compact.includes('Fortheyearended31March2026-Ledger') && compact.includes('31March2025-Sub-noteTotal'))
+      }
       console.log(`T-027 dated notes PDF: ${userData}-dated-notes.pdf`)
     }
 
@@ -166,12 +166,9 @@ export async function checkMissingAlie({ db, root, userData, check, staff, partn
   const pdf = await partner('financials:renderPDF', html)
   if (!pdf.ok) throw new Error(pdf.error)
   writeFileSync(`${userData}-missing-alie.pdf`, new Uint8Array(pdf.result))
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(pdf.result), useSystemFonts: true }).promise
-  const texts = []
-  for (let p = 1; p <= doc.numPages; p++) texts.push((await (await doc.getPage(p)).getTextContent()).items.map(x => x.str).join(' '))
-  check('T-026 actual PDF generates BS, PL and annexure while warnings remain', texts.some(t => /Balance Sheet/i.test(t) && t.replace(/\s+/g, '').includes('ALIEclassificationmissing')) && texts.some(t => /Profit and Loss/i.test(t) && t.replace(/\s+/g, '').includes('ALIEclassificationmissing')) && texts.join(' ').includes('Unresolved <ledger>'))
-  await doc.destroy()
+  const alieCheck = 'T-026 actual PDF generates BS, PL and annexure while warnings remain'
+  const texts = await pdfPageTexts(pdf.result, alieCheck)
+  if (texts) check(alieCheck, texts.some(t => /Balance Sheet/i.test(t) && t.replace(/\s+/g, '').includes('ALIEclassificationmissing')) && texts.some(t => /Profit and Loss/i.test(t) && t.replace(/\s+/g, '').includes('ALIEclassificationmissing')) && texts.join(' ').includes('Unresolved <ledger>'))
   console.log(`T-026 synthetic PDF: ${userData}-missing-alie.pdf`)
   const ids = cyMissing.filter(x => x.mapped_id).map(x => x.mapped_id)
   for (const id of ids) db.prepare("UPDATE mapped_tb SET alie='ASSETS' WHERE id=?").run(id)

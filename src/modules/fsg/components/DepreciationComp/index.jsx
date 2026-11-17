@@ -21,7 +21,8 @@ import { fmtINR, displayAmt, fetchFinancialsData } from '../../hooks/useFinancia
 import { depStoreFor } from '../../utils/depStore'
 import { joinDepCompSchedules } from '../../utils/depJoin'
 import { withNet, isDerivedField } from '../../utils/depCompNet'
-import { buildDepCompBlankTemplate, buildDepCompFilledWorkbook, parseDepCompWorkbook } from './depCompWorkbook'
+import { buildDepCompBlankTemplate, buildDepCompFilledWorkbook, parseDepCompWorkbook, depCompExcelSpec } from './depCompWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
 
 const INP  = 'w-full border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
@@ -279,14 +280,15 @@ export default function DepreciationComp({ entity, activeTB }) {
         const itSaved = await itStore.get()
         if (itSaved?.includeInPPENote) {
           await itStore.save({ ...itSaved, includeInPPENote: false })
-          showToast('Included in PPE Note. Dep (IT)\'s inclusion was turned off — only one schedule can show in the note.')
+          showToast('Included in PPE Note. Dep (Income Tax)\'s inclusion was turned off — only one schedule can show in the note.')
         }
       } catch (_) {}
     }
   }
 
-  const saveWorkbook = async (wb, defaultPath) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells, dropdowns) — utils/veraExcel.js.
+  const saveWorkbook = async (wb, defaultPath, mode) => {
+    const buf = await finishWorkbook(wb, depCompExcelSpec(mode, scheduleII))
     const result = await fsgApi?.saveFileDialog({
       defaultPath, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
     })
@@ -299,7 +301,7 @@ export default function DepreciationComp({ entity, activeTB }) {
 
   const downloadBlankTemplate = async () => {
     try {
-      const path = await saveWorkbook(buildDepCompBlankTemplate(scheduleII), 'Dep_Comp_Template.xlsx')
+      const path = await saveWorkbook(buildDepCompBlankTemplate(scheduleII), 'Dep_Comp_Template.xlsx', 'template')
       if (path) showToast('Blank template saved.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
@@ -307,7 +309,7 @@ export default function DepreciationComp({ entity, activeTB }) {
   const downloadFilled = async () => {
     try {
       const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
-      const path = await saveWorkbook(buildDepCompFilledWorkbook(categoryRows, scheduleII), `${eName}_Dep_Comp_Filled.xlsx`)
+      const path = await saveWorkbook(buildDepCompFilledWorkbook(categoryRows, scheduleII), `${eName}_Dep_Comp_Filled.xlsx`, 'filled')
       if (path) showToast('Filled schedule saved — keep this safe before re-uploading a Trial Balance.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
@@ -479,7 +481,7 @@ export default function DepreciationComp({ entity, activeTB }) {
               <span>
                 <strong>Include this Fixed Assets Schedule in the PPE Note disclosure.</strong> When checked and saved, this
                 table appears inside the "Property, Plant & Equipment" note — in the Notes tab, the Excel export, and the
-                PDF export. Only one of Dep (Comp) or Dep (IT) can be included at a time — checking this turns off Dep (IT)'s
+                PDF export. Only one of Dep (Books) or Dep (Income Tax) can be included at a time — checking this turns off Dep (Income Tax)'s
                 inclusion if it was on. Uncheck and save to remove it again.
               </span>
             </label>

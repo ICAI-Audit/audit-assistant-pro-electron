@@ -8,6 +8,7 @@
 // re-uploading a TB, then Upload Filled afterwards to restore — rows are
 // matched back onto the new TB's ledger list by ledger name.
 import * as XLSX from 'xlsx-js-style'
+import { dataSheetNames } from '../../utils/veraExcel'
 
 const HEADER_ROW = ['Ledger / Asset Name', 'Asset Block', 'Opening WDV', 'Addition <180 Days', 'Addition >=180 Days', 'Deduction']
 const COL_WIDTHS = [{ wch: 40 }, { wch: 40 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }]
@@ -109,12 +110,73 @@ export function appendDepITTemplateSheets(wb, blocks, usedNames) {
 }
 
 /**
+ * T-047: how utils/veraExcel.js finishes these files — How to Fill guide, blue header,
+ * yellow cells to fill in, amount formats, and an Asset Block dropdown of the Income-tax
+ * blocks (a fixed list). The Ledger / Asset Name column stays free text (the client's
+ * own ledgers). Sheet names and cell positions are unchanged, so parseDepITWorkbook
+ * reads old and new files alike.
+ * @param {'template'|'filled'} mode
+ * @param {{block:string}[]} blocks
+ */
+export function depITExcelSpec(mode, blocks = []) {
+  const names = [...new Set((blocks || []).map(b => String(b.block || '').trim()).filter(Boolean))]
+  const sheet = {
+    headerRow: 1,
+    lastCol: 'F',
+    minRows: mode === 'template' ? 30 : 0,
+    inputCols: ['A', 'B', 'C', 'D', 'E', 'F'],
+    amountCols: ['C', 'D', 'E', 'F'],
+    freezeCols: 1,
+    widths: [40, 48, 16, 18, 18, 16],
+    autoFilter: false,
+    dropdowns: names.length ? [{
+      col: 'B', list: names, openEnded: true, name: 'Asset Block',
+      prompt: 'Pick the Income-tax block of this asset.',
+      error: 'Pick an Asset Block from the list (the IT Blocks Reference sheet shows them with their rates).',
+    }] : [],
+  }
+  return {
+    mode,
+    sheets: {
+      [WIP_SHEET]: { headerRow: 1, lastRow: 4, lastCol: 'B', inputCols: ['B'], amountCols: ['B'], widths: [45, 18], autoFilter: false },
+      'Dep (IT)*': sheet,
+      'IT Blocks Reference': { headerRow: 1, lastCol: 'C', widths: [28, 70, 10], autoFilter: false },
+    },
+    howTo: {
+      title: mode === 'filled' ? 'Depreciation (Income Tax) — saved figures' : 'Depreciation (Income Tax) — template',
+      purpose: mode === 'filled'
+        ? 'The Income-tax depreciation inputs saved in VERA for this Trial Balance, one row per ledger. Keep it as a backup before re-uploading a Trial Balance, or correct it here and upload it back.'
+        : 'Enter the Income-tax depreciation inputs, one row per fixed-asset ledger, and upload it on the Dep (Income Tax) screen.',
+      steps: [
+        'Go to the "' + (mode === 'filled' ? 'Dep (IT) Filled' : 'Dep (IT) Template') + '" sheet.',
+        'Type the ledger name exactly as it is in the Trial Balance, then pick its Asset Block from the dropdown.',
+        'Enter the Opening WDV, additions (put to use before / after 180 days) and deductions in the pale-yellow cells, in rupees.',
+        'On the "' + WIP_SHEET + '" sheet, enter Capital and Intangible Work in Progress, if any.',
+        'Save the file, then on VERA\'s Dep (Income Tax) screen click "Upload Filled" and pick it. Rows are matched by ledger name.',
+      ],
+      columns: [
+        ['Ledger / Asset Name', 'The fixed-asset ledger, as named in the Trial Balance.', 'Text — fill in'],
+        ['Asset Block', 'The Income-tax block (and so the rate) of the asset.', names.length ? 'Dropdown' : 'Text — fill in'],
+        ['Opening WDV', 'Written-down value at the start of the year.', 'Amount — fill in'],
+        ['Addition <180 Days', 'Additions put to use for less than 180 days (half rate).', 'Amount — fill in'],
+        ['Addition >=180 Days', 'Additions put to use for 180 days or more (full rate).', 'Amount — fill in'],
+        ['Deduction', 'Sale value or other deductions from the block.', 'Amount — fill in'],
+      ],
+      tips: [
+        'The "IT Blocks Reference" sheet lists every block with its rate.',
+        'A ledger name not found in the Trial Balance is reported after upload; nothing else is changed.',
+      ],
+    },
+  }
+}
+
+/**
  * @param {XLSX.WorkBook} wb
  * @param {object[]} blocks - current master+custom blocks, to resolve block name -> id
  * @returns {{ rows: Record<string, {block:string, openingWDV:string, addBefore180:string, addAfter180:string, deduction:string}>, matched: number, unmatched: string[] }}
  */
 export function parseDepITWorkbook(wb, blocks) {
-  const sheetName = wb.SheetNames.find(n => n.startsWith('Dep (IT)')) || wb.SheetNames[0]
+  const sheetName = wb.SheetNames.find(n => n.startsWith('Dep (IT)') && n !== WIP_SHEET) || dataSheetNames(wb).find(n => n !== WIP_SHEET && n !== 'IT Blocks Reference')
   const ws = wb.Sheets[sheetName]
   if (!ws) return { rows: {}, matched: 0, unmatched: [] }
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })

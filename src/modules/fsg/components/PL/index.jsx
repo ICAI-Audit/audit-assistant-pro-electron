@@ -6,6 +6,7 @@ import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
 import RemarkCell, { useRemarks } from '../shared/RemarkCell'
+import { AnalyseChangeButton, AnalyseChangeProvider, useAnalyseChangeToggle, ChangeCells, ChangeHeads, useChangeSpan } from '../shared/AnalyseChange'
 import { FormatRefButton, SCHEDULE3_SECTIONS } from '../shared/FormatReference'
 import { computeNonCorpPLLayout } from '../../utils/plStructureNonCorp'
 import { fixFilterWith } from '../../utils/fixTargets'
@@ -52,11 +53,12 @@ function EpsRow({ label, indent, cyValue, pyValue, cyRed, pyRed, pyDash = false,
       <td className="py-1.5 text-center text-xs"></td>
       <td className="py-1 text-xs"><EpsCell value={cyValue} isRed={cyRed} onCommit={onCommitCY} /></td>
       <td className="py-1 text-xs py-col"><EpsCell value={pyValue} isRed={pyRed} dash={pyDash && (pyValue === null || pyValue === undefined)} onCommit={onCommitPY} /></td>
+      <ChangeCells blank />
     </tr>
   )
 }
 
-function Row({ roman, label, noteNum, amount, prevAmount, bold, dark, red, indent, sub, onNoteClick, tbId, remarkKey, getRemark, onRemarkSaved, onFix, fixFilter, fixLabel, fixButtonLabel }) {
+function Row({ roman, label, noteNum, amount, prevAmount, bold, dark, red, indent, sub, onNoteClick, tbId, remarkKey, getRemark, onRemarkSaved, onFix, fixFilter, fixLabel, fixButtonLabel, changeKey }) {
   const cls = dark  ? 'bg-blue-800 text-white'
     : bold  ? 'bg-blue-50 font-semibold border-b border-blue-200'
     : red   ? 'bg-red-50/60 border-b border-gray-100 hover:bg-red-100/60'
@@ -100,13 +102,15 @@ function Row({ roman, label, noteNum, amount, prevAmount, bold, dark, red, inden
       <td className={`py-col py-1.5 text-right font-mono text-xs pr-2 ${dark ? 'opacity-70' : bold ? 'text-gray-400 border-t-2 border-blue-400' : 'text-gray-400'}`}>
         {prevAmount !== undefined ? fmtINR(prevAmount) : ''}
       </td>
+      <ChangeCells cy={amount} py={prevAmount} rowKey={changeKey || remarkKey || label} blank={amount === undefined && prevAmount === undefined} dark={dark} bold={bold} />
     </tr>
   )
 }
 
-function Spacer() { return <tr><td colSpan={4} className="py-1" /></tr> }
+function Spacer() { const extra = useChangeSpan(); return <tr><td colSpan={4 + extra} className="py-1" /></tr> }
 function SectionHead({ label }) {
-  return <tr className="bg-blue-50"><td colSpan={4} className="py-1.5 px-3 font-bold text-blue-800 border-b border-blue-100 text-xs uppercase">{label}</td></tr>
+  const extra = useChangeSpan()
+  return <tr className="bg-blue-50"><td colSpan={4 + extra} className="py-1.5 px-3 font-bold text-blue-800 border-b border-blue-100 text-xs uppercase">{label}</td></tr>
 }
 
 // ── Bucket mapper ────────────────────────────────────────────────────────────
@@ -186,6 +190,7 @@ function AddFaceLineRow({ tbId, section, onAdded }) {
   const [cy, setCy] = useState('')
   const [py, setPy] = useState('')
   const [saving, setSaving] = useState(false)
+  const extra = useChangeSpan()
 
   const save = async () => {
     if (!label.trim() || !tbId) return
@@ -200,7 +205,7 @@ function AddFaceLineRow({ tbId, section, onAdded }) {
   if (!open) {
     return (
       <tr>
-        <td colSpan={4} className="py-1 pl-10">
+        <td colSpan={4 + extra} className="py-1 pl-10">
           <button onClick={() => setOpen(true)} className="text-[11px] text-blue-600 hover:underline">+ Add Line</button>
         </td>
       </tr>
@@ -226,6 +231,7 @@ function AddFaceLineRow({ tbId, section, onAdded }) {
           <button onClick={() => { setOpen(false); setLabel(''); setCy(''); setPy('') }} className="text-[11px] text-gray-400 hover:text-gray-600 shrink-0">✕</button>
         </div>
       </td>
+      <ChangeCells blank />
     </tr>
   )
 }
@@ -246,6 +252,7 @@ function NonCorpPLTable({ layout, onNoteClick, tbId, getRemark, onRemarkSaved, o
                 <td />
                 <td className="py-1.5 text-right font-mono text-xs pr-2 text-gray-900">{fmtINR(item.cy)}</td>
                 <td className="py-1.5 text-right font-mono text-xs pr-2 text-gray-400">{fmtINR(item.py)}</td>
+                <ChangeCells cy={item.cy} py={item.py} rowKey={`manual::${item.label}`} />
               </tr>
             )
           case 'addline':
@@ -331,6 +338,7 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
   const pyOff = !!data?.pyMode && data.pyMode !== 'required'
   const pyOffTitle = 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).'
   const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB, 'pl')
+  const [changeOn, setChangeOn] = useAnalyseChangeToggle('pl')
 
   const incSections = data?.incomeSections || []
   const expSections = data?.expenseSections || []
@@ -383,19 +391,25 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
   let rn = 0
 
   return (
+    <AnalyseChangeProvider on={changeOn && !pyOff} tbId={tbId} scope="pl" getRemark={getRemark} onRemarkSaved={onRemarkSaved}>
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center gap-4 px-5 py-2 border-b border-blue-100 bg-gray-50 shrink-0">
-        <span className="text-xs text-gray-500 font-medium">Profit & Loss</span>
+      {/* T-050: one-line toolbar, same layout as the Balance Sheet. */}
+      <div className="fsg-stmt-toolbar px-5 py-1.5 border-b border-blue-100 bg-gray-50 shrink-0">
+        <span className="fsg-stmt-title">Profit &amp; Loss</span>
         <FormatRefButton entity={entity} url={SCHEDULE3_SECTIONS.PL.url} label={SCHEDULE3_SECTIONS.PL.label} />
         <div className="ml-auto flex items-center gap-2">
-          <PYModeSelect activeTB={activeTB} onChanged={refresh} />
-          <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
-            onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
-            disabled={(isBranchEntity && !!prevTB?.id) || pyOff}
-            disabledTitle={pyOff ? pyOffTitle : 'A Previous Year Trial Balance is already selected for this branch — clear it below to use Manual PY instead.'} />
-          <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-            disabled={(isBranchEntity && manualPyOn) || pyOff}
-            disabledTitle={pyOff ? pyOffTitle : 'Manual PY is ON for this branch — turn it off to select a Previous Year Trial Balance instead.'} />
+          <AnalyseChangeButton on={changeOn && !pyOff} onToggle={setChangeOn} disabled={pyOff} disabledTitle={pyOffTitle} />
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Previous Year</span>
+            <PYModeSelect activeTB={activeTB} onChanged={refresh} label="" />
+            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange} label="TB:"
+              disabled={(isBranchEntity && manualPyOn) || pyOff}
+              disabledTitle={pyOff ? pyOffTitle : 'Manual PY is ON for this branch — turn it off to select a Previous Year Trial Balance instead.'} />
+            <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
+              onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
+              disabled={(isBranchEntity && !!prevTB?.id) || pyOff}
+              disabledTitle={pyOff ? pyOffTitle : 'A Previous Year Trial Balance is already selected for this branch — clear it to use Manual PY instead.'} />
+          </div>
         </div>
       </div>
 
@@ -412,13 +426,14 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
               </div>
 
               <MissingAlieWarning report={data.missingAlie} onFix={openFix} tbId={activeTB?.id} />
-              <table className="w-full text-xs">
+              <table className={`w-full text-xs ${changeOn && !pyOff ? 'table-fixed' : ''}`}>
                 <thead>
                   <tr className="border-b-2 border-blue-800">
-                    <th className="text-left py-1.5 font-semibold text-blue-900 w-[52%]">Particulars</th>
-                    <th className="text-center py-1.5 font-semibold text-blue-900 w-[8%]">Note No.</th>
-                    <th className="text-right py-1.5 font-semibold text-blue-900 w-[20%] pr-2">{cyLabel}</th>
-                    <th className="py-col text-right py-1.5 font-semibold text-blue-900 w-[20%] pr-2">{pyLabel}</th>
+                    <th className={`text-left py-1.5 font-semibold text-blue-900 ${changeOn && !pyOff ? 'w-[32%]' : 'w-[52%]'}`}>Particulars</th>
+                    <th className={`text-center py-1.5 font-semibold text-blue-900 ${changeOn && !pyOff ? 'w-[6%]' : 'w-[8%]'}`}>Note No.</th>
+                    <th className={`text-right py-1.5 font-semibold text-blue-900 pr-2 ${changeOn && !pyOff ? 'fsg-dated-heading w-[12.5%]' : 'w-[20%]'}`}>{cyLabel}</th>
+                    <th className={`py-col text-right py-1.5 font-semibold text-blue-900 pr-2 ${changeOn && !pyOff ? 'fsg-dated-heading w-[12.5%]' : 'w-[20%]'}`}>{pyLabel}</th>
+                    <ChangeHeads widths={['13%', '8%', '16%']} />
                   </tr>
                 </thead>
                 <tbody>
@@ -632,7 +647,7 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                           onCommitCY={commit('dilutedCY')} onCommitPY={commit('dilutedPY')} />
                         {(cyMissing || pyMissing) && (
                           <tr>
-                            <td colSpan={4} className="py-1 pl-10 pr-2 text-[11px] text-red-600 italic">
+                            <td colSpan={4 + (changeOn && !pyOff ? 3 : 0)} className="py-1 pl-10 pr-2 text-[11px] text-red-600 italic">
                               ⚠ Number of Equity Shares Issued &amp; Subscribed not found in the Share Capital note's Fill Details — EPS shown in red until it's filled in, or type the figures directly above.
                             </td>
                           </tr>
@@ -677,5 +692,6 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
         </Guard>
       </div>
     </div>
+    </AnalyseChangeProvider>
   )
 }

@@ -4,7 +4,10 @@ import { parseTallyTB, parseMasterJSON, buildTBRowsFromTally, parseRealBooksTB, 
 import { parseZohoTB, buildTBRowsFromZoho } from '../../utils/zohoParsers'
 import { parseBusyTB, buildTBRowsFromBusy } from '../../utils/busyParsers'
 import FinancialPeriodPicker from '../shared/FinancialPeriodPicker'
+import WorkingsModal, { workingsResultText } from './WorkingsModal'
 import { fsgApi } from '../../api.js'
+import { finishWorkbook } from '../../utils/veraExcel'
+import { tbTemplateExcelSpec, workingsExcelSpec } from '../../utils/tbExcelSpecs'
 
 // Every TB is compulsorily tied to a real Financial Period — checks whether
 // that period already has a TB (branch entities excepted, since one TB per
@@ -16,12 +19,40 @@ async function confirmIfPeriodAlreadyHasTB(entityPeriodId, hasBranches) {
   try {
     const existing = await fsgApi?.getTBsForEntityPeriod(entityPeriodId) || []
     if (existing.length === 0) return true
+    // T-044: remind the user of the work done on the existing Trial Balance, and offer a backup first.
+    let workings = []
+    try { workings = ((await fsgApi?.workingsSummary(existing[0].id))?.areas || []).filter(a => a.count > 0) } catch { /* best-effort */ }
+    if (workings.length) {
+      const list = workings.map(a => `  • ${a.label} (${a.count})`).join('\n')
+      if (window.confirm(
+        `The Trial Balance already uploaded for this year (${existing[0].filename || `#${existing[0].id}`}) has your workings:\n\n${list}\n\n` +
+        'After the upload you will be offered to carry them over to the new Trial Balance.\n\n' +
+        'Download a backup of all these workings now (one Excel file)?\nOK = download the backup first     Cancel = continue without a backup'
+      )) {
+        await downloadWorkingsFile(existing[0].id)
+      }
+    }
     return window.confirm(
       `This Financial Period already has ${existing.length} Trial Balance${existing.length > 1 ? 's' : ''} uploaded ` +
       `(${existing.map(t => t.filename || `#${t.id}`).join(', ')}). Upload another one for the same period anyway?`
     )
   } catch {
     return true  // best-effort check — don't block upload if it fails
+  }
+}
+
+// T-044: every working of one Trial Balance as one Excel file. Returns true when saved.
+export async function downloadWorkingsFile(tbId) {
+  try {
+    const { bytes, filename } = await fsgApi.exportWorkings(tbId)
+    const result = await fsgApi?.saveFileDialog({ defaultPath: filename, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }] })
+    if (!result?.filePath) return false
+    // T-047: VERA style; the "Workings data" sheet the upload reads is left exactly as built.
+    await fsgApi?.writeFile(result.filePath, Array.from(await finishWorkbook(bytes, workingsExcelSpec())))
+    return true
+  } catch (e) {
+    window.alert('The workings could not be downloaded: ' + (e?.message || e))
+    return false
   }
 }
 
@@ -963,6 +994,53 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
   const [balanceWarning, setBalanceWarning] = useState(null)
   const [stockMode, setStockMode] = useState(null) // 'prompt' | null
   const [deleting, setDeleting]     = useState(false)
+  // T-044: { mode: 'carry' | 'import', fromTb?, toTb, areas, source?, bytes?, warning? } while the workings dialog is open
+  const [workingsPrompt, setWorkingsPrompt] = useState(null)
+
+  // After a new Trial Balance is uploaded and mapped: if another Trial Balance of the same year and branch holds workings,
+  // offer to carry them over. Returns true when the dialog was opened (the Stock prompt then waits for it).
+  const offerCarryOver = async (newTB) => {
+    if (!newTB?.id || !newTB.entity_period_id) return false
+    try {
+      const siblings = ((await fsgApi?.getTBsForEntityPeriod(newTB.entity_period_id)) || [])
+        .filter(t => t.id !== newTB.id && (t.branch_name || '') === (newTB.branch_name || ''))
+        .sort((a, b) => b.id - a.id)
+      for (const from of siblings) {
+        const areas = ((await fsgApi?.workingsSummary(from.id))?.areas || [])
+        if (areas.some(a => a.count > 0)) { setWorkingsPrompt({ mode: 'carry', fromTb: from, toTb: newTB, areas }); return true }
+      }
+    } catch { /* best-effort: the upload itself already succeeded */ }
+    return false
+  }
+  const closeWorkingsPrompt = (stockCarried = false) => {
+    const wasCarry = workingsPrompt?.mode === 'carry'
+    setWorkingsPrompt(null)
+    if (wasCarry && !stockCarried) setStockMode('prompt')
+  }
+  const confirmWorkings = async (include) => {
+    const p = workingsPrompt
+    const result = p.mode === 'carry'
+      ? await fsgApi.carryOverWorkings({ fromTbId: p.fromTb.id, toTbId: p.toTb.id, include })
+      : await fsgApi.importWorkings({ tbId: p.toTb.id, bytes: p.bytes, include })
+    window.alert(workingsResultText(result))
+    closeWorkingsPrompt(result.carried.some(c => c.key === 'stock'))
+    onTBLoaded({ ...p.toTb })   // every screen re-reads the Trial Balance
+  }
+  const handleDownloadWorkings = () => activeTB?.id && downloadWorkingsFile(activeTB.id)
+  const handleUploadWorkings = async () => {
+    if (!activeTB?.id) return
+    try {
+      const result = await fsgApi?.openFileDialog({ filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }], properties: ['openFile'] })
+      const filePath = result?.filePaths?.[0]
+      if (!filePath) return
+      const bytes = await fsgApi.readFile(filePath)
+      const preview = await fsgApi.importWorkings({ tbId: activeTB.id, bytes, dryRun: true })
+      if (!preview.sameClient) { window.alert(`This workings file belongs to "${preview.source?.entityName || 'another client'}", not to ${entity?.name}.`); return }
+      if (!preview.areas.some(a => a.count > 0)) { window.alert('This workings file is empty.'); return }
+      setWorkingsPrompt({ mode: 'import', toTb: activeTB, areas: preview.areas, source: preview.source, bytes,
+        warning: preview.sameYear ? '' : `This file was downloaded from financial year ${preview.source?.yearLabel || '(unknown)'}, not ${activeTB.period || 'this year'}. Its figures (Stock, depreciation, adjustments) belong to that year: tick only what applies.` })
+    } catch (e) { window.alert('The workings file could not be read: ' + (e?.message || e)) }
+  }
 
   useEffect(() => {
     if (!entity) return
@@ -1091,7 +1169,7 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
       setSelectedTBId(newTB.id)
       await runAutoMapping(newTB.id)
       await checkBalance(newTB.id)
-      setStockMode('prompt')
+      if (!(await offerCarryOver(newTB))) setStockMode('prompt')
     } catch (err) {
       setError(err.message || 'Post-upload load failed.')
     }
@@ -1107,8 +1185,8 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
       setSelectedTBId(newTB.id)
       await runAutoMapping(newTB.id)
       await checkBalance(newTB.id)
-      // Stock prompt — same as ODBC
-      setStockMode('prompt')
+      // Stock prompt — same as ODBC (after the T-044 carry-over offer, if any)
+      if (!(await offerCarryOver(newTB))) setStockMode('prompt')
     } catch (err) {
       setError(err.message || 'Post-upload load failed.')
     }
@@ -1128,8 +1206,8 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
       setSelectedTBId(res.tb.id)
       await runAutoMapping(res.tb.id)
       await checkBalance(res.tb.id)
-      // Prompt for stock entry
-      setStockMode('prompt')
+      // Prompt for stock entry (after the T-044 carry-over offer, if any)
+      if (!(await offerCarryOver(res.tb))) setStockMode('prompt')
     } catch (err) {
       setError(err.message || 'Upload failed.')
     } finally {
@@ -1179,7 +1257,8 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
         filters: [{ name: 'Excel', extensions: ['xlsx'] }]
       })
       if (result?.canceled || !result?.filePath) return
-      await fsgApi?.writeFile(result.filePath, buf)
+      // T-047: VERA style (How to Fill, yellow cells, Yes/No dropdowns) — utils/tbExcelSpecs.js.
+      await fsgApi?.writeFile(result.filePath, Array.from(await finishWorkbook(new Uint8Array(buf), tbTemplateExcelSpec())))
     } catch (err) {
       setError(err.message)
     }
@@ -1226,6 +1305,21 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
           Download Template
         </button>
 
+        {activeTB && Number.isInteger(Number(activeTB.id)) && (
+          <>
+            <button
+              onClick={handleDownloadWorkings}
+              className="fsg-workings-download flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition"
+              title="One Excel file with every working of this Trial Balance: Fill Details, depreciation, Stock, manual PY, remarks, adjustments, journal entries and the client's learned ledger rules"
+            >⬇ Download all workings</button>
+            <button
+              onClick={handleUploadWorkings}
+              className="fsg-workings-upload flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition"
+              title="Bring workings back from a 'Download all workings' file into this Trial Balance - you choose what"
+            >⬆ Upload all workings</button>
+          </>
+        )}
+
         {activeTB && (
           <button
             onClick={() => setConfirmDelete(true)}
@@ -1253,6 +1347,21 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
         <div className="text-sm text-blue-800 bg-blue-50 border border-blue-100 rounded px-3 py-2">
           Active Trial Balance: <span className="font-semibold">{activeTB.period || activeTB.filename}</span>{activeTB.branch_name ? ` [${activeTB.branch_name}]` : ''} — see it in the <span className="font-semibold">Actual TB</span> tab.
         </div>
+      )}
+
+      {/* T-044: carry workings over to the new Trial Balance / bring them back from a file */}
+      {workingsPrompt && (
+        <WorkingsModal
+          title={workingsPrompt.mode === 'carry' ? 'Carry your workings over to the new Trial Balance?' : 'Upload workings into this Trial Balance'}
+          intro={workingsPrompt.mode === 'carry'
+            ? `The earlier Trial Balance of this year (${workingsPrompt.fromTb.filename || `#${workingsPrompt.fromTb.id}`}) holds the work below. Tick what to copy to the new one (${workingsPrompt.toTb.filename || `#${workingsPrompt.toTb.id}`}). The earlier Trial Balance is kept as it is. Categorisation decisions are carried forward by themselves.`
+            : `From the file of ${workingsPrompt.source?.entityName || 'this client'}, ${workingsPrompt.source?.yearLabel || ''} (${workingsPrompt.source?.filename || 'Trial Balance'}). Ticked items replace the same items in this Trial Balance.`}
+          warning={workingsPrompt.warning || ''}
+          areas={workingsPrompt.areas}
+          confirmLabel={workingsPrompt.mode === 'carry' ? 'Carry over' : 'Upload'}
+          onConfirm={confirmWorkings}
+          onClose={() => closeWorkingsPrompt(false)}
+        />
       )}
 
       {/* Format chooser modal */}

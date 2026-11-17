@@ -5,6 +5,10 @@
 
 import * as XLSX from 'xlsx'
 
+// T-047: a file VERA styled opens on a "How to Fill" guide (and may hold a hidden "Lists"
+// sheet); the data is on the first other sheet. Same names as utils/veraExcel.js.
+const firstDataSheetName = (wb) => wb.SheetNames.find(n => n !== 'How to Fill' && n !== 'Lists') ?? wb.SheetNames[0]
+
 /**
  * Parses a Tally Trial Balance Excel file.
  * @param {ArrayBuffer} buffer
@@ -13,7 +17,7 @@ import * as XLSX from 'xlsx'
  */
 export function parseTallyTB(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer', cellText: true, cellNF: false })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  const ws = wb.Sheets[firstDataSheetName(wb)]
   if (!ws || !ws['!ref']) return { rows: [], header: '' }
   const range = XLSX.utils.decode_range(ws['!ref'])
   const rows = []
@@ -167,9 +171,19 @@ export function buildTBRowsFromTally(tbRows, ledgerMap) {
     // still Dr-natured. Falling back to the balance-side heuristic only
     // when the master data doesn't carry the field at all (e.g. some Excel
     // Master.json exports).
-    const isDeemedPositive = m?.isDeemedPositive !== null && m?.isDeemedPositive !== undefined
+    const natureKnown = m?.isDeemedPositive !== null && m?.isDeemedPositive !== undefined
+    const isDeemedPositive = natureKnown
       ? m.isDeemedPositive
       : (r.closing_dr >= r.closing_cr ? true : (r.opening_dr > r.opening_cr))
+    // T-037: Tally's IsRevenue master flag, kept only when the nature itself
+    // came from the master too, so the mapping engine never derives ALIE from
+    // a balance-side guess.
+    const isRevenue = natureKnown && typeof m?.isRevenue === 'boolean' ? m.isRevenue : null
+    // T-037: keep up to ten hierarchy levels. Chains of nine or fewer are laid
+    // out exactly as before (top group repeated in group_parent_7); a longer
+    // chain now fills group_parent_7 and keeps its top group in group_parent_8
+    // instead of dropping the levels in between.
+    const long = chain.length > 9
 
     return {
       period: '',
@@ -180,7 +194,7 @@ export function buildTBRowsFromTally(tbRows, ledgerMap) {
       debit: r.debit,
       credit: r.credit,
       closing_balance: closingBalance,
-      is_revenue: null,
+      is_revenue: isRevenue,
       is_deemed_positive: isDeemedPositive,
       trail_balance: 0,
       parent:         chain[0] || '',
@@ -191,7 +205,8 @@ export function buildTBRowsFromTally(tbRows, ledgerMap) {
       group_parent_4: chain[5] || '',
       group_parent_5: chain[6] || '',
       group_parent_6: chain[7] || '',
-      group_parent_7: chain[chain.length - 1] || '',  // primary group at the top
+      group_parent_7: long ? chain[8] : (chain[chain.length - 1] || ''),  // primary group at the top
+      group_parent_8: long ? chain[chain.length - 1] : '',
     }
   })
 }
@@ -205,7 +220,7 @@ export function buildTBRowsFromTally(tbRows, ledgerMap) {
  */
 export function parseRealBooksTB(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  const ws = wb.Sheets[firstDataSheetName(wb)]
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
 
   let headerIdx = -1
@@ -256,7 +271,7 @@ export function parseRealBooksTB(buffer) {
  */
 export function parseRealBooksMaster(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  const ws = wb.Sheets[firstDataSheetName(wb)]
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
 
   let headerIdx = -1

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { SC_DISCLOSURES, disclosureTexts, defaultDisclosureText } from '../../utils/shareCapitalDisclosures'
 import { fsgApi } from '../../api.js'
+import { finishWorkbook, firstDataSheet } from '../../utils/veraExcel'
+import { SHAREHOLDER_SHEET, shareholderTemplateExcelSpec } from './shareCapitalDetailsWorkbook'
 
 const INP = 'w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
 const NUM = INP + ' text-right font-mono'
@@ -272,7 +274,10 @@ function PromoterTable({ rows, onChange }) {
 }
 
 // ── Shareholder Excel template download (with dropdown validation) ────────────
-function downloadShareholderTemplate() {
+// T-047: finished in the VERA style (How to Fill sheet, blue header, yellow cells and a
+// real Category dropdown) — utils/veraExcel.js. The old ws['!dataValidation'] was never
+// written by SheetJS; the dropdown now comes from finishWorkbook.
+async function downloadShareholderTemplate() {
   const wb = XLSX.utils.book_new()
   // Data sheet
   const ws = XLSX.utils.aoa_to_sheet([
@@ -284,18 +289,8 @@ function downloadShareholderTemplate() {
     [5, '', '', '', '', 'Non-Promoter'],
   ])
   ws['!cols'] = [{ wch: 6 }, { wch: 40 }, { wch: 18 }, { wch: 30 }, { wch: 28 }, { wch: 18 }]
-  // Add data validation for Category dropdown (rows 2-500, column F = col 6)
-  ws['!dataValidation'] = [{
-    sqref: 'F2:F500',
-    type: 'list',
-    formula1: '"Promoter,Non-Promoter"',
-    showDropDown: false,
-    showErrorMessage: true,
-    errorTitle: 'Invalid',
-    error: 'Please select Promoter or Non-Promoter',
-  }]
-  XLSX.utils.book_append_sheet(wb, ws, 'Shareholders')
-  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+  XLSX.utils.book_append_sheet(wb, ws, SHAREHOLDER_SHEET)
+  const buf = await finishWorkbook(wb, shareholderTemplateExcelSpec())
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Shareholder_Template.xlsx'; a.click()
 }
@@ -307,7 +302,8 @@ function importShareholdersFromExcel(file, totalSharesCY, totalSharesPY, onImpor
   const reader = new FileReader()
   reader.onload = (e) => {
     const wb = XLSX.read(e.target.result, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
+    // T-047: never the How to Fill / Lists sheet of a VERA-styled file.
+    const ws = wb.Sheets[SHAREHOLDER_SHEET] || firstDataSheet(wb)
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
     const totalCY = parseFloat(totalSharesCY) || 1
     const totalPY = parseFloat(totalSharesPY) || 1

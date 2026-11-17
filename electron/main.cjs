@@ -820,6 +820,14 @@ function resolveEvidenceFile(db, bucket, relativePath, context) {
 function registerIpcHandlers() {
   const { ipcMain } = require('electron');
 
+  const { createPermanentFileHandler } = require('./permanent-file/ipc.cjs');
+  ipcMain.handle('permanent-file:request', createPermanentFileHandler({
+    getDb: getSqliteDb,
+    getContext: getAuthorizedSession,
+    backupDir: path.join(app.getPath('userData'), 'backups'),
+    storageDir: path.join(app.getPath('userData'), 'files', 'permanent-file'),
+  }));
+
   // --- SQLite AUTH & QUERY HANDLERS ---
   ipcMain.handle('sqlite-auth', async (event, payload) => {
     if (!isTrustedRendererEvent(event)) {
@@ -1289,20 +1297,14 @@ function registerIpcHandlers() {
 
   ipcMain.handle('app:exportFile', async (event, payload) => {
     try {
-      const { defaultFilename, buffer, showSaveDialog = true } = payload || {};
-      const safeFilename = String(defaultFilename || 'export.docx')
-        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-        .replace(/\s+/g, '_');
-      const filename = safeFilename.toLowerCase().endsWith('.docx') ? safeFilename : `${safeFilename}.docx`;
+      const { buffer, showSaveDialog = true } = payload || {};
+      const { resolveExportFileOptions } = require('./export-file-options.cjs');
       const downloadsPath = app.getPath('downloads');
-      let filePath = path.join(downloadsPath, filename);
+      const fileOptions = resolveExportFileOptions(payload, downloadsPath);
+      let filePath = fileOptions.defaultPath;
 
       if (showSaveDialog) {
-        const result = await dialog.showSaveDialog({
-          title: 'Export Word Document',
-          defaultPath: filePath,
-          filters: [{ name: 'Word Document', extensions: ['docx'] }],
-        });
+        const result = await dialog.showSaveDialog(fileOptions);
 
         if (result.canceled || !result.filePath) {
           return { success: false, canceled: true };
@@ -2330,6 +2332,32 @@ function registerIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // Ledger Analysis (VERA Tools > Ledger Analysis): read-only export of ledger masters, groups and the
+  // day book from Tally's HTTP XML server. Requires a signed-in user; nothing is written to Tally.
+  const ledgerAnalysisTally = require('./ledger-analysis/tally-xml.cjs');
+  ipcMain.handle('ledger-analysis:tally-companies', async (event, { host, port } = {}) => {
+    try {
+      if (!getAuthenticatedUserId(event)) return { success: false, error: 'Sign in first.' };
+      const companies = await ledgerAnalysisTally.fetchCompanies(host, port);
+      return { success: true, companies };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+  ipcMain.handle('ledger-analysis:tally-fetch', async (event, payload = {}) => {
+    try {
+      if (!getAuthenticatedUserId(event)) return { success: false, error: 'Sign in first.' };
+      const data = await ledgerAnalysisTally.fetchAll(payload, (p) => {
+        try { if (!event.sender.isDestroyed()) event.sender.send('ledger-analysis:progress', p); } catch (_) { /* window closed */ }
+      });
+      safeLog(`Ledger Analysis: fetched ${data.ledgers.length} ledgers, ${data.groups.length} groups, ${data.lines.length} day book lines`);
+      return { success: true, data };
+    } catch (error) {
+      safeLog('Ledger Analysis Tally fetch error:', error.message);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 function createWindow() {
@@ -2396,6 +2424,28 @@ function createWindow() {
     mainWindow.maximize();
     mainWindow.show();
   });
+
+  // PDF Tools "Save to computer" lets the user pick a folder. Chromium treats some folders as
+  // restricted and, with no listener here, the pick never answers and no later save window can
+  // open until the application restarts. Answer every request: the user's own Desktop, Documents
+  // and Downloads folders are accepted; any other restricted folder (Windows, Program Files, the
+  // profile root, AppData) is refused, and the screen then asks for another folder.
+  const fileAccessSession = mainWindow.webContents.session;
+  if (fileAccessSession.listenerCount('file-system-access-restricted') === 0) {
+    fileAccessSession.on('file-system-access-restricted', (_event, details, callback) => {
+      let allowed = false;
+      try {
+        const picked = path.resolve(String(details && details.path ? details.path : '')).toLowerCase();
+        allowed = ['desktop', 'documents', 'downloads'].some((name) => {
+          const base = path.resolve(app.getPath(name)).toLowerCase();
+          return picked === base || picked.startsWith(base + path.sep);
+        });
+      } catch (error) {
+        allowed = false;
+      }
+      callback(allowed ? 'allow' : 'deny');
+    });
+  }
 
   // Load the app
   if (isDev) {
@@ -2559,3 +2609,6 @@ ipcMain.handle('gstzen-api-request', async (event, { endpoint, method, data, tok
   safeLog(`[IPC] gstzen-api-request: ${method} ${endpoint}`);
   return handleApiRequest(endpoint, method, data, token);
 });
+
+const { createGstinLookupHandler } = require('./gstin-lookup.cjs');
+ipcMain.handle('gstin:lookup-details', createGstinLookupHandler({ getAuthenticatedUserId }));

@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { investmentKind, investmentGroups, investmentLedgerKey, prepareInvestmentDetails, investmentIssues, investmentTables, investmentPeriodRows } from '../src/modules/fsg/utils/investments.js'
 import { investmentToRows, investmentFromRows } from '../src/modules/fsg/utils/investmentWorkbook.js'
+import { pdfPageTexts } from './fsg-pdf-text.mjs'
 const require = createRequire(import.meta.url)
 export async function checkInvestments({ db, root, userData, check, staff, partner, entityId, periodId, defaultRs, renderPdf }) {
   const tb = db.prepare('INSERT INTO trial_balances (entity_id,entity_period_id,period) VALUES (?,?,?) RETURNING *').get(entityId, periodId, '2024-25')
@@ -83,11 +84,12 @@ export async function checkInvestments({ db, root, userData, check, staff, partn
   const other = await partner('context:open', 'e2')
   r = await staff('investments:list', { entityPeriodId: other.result.entityPeriodId })
   check('T-025 investment reads outside assigned client are denied', !r.ok && r.denied, r)
+  // Checked while unlocked: since T-035 a locked year refuses the generic save before the investment guard is reached.
+  r = await staff('noteDetails:save', { tbId: tb.id, noteNum: -3000000 - periodId * 2, noteTitle: `Investment disclosure FY ${periodId} noncurrent`, data: d })
+  check('T-025 generic note save cannot bypass investment lock/validation', !r.ok && /year-scoped/.test(r.error), r)
   await staff('entityPeriod:lock', periodId)
   r = await staff('investments:save', { ...scope, noteTitle: 'Non-current investments', data: d })
   check('T-025 direct investment IPC cannot edit a locked year', !r.ok && /locked/.test(r.error), r)
-  r = await staff('noteDetails:save', { tbId: tb.id, noteNum: -3000000 - periodId * 2, noteTitle: `Investment disclosure FY ${periodId} noncurrent`, data: d })
-  check('T-025 generic note save cannot bypass investment lock/validation', !r.ok && /year-scoped/.test(r.error), r)
   await partner('entityPeriod:unlock', periodId)
   const bundled = require('esbuild').buildSync({ stdin: { contents: `
     export { processRows } from './src/modules/fsg/hooks/useFinancials.js';
@@ -120,14 +122,14 @@ export async function checkInvestments({ db, root, userData, check, staff, partn
   check('T-025 actual consolidated Fill Details workbook reopens with both investment notes and partners', parsed.results.filter(x => investmentKind(x.noteTitle)).length === 2 && parsed.results.find(x => investmentKind(x.noteTitle) === 'noncurrent').data.entries[1].partners.length === 2)
   const pdfResult = await renderPdf(html)
   if (!pdfResult.ok) throw new Error(pdfResult.error)
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const document = await pdfjs.getDocument({ data: new Uint8Array(pdfResult.result), useSystemFonts: true }).promise
-  let content = ''
-  for (let p = 1; p <= document.numPages; p++) content += (await (await document.getPage(p)).getTextContent()).items.map(i => i.str).join(' ') + ' '
-  check('T-025 actual generated PDF contains the partnership and investment disclosures', labels.every(s => content.includes(s)))
+  const pdfCheck = 'T-025 actual generated PDF contains the partnership and investment disclosures'
+  const pages = await pdfPageTexts(pdfResult.result, pdfCheck)
+  if (pages) {
+    const content = pages.map(p => p + ' ').join('')
+    check(pdfCheck, labels.every(s => content.includes(s)))
+  }
   writeFileSync(`${userData}-investments.pdf`, new Uint8Array(pdfResult.result))
   console.log(`T-025 synthetic PDF: ${userData}-investments.pdf`)
-  await document.destroy()
   const source = db.prepare('SELECT name,closing_balance,imported_closing_balance FROM tb_rows WHERE tb_id=? ORDER BY id').all(tb.id)
   check('T-025 disclosure saves leave source ledger signs and balances unchanged', fixtures.every((f, i) => source[i].name === f[0] && source[i].closing_balance === f[3] && source[i].imported_closing_balance === f[3]))
 }

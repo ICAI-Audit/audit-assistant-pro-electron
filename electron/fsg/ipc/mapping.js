@@ -1,7 +1,7 @@
 import { ipcMain } from '../ipc-registry.js'
 import { readFileSync } from 'fs'
 import { query } from '../db/client.js'
-import { readMappingFile, exportMappingToExcel } from '../services/excel.js'
+import { readMappingFile, exportMappingToExcel, formatLevel } from '../services/excel.js'
 
 // ── Startup DB patches applied to ALL rule sets ─────────────────────────────
 // These fix missing keywords across default + all custom rule sets.
@@ -180,8 +180,8 @@ export function registerMappingHandlers() {
         `INSERT INTO level_format
            (rule_set_id, constitution, alie, level1, level2, level3, level4, level5, level6, level7, sort_order)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [rsId, constitution, r['ALIE'], r['Level 1'], r['Level 2'],
-         r['Level 3'], r['Level 4'], r['Level 5'], r['Level 6'], r['Level 7'], i]
+        [rsId, constitution, r['ALIE'], formatLevel(r, 1), formatLevel(r, 2),
+         formatLevel(r, 3), formatLevel(r, 4), formatLevel(r, 5), formatLevel(r, 6), formatLevel(r, 7), i]
       )
     }
     for (const r of data.map1) {

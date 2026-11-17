@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sqliteAuth: (payload) => ipcRenderer.invoke('sqlite-auth', payload),
   sqliteGetCurrentUser: () => ipcRenderer.invoke('sqlite-get-current-user'),
   sqliteQuery: (payload) => ipcRenderer.invoke('sqlite-query', payload),
+  permanentFile: {
+    request: (payload) => ipcRenderer.invoke('permanent-file:request', payload),
+  },
   saveFile: async ({ bucket, path, buffer, mimeType }) => {
     const result = await ipcRenderer.invoke('file-save', { bucket, path, buffer, mimeType });
     if (!result?.success) {
@@ -109,8 +112,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return true;
   },
   app: {
-    exportFile: async ({ defaultFilename, buffer, mimeType, showSaveDialog }) => {
-      const result = await ipcRenderer.invoke('app:exportFile', { defaultFilename, buffer, mimeType, showSaveDialog });
+    exportFile: async ({ defaultFilename, buffer, mimeType, showSaveDialog, fileExtension }) => {
+      const result = await ipcRenderer.invoke('app:exportFile', { defaultFilename, buffer, mimeType, showSaveDialog, fileExtension });
       if (!result?.success) {
         if (result?.canceled) return null;
         throw new Error(result?.error || 'File export failed');
@@ -124,6 +127,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     establishSession: (data, token) => ipcRenderer.invoke('gstzen-establish-session', { data, token }),
     downloadGstr1: (data, token) => ipcRenderer.invoke('gstzen-download-gstr1', { data, token }),
     request: (endpoint, method, data, token) => ipcRenderer.invoke('gstzen-api-request', { endpoint, method, data, token }),
+  },
+  gstinLookup: {
+    fetchDetails: (payload) => ipcRenderer.invoke('gstin:lookup-details', payload),
   },
   // Auto-updater API, consumed by useAutoUpdater hook
   updater: updaterApi,
@@ -156,6 +162,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   odbcFetchGSTNotFeeded: () => ipcRenderer.invoke('odbc-fetch-gst-not-feeded'),
   // Stock Items methods
   odbcFetchStockItems: () => ipcRenderer.invoke('odbc-fetch-stock-items'),
+  // Ledger Analysis - read-only Tally HTTP XML export (masters + day book)
+  ledgerAnalysis: {
+    tallyCompanies: (opts) => ipcRenderer.invoke('ledger-analysis:tally-companies', opts),
+    tallyFetch: (opts) => ipcRenderer.invoke('ledger-analysis:tally-fetch', opts),
+    onProgress: (cb) => {
+      const listener = (_event, p) => cb(p);
+      ipcRenderer.on('ledger-analysis:progress', listener);
+      return () => ipcRenderer.removeListener('ledger-analysis:progress', listener);
+    },
+  },
   // Financial Statement Review (FSG) module. Every fsg:* channel is checked in
   // the main process (electron/fsg/authorization.js); this bridge only limits
   // the renderer to that channel family.
@@ -171,4 +187,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 // Log when preload script is loaded
 console.log('Preload script loaded');
-

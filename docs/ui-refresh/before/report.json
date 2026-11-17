@@ -1,0 +1,242 @@
+{
+  "label": "before",
+  "widths": [
+    1440,
+    1024,
+    768,
+    390
+  ],
+  "checks": [
+    {
+      "name": "synthetic admin signed up",
+      "pass": true
+    },
+    {
+      "name": "signed in (populated client)",
+      "pass": true
+    },
+    {
+      "name": "populated page renders",
+      "pass": true
+    },
+    {
+      "name": "populated: modal-ownership opens at 1440px",
+      "pass": true
+    },
+    {
+      "name": "populated: Esc closes modal-ownership (empty form) at 1440px",
+      "pass": true
+    },
+    {
+      "name": "populated: modal-document opens at 1440px",
+      "pass": true
+    },
+    {
+      "name": "populated: Esc closes modal-document (empty form) at 1440px",
+      "pass": true
+    },
+    {
+      "name": "populated: modal-report opens at 1440px",
+      "pass": true
+    },
+    {
+      "name": "populated: Esc closes modal-report (empty form) at 1440px",
+      "pass": true
+    },
+    {
+      "name": "populated: modal-ownership opens at 390px",
+      "pass": true
+    },
+    {
+      "name": "populated: Esc closes modal-ownership (empty form) at 390px",
+      "pass": true
+    },
+    {
+      "name": "populated: modal-document opens at 390px",
+      "pass": true
+    },
+    {
+      "name": "populated: Esc closes modal-document (empty form) at 390px",
+      "pass": true
+    },
+    {
+      "name": "populated: modal-report opens at 390px",
+      "pass": true
+    },
+    {
+      "name": "populated: Esc closes modal-report (empty form) at 390px",
+      "pass": true
+    },
+    {
+      "name": "signed in (empty client)",
+      "pass": true
+    }
+  ],
+  "axe": [
+    {
+      "screen": "page-populated",
+      "violations": [
+        {
+          "id": "button-name",
+          "impact": "critical",
+          "help": "Buttons must have discernible text",
+          "nodes": 1,
+          "targets": [
+            "button[aria-haspopup=\"dialog\"]"
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "nodes": 2,
+          "targets": [
+            ".text-primary.font-medium.truncate > span:nth-child(2)",
+            ".text-primary.text-xs.font-medium"
+          ]
+        }
+      ],
+      "passes": 27,
+      "incomplete": 1
+    },
+    {
+      "screen": "populated modal-ownership",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "nodes": 2,
+          "targets": [
+            ".text-primary.font-medium.truncate > span:nth-child(2)",
+            ".text-primary.text-xs.font-medium"
+          ]
+        }
+      ],
+      "passes": 23,
+      "incomplete": 2
+    },
+    {
+      "screen": "populated modal-document",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "nodes": 2,
+          "targets": [
+            ".text-primary.font-medium.truncate > span:nth-child(2)",
+            ".text-primary.text-xs.font-medium"
+          ]
+        }
+      ],
+      "passes": 23,
+      "incomplete": 2
+    },
+    {
+      "screen": "populated modal-report",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "nodes": 2,
+          "targets": [
+            ".text-primary.font-medium.truncate > span:nth-child(2)",
+            ".text-primary.text-xs.font-medium"
+          ]
+        }
+      ],
+      "passes": 22,
+      "incomplete": 2
+    },
+    {
+      "screen": "client-edit",
+      "violations": [
+        {
+          "id": "button-name",
+          "impact": "critical",
+          "help": "Buttons must have discernible text",
+          "nodes": 1,
+          "targets": [
+            "button[aria-haspopup=\"dialog\"]"
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "nodes": 2,
+          "targets": [
+            ".text-primary.font-medium.truncate > span:nth-child(2)",
+            ".text-primary.text-xs.font-medium"
+          ]
+        }
+      ],
+      "passes": 28,
+      "incomplete": 1
+    }
+  ],
+  "focusOrder": {
+    "page": [
+      "button: AuditProAudit Management",
+      "a: Dashboard",
+      "a: Assignments",
+      "a: Permanent File",
+      "a: Appointment & Engagement",
+      "a: Compliance Applicability",
+      "a: Materiality & Risk Assessment",
+      "a: Audit Execution",
+      "a: Financial Statement Review",
+      "a: Audit Report",
+      "a: Tax Audit",
+      "a: Review Notes",
+      "a: Evidence Vault",
+      "a: VERA Tools",
+      "a: CAAT Tools",
+      "a: Feedback",
+      "a: Audit Trail",
+      "a: Completion",
+      "a: Admin",
+      "a: Admin Settings",
+      "button: Collapse",
+      "button: Synthetic Manufacturing Private Limited- 2024-25",
+      "input: Search evidence, notes...",
+      "button: Check for updates",
+      "button: ",
+      "button: ",
+      "button: SPSynthetic PF AdminAdmin",
+      "button: Year-End Comparison Report",
+      "summary: Client DetailsSynthetic Manufacturing Private Limi",
+      "button: + Add Record",
+      "button: Edit Asha Synthetic",
+      "button: Edit Meera Sample",
+      "button: Edit Example Traders Pvt Ltd",
+      "button: Edit Synthetic Holdings LLP",
+      "button: + Add Document",
+      "input: Search",
+      "select: CategoryAll categoriesPF-01 — Entity master inform",
+      "input: Year",
+      "select: StatusAll statusesUnverifiedVerifiedRejected",
+      "select: EngagementAll engagementsStatutory audit FY 2024-2"
+    ],
+    "ownershipModal": [
+      "input: Name (dialog)",
+      "textarea: Details (role, ownership, relationship or basis) (dialog)",
+      "input: Effective from (dialog)",
+      "input: Effective from (dialog)",
+      "input: Effective from (dialog)",
+      "input: Effective from (dialog)",
+      "input: Until (exclusive) (dialog)",
+      "input: Until (exclusive) (dialog)",
+      "input: Until (exclusive) (dialog)",
+      "input: Until (exclusive) (dialog)",
+      "select: Supporting document version (optional)NoneCertific (dialog)",
+      "button: Save record (dialog)"
+    ]
+  },
+  "rendererErrors": [],
+  "dirtyEscapeClosedDialog": true,
+  "focusAfterClose": "body",
+  "rendererErrorCount": 0
+}

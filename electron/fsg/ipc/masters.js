@@ -279,7 +279,8 @@ export function registerMastersHandlers() {
   })
 
   // ── Remarks handlers ─────────────────────────────────────────────────────
-  const VALID_SCOPES = new Set(['tb', 'bs', 'pl', 'notes', 'annexure'])
+  // T-048: *_change hold the Reason of Change typed on BS, PL and Notes (Analyse Change).
+  const VALID_SCOPES = new Set(['tb', 'bs', 'pl', 'notes', 'annexure', 'bs_change', 'pl_change', 'notes_change'])
 
   // Fetch all remarks for a TB, keyed by "scope|scope_key"
   ipcMain.handle('remarks:listByTB', async (_, tbId) => {

@@ -7,8 +7,9 @@ import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
 import * as XLSX from 'xlsx-js-style'
-import { buildManualPyFilledWorkbook, parseManualPyWorkbook } from './manualPyWorkbook'
-import { buildFillDetailsWorkbook, parseFillDetailsWorkbook, parseFillDetailsStockSheet } from '../GenerateFinancials/fillDetailsWorkbook'
+import { buildManualPyFilledWorkbook, parseManualPyWorkbook, manualPyExcelSpec } from './manualPyWorkbook'
+import { buildFillDetailsWorkbook, parseFillDetailsWorkbook, parseFillDetailsStockSheet, fillDetailsExcelSpec } from '../GenerateFinancials/fillDetailsWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { loadStockMaps } from '../Stock/StockPage'
 import { buildCashFlow } from '../../utils/cashFlow'
 import { parseCfsSheet, applyCfsUpload } from '../CFS/cfsWorkbook'
@@ -17,6 +18,7 @@ import { parseDepCompWorkbook } from '../DepreciationComp/depCompWorkbook'
 import { parseShareCapitalDetailsSheet } from './shareCapitalDetailsWorkbook'
 import { FILL_DETAILS_REGISTRY } from '../../utils/fillDetailsRegistry'
 import RemarkCell, { useRemarks } from '../shared/RemarkCell'
+import { AnalyseChangeButton, AnalyseChangeProvider, useAnalyseChangeToggle, ChangeCells, ChangeHeads, useChangeSpan } from '../shared/AnalyseChange'
 import ShareCapitalForm from './ShareCapitalForm'
 import LongTermBorrowingsForm from './LongTermBorrowingsForm'
 import ShortTermBorrowingsForm from './ShortTermBorrowingsForm'
@@ -300,6 +302,7 @@ function AddManualPyRow({ tbId, entityId, noteNum, noteTitle, onSaved }) {
   const [label, setLabel] = useState('')
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const extra = useChangeSpan()
 
   const save = async () => {
     if (!label.trim()) return
@@ -318,7 +321,7 @@ function AddManualPyRow({ tbId, entityId, noteNum, noteTitle, onSaved }) {
   if (!open) {
     return (
       <tr>
-        <td colSpan={3} className="py-1 px-4">
+        <td colSpan={3 + extra} className="py-1 px-4">
           <button onClick={() => setOpen(true)} className="text-[11px] text-amber-700 hover:underline">+ Add Row (Previous Year sub-head)</button>
         </td>
       </tr>
@@ -340,6 +343,7 @@ function AddManualPyRow({ tbId, entityId, noteNum, noteTitle, onSaved }) {
           <button onClick={() => { setOpen(false); setLabel(''); setAmount('') }} className="text-[11px] text-gray-400 hover:text-gray-600 shrink-0">✕</button>
         </div>
       </td>
+      <ChangeCells blank />
     </tr>
   )
 }
@@ -448,6 +452,10 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
   }
 
   const hasL2Lines = plNoteShowsLines(note)
+  // T-048: with Variance Analysis on, Particulars and the year columns make room for the three change columns.
+  const changeWide = useChangeSpan() > 0
+  const wP = changeWide ? 'w-[35%]' : 'w-[55%]', wY = changeWide ? 'w-[14%]' : 'w-[22%]'
+  const CHANGE_W = ['13%', '8%', '16%']
   // PPE note: when the IT Act Block-wise WDV Summary or the Dep (Comp)
   // category-level schedule is present (opt-in, mutually exclusive), it
   // supersedes the plain "Property, Plant & Equipment / Total" one-row
@@ -529,9 +537,10 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-blue-50 border-b border-blue-200">
-              <th className="text-left py-1.5 px-4 font-semibold text-blue-900 w-[55%]">Particulars</th>
-              <th className="fsg-dated-heading text-right py-1.5 px-3 font-semibold text-blue-900 w-[22%]">{periodLabels.cy}</th>
-              <th className="fsg-dated-heading text-right py-1.5 px-3 font-semibold text-blue-900 w-[22%]">{periodLabels.py}</th>
+              <th className={`text-left py-1.5 px-4 font-semibold text-blue-900 ${wP}`}>Particulars</th>
+              <th className={`fsg-dated-heading text-right py-1.5 px-3 font-semibold text-blue-900 ${wY}`}>{periodLabels.cy}</th>
+              <th className={`fsg-dated-heading text-right py-1.5 px-3 font-semibold text-blue-900 ${wY}`}>{periodLabels.py}</th>
+              <ChangeHeads className="py-1.5 font-semibold text-blue-900" widths={CHANGE_W} />
             </tr>
           </thead>
           <tbody>
@@ -558,6 +567,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                 <td className="py-1 text-right font-mono pr-3 text-gray-400">
                   {oi === 0 ? fmtINR(capPyExPL(ownerDetails)) : ''}
                 </td>
+                <ChangeCells cy={capRowExPL(r, ownerDetails.variant)} py={oi === 0 ? capPyExPL(ownerDetails) : undefined} rowKey={`${note.title}::${r.name}`} />
               </tr>
             ) : null)}
             {/* PL note: Level 2 breakdown only (no ledger rows) */}
@@ -607,7 +617,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                     )}
                     {l2Label}
                     {toSplit && (
-                      <span className="ml-1 text-[10px] font-normal text-red-600">— bifurcate into Sale of Goods / Sale of Services (Level 3)</span>
+                      <span className="ml-1 text-[10px] font-normal text-red-600">— bifurcate into Sale of Goods / Sale of Services (Mapping 3)</span>
                     )}
                     {l2Uncat && onFix && (
                       <button
@@ -641,12 +651,14 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                       <div className={`text-right font-mono text-gray-400 ${isClosingLine ? 'underline' : ''}`}>{fmtINR(line.prevTotal)}</div>
                     )}
                   </td>
+                  <ChangeCells cy={line.total} py={line.prevTotal} rowKey={`${note.title}::${l2Label}`} />
                 </tr>
                 {hasBreakdown && lineExpanded && visibleBreakdownRows.map((row, ri) => (
                   <tr key={`${lineKey}-row-${ri}`} className="border-b border-gray-50 bg-blue-50/40">
                     <td className="py-0.5 pl-10 pr-2 text-gray-500 italic">{row.name || '(unnamed ledger)'}</td>
                     <td className="py-0.5 text-right font-mono pr-3 text-gray-500">{fmtINR(rowAmt(row, 'closing_balance'))}</td>
                     <td className="py-0.5 text-right font-mono pr-3 text-gray-500">{fmtINR(rowAmt(row, 'opening_balance'))}</td>
+                    <ChangeCells cy={rowAmt(row, 'closing_balance')} py={rowAmt(row, 'opening_balance')} rowKey={`${note.title}::${l2Label}::ledger::${row.ledger_code || row.name || ri}`} />
                   </tr>
                 ))}
                 </React.Fragment>
@@ -709,6 +721,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                         <div className={`text-right font-mono ${isHighlight ? 'font-bold text-red-600' : r.isSubtotal ? 'font-bold text-gray-600' : 'text-gray-400'}`}>{fmtINR(r.py)}</div>
                       )}
                     </td>
+                    <ChangeCells cy={r.cy} py={r.py} rowKey={`${note.title}::${r.label}`} bold={r.isSubtotal} />
                   </tr>
                 )
               }
@@ -727,6 +740,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                     </td>
                     <td className="py-1 text-right font-mono pr-3">{fmtINR(r.cy)}</td>
                     <td className="py-1 text-right font-mono pr-3 text-gray-400">{fmtINR(r.py)}</td>
+                    <ChangeCells cy={r.cy} py={r.py} rowKey={`${note.title}::${r.label}`} />
                   </tr>
                 )
               }
@@ -734,7 +748,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
               return (
                 <tr key={ri} className={`border-b border-gray-50 ${r.unclassified ? 'bg-red-50' : ''}`}>
                   <td className={`py-0.5 pl-10 pr-2 italic ${r.unclassified ? 'text-red-600' : 'text-gray-600'}`}>
-                    {r.unclassified ? `Unclassified${r.natureLevel ? ` — Level ${r.natureLevel}` : ''}` : r.label}
+                    {r.unclassified ? `Unclassified${r.natureLevel ? ` — Mapping ${r.natureLevel}` : ''}` : r.label}
                     {r.unclassified && onFix && (
                       <button
                         onClick={() => onFix(
@@ -752,7 +766,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                                 mapping3_resultant: r.parentL3,
                                 level5_unclassified: true,
                               }, r.ledgerIds, r.pyLedgerIds, r.natureLevel),
-                          `Fix Unclassified (Level ${r.natureLevel || 5}) — ${r.parentL3 || note.title}`
+                          `Fix Unclassified (Mapping ${r.natureLevel || 5}) — ${r.parentL3 || note.title}`
                         )}
                         className="ml-2 px-1.5 py-0.5 text-[10px] rounded border border-red-400 text-red-700 bg-white hover:bg-red-100 transition not-italic"
                       >
@@ -775,6 +789,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                       <div className="text-right font-mono text-gray-400">{fmtINR(r.py)}</div>
                     )}
                   </td>
+                  <ChangeCells cy={r.cy} py={r.py} rowKey={r.unclassified ? `${note.title}::${r.parentL3 || note.title}::Unclassified` : `${note.title}::${r.parentL3 || note.title}::${r.label}`} />
                 </tr>
               )
             })}
@@ -794,6 +809,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                 </td>
                 <td className={`py-1 text-right font-mono pr-3 ${l.isSubtotal ? 'font-bold' : 'font-semibold'}`}>{fmtINR(l.cy)}</td>
                 <td className={`py-1 text-right font-mono pr-3 ${l.isSubtotal ? 'font-bold text-gray-600' : 'text-gray-400'}`}>{fmtINR(l.py)}</td>
+                <ChangeCells cy={l.cy} py={l.py} rowKey={`${note.title}::${l.label}`} bold={l.isSubtotal} />
               </tr>
             ))}
             {!note.isPL && manualPyEnabled && (
@@ -811,6 +827,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                   <div className="text-right font-mono font-bold text-blue-800">{fmtINR(note.prevTotal)}</div>
                 )}
               </td>
+              <ChangeCells cy={note.total} py={note.prevTotal} rowKey={`${note.title}::Total`} bold />
             </tr>
           </tfoot>
         </table>
@@ -823,9 +840,10 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-amber-50 border-b border-amber-200">
-                  <th className="text-left py-1.5 px-4 font-semibold text-amber-900 w-[55%]">Particulars</th>
-                  <th className="fsg-dated-heading text-right py-1.5 px-3 font-semibold text-amber-900 w-[22%]">{periodLabels.cy}</th>
-                  <th className="fsg-dated-heading text-right py-1.5 px-3 font-semibold text-amber-900 w-[22%]">{periodLabels.py}</th>
+                  <th className={`text-left py-1.5 px-4 font-semibold text-amber-900 ${wP}`}>Particulars</th>
+                  <th className={`fsg-dated-heading text-right py-1.5 px-3 font-semibold text-amber-900 ${wY}`}>{periodLabels.cy}</th>
+                  <th className={`fsg-dated-heading text-right py-1.5 px-3 font-semibold text-amber-900 ${wY}`}>{periodLabels.py}</th>
+                  <ChangeHeads className="py-1.5 font-semibold text-amber-900" widths={CHANGE_W} />
                 </tr>
               </thead>
               <tbody>
@@ -840,6 +858,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                         <div className="text-right font-mono text-gray-500 font-medium">{fmtINR(r.py)}</div>
                       )}
                     </td>
+                    <ChangeCells cy={r.cy} py={r.py} rowKey={`${note.title}::MSME::${r.label}`} />
                   </tr>
                 ))}
               </tbody>
@@ -1205,22 +1224,28 @@ function DisclosureNote({ tbId, entityId, note }) {
   }
 
   if (!scopeId || loading) return null
+  // T-046: one line when empty; grows with its text (up to 240px, then scrolls).
+  const fit = (el) => { if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight + 2, 240) + 'px' }
   return (
-    <div className="mt-4 pt-4 border-t border-gray-200 px-4 pb-4">
-      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
-        Disclosure Note <span className="normal-case font-normal text-gray-400">(optional — included in PDF/Excel when filled in)</span>
-      </label>
-      <textarea
-        value={text}
-        onChange={e => setText(e.target.value)}
-        onBlur={save}
-        rows={4}
-        placeholder="Add any additional disclosure for this note…"
-        className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-700 focus:ring-2 focus:ring-blue-400 focus:outline-none resize-y max-h-[240px] overflow-y-auto"
-      />
-      {saving && <span className="text-[10px] text-gray-400">Saving…</span>}
-      {!saving && !error && text && text === saved && <span className="text-[10px] text-green-600">Saved - printed below this note in the PDF and Excel</span>}
-      {error && <span className="text-[10px] text-red-600">{error}</span>}
+    <div className="mt-2 pt-2 border-t border-gray-200 px-4 pb-3">
+      <div className="flex items-start gap-3">
+        <label className="shrink-0 pt-1.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+          title="Optional. Printed below this note in the PDF and Excel when filled in.">
+          Disclosure Note
+        </label>
+        <textarea
+          ref={fit}
+          value={text}
+          onChange={e => { setText(e.target.value); fit(e.target) }}
+          onBlur={save}
+          rows={1}
+          placeholder="Optional — add any additional disclosure for this note (printed in the PDF/Excel when filled in)…"
+          className="fsg-disclosure flex-1 border border-gray-300 rounded px-2 py-1 text-xs leading-5 text-gray-700 focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none overflow-y-auto"
+        />
+      </div>
+      {saving && <span className="block text-right text-[10px] text-gray-400">Saving…</span>}
+      {!saving && !error && text && text === saved && <span className="block text-right text-[10px] text-green-600">Saved - printed below this note in the PDF and Excel</span>}
+      {error && <span className="block text-[10px] text-red-600">{error}</span>}
     </div>
   )
 }
@@ -1319,7 +1344,7 @@ export function AssumptionDisclosureModal({ items, onClose }) {
         </div>
         <p className="text-xs text-gray-600 mb-4 leading-relaxed">
           The following ledgers could not be conclusively classified from their name or books hierarchy, so a
-          default nature was assumed. Please review and correct via the Categorisation tab (Mapping 3 / Level 3)
+          default nature was assumed. Please review and correct via the Categorisation tab (Mapping 3)
           if any of these are wrong for this entity.
         </p>
         <div className="max-h-80 overflow-y-auto border border-gray-200 rounded mb-4">
@@ -1366,6 +1391,7 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
   const [search, setSearch] = useState('')
   const [showEmpty, setShowEmpty] = useState(false)
   const [showZeroRows, setShowZeroRows] = useState(false)
+  const [changeOn, setChangeOn] = useAnalyseChangeToggle('notes')
   // "Fix" jumps to the full Rectification / Recategorisation screen, scoped
   // to just the clicked category — same screen/features as the Mapping menu.
   const openFix = (filter, title) => onFixNavigate?.(filter, title)
@@ -1414,8 +1440,9 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
   ]
   const pickStock = (obj) => Object.fromEntries(STOCK_INVENTORY_TYPES.map(t => [t, obj[t] ?? '']).filter(([, v]) => v !== ''))
 
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells, fixed-list dropdowns).
   const saveFillDetailsWorkbook = async (wb, suffix) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const buf = await finishWorkbook(wb, fillDetailsExcelSpec(wb))
     const eName = (entity?.name || 'FS').replace(/[^A-Za-z0-9]+/g, '_')
     const result = await fsgApi?.saveFileDialog({
       defaultPath: `${eName}_FillDetails_${suffix}.xlsx`,
@@ -1695,7 +1722,7 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
     const eName = (entity?.name || 'FS').replace(/[^A-Za-z0-9]+/g, '_')
     const scopeName = (isConsolidatedManualPy ? 'Consolidated' : (activeTB?.branch_name || activeTB?.period || 'TB')).replace(/[^A-Za-z0-9]+/g, '_')
     const wb = buildManualPyFilledWorkbook(entries || [], { sheetLabel: 'Manual PY' })
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const buf = await finishWorkbook(wb, manualPyExcelSpec((entries || []).length))
     const result = await fsgApi?.saveFileDialog({
       defaultPath: `${eName}_ManualPY_${scopeName}.xlsx`,
       filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
@@ -1921,15 +1948,42 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
 
   const period = activeTB?.period || ''
 
+  const changePyOff = !!data?.pyMode && data.pyMode !== 'required'
   return (
+    <AnalyseChangeProvider on={changeOn && !changePyOff} tbId={activeTB?.id} scope="notes" getRemark={getRemark} onRemarkSaved={onRemarkSaved}>
     <div className="flex flex-col h-full overflow-hidden">
       <Guard activeTB={activeTB} loading={loading} hasData={!!data} error={error}>
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-blue-100 shrink-0 bg-white flex-wrap">
-          <div>
+        {/* T-046: compact header — title line with count, search and expand/collapse; below it one wrapping line of labelled groups. */}
+        <div className="px-5 py-2 border-b border-blue-100 shrink-0 bg-white">
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="font-bold text-blue-900 text-sm">Notes to Financial Statements</h2>
-            {entity && <p className="text-xs text-gray-500">{entity.name}{period ? ` | ${period}` : ''}</p>}
+            {period && <span className="text-[11px] text-gray-400">{period}</span>}
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">{noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)} note{(noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)) !== 1 ? 's' : ''}</span>
+            <div className="ml-auto flex items-center gap-2">
+              <AnalyseChangeButton on={changeOn && !changePyOff} onToggle={setChangeOn} disabled={changePyOff}
+                disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
+              <div className="relative">
+                <input type="text" placeholder="Search notes..." value={search} onChange={e => setSearch(e.target.value)}
+                  className="border border-gray-300 rounded pl-2.5 pr-6 py-1 text-xs w-44 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
+                {search && <button onClick={() => setSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs" title="Clear search">✕</button>}
+              </div>
+              <div className="flex items-center rounded border border-gray-300 overflow-hidden">
+                <button
+                  onClick={() => setExpandSignal(s => ({ v: true, n: s.n + 1 }))}
+                  className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
+                  title="Expand all notes"
+                >⊞ Expand All</button>
+                <button
+                  onClick={() => setExpandSignal(s => ({ v: false, n: s.n + 1 }))}
+                  className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
+                  title="Collapse all notes"
+                >⊟ Collapse All</button>
+              </div>
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-3 flex-wrap">
+          <div className="fsg-notes-toolbar flex items-center gap-x-3 gap-y-1.5 flex-wrap mt-2">
+          <div className="flex items-center gap-2 flex-wrap rounded border border-gray-200 bg-gray-50 px-2 py-1">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Previous Year</span>
             <PYModeSelect activeTB={activeTB} onChanged={refresh} />
             <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
               onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
@@ -1959,52 +2013,43 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
                 + Add PY-only Major Head
               </button>
             )}
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden">
+            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
+              disabled={!!data?.pyMode && data.pyMode !== 'required'}
+              disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
+          </div>
+          <div className="flex items-center gap-1.5 rounded border border-gray-200 bg-gray-50 px-2 py-1">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mr-0.5">Fill Details Excel</span>
+            <div className="flex items-center rounded border border-gray-300 overflow-hidden bg-white">
               <button onClick={downloadFillDetailsBlank}
                 className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Download a pristine consolidated Excel template — one sheet per Fill Details note plus Stock, ignoring anything already saved">
-                ⬇ Blank Template
+                title="Download a pristine consolidated Excel template — one sheet per Fill Details note plus Inventory, ignoring anything already saved">
+                ⬇ Blank
               </button>
               <button onClick={downloadFillDetailsFilled}
                 className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Download everything currently saved (Fill Details forms + Stock) — a backup/reference of your progress so far">
-                ⬇ Filled Template
+                title="Download everything currently saved (Fill Details forms + Inventory) — a backup/reference of your progress so far">
+                ⬇ Filled
               </button>
               <button onClick={uploadFillDetails}
                 className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
                 title="Upload a filled-in template — every non-blank sheet is saved at once, blank sheets are left untouched">
-                ⬆ Upload Fill Details
+                ⬆ Upload
               </button>
             </div>
-            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-              disabled={!!data?.pyMode && data.pyMode !== 'required'}
-              disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
-            <span className="text-xs text-gray-400">{noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)} note{(noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)) !== 1 ? 's' : ''}</span>
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden">
-              <button
-                onClick={() => setExpandSignal(s => ({ v: true, n: s.n + 1 }))}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Expand all notes"
-              >Expand All</button>
-              <button
-                onClick={() => setExpandSignal(s => ({ v: false, n: s.n + 1 }))}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
-                title="Collapse all notes"
-              >Collapse All</button>
-            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded border border-gray-200 bg-gray-50 px-2 py-1">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Show</span>
             <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
               <input type="checkbox" checked={showEmpty} onChange={e => setShowEmpty(e.target.checked)}
                 className="rounded border-gray-300" />
-              Show empty notes
+              Empty notes
             </label>
             <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
               <input type="checkbox" checked={showZeroRows} onChange={e => setShowZeroRows(e.target.checked)}
                 className="rounded border-gray-300" />
-              Show zero-balance rows
+              Zero-balance rows
             </label>
-            <input type="text" placeholder="Search notes..." value={search} onChange={e => setSearch(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1.5 text-xs w-40 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-            {search && <button onClick={() => setSearch('')} className="text-gray-400 text-xs">X</button>}
+          </div>
           </div>
         </div>
 
@@ -2186,5 +2231,6 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
         />
       )}
     </div>
+    </AnalyseChangeProvider>
   )
 }
