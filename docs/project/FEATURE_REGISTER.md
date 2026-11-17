@@ -94,3 +94,5 @@ F-007/F-009 update, 10 November 2026: [T-024](T024_LEVEL1_FALLBACKS.md) adds the
 F-002/F-009 update, 10 November 2026: [T-023](T023_FIRM_SIGNING_PLACE.md) adds the nullable Firm Place in VERA Settings/Admin Settings and uses it as the editable Financial Statement Review signing default. Existing finalised signing records remain authoritative. FSG integration and upgrade/recovery checks passed 60/60; UI results are recorded in [current status](CURRENT_STATUS.md). Owner UAT and exported-file inspection remain pending.
 
 The original Phase I also requests searchable audit checklist and MRL formats and line-item workpaper linkage. Programmes, templates and evidence exist, but their exact coverage against those original requirements is not established. T-005 now has a documented trace and gap register prepared for owner review; this does not mean these capabilities are implemented or accepted. The tax guidance PDFs supplied in this conversation were not audited clause by clause during this documentation review.
+
+F-029 update, 17 November 2026: [T-030](CAAT_TOOLS.md) replaces the embedded tool with v0.10 in the VERA look; automated 29/29, owner UAT pending.

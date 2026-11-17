@@ -1,5 +1,12 @@
 # Latest session handoff
 
+## T-030 CAAT Tools v0.10 merged to caat_tools (17 November 2026)
+
+- Owner instruction: add the revised CAAT Tools (`CAAT_Tools3.html`, v0.10) with the app's UI/UX, review the code, merge to `caat_tools`, pull before pushing. Branch `caat_tools`, base `6edb0e6` (origin/caat_tools after `git pull`).
+- Changed: `public/caat/caat-tools.html` (v0.10 with the re-applied approved fixes), new `public/caat/caat-vera-theme.css`, `public/caat/caat-bridge.js`, `scripts/test-caat-ui.cjs` (large-ledger check updated for v0.10), `docs/project/CAAT_TOOLS.md`, CURRENT_STATUS, NEXT_TASKS, FEATURE_REGISTER, this handoff.
+- Checks: `npm run test:caat-ui` 29/29 (includes `npm run build`). Not run: owner UAT with real ledgers, packaged installer.
+- Open: eight logic findings in the owner's new code are listed in CAAT_TOOLS.md and were not changed. First next step: owner decides which findings to fix.
+
 ## RSF GitHub publication authorised and completed (13 November 2026)
 
 - Owner explicitly instructed "push the commit to github", superseding prior no-push instructions for the reviewed branch. Branch RSF; implementation commit `b842642620e6885ee61aafdecd0919dccf5f8145`; source/base `26d3b9f37a9f3aadd8b3d5bf456538e195a60a67`. Fresh git fetch origin succeeded. Verified clean working tree, exact implementation commit, one commit beyond origin/main and source/base already an ancestor of origin/main. No merge, force push, history rewrite or application change.

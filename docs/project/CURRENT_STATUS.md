@@ -1,5 +1,9 @@
 # Current status
 
+## T-030 CAAT Tools v0.10 (17 November 2026)
+
+On `caat_tools`, the embedded CAAT Tools was replaced by the owner-supplied v0.10 (new sidebar layout, data-type detection, Insights, export dialog, tests run on Apply mapping) and restyled with the VERA colours, type and components. The approved large-ledger loop fix and sampling wording fix were re-applied; SheetJS stays 0.20.3. `npm run test:caat-ui` 29/29. Eight logic findings in the new version are recorded in [CAAT_TOOLS.md](CAAT_TOOLS.md) and await an owner decision; owner UAT pending.
+
 ## RSF published to GitHub (13 November 2026)
 
 Owner explicitly authorised push. Implementation commit b842642 is published on origin/RSF, and local RSF tracks it. Only the reviewed source/docs/mapping-master changes are new; older tracked data artifacts are unchanged from already-published main. No new client TB/database files, merge, release or unrelated fixes. App health HTTP 200 confirmed. Publication details and remaining issues are in the latest handoff.

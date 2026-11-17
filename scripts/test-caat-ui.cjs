@@ -264,8 +264,9 @@ async function main() {
     return true;
   })()`);
   await waitCaat(`S.raw.length === ${bigRows}`, 60000);
-  const overview = await inCaat(`(() => { try { document.querySelector('#bApply').click(); return S.view + '|' + document.querySelector('#main').innerText.includes('Largest / smallest') } catch (e) { return 'error: ' + e.message } })()`);
-  check(`${bigRows.toLocaleString('en-IN')}-row ledger opens the Overview (fix 1)`, overview === 'overview|true', overview);
+  // Apply mapping runs every test (v0.10); none may fail with the call-stack error (fix 1).
+  const overview = await inCaat(`(() => { try { document.querySelector('#bApply').click(); const bad = Object.entries(S.err).filter(([, e]) => /call stack/i.test(String(e || ''))).map(([k]) => k); return S.view + '|' + (bad.join(',') || 'none') + '|' + ['strat', 'benford', 'gaps'].filter((k) => !S.results[k]).join(',') } catch (e) { return 'error: ' + e.message } })()`);
+  check(`${bigRows.toLocaleString('en-IN')}-row ledger opens Insights with no call-stack failures (fix 1)`, overview === 'overview|none|', overview);
   await inCaat(`(document.querySelector('#nav a[data-v="strat"]').click(), document.querySelector('#bRun').click(), true)`);
   check('stratification runs on the large ledger', await waitCaat(`Boolean(S.results.strat)`));
   await screenshot('02-large-ledger');
