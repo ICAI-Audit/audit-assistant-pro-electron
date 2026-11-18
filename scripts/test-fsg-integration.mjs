@@ -24,6 +24,7 @@ import { checkNaming } from './fsg-naming-checks.mjs'
 import { checkPolicyFormat } from './fsg-policy-checks.mjs'
 import { checkWorkings } from './fsg-workings-checks.mjs'
 import { checkAnalyseChange } from './fsg-analyse-change-checks.mjs'
+import { checkInventoryNote, checkShareholding, checkOpeningSurplusLabel, checkConflictFallback } from './fsg-inventory-note-checks.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
@@ -417,6 +418,10 @@ async function main() {
   await checkPolicyFormat({ root, userData, check })
   await checkWorkings({ db, check, staff, partner, entityId, periodId, defaultRs })
   await checkAnalyseChange({ root, userData, check, staff, entityId, periodId, defaultRs })
+  await checkInventoryNote({ db, root, userData, check, staff, entityId, periodId, defaultRs })
+  await checkShareholding({ root, userData, check })
+  await checkOpeningSurplusLabel({ db, root, userData, check, staff, entityId, periodId, defaultRs })
+  await checkConflictFallback({ db, check, staff, entityId, periodId, defaultRs })
 
   const failed = results.filter((x) => !x.pass)
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`)

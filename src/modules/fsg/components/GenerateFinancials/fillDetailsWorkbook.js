@@ -12,6 +12,7 @@ import { buildStockBlankTemplate, buildStockFilledWorkbook, parseStockWorkbook, 
 import { appendShareCapitalDetailsSheet, shareCapitalDetailsSheetSpec } from '../Notes/shareCapitalDetailsWorkbook'
 import { appendCfsSheet, cfsSheetSpec, CFS_SHEET } from '../CFS/cfsWorkbook'
 import { INVESTMENT_FIELDS } from '../../utils/investmentWorkbook'
+import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpCellBlocked } from '../Notes/TradePayablesDisclosureForm'
 import { INVESTMENT_CATEGORIES, INVESTMENT_RELATIONSHIPS } from '../../utils/investments'
 import { HOW_TO_SHEET, LISTS_SHEET } from '../../utils/veraExcel'
 
@@ -246,6 +247,7 @@ function registrySheetSpec(entry, dataRows) {
   const inputCells = []
   const dropdowns = []
   let amount = []
+  const blocked = []   // ranges such as "D7:E7" that take no entry
   const cells = (r, cols) => cols.forEach(c => inputCells.push(`${L(c)}${r}`))
   const pick = (col, list, name, fromRow, toRow, extra = {}) => dropdowns.push({ col: L(col), list, name, fromRow, toRow, prompt: `Choose ${name.toLowerCase()} from the list.`, error: `Choose one of the listed values for ${name}.`, ...extra })
   const label = (row, i) => String(row?.[i] ?? '').trim()
@@ -300,7 +302,16 @@ function registrySheetSpec(entry, dataRows) {
       dataRows.forEach((row, i) => {
         const r = first + i
         const section = label(row, 0).toUpperCase()
-        if (section === 'AGEING') cells(r, range(3, lastColIdx))
+        if (section === 'AGEING') {
+          // T-063: grey, locked cells where the schedule takes no entry; Total Due / Total are worked out.
+          const ageRow = TP_AGEING_ROWS.find(x => x.label.toLowerCase() === label(row, 2).toLowerCase())
+          if (!ageRow || ageRow.isTotal) return
+          const open = [], shut = []
+          TP_AGEING_BUCKETS.forEach((b, j) => (tpCellBlocked(ageRow, b.key) ? shut : open).push(3 + j))
+          cells(r, open)
+          // One range per run of side-by-side grey cells (an Undue row: Unbilled, then the four periods).
+          shut.forEach((c, k) => { if (k === 0 || shut[k - 1] !== c - 1) { let e = c; while (shut.includes(e + 1)) e++; blocked.push(`${L(c)}${r}:${L(e)}${r}`) } })
+        }
         else if (section === 'FLAGS') { cells(r, [3]); pick(3, FILL_DETAILS_LISTS.yesNo, label(row, 2).replace(/\s*\(yes\/no\)\s*$/i, '') || 'Yes/No', r, r) }
         else cells(r, [3])
       })
@@ -336,6 +347,7 @@ function registrySheetSpec(entry, dataRows) {
     lastRow: Math.max(HEADER_ROW + 1, lastOf()),
     lastCol: L(lastColIdx),
     inputCells,
+    blockedCells: blocked,
     amountCols: amount.map(L),
     dropdowns,
     freezeCols: 1,
@@ -413,7 +425,7 @@ export function parseFillDetailsWorkbook(wb, { constitution = null } = {}) {
     if (rowsEqual(dataRows, blankRows)) { skippedBlank++; continue }
 
     try {
-      const data = entry.fromRows(dataRows)
+      const data = entry.fromRows(dataRows, aoa[HEADER_ROW] || [])
       results.push({ noteNum, noteTitle, data })
     } catch (e) {
       if (entry.key.startsWith('investments-')) throw new Error(`Invalid investment sheet "${sheetName}": ${e.message}`)

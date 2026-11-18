@@ -20,7 +20,7 @@ const ROWS = [
 // double-counted.
 const OPENING_LINE_RX = /^opening (stock|value) of/i
 const CLOSING_LINE_RX = /^less:\s*closing (stock|value) of/i
-const DERIVED_LINE_RX = /^(change in inventory of|net change in inventory)/i
+const DERIVED_LINE_RX = /^(change in inventory of|net change in inventory|add \/ \(less\): other ledgers mapped to this head)/i
 const CHANGES_SECTION_RX = /changes in inventor/i
 const UNCAT_RX = /uncategorised/i
 

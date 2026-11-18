@@ -86,7 +86,7 @@ export async function checkMissingAlie({ db, root, userData, check, staff, partn
     const signedOptions = { entity: { ...entity, constitution }, activeTB: tb, data: draft, denomination: 'as_is', signatories: [] }
     const signedWb = renderer.buildFinancialsWorkbook(signedOptions)
     const reopened = XLSX.read(XLSX.write(signedWb, { type: 'buffer', bookType: 'xlsx' }), { sheetStubs: true })
-    check(`T-026 constitution ${constitution}: Excel excludes provisional head ${net} and retains its live total formula`, !XLSX.utils.sheet_to_json(reopened.Sheets['Balance Sheet'], { header: 1 }).some(row => row.some(v => String(v).trim().replace(/^\([a-z]\)\s*/, '') === 'ALIE MISSING')) && Object.entries(reopened.Sheets['Balance Sheet']).some(([addr, cell]) => cell?.v === 'TOTAL EQUITY AND LIABILITIES' && /^SUM\(/.test(reopened.Sheets['Balance Sheet'][addr.replace(/^A/, 'C')]?.f || '')))
+    check(`T-026 constitution ${constitution}: Excel excludes provisional head ${net} and retains its live total formula`, !XLSX.utils.sheet_to_json(reopened.Sheets['Balance Sheet'], { header: 1 }).some(row => row.some(v => String(v).trim().replace(/^\([a-z]\)\s*/, '') === 'ALIE MISSING')) && Object.entries(reopened.Sheets['Balance Sheet']).some(([addr, cell]) => cell?.v === 'TOTAL' && /^SUM\(/.test(reopened.Sheets['Balance Sheet'][addr.replace(/^A/, 'C')]?.f || '')))
     if (constitution === 3) {
       const signedBranches = [{ ...branchData[0], rows: accepted, missingAlieRows: draft.missingAlie.cy.items }]
       const columnWb = renderer.buildColumnarWorkbook({ entity, branchTBsData: signedBranches, denomination: 'as_is', signatories: [] })

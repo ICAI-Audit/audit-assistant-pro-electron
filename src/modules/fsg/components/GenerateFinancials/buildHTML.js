@@ -4,7 +4,7 @@ import { netCreditPurchasesWorking } from '../../utils/ratios'
 import { auditorForDenomination } from '../../utils/signingRules'
 // Ageing schedule definitions shared with the fill-details forms
 // (single source of truth so PDF labels always match the forms)
-import { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from '../Notes/TradePayablesDisclosureForm'
+import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../Notes/TradePayablesDisclosureForm'
 import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell } from '../Notes/TradeReceivablesAgingForm'
 // Single source of truth for the Schedule III BS layout — shared with the
 // live BS screen and the Excel exporter, so PDF always matches both exactly.
@@ -231,7 +231,7 @@ function buildBSPage(entity, activeTB, prevTB, data, auditor, signatories, signP
       body += lineRow(`<span class="uncat-text">${esc(side.uncatTop.label)}</span>`, side.uncatTop.noteNum, side.uncatTop.total, side.uncatTop.prevTotal)
     }
     body += `<tr class="total-row">
-      <td colspan="2">TOTAL ${esc(alieLabel)}</td>
+      <td colspan="2">TOTAL</td>
       <td class="right">${fmtINR(grandTotal)}</td>
       <td class="right">${fmtINR(grandPrevTotal)}</td>
     </tr>`
@@ -249,7 +249,7 @@ function buildBSPage(entity, activeTB, prevTB, data, auditor, signatories, signP
       })
     })
     body += `<tr class="total-row">
-      <td colspan="2">TOTAL ${esc(alieLabel)}</td>
+      <td colspan="2">TOTAL</td>
       <td class="right">${fmtINR(grandTotal)}</td>
       <td class="right">${fmtINR(grandPrevTotal)}</td>
     </tr>`
@@ -2006,8 +2006,10 @@ function renderAgeingSchedule(details, noteTitle, cyLabel = 'Current Year', pyLa
   const td  = 'border:0.5pt solid #444;padding:0.8mm 1.5mm;font-size:8pt;text-align:right;'
   const tdl = 'border:0.5pt solid #444;padding:0.8mm 1.5mm;font-size:8pt;text-align:left;'
 
-  const buildPeriod = (pd, heading) => {
-    if (!pd) return ''
+  const buildPeriod = (rawPd, heading) => {
+    if (!rawPd) return ''
+    // T-063: Trade Payables blocked cells are nil and Total Due / Total are worked out.
+    const pd = isTP ? tpPeriodView(rawPd) : rawPd
     const any = AG_ROWS.some(r => AG_BUCKETS.some(b => Math.abs(cellVal(pd, r, b.key)) > 0.005))
     if (!any && !ag.includeInOutput && !details.includeInOutput) return ''
     let html = `<p style="font-weight:bold;font-size:9pt;margin:2.5mm 0 1mm;">${isTP ? 'Trade Payables' : 'Trade Receivables'} ageing schedule (${heading})</p>`
@@ -2020,10 +2022,11 @@ function renderAgeingSchedule(details, noteTitle, cyLabel = 'Current Year', pyLa
     html += `<thead>
       <tr>
         <th rowspan="2" style="${thl}vertical-align:bottom;">Particulars</th>
-        <th colspan="${AG_BUCKETS.length}" style="${thc}">Outstanding for following periods from due date of payment</th>
+        ${AG_BUCKETS.filter(b => b.notAged).map(b => `<th rowspan="2" style="${th}vertical-align:bottom;">${esc(b.label)}</th>`).join('')}
+        <th colspan="${AG_BUCKETS.filter(b => !b.notAged).length}" style="${thc}">Outstanding for following periods from due date of payment</th>
         <th rowspan="2" style="${th}vertical-align:bottom;">Total</th>
       </tr>
-      <tr>${AG_BUCKETS.map(b => `<th style="${th}">${esc(b.label)}</th>`).join('')}</tr>
+      <tr>${AG_BUCKETS.filter(b => !b.notAged).map(b => `<th style="${th}">${esc(b.label)}</th>`).join('')}</tr>
     </thead><tbody>`
     for (const r of AG_ROWS) {
       const vals = AG_BUCKETS.map(b => cellVal(pd, r, b.key))
@@ -3058,7 +3061,7 @@ export function buildColumnarHTML({ entity, branchTBsData, auditor: auditorGiven
       }
       const totals = branches.map(br => (alieKey === 'EL' ? br.data.elSections : br.data.assetSections).reduce((s, sec) => s + sec.total, 0))
       const grand  = totals.reduce((s, t) => s + t, 0)
-      body += `<tr class="total-row"><td>TOTAL ${esc(alieLabel)}</td>${totals.map(t => `<td class="right">${fmtINR(t)}</td>`).join('')}<td class="right total-col">${fmtINR(grand)}</td></tr>`
+      body += `<tr class="total-row"><td>TOTAL</td>${totals.map(t => `<td class="right">${fmtINR(t)}</td>`).join('')}<td class="right total-col">${fmtINR(grand)}</td></tr>`
       return body
     }
 
