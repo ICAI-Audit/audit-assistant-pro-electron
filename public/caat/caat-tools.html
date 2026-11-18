@@ -10,26 +10,57 @@
 --ink:#1f2933;--mut:#616e7c;--line:#e4e7eb;--bg:#f5f7fa;--card:#fff;--sh:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04)}
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
-header{background:#fff;border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
-.logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--green));display:grid;place-items:center;color:#fff;font-size:15px}
-.brand small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
-.eng{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
-.eng input{width:170px}
-.wrap{display:flex;min-height:calc(100vh - 57px)}
-nav{width:236px;background:#fff;border-right:1px solid var(--line);padding:12px 8px;flex-shrink:0}
-nav .sec{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);padding:12px 12px 4px}
-nav a{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:7px;color:var(--ink);text-decoration:none;cursor:pointer;font-size:13.5px}
+.wrap{display:flex;min-height:100vh}
+aside#side{width:258px;flex-shrink:0;background:#fff;border-right:1px solid var(--line);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow:hidden;z-index:6;transition:width .15s}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px;padding:12px 12px 10px;border-bottom:1px solid var(--line)}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--green));display:grid;place-items:center;color:#fff;font-size:15px;flex-shrink:0}
+.brand small{display:block;font-weight:400;color:var(--mut);font-size:11px}
+.brand .bt{flex:1;white-space:nowrap;overflow:hidden}
+.collapse{border:1px solid var(--line);background:#fff;border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--mut);flex-shrink:0}
+.collapse:hover{background:var(--bg)}
+#dcard{padding:10px 12px;border-bottom:1px solid var(--line);font-size:12px}
+#dcard .dt{font-weight:600;font-size:12.5px;color:var(--ink)}#dcard .df{color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav{flex:1;overflow-y:auto;padding:6px 8px}
+nav .sec,.eng .sec{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);padding:10px 10px 3px}
+nav a{display:flex;align-items:center;gap:9px;padding:6px 10px;border-radius:7px;color:var(--ink);text-decoration:none;cursor:pointer;font-size:13px;white-space:nowrap}
+nav a .lb{overflow:hidden;text-overflow:ellipsis}
 nav a:hover{background:var(--bg)}
 nav a.on{background:var(--blue-l);color:var(--blue);font-weight:600}
 nav a .n{width:20px;height:20px;border-radius:5px;background:var(--bg);display:grid;place-items:center;font-size:11px;color:var(--mut);flex-shrink:0}
 nav a.on .n{background:var(--blue);color:#fff}
+nav a .rec{color:#d69e2e;font-size:11px;margin-left:-4px}
 nav a .dot{margin-left:auto;font-size:11px;border-radius:9px;padding:0 7px;background:var(--bg);color:var(--mut)}
 nav a .dot.warn{background:var(--amber-l);color:var(--amber)}
 nav a .dot.ok{background:var(--green-l);color:var(--green)}
-main{flex:1;padding:20px 24px;min-width:0}
-h1{font-size:20px;margin:0 0 4px}
-.sub{color:var(--mut);margin:0 0 16px}
+.eng{border-top:1px solid var(--line);padding:4px 12px 12px;display:flex;flex-direction:column;gap:6px}
+.eng input{width:100%;font-size:12.5px;padding:5px 8px}
+.eng .btn{width:100%}
+body.col aside#side{width:56px}
+body.col .brand .bt,body.col #dcard,body.col nav .sec,body.col nav a .lb,body.col nav a .dot,body.col nav a .rec,body.col .eng input,body.col .eng .sec,body.col .eng .tx{display:none}
+body.col .brand{flex-direction:column;padding:10px 6px}body.col nav a{justify-content:center;padding:7px 4px}body.col .eng{padding:8px 6px}body.col .eng .btn{padding:7px 0}
+main{flex:1;padding:12px 18px 10px;min-width:0}
+.content{flex:1;min-width:0;display:flex;flex-direction:column}
+#tabbar{display:none}
+.split,.split.wide{display:block}
+.cp{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);padding:12px 16px 14px;margin-bottom:14px}
+.cp h1{font-size:17px;margin:0 0 2px}.cp .sub{margin:0}
+.hdr{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}.hdr>.ht{flex:1 1 300px;min-width:0}
+.hdr .acts{display:flex;gap:8px;margin:0}
+.cp .ttl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:12px 0 6px;font-weight:600}
+.cp details.about{margin-top:6px}.cp details.about>summary{cursor:pointer;color:var(--blue);font-size:12.5px}
+.cp .help{font-size:12.5px;padding:8px 10px;margin:8px 0}.cp .note,.cp .err{font-size:12.5px;padding:7px 10px;margin:8px 0}
+.cp .card{box-shadow:none;border:0;border-top:1px solid #eef1f5;border-radius:0;padding:12px 0 4px;margin:0}.cp .card h3{font-size:14px;margin:0 0 8px}
+.cp .cards{margin:10px 0 0}
+.cp .kpi{box-shadow:none}
+.runinfo{font-size:11.5px;color:var(--mut);margin:-6px 0 12px}
+#wpDlg{position:fixed;inset:0;background:rgba(20,30,45,.35);display:none;align-items:center;justify-content:center;z-index:30}
+#wpDlg.on{display:flex}
+#wpDlg .box{background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:18px 20px;width:380px;display:flex;flex-direction:column;gap:10px}
+#wpDlg h3{margin:0;font-size:16px}#wpDlg input{width:100%}#wpDlg .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.res{min-width:0}
+.res .empty{border:2px dashed var(--line);border-radius:10px;padding:60px 20px;text-align:center;color:var(--mut)}
+h1{font-size:18px;margin:0 0 2px}
+.sub{color:var(--mut);margin:0 0 12px;font-size:12.5px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);padding:16px 18px;margin-bottom:16px}
 .card h3{margin:0 0 10px;font-size:14.5px}
 .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
@@ -56,7 +87,7 @@ input:focus,select:focus{outline:2px solid var(--blue-l);border-color:var(--blue
 .kpi.warn{border-left:4px solid var(--amber)}
 .kpi.ok{border-left:4px solid var(--green)}
 .kpi.bad{border-left:4px solid var(--red)}
-.tw{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
+.tw{overflow:auto;max-height:calc(100vh - 150px);border:1px solid var(--line);border-radius:8px}
 table{border-collapse:collapse;width:100%;font-size:12.5px;background:#fff}
 th{position:sticky;top:0;background:#f0f3f7;text-align:left;font-weight:600;padding:7px 9px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none}
 th.r,td.r{text-align:right}
@@ -82,29 +113,38 @@ tr.sel td{background:#e8f1fb}
 .chart{overflow-x:auto}
 .toast{position:fixed;bottom:20px;right:20px;background:#1f2933;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
 .toast.on{opacity:1}
-footer{color:var(--mut);font-size:12px;padding:8px 0 20px}
-@media(max-width:820px){.wrap{flex-direction:column}nav{width:auto;display:flex;flex-wrap:wrap;gap:2px}nav .sec{width:100%}.eng{margin-left:0}}
+footer{color:var(--mut);font-size:11px;padding:6px 0 14px;line-height:1.45}
+@media(max-width:820px){aside#side{width:56px}.brand .bt,#dcard,nav .sec,nav a .lb,nav a .dot,.eng input,.eng .sec,.eng .tx{display:none}}
 </style>
+<link rel="stylesheet" href="caat-vera-theme.css">
 </head>
 <body>
-<header>
-  <div class="brand"><div class="logo">∑</div><div>CAAT Tools<small>Data analytics tests for audit · Prototype v0.6</small></div></div>
-  <div class="eng">
-    <input id="eEnt" placeholder="Entity / client name">
-    <input id="ePer" placeholder="Period (e.g. FY 2025-26)">
-    <input id="ePrep" placeholder="Prepared by">
-    <button class="btn g" id="bExport">Export working papers (.xlsx)</button>
-  </div>
-</header>
 <div class="wrap">
-  <nav id="nav"></nav>
-  <main id="main"></main>
+  <aside id="side">
+    <div class="brand"><div class="logo">∑</div><div class="bt">CAAT Tools<small>Data analytics for audit · v0.10</small></div><button class="collapse" id="bCol" title="Collapse / expand the sidebar">«</button></div>
+    <div id="dcard"></div>
+    <nav id="nav"></nav>
+    <div class="eng">
+      <button class="btn g" id="bWP" title="Export working papers (.xlsx)"><span class="ic">⤓</span><span class="tx"> Export working papers</span></button>
+    </div>
+  </aside>
+  <section class="content"><div id="tabbar"></div><main id="main"></main></section>
 </div>
 <div class="toast" id="toast"></div>
+<div id="wpDlg"><div class="box"><h3>Export working papers</h3><div class="muted" style="font-size:12.5px">One Excel file with the data log, every test run, the sample and the disclaimer. These details go on each sheet and are remembered for next time.</div>
+  <label class="f">Entity / client name<input id="eEnt" placeholder="e.g. ABC Pvt Ltd"></label>
+  <label class="f">Period<input id="ePer" placeholder="e.g. FY 2025-26"></label>
+  <label class="f">Prepared by<input id="ePrep" placeholder="Your name"></label>
+  <div class="acts"><button class="btn" id="bWPx">Cancel</button><button class="btn g" id="bExport">⤓ Export</button></div></div></div>
 
 <script>
 "use strict";
 /* ============ Utilities ============ */
+/* VERA: how many tests produced a result */
+function testsRunText(){const n=TESTS.filter(t=>S.results[t.id]).length;return n===TESTS.length?'all '+n+' tests run':n+' of '+TESTS.length+' tests run — '+(TESTS.length-n)+' could not run (see the test list)'}
+/* VERA: loop versions of Math.max(...a) / Math.min(...a), which throw RangeError on very large arrays */
+function arrMax(a){let m=-Infinity;for(let i=0;i<a.length;i++)if(a[i]>m)m=a[i];return m}
+function arrMin(a){let m=Infinity;for(let i=0;i<a.length;i++)if(a[i]<m)m=a[i];return m}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>(n==null||n===''||isNaN(n))?'':Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -150,21 +190,185 @@ function parseAmount(v){
 
 /* ============ State ============ */
 const S={fileName:'',hash:'',sheet:'',files:[],parts:[],delim:'auto',headerRow:1,headerRows:1,headers:[],headersPre:[],raw:[],rows:[],
-  opt:{skipTotals:true,totalWords:'total, grand total, sub total, subtotal, opening balance, closing balance, carried over, carried forward, brought forward, c/f, b/f',skipRepHdr:true,fill:[],unpivot:[],unpivotName:'Period',srcCol:true},
-  amtMode:'single',splitPos:'dr',map:{amount:'',credit:'',drcr:'',party:'',date:'',doc:'',vtype:'',cat:'',desc:'',gstin:'',pan:'',user:''},drcrNeg:'cr',dateFmt:'auto',numFmt:'in',filters:[],
+  opt:{skipTotals:true,totalWords:'total, grand total, sub total, subtotal, current total, opening balance, closing balance, opening bal, closing bal, op. bal, cl. bal, op bal, cl bal, carried over, carried forward, brought forward, c/f, b/f',skipRepHdr:true,fill:[],unpivot:[],unpivotName:'Period',srcCol:true},
+  amtMode:'single',splitPos:'dr',map:{amount:'',credit:'',drcr:'',party:'',date:'',doc:'',ref:'',vtype:'',cat:'',desc:'',gstin:'',pan:'',user:''},drcrNeg:'cr',dateFmt:'auto',numFmt:'in',filters:[],
   abs:false,crNeg:false,mapped:false,log:{},view:'data',params:{},results:{},err:{}};
 const MAPF=[['amount','Amount',''],['credit','Credit amount',''],['drcr','Dr / Cr column',''],
  ['party','Party / Vendor / Ledger','Needed for RSF, Single transactions and party-wise tests.'],
- ['date','Date',''],['doc','Voucher / Invoice No.','Needed for the sequence gap test.'],['vtype','Voucher type','e.g. Payment, Journal, Sales. Useful for row filters.'],
+ ['date','Date',''],['doc','Voucher / Invoice No.','Needed for the sequence gap test.'],['vtype','Voucher type','e.g. Payment, Journal, Sales. Useful for row filters.'],['ref',"Party's invoice / reference no.",'Supplier bill no., customer order no., cheque or bank reference. Used by the duplicate test.'],
  ['cat','Category / Expense head',''],['desc','Narration / Description',''],
  ['gstin','GSTIN','For the GSTIN / PAN format check.'],['pan','PAN','For the GSTIN / PAN format check.'],['user','Entered by / User','Who posted the entry, if the export has it.']];
-const GUESS_PRI={amount:[/^(invoice|bill|net|gross|total|txn|transaction)?\s*(amount|amt)\.?$/i,/invoice value|bill value|total value|gross value|net value|voucher amount/i,/amount|amt/i,/debit|\bdr\b|total|net|gross|value|taxable/i],
+const GUESS_PRI={amount:[/^(invoice|bill|net|gross|total|txn|transaction)?\s*(amount|amt)\.?$/i,/^gross total$/i,/invoice value|bill value|total value|gross value|net value|voucher amount/i,/amount|amt/i,/debit|\bdr\b|withdrawal|total|net|gross|value|taxable/i],
   doc:[/voucher|vch/i,/invoice ?no|inv\.? ?no|bill ?no|doc(ument)? ?no|entry ?no/i,/ref|number|\bno\b/i]};
-const GUESS_EXC={amount:/date|balance|\bgst\b|cgst|sgst|igst|cess|tax amount|tds|discount|rate|qty|quantity|%|\bno\b|number/i,doc:/type|date/i,party:/date|amount|gstin|\bpan\b|\bno\.?$|number|invoice|\bcode\b|\bid$|type|group|head|category/i};
-const GUESS={amount:/amount|amt|value|debit|\bdr\b|total|net|gross|taxable/i,credit:/credit|\bcr\b/i,drcr:/^(dr\s*\/\s*cr|cr\s*\/\s*dr|drcr|d\s*\/\s*c|dc|debit\s*\/\s*credit|dr or cr|sign)$/i,
+const GUESS_EXC={ref:/date|amount|type/i,amount:/date|balance|\bgst\b|cgst|sgst|igst|cess|tax amount|tds|discount|rate|qty|quantity|%|\bno\b|number/i,doc:/type|date/i,party:/date|amount|gstin|\bpan\b|\bno\.?$|number|invoice|\bcode\b|\bid$|type|group|head|category/i};
+const GUESS={amount:/amount|amt|value|debit|\bdr\b|total|net|gross|taxable/i,credit:/credit|\bcr\b|deposit/i,drcr:/^(dr\s*\/\s*cr|cr\s*\/\s*dr|drcr|d\s*\/\s*c|dc|debit\s*\/\s*credit|dr or cr|sign)$/i,
   party:/party|vendor|supplier|customer|ledger|name|account|payee|beneficiary|remitter|particulars/i,date:/date|\bdt\b/i,doc:/voucher|vch|invoice|inv\.? ?no|doc|bill|ref|number|\bno\b/i,
   vtype:/vch\.? ?type|voucher ?type|doc(ument)? ?type|txn ?type|transaction ?type|entry ?type/i,user:/user|entered ?by|created ?by|posted ?by|maker/i,
   cat:/head|category|group|type|nature|gl/i,desc:/narration|desc|remark|memo/i,gstin:/gstin|gst ?no|gst ?number|gst ?reg|gst ?id/i,pan:/\bpan\b|pan ?no|pan ?number/i};
+
+/* ============ Data types & software presets ============ */
+const DTYPES={general:{label:'General transaction listing',short:'general data',party:'Party / Ledger',icon:'▤',desc:'Any ledger, register or listing'},
+  purchase:{label:'Purchase Register',short:'purchases',party:'Supplier',icon:'⬇',desc:'Purchase invoices / bills'},
+  sales:{label:'Sales Register',short:'sales',party:'Customer',icon:'⬆',desc:'Sales invoices'},
+  cash:{label:'Cash Book',short:'cash book',party:'Party / Ledger',icon:'₹',desc:'Cash receipts and payments',book:true},
+  bank:{label:'Bank Book',short:'bank book',party:'Party / Ledger',icon:'⌂',desc:'Bank book or bank statement',book:true},
+  daybook:{label:'Day Book / Journal',short:'day book',party:'Ledger / Particulars',icon:'☰',desc:'All vouchers, journals',book:true}};
+const SOFT={tally:'Tally',busy:'Busy',zoho:'Zoho Books',bankstmt:'Bank statement',other:'Other / Excel'};
+const REC={purchase:['rsf','gaps','dups','round','odd','single','idchk','thresh'],sales:['gaps','dups','round','single','idchk','outlier','benford','strat'],
+  cash:['dups','round','odd','thresh','single','benford'],bank:['dups','round','single','thresh','rsf','outlier'],daybook:['gaps','round','benford','dups','thresh','outlier','rsf']};
+S.dtype='general';S.soft='auto';S.side='pay';
+const sideOK=()=>!!(DTYPES[S.dtype]&&DTYPES[S.dtype].book);
+function sideLabels(){const st=S.soft==='bankstmt';if(S.dtype==='daybook')return[['dr','Debit lines (each entry once)'],['cr','Credit lines'],['all','All lines']];
+  return[['pay',st?'Payments (withdrawals)':'Payments (credit side)'],['rec',st?'Receipts (deposits)':'Receipts (debit side)'],['all','Both']]}
+function sideDC(){if(!sideOK()||S.side==='all'||S.amtMode==='single')return null; /* VERA: one amount column cannot be split by side */
+  if(S.dtype==='daybook')return S.side==='cr'?'cr':'dr';const st=S.soft==='bankstmt';return S.side==='pay'?(st?'dr':'cr'):(st?'cr':'dr')}
+function guessPri(k){const t=S.dtype,st=S.soft==='bankstmt',P=[];
+  if(k==='party'){if(t==='purchase')P.push(/supplier ?name|vendor ?name|party ?name/i,/supplier|vendor/i);if(t==='sales')P.push(/customer ?name|buyer ?name|party ?name/i,/customer|buyer/i);
+    if(t==='cash'||t==='bank'||t==='daybook')P.push(/^particulars$/i,/ledger|account ?name|beneficiary|remitter|payee/i);P.push(/party ?name|^account$/i,/^particulars$/i)}
+  if(k==='amount'){if(st)P.push(/withdrawal|debit|\bdr\b/i);if(t==='purchase'||t==='sales')P.push(/^gross total$/i,/^(bill|invoice) ?(total|amount|value)$/i,/^total$/i);P.push(/^(net|bill|total) ?amount$/i)}
+  if(k==='credit'&&st)P.push(/deposit|credit|\bcr\b/i);
+  if(k==='doc')P.push(/^(vch|voucher)\.? ?(no\.?|number)$/i,/vch\/bill ?no/i,/^(invoice|bill|credit note) ?(number|no\.?)$/i);
+  if(k==='ref'){if(t==='purchase')P.push(/supplier ?(inv|bill)|party ?(inv|bill)|vendor ?(inv|bill)|bill ?(no|number)|supplier ?invoice/i);if(t==='sales')P.push(/order ?(no|number)|po ?no|reference/i);
+    if(t==='bank'||st)P.push(/chq|cheque|ref/i);P.push(/reference|ref\.? ?no|chq|cheque/i);return P}
+  return P.concat(GUESS_PRI[k]||(GUESS[k]?[GUESS[k]]:[]))}
+function presetFill(headers){const t=S.dtype,f=S.soft;if(!((f==='tally'||f==='busy')&&(t==='daybook'||t==='cash'||t==='bank')))return null;
+  return headers.filter(h=>/^date$|^(vch|voucher)\.? ?(type|no\.?|number)$|vch\/bill|^type$/i.test(h.trim()))}
+function presetLimits(){return{purchase:'50000, 100000, 200000, 500000',sales:'50000, 200000, 500000, 1000000',cash:'10000, 20000, 200000',bank:'100000, 200000, 500000, 1000000',daybook:'10000, 50000, 100000, 500000'}[S.dtype]}
+function typeOverrides(){const m=S.map,t=S.dtype,o={};
+  if(t==='purchase')o.dups={keys:m.ref&&m.party?[m.party,m.ref]:[m.party,m.amount,m.date].filter(Boolean)};
+  if(t==='sales')o.dups={keys:m.doc?[m.doc]:[m.party,m.amount,m.date].filter(Boolean)};
+  if(t==='bank'){o.dups={keys:[m.party||m.desc,m.amount,m.date].filter(Boolean)};o.thresh={win:1}}
+  if(t==='cash')o.thresh={win:0,part:20};
+  if(t==='daybook'&&m.desc)o.dups={keys:[m.desc,m.amount].filter(Boolean)};
+  const lim=presetLimits();if(lim)o.thresh=Object.assign(o.thresh||{},{th:lim});
+  return o}
+const TYPE_NOTES={thresh:{cash:'Limits pre-set for a cash book: ₹10,000, ₹20,000 and ₹2,00,000 — commonly used cash limits under the Income-tax law (cash payments per person per day; cash loans and deposits; cash receipts). Check the limits in force for the period before relying on them.',
+    bank:"Limits pre-set for a bank book: ₹1, 2, 5 and 10 lakh, with a 1-day split window. Replace them with the entity's approval limits.",
+    purchase:"Limits pre-set for purchases: ₹50,000 and ₹1, 2 and 5 lakh. Replace them with the entity's purchase approval limits.",sales:'Limits pre-set for sales: ₹50,000 (a common e-way bill value), ₹2, 5 and 10 lakh. Replace them with limits that matter for the entity.',
+    daybook:'Limits pre-set for a day book: ₹10,000, ₹50,000, ₹1 lakh and ₹5 lakh.'},
+  dups:{purchase:'Pre-set for purchases: same supplier and same supplier invoice number (when that column is mapped) — the surest sign of a bill booked twice.',sales:'Pre-set for sales: the same invoice number used twice.',daybook:'Pre-set for a day book: same narration and same amount.',bank:'Pre-set for a bank book: same party, amount and date.'}};
+
+/* ============ Intelligence: detect the data, score the risk, explain the findings ============ */
+S.dtypeAuto=true;S.det=null;S.stmtAuto=true;
+const KW=(t,re)=>(t.match(re)||[]).length;
+function detectType(){
+  const p0=S.parts.find(p=>p.on)||S.parts[0];if(!p0)return;
+  const title=[p0.file,p0.sheet,...p0.aoa.slice(0,Math.max(0,S.headerRow-1)).map(r=>r.join(' '))].join(' ').toLowerCase();
+  const H=S.headers.join(' | ').toLowerCase();
+  const vt=S.headers.find(h=>/vch\.? ?type|voucher ?type|txn ?type|transaction ?type|entry ?type/i.test(h));
+  const vtv=vt?new Set(S.raw.slice(0,3000).map(o=>String(o[vt]||'').trim().toLowerCase()).filter(Boolean)):new Set();
+  const vkinds=['payment','receipt','journal','contra','sales','purchase','debit note','credit note'].filter(k=>[...vtv].some(v=>v.startsWith(k))).length;
+  const sc={purchase:0,sales:0,cash:0,bank:0,daybook:0},why={purchase:[],sales:[],cash:[],bank:[],daybook:[]};
+  const add=(k,n,w)=>{if(n>0){sc[k]+=n;why[k].push(w)}};
+  // report title, file and sheet names are the strongest evidence
+  add('purchase',/purchase (register|book|day ?book)|purchases? register|bills? register|purchase/.test(title)?5:0,'title mentions purchases');
+  add('sales',/sales? (register|book|day ?book)|sales register|invoices? register|sales/.test(title)?5:0,'title mentions sales');
+  add('cash',/cash ?book|cash a\/?c|cash account|petty cash|cash in hand/.test(title)?6:0,'title mentions a cash book');
+  add('bank',/bank ?book|bank a\/?c|bank account|bank statement|statement of account|account statement|hdfc|icici|sbi|axis|kotak|bank/.test(title)?6:0,'title mentions a bank account or statement');
+  add('daybook',/day ?book|journal|daybook|voucher register|all vouchers/.test(title)?6:0,'title mentions a day book or journal');
+  // column headings
+  add('purchase',KW(H,/supplier|vendor|bill no|bill date|input tax|itc|purchase/g)*2,'supplier / bill columns');
+  add('sales',KW(H,/customer|buyer|place of supply|output tax|sales|invoice status/g)*2,'customer / sales columns');
+  const stmt=/withdrawal|deposit|chq|cheque|value ?d(a)?te?\b|closing balance|txn ?date/.test(H);
+  add('bank',stmt?6:0,'withdrawal / deposit / cheque columns, as in a bank statement');
+  add('daybook',vkinds>=3?6:0,'several voucher types ('+[...vtv].slice(0,4).join(', ')+')');
+  add('cash',vkinds>0&&vkinds<3&&[...vtv].every(v=>/payment|receipt|contra/.test(v))&&/cash/.test(H+title)?2:0,'payment and receipt vouchers');
+  // values in the party / particulars column
+  const pc=S.headers.find(h=>/particulars|ledger|account|beneficiary|narration|description/i.test(h));
+  if(pc){const vals=S.raw.slice(0,2000).map(o=>String(o[pc]||'').toLowerCase());const n=vals.length||1;
+    const bank=vals.filter(v=>/bank|neft|rtgs|imps|upi|chq|cheque/.test(v)).length/n,cash=vals.filter(v=>/^cash\b|cash a\/?c/.test(v)).length/n;
+    if(bank>0.2)add('bank',3,'many bank references in '+pc);if(cash>0.2&&vkinds>=3)add('daybook',1,'cash and bank lines together')}
+  let best='general',bs=0;for(const k in sc)if(sc[k]>bs){bs=sc[k];best=k}
+  if(bs<3)best='general';
+  S.det={type:best,score:bs,why:best==='general'?['no clear signs of a particular register or book']:why[best],stmt:best==='bank'&&stmt,sure:bs>=6};
+  if(S.dtypeAuto){S.dtype=best;S.side=best==='daybook'?'dr':'pay'}
+  if(S.stmtAuto)S.soft=S.det.stmt?'bankstmt':'auto';
+}
+// columns that are filled only on the first line of each voucher → fill down
+function autoFill(){
+  const m=S.map,cand=[m.date,m.doc,m.vtype].filter(Boolean);if(!cand.length)return[];
+  const amtCols=[m.amount,m.credit].filter(Boolean);
+  const rows=S.raw.filter(o=>amtCols.some(c=>String(o[c]??'').trim()!==''));if(rows.length<10)return[];
+  const bl=c=>new Set(rows.map((o,i)=>String(o[c]??'').trim()===''?i:-1).filter(i=>i>=0));
+  const B=Object.fromEntries(cand.map(c=>[c,bl(c)])),first=c=>String(rows[0][c]??'').trim()!=='';
+  const out=cand.filter(c=>first(c)&&B[c].size/rows.length>=0.1);
+  // smaller share of blanks still means "continuation lines" when two columns are blank on the same rows
+  for(const a of cand)for(const b of cand){if(a>=b||!first(a)||!first(b))continue;const A=B[a],Bb=B[b];if(A.size/rows.length<0.03||Bb.size/rows.length<0.03)continue;
+    const both=[...A].filter(i=>Bb.has(i)).length;if(both/Math.min(A.size,Bb.size)>=0.8){if(!out.includes(a))out.push(a);if(!out.includes(b))out.push(b)}}
+  return out}
+/* ---------- risk scoring across tests ---------- */
+const FLAGW={dups:3,split:3,rsf:3,idchk:1,odd:2,outlier:2,single:1.5,round:1,below:1,benford:0.5};
+function flagMap(){
+  const F=new Map(),R=S.results;const add=(r,k,label)=>{if(!r||r._r==null)return;const o=S._byR?S._byR.get(r._r)||r:r;let e=F.get(o);if(!e){e={row:o,f:{}};F.set(o,e)}if(!e.f[k])e.f[k]=label};
+  S._byR=S._byR||new Map(S.rows.map(x=>[x._r,x]));
+  if(R.rsf)R.rsf.tables[0].rows.filter(x=>x.flag).forEach(x=>{const top=x._rows.reduce((a,b)=>Math.abs(b._amt)>Math.abs(a._amt)?b:a);add(top,'rsf','RSF '+(x.rsf===Infinity?'∞':x.rsf.toFixed(1)))});
+  if(R.dups)R.dups.tables[0].rows.forEach(x=>add(x,'dups','Duplicate'));
+  if(R.round)R.round.tables[1].rows.forEach(x=>add(x,'round','Round amount'));
+  if(R.odd)R.odd.tables[0].rows.forEach(x=>x._rows.forEach(r=>add(r,'odd','Repeated odd ₹'+fmt0(x.amt)+' ×'+x.n)));
+  if(R.single)R.single.tables[0].rows.forEach(x=>add(x,'single','One-time party'));
+  if(R.outlier)R.outlier.tables[0].rows.forEach(x=>add(x,'outlier','Outlier'));
+  if(R.idchk)R.idchk.tables[0].rows.filter(x=>x.sev!=='Low').forEach(x=>x._rows.forEach(r=>add(r,'idchk','GSTIN/PAN issue')));
+  if(R.thresh){R.thresh.tables[1].rows.forEach(x=>x._rows.forEach(r=>add(r,'split','Possible split ('+fmt0(x.t)+')')));R.thresh.tables[2].rows.forEach(x=>add(x,'below','Just under ₹'+fmt0(x._t)))}
+  if(R.benford&&R.benford.suitable&&R.benford.flag)R.benford.tables[0].rows.filter(x=>x.flag==='Spike').forEach(x=>x._rows.forEach(r=>add(r,'benford','Benford digit '+x.d)));
+  const out=[...F.values()].map(e=>{const ks=Object.keys(e.f);return Object.assign({},e.row,{_score:ks.reduce((s,k)=>s+FLAGW[k],0),_n:ks.length,_why:ks.map(k=>e.f[k]),_keys:ks})});
+  out.sort((a,b)=>b._score-a._score||Math.abs(b._amt)-Math.abs(a._amt));return out}
+function periodEnd(){const ds=S.rows.map(r=>r._date).filter(Boolean).sort();return ds.length?{first:ds[0],last:ds[ds.length-1]}:null}
+function nearEnd(rows,days){const pe=periodEnd();if(!pe)return 0;const lim=dayNum(pe.last)-days;return rows.filter(r=>r._date&&dayNum(r._date)>lim).length}
+
+/* ---------- plain-language findings ---------- */
+function findings(){
+  const P=(n,a,b)=>fmt0(n)+' '+(n===1?a:b);
+  const R=S.results,F=[],V=valid(),pe=periodEnd();const push=(sev,id,txt)=>F.push({sev,id,txt});
+  const unp=S.rows.length-V.length;if(unp)push(2,'data',P(unp,'row has','rows have')+' no readable amount and were left out of the tests. Check the amount column on the Data tab.');
+  if(S.map.date){const und=S.rows.filter(r=>!r._date).length;if(und)push(2,'data',P(und,'row has','rows have')+' no readable date — date-based checks (month-wise view, splits, sampling by period) skip them.')}
+  const r=R;
+  if(r.dups&&r.dups.flag){const ex=r.dups.tables[0].rows.reduce((s,x,i,a)=>s,0);push(3,'dups',`${P(r.dups.flag,'group','groups')} of possible duplicates (${fmt0(r.dups.tables[0].rows.length)} rows); ₹${r.dups.cards[2][1]} sits in the second and later entries. Matched on ${r.dups.cards[3][1]}.`)}
+  if(r.gaps&&!r.gaps.notSeries&&r.gaps.missing)push(3,'gaps',`${P(r.gaps.missing,'document number is','document numbers are')} missing from the series${r.gaps.firstGaps?' — e.g. '+r.gaps.firstGaps:''}. Each needs an explanation (cancelled, voided or unrecorded).`);
+  if(r.gaps&&r.gaps.dupNos)push(2,'gaps',`${P(r.gaps.dupNos,'document number is','document numbers are')} used more than once.`);
+  if(r.thresh){const sp=r.thresh.tables[1].rows;if(sp.length){const x=sp[0];push(3,'thresh',`${P(sp.length,'possible split transaction','possible split transactions')}. Strongest: ${x.party} on ${dmy(x.from)} — ${x.n} items totalling ₹${fmt(x.tot)}, each under the ₹${fmt0(x.t)} limit.`)}
+    const cl=r.thresh.tables[0].rows.filter(x=>x.flag);if(cl.length)push(2,'thresh',`Amounts bunch just below ${cl.map(x=>'₹'+fmt0(x.t)).join(', ')}: ${cl.map(x=>x.nb+' just below against '+x.na+' just above').join('; ')}.`)}
+  if(r.rsf&&r.rsf.flag){const x=r.rsf.tables[0].rows[0];push(3,'rsf',`${fmt0(r.rsf.flag)} part${r.rsf.flag>1?'ies have':'y has'} one transaction far larger than the rest. Largest: ${x.party} — ₹${fmt(x.largest)}, ${x.rsf===Infinity?'with no other comparable item':x.rsf.toFixed(1)+' times the next largest'}.`)}
+  if(r.idchk&&r.idchk.flag){const hi=r.idchk.tables[0].rows.filter(x=>x.sev==='High');push(hi.length?3:2,'idchk',`${P(r.idchk.flag,'GSTIN / PAN problem','GSTIN / PAN problems')}${hi.length?', e.g. '+hi.slice(0,2).map(x=>{const t=x.issue.split(' — ')[0];return (x.party||x.id)+' — '+t.charAt(0).toLowerCase()+t.slice(1)}).join('; '):''}.`)}
+  if(r.odd&&r.odd.flag){const x=r.odd.tables[0].rows[0];push(2,'odd',`The same non-round amount repeats: ₹${fmt(x.amt)} appears ${x.n} times (${x.names}).${r.odd.flag>1?' '+(r.odd.flag-1)+' more such amount'+(r.odd.flag>2?'s':'')+'.':''}`)}
+  if(r.round&&r.round.flag){const rr=r.round.tables[1].rows,ne=nearEnd(rr,5),all=nearEnd(V,5);const share=V.length?all/V.length:0;
+    push(ne/rr.length>Math.max(0.2,2*share)?3:1,'round',`${fmt0(rr.length)} round amounts (${r.round.cards[2][1]} of items), worth ₹${r.round.cards[3][1]}.${pe&&ne?` ${ne} of them ${ne===1?'falls':'fall'} in the last 5 days of the period (${dmy(pe.last)}) — against ${pct(share)} of all transactions.`:''}`)}
+  if(r.single&&r.single.flag){const x=r.single.tables[0].rows[0];push(r.single.flag>20?1:2,'single',`${P(r.single.flag,'one-time party','one-time parties')} worth ₹${r.single.cards[2][1]}. Largest: ${x._party} — ₹${fmt(x._amt)}.`)}
+  if(r.outlier&&r.outlier.flag){const x=r.outlier.tables[0].rows[0];push(1,'outlier',`${P(r.outlier.flag,'transaction lies','transactions lie')} far outside the normal range of their group. Most extreme: ${x._party||x._g} — ₹${fmt(x._amt)}.`)}
+  if(r.benford){const b=r.benford;if(!b.suitable)push(0,'benford',`Benford's Law was not relied on: ${b.why}.`);else if(b.flag)push(2,'benford',`The digit pattern departs from Benford's Law (${b.cards[2][1]}). Look at the digits marked "Spike".`);else push(0,'benford',`The digit pattern fits Benford's Law (${b.cards[2][1]}) — no sign of invented amounts across the population.`)}
+  if(V.length>=50){const s=V.map(x=>Math.abs(x._amt)).sort((a,b)=>b-a),tot=s.reduce((a,b)=>a+b,0),k=Math.max(1,Math.round(s.length*0.02)),top=s.slice(0,k).reduce((a,b)=>a+b,0);
+    if(tot)push(0,'strat',`The largest ${P(k,'item','items')} (2% of the count) carry ${pct(top/tot)} of the value — ${top/tot>0.4?'testing them in full covers much of the population':'value is spread fairly evenly, so sampling matters more'}.`)}
+  if(S.map.date){const sun=S.rows.filter(x=>x._date&&new Date(x._date+'T00:00:00Z').getUTCDay()===0);if(sun.length&&sun.length/S.rows.length<0.1)push(1,'sun',`${P(sun.length,'entry is','entries are')} dated on a Sunday — worth a look if the entity does not work on Sundays.`)}
+  F.sort((a,b)=>b.sev-a.sev);return F}
+function runAll(){TESTS.forEach(t=>runTest(t,true));S._ins=null}
+
+/* ---------- Insights page ---------- */
+function viewOverview(){
+  const R=S.rows,V=valid(),m=S.map;if(!TESTS.some(t=>S.results[t.id]||S.err[t.id]))runAll();
+  const fl=flagMap(),multi=fl.filter(x=>x._n>=2),F=findings();
+  const ds=R.map(r=>r._date).filter(Boolean).sort();
+  const dt=DTYPES[S.dtype]||DTYPES.general;
+  let L=`<div class="hdr"><div class="ht"><h1>Insights</h1><p class="sub">${esc(dt.label)} · ${fmt0(R.length)} rows${ds.length?' · '+dmy(ds[0])+' to '+dmy(ds[ds.length-1]):''} · ${testsRunText()}</p></div>
+   <div class="acts"><button class="btn p" id="bPlan">Plan the sample</button><button class="btn" id="bAll">Run all again</button></div></div>
+   <div class="cards">${[['Transactions flagged by any test',fmt0(fl.length),fl.length?'warn':'ok'],['Flagged by two or more',fmt0(multi.length),multi.length?'bad':'ok'],['Value of multi-flagged',fmt(sumBy(multi,x=>Math.abs(x._amt)))],['Total value',fmt(sumBy(V,x=>Math.abs(x._amt)))]].map(kpi).join('')}</div>
+   <div class="help" style="margin-bottom:0"><b>Suggested next step:</b> ${multi.length?`check the <b>${fmt0(multi.length)}</b> transactions flagged by more than one test in full, and draw a sample from the rest.`:'no transaction is flagged by more than one test. Review the key findings, then draw a sample.'} The result of each test is shown against its name in the sidebar.</div>`;
+  let Rh=`<div class="card"><h3>Key findings <span class="muted" style="font-weight:400">— most important first; click one to open its test</span></h3><ol class="finds">${F.map(f=>`<li class="s${f.sev}" ${TBYID[f.id]?`data-go="${f.id}"`:f.id==='data'?'data-go="data"':''}>${esc(f.txt)}</li>`).join('')||'<li>No exceptions found by any test.</li>'}</ol></div>`;
+  Rh+=`<div class="card" id="riskT"></div><div class="card" id="partyT"></div>`;
+  $('#main').innerHTML=`<style>.finds{margin:0;padding-left:22px}.finds li{padding:6px 4px;border-bottom:1px solid #f0f2f5;cursor:pointer;line-height:1.45}.finds li:hover{background:#f5f9ff}.finds li.s3::marker{color:var(--red);font-weight:700}.finds li.s2::marker{color:var(--amber);font-weight:700}.finds li.s1::marker,.finds li.s0::marker{color:var(--mut)}
+    .tlist a{display:flex;justify-content:space-between;align-items:center;padding:5px 4px;border-bottom:1px solid #f0f2f5;cursor:pointer;font-size:12.5px;color:var(--ink);text-decoration:none}.tlist a:hover{background:#f5f9ff}.why{display:inline-block;background:var(--amber-l);color:#7a5212;border-radius:9px;padding:0 7px;margin:0 3px 2px 0;font-size:11.5px}</style>
+    <div class="split"><aside class="cp">${L}</aside><div class="res">${Rh}${footer()}</div></div>`;
+  const cols=[{k:'_score',h:'Risk score',t:'num'},{k:'_whyT',h:'Why it is flagged'},...txnCols().filter(c=>c.k!=='_desc')];
+  const rows=fl.map(x=>Object.assign(x,{_whyT:x._why.join(' · ')}));
+  renderTable($('#riskT'),{title:'Transactions ranked by risk (flagged by more tests rank higher)',cols,rows});
+  $('#riskT').querySelectorAll('tbody td:nth-child(2)').forEach(td=>{const t=td.textContent;td.innerHTML=t.split(' · ').map(w=>`<span class="why">${esc(w)}</span>`).join('');td.style.whiteSpace='normal';td.style.minWidth='330px';td.style.maxWidth='460px'});
+  if(m.party){const P=new Map();for(const x of fl){const k=x._party||'(blank)';let e=P.get(k);if(!e){e={party:k,n:0,score:0,v:0,tests:new Set(),_rows:[]};P.set(k,e)}e.n++;e.score+=x._score;e.v+=Math.abs(x._amt);x._keys.forEach(t=>e.tests.add(t));e._rows.push(x)}
+    const pr=[...P.values()].map(e=>Object.assign(e,{nt:e.tests.size,tl:[...e.tests].map(t=>({dups:'duplicates',split:'splits',rsf:'RSF',idchk:'GSTIN/PAN',odd:'repeated amounts',outlier:'outliers',single:'one-time',round:'round amounts',below:'just under limits',benford:'Benford'})[t]).join(', ')})).sort((a,b)=>b.score-a.score);
+    renderTable($('#partyT'),{title:'Parties to look at',cols:[{k:'party',h:m.party},{k:'n',h:'Flagged items',t:'int'},{k:'v',h:'Value flagged',t:'amt'},{k:'score',h:'Total risk score',t:'num'},{k:'tl',h:'Found by'}],rows:pr,drill:x=>({title:x.party,rows:x._rows,cols})})}
+  else $('#partyT').remove();
+  document.querySelectorAll('[data-go]').forEach(d=>d.onclick=()=>openTab(d.dataset.go));
+  $('#bAll').onclick=()=>{runAll();render();toast('Tests run again — '+testsRunText())};
+  $('#bPlan').onclick=()=>{if(!S.samp)S.samp={p:SP_DEF(),res:null,audit:{},err:''};const p=S.samp.p;p.purpose='details';
+    p.keyTests=['dups','thresh','rsf','idchk','odd'].filter(id=>S.results[id]&&S.results[id].flag);openTab('sampling');toast('Exceptions of '+p.keyTests.length+' tests will be checked in full')};
+}
 
 /* ============ Load files ============ */
 function sniffDelim(t){const lines=t.split(/\r?\n/).filter(l=>l.trim()).slice(0,20);let best=',',bs=-1;
@@ -216,38 +420,53 @@ function buildRows(guess){
   S.headers=headers;S.raw=rows;S.log=log;S.multi=multi;
   S.fileName=[...new Set(parts.map(p=>p.file))].join(' + ');S.sheet=parts.map(p=>p.sheet).join(', ');S.hash=S.files.filter(f=>parts.some(p=>p.fid===f.id)).map(f=>f.name+': '+f.hash).join(' | ');
   for(const k in S.map)if(S.map[k]&&!headers.includes(S.map[k]))S.map[k]='';
+  if(guess)detectType();
   if(guess){const used=new Set();for(const k in S.map)S.map[k]='';
-    for(const k of ['gstin','pan','drcr','vtype','user','date','doc','amount','credit','party','cat','desc']){let hit='';
-      for(const pat of (GUESS_PRI[k]||[GUESS[k]])){hit=headers.find(x=>!used.has(x)&&pat.test(x)&&!(GUESS_EXC[k]&&GUESS_EXC[k].test(x)));if(hit)break}
+    for(const k of ['gstin','pan','drcr','vtype','user','date','doc','ref','amount','credit','party','cat','desc']){let hit='';
+      if(k==='doc'&&S.soft==='bankstmt'){S.map.doc='';continue}
+      for(const pat of guessPri(k)){hit=headers.find(x=>!used.has(x)&&pat.test(x)&&!(GUESS_EXC[k]&&GUESS_EXC[k].test(x)));if(hit)break}
       S.map[k]=hit||'';if(hit)used.add(hit)}
-    if(S.map.credit&&!/debit|\bdr\b/i.test(S.map.amount))S.map.credit='';
+    if(S.map.credit&&!/debit|\bdr\b|withdrawal/i.test(S.map.amount))S.map.credit='';
     if(up.length&&!S.map.amount)S.map.amount='Value';
-    S.amtMode=S.map.credit?'split':S.map.drcr?'ind':'single'}
+    S.amtMode=S.map.credit?'split':S.map.drcr?'ind':'single';
+    const pf=autoFill();if(pf&&pf.length&&!S._pfDone&&pf.some(c=>!S.opt.fill.includes(c))){S._pfDone=true;S.opt.fill=[...new Set([...S.opt.fill,...pf])];const keep={...S.map},am=S.amtMode;buildRows(false);S.map=Object.assign(S.map,keep);S.amtMode=am;S._pfDone=false;render();return}}
   S.mapped=false;S.results={};S.samp=null;S._byR=null;render()}
+function passSide(o,sd){const m=S.map;
+  if(S.amtMode==='split'){const col=sd==='dr'?m.amount:m.credit;const v=parseAmount(o[col]);return v!=null&&v!==0}
+  if(S.amtMode==='ind'){const ind=String(o[m.drcr]??'').trim().toLowerCase();return sd==='dr'?/^d/.test(ind):/^c/.test(ind)}
+  return true}
 function passFilters(o){for(const f of S.filters){if(!f.col)continue;const raw=o[f.col],v=String(raw??'').trim().toLowerCase(),vals=String(f.val||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);let ok=true;
   switch(f.op){case 'eq':ok=vals.includes(v);break;case 'neq':ok=!vals.includes(v);break;case 'has':ok=vals.some(x=>v.includes(x));break;case 'nhas':ok=!vals.some(x=>v.includes(x));break;
     case 'blank':ok=v==='';break;case 'nblank':ok=v!=='';break;case 'gte':{const a=parseAmount(raw),b=parseAmount(f.val);ok=a!=null&&b!=null&&a>=b;break}case 'lte':{const a=parseAmount(raw),b=parseAmount(f.val);ok=a!=null&&b!=null&&a<=b;break}}
   if(!ok)return false}return true}
 function detectDF(){let a=0,b=0;const c=S.map.date;if(c)for(const o of S.raw){const m=String(o[c]??'').trim().match(/^(\d{1,2})[-\/. ](\d{1,2})[-\/. ](\d{2,4})\b/);if(m){if(+m[1]>12)a++;if(+m[2]>12)b++}}
   S._dfAuto=b>a?'mdy':'dmy';S._dfEvid=[a,b];return S._dfAuto}
+/* VERA: the side chosen decides the sign used in the tests without overwriting the user's own settings */
+function effSplitPos(){const sd=sideDC();return sd&&S.amtMode==='split'?sd:S.splitPos}
+function effDrcrNeg(){const sd=sideDC();return sd&&S.amtMode==='ind'?(sd==='dr'?'cr':'dr'):S.drcrNeg}
 function deriveRow(o){const m=S.map;let a=parseAmount(o[m.amount]);
-  if(S.amtMode==='split'){const c=m.credit?parseAmount(o[m.credit]):null;a=(a==null&&c==null)?null:(a||0)-(c||0);if(a!=null&&S.splitPos==='cr')a=-a}
-  if(S.amtMode==='ind'&&m.drcr&&a!=null){const ind=String(o[m.drcr]??'').trim().toLowerCase();a=Math.abs(a);if(S.drcrNeg==='cr'&&/^c/.test(ind))a=-a;if(S.drcrNeg==='dr'&&/^d/.test(ind))a=-a}
+  if(S.amtMode==='split'){const c=m.credit?parseAmount(o[m.credit]):null;a=(a==null&&c==null)?null:(a||0)-(c||0);if(a!=null&&effSplitPos()==='cr')a=-a}
+  if(S.amtMode==='ind'&&m.drcr&&a!=null){const ind=String(o[m.drcr]??'').trim().toLowerCase();a=Math.abs(a);const dn=effDrcrNeg();if(dn==='cr'&&/^c/.test(ind))a=-a;if(dn==='dr'&&/^d/.test(ind))a=-a}
   o._sAmt=a;o._amt=(a!=null&&S.abs)?Math.abs(a):a;const t=k=>m[k]?String(o[m[k]]??'').trim():'';
-  o._party=t('party');o._date=m.date?parseDate(o[m.date]):'';o._doc=t('doc');o._vtype=t('vtype');o._cat=t('cat');o._desc=t('desc');o._user=t('user');
+  o._party=t('party');o._ref=t('ref');o._date=m.date?parseDate(o[m.date]):'';o._doc=t('doc');o._vtype=t('vtype');o._cat=t('cat');o._desc=t('desc');o._user=t('user');
   o._gstin=m.gstin?String(o[m.gstin]??'').toUpperCase().replace(/[\s-]/g,''):'';o._pan=m.pan?String(o[m.pan]??'').toUpperCase().replace(/\s/g,''):'';return o}
 function applyMap(){
   detectDF();
   const mm=S.map;if(!mm.amount){S.err.data=S.amtMode==='split'?'Please choose the Debit amount column.':'Please choose the Amount column.';render();return}
   if(S.amtMode==='split'&&!mm.credit){S.err.data='Please choose the Credit amount column, or pick "One amount column" if there is none.';render();return}
   if(S.amtMode==='ind'&&!mm.drcr){S.err.data='Please choose the Dr / Cr column, or pick "One amount column" if there is none.';render();return}
-  let filt=0;const rows=[];for(const o of S.raw){deriveRow(o);if(!passFilters(o)){filt++;continue}rows.push(o)}
-  if(!rows.length){S.err.data='No rows are left after the row filters. Check the filters.';render();return}
-  S.rows=rows;S.log.filtered=filt;S.mapped=true;S.results={};S.samp=null;S._byR=null;S.err.data='';S.view='overview';render();toast('Mapping applied to '+fmt0(S.rows.length)+' rows')}
+  const sd=sideDC();
+  let filt=0,sideOut=0;const rows=[],rowsAll=[];for(const o of S.raw){deriveRow(o);if(!passFilters(o)){filt++;continue}rowsAll.push(o);if(sd&&!passSide(o,sd)){sideOut++;continue}rows.push(o)}
+  S.rowsAll=rowsAll;
+  S.log.side=sideOut;
+  if(!rows.length){S.err.data='No rows are left after the row filters'+(sd?' and the side chosen to analyse':'')+'. Check those settings.';render();return}
+  S.rows=rows;S.log.filtered=filt;S.mapped=true;S.results={};S.err={};S.tabs=['data','overview'];S.scroll={};S.samp=null;S._byR=null;S.err.data='';S._byR=null;runAll();S.view='overview';render();window.scrollTo(0,0);toast(fmt0(S.rows.length)+' rows analysed — '+testsRunText())}
 const valid=()=>S.rows.filter(r=>r._amt!=null);
+const allRows=()=>S.rowsAll||S.rows;
 function dataLogLines(){const L=S.log||{},parts=S.parts.filter(p=>p.on);const lines=[['Files and sheets combined',parts.map(p=>p.label).join('; ')],['Header row',S.headerRow+(S.headerRows===2?' (two header rows merged)':'')]];
   lines.push(['Rows read',L.read],['Removed — blank rows',L.blank],['Removed — repeated header rows',L.hdr],['Removed — total / opening / closing rows',L.tot+(S.opt.skipTotals?' (keywords: '+S.opt.totalWords+')':'')],['Blank cells filled down',L.filled+(S.opt.fill.length?' ('+S.opt.fill.join(', ')+')':'')]);
   if(S.opt.unpivot.length)lines.push(['Columns turned into rows',S.opt.unpivot.join(', ')+' → '+L.unpiv+' rows']);
+  lines.push(['Data type',(DTYPES[S.dtype]||DTYPES.general).label+(S.soft==='bankstmt'?' (bank statement)':'')+(S.dtypeAuto&&S.det?' — detected automatically: '+S.det.why.join('; '):' — chosen by the user')]);if(sideOK())lines.push(['Side analysed',S.amtMode==='single'?'All lines — with one amount column the sides cannot be told apart':(sideLabels().find(x=>x[0]===S.side)||['',''])[1]+' — '+(S.log.side||0)+' other lines left out']);
   lines.push(['Date format used',S.dateFmt==='auto'?(S._dfAuto==='mdy'?'Month / Day / Year (detected)':'Day / Month / Year (detected or assumed)'):DFMT[S.dateFmt]],['Row filters',S.filters.filter(f=>f.col).map(f=>f.col+' '+FOPS[f.op]+(['blank','nblank'].includes(f.op)?'':' '+f.val)).join('; ')||'None'],['Removed by row filters',L.filtered||0],['Number format',S.numFmt==='eu'?'1.234,56 (comma decimal)':'1,23,456.78 (Indian / international)']);
   return lines}
 const FOPS={eq:'is any of',neq:'is none of',has:'contains any of',nhas:'contains none of',blank:'is blank',nblank:'is not blank',gte:'is at least',lte:'is at most'};
@@ -256,8 +475,8 @@ const DFMT={auto:'Automatic — detected from the whole column',dmy:'Day / Month
 /* ============ Mapping profiles ============ */
 function profGet(){try{return JSON.parse(localStorage.getItem('caat_profiles')||'{}')}catch(e){return{}}}
 function profSet(o){try{localStorage.setItem('caat_profiles',JSON.stringify(o));return true}catch(e){return false}}
-function profSnap(){return JSON.parse(JSON.stringify({amtMode:S.amtMode,splitPos:S.splitPos,headerRow:S.headerRow,headerRows:S.headerRows,delim:S.delim,opt:S.opt,map:S.map,drcrNeg:S.drcrNeg,dateFmt:S.dateFmt,numFmt:S.numFmt,filters:S.filters,abs:S.abs,crNeg:S.crNeg}))}
-function profApply(pr){if(!pr)return;Object.assign(S,{amtMode:pr.amtMode||(pr.map&&pr.map.credit?'split':pr.map&&pr.map.drcr?'ind':'single'),splitPos:pr.splitPos||'dr',headerRow:pr.headerRow||1,headerRows:pr.headerRows||1,drcrNeg:pr.drcrNeg||'cr',dateFmt:pr.dateFmt||'auto',numFmt:pr.numFmt||'in',filters:pr.filters||[],abs:!!pr.abs,crNeg:!!pr.crNeg});
+function profSnap(){return JSON.parse(JSON.stringify({dtype:S.dtype,soft:S.soft,side:S.side,amtMode:S.amtMode,splitPos:S.splitPos,headerRow:S.headerRow,headerRows:S.headerRows,delim:S.delim,opt:S.opt,map:S.map,drcrNeg:S.drcrNeg,dateFmt:S.dateFmt,numFmt:S.numFmt,filters:S.filters,abs:S.abs,crNeg:S.crNeg}))}
+function profApply(pr){if(!pr)return;Object.assign(S,{dtype:DTYPES[pr.dtype]?pr.dtype:S.dtype,soft:(pr.soft==='auto'||SOFT[pr.soft])?pr.soft:S.soft,side:['pay','rec','dr','cr','all'].includes(pr.side)?pr.side:S.side,amtMode:pr.amtMode||(pr.map&&pr.map.credit?'split':pr.map&&pr.map.drcr?'ind':'single'),splitPos:pr.splitPos||'dr',headerRow:pr.headerRow||1,headerRows:pr.headerRows||1,drcrNeg:pr.drcrNeg||'cr',dateFmt:pr.dateFmt||'auto',numFmt:pr.numFmt||'in',filters:pr.filters||[],abs:!!pr.abs,crNeg:!!pr.crNeg});
   S.opt=Object.assign({},S.opt,pr.opt||{});if(pr.delim&&pr.delim!==S.delim){S.delim=pr.delim;reparseCsv()}
   buildRows(false);const miss=[];for(const k in S.map){const v=(pr.map||{})[k]||'';if(v&&!S.headers.includes(v))miss.push(v);S.map[k]=v&&S.headers.includes(v)?v:''}
   if(miss.length)S.err.data='Profile applied. These columns were not found in this file: '+miss.join(', ')+'. Map them by hand.';else S.err.data='';render();toast('Profile applied')}
@@ -266,9 +485,13 @@ function profApply(pr){if(!pr)return;Object.assign(S,{amtMode:pr.amtMode||(pr.ma
 function viewData(){
   detectDF();const m=S.map;const F=(l,inner,w)=>`<label class="f" ${w?`style="min-width:${w}px"`:''}>${esc(l)}${inner}</label>`;
   const cb=(id,on,l)=>`<label class="f" style="flex-direction:row;gap:7px;align-items:center;color:var(--ink);min-width:0"><input type="checkbox" id="${id}" ${on?'checked':''}>${l}</label>`;
-  let h=`<h1>Data &amp; Mapping</h1><p class="sub">Load one or more CSV or Excel files. The tool can combine monthly files or sheets, skip report totals and repeated headers, fill down blank cells, turn month-wise columns into rows, read Dr/Cr columns, and remember your settings as a profile. Nothing is uploaded anywhere.</p>`;
-  h+=`<div class="note"><b>Disclaimer.</b> ${esc(DISCLAIMER)}</div>`;
+  let h=`<h1>Data &amp; Mapping</h1><p class="sub">Choose the kind of data, load the file(s), check the layout and mapping, then apply. Nothing is uploaded anywhere.</p>`;
+  h+=`<details class="note" style="padding:7px 14px"><summary style="cursor:pointer"><b>Disclaimer</b> — independent prototype; results are indicators only and the auditor remains responsible. <span style="color:var(--blue)">Read in full</span></summary><div style="margin-top:6px">${esc(DISCLAIMER)}</div></details>`;
   if(S.err.data)h+=`<div class="${/^Profile applied/.test(S.err.data)?'note':'err'}">${esc(S.err.data)}</div>`;
+  const dtc=(k,d)=>`<div class="opt ${S.dtype===k?'on':''}" data-dt="${k}" style="flex:1 1 150px"><div class="ot">${d.icon} ${esc(d.label)}</div><div class="od">${esc(d.desc)}</div></div>`;
+  const softs=Object.entries(SOFT).filter(([k])=>k!=='bankstmt'||S.dtype==='bank');
+  h+=`<style>.opt{border:1px solid var(--line);border-radius:9px;padding:9px 11px;cursor:pointer;background:#fff}.opt:hover{border-color:#9fb8d6}.opt.on{border-color:var(--blue);background:var(--blue-l);box-shadow:0 0 0 1px var(--blue) inset}.opt .ot{font-weight:600;font-size:13px}.opt .od{font-size:11.5px;color:var(--mut);margin-top:2px}.opts{display:flex;gap:8px;flex-wrap:wrap}.seg{display:inline-flex;border:1px solid #cbd2d9;border-radius:7px;overflow:hidden;flex-wrap:wrap}.seg button{font:inherit;font-size:12.5px;border:0;background:#fff;padding:6px 13px;cursor:pointer;border-right:1px solid #cbd2d9}.seg button:last-child{border-right:0}.seg button.on{background:var(--blue);color:#fff}</style>
+`;
   h+=`<div class="card"><h3>1. Files</h3><div class="drop" id="drop"><b>Drop one or more files here</b> or click to choose<br><span class="muted">.xlsx, .xls, .csv, .txt, .tsv · files or sheets with the same columns (for example 12 monthly ledgers) are combined into one population</span><input type="file" id="fi" multiple accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv" hidden></div>
     <div class="row" style="margin-top:12px"><button class="btn" id="bDemo">Load demo data (synthetic expense payments)</button>${S.files.length?'<button class="btn" id="bClr">Remove all files</button>':''}
     ${S.files.some(f=>f.kind==='csv')?F('Separator in text files',`<select id="sDelim">${[['auto','Detect automatically'],[',','Comma ,'],[';','Semicolon ;'],['\t','Tab'],['|','Pipe |']].map(([v,l])=>`<option value="${esc(v)}" ${S.delim===v?'selected':''}>${l}</option>`).join('')}</select>`):''}</div>`;
@@ -276,13 +499,19 @@ function viewData(){
     <div class="muted" style="margin-top:6px">Tick every sheet or file to combine. Columns are matched by heading name; a "Source" column records where each row came from.</div>`;
   h+=`</div>`;
   if(!S.parts.length){h+=footer();$('#main').innerHTML=h;bindData();return}
+  const D=S.det;
+  h+=`<div class="card"><h3>2. What kind of data is this?</h3>
+    ${D?`<div class="${S.dtypeAuto?'help':'note'}" style="margin:0 0 10px">${S.dtypeAuto?`<b>Detected: ${esc((DTYPES[S.dtype]||DTYPES.general).label)}${S.soft==='bankstmt'?' (statement from the bank)':''}.</b> Why: ${esc(D.why.join('; '))}.${D.sure?'':' The signs are weak — please confirm or pick the right type.'}`:`<b>You chose ${esc((DTYPES[S.dtype]||DTYPES.general).label)}.</b> The tool detected ${esc(DTYPES[D.type].label)}. <a href="#" id="bRedetect">Use the detected type</a>`}</div>`:''}
+    <div class="opts">${Object.entries(DTYPES).map(([k,d])=>dtc(k,d)).join('')}</div>
+    ${S.dtype==='bank'?`<label class="f" style="flex-direction:row;gap:8px;align-items:center;color:var(--ink);margin-top:10px"><input type="checkbox" id="oStmt" ${S.soft==='bankstmt'?'checked':''}> This is a statement downloaded from the bank — withdrawals (debits) are payments</label>`:''}
+    <div class="muted" style="margin-top:8px">The type decides which columns the tool looks for, which side of a book it analyses, the limits used in the tests and which tests are marked ★. Columns, clean-up and fill-down are always worked out from the data itself.</div></div>`;
   const p0=S.parts.find(p=>p.on)||S.parts[0],hr0=S.headerRow-1,hr1=hr0+S.headerRows-1;
-  h+=`<div class="card"><h3>2. Layout — where the headings are</h3><div class="row">${F('Heading row number',`<input type="number" id="sHdr" min="1" value="${S.headerRow}" style="width:100px">`)}
+  h+=`<div class="card"><h3>3. Layout — where the headings are</h3><div class="row">${F('Heading row number',`<input type="number" id="sHdr" min="1" value="${S.headerRow}" style="width:100px">`)}
     ${F('Heading rows',`<select id="sHdrN"><option value="1" ${S.headerRows===1?'selected':''}>One row</option><option value="2" ${S.headerRows===2?'selected':''}>Two rows (e.g. "Amount" over "Debit | Credit")</option></select>`)}
     <span class="muted" style="padding-bottom:7px">Raw view of <b>${esc(p0.label)}</b> — heading row${S.headerRows===2?'s':''} highlighted. Click a row number to make it the heading row.</span></div>
     <div class="tw" style="margin-top:10px;max-height:300px"><table><tbody>${p0.aoa.slice(0,Math.max(15,hr1+4)).map((r,i)=>`<tr style="${i>=hr0&&i<=hr1?'background:#e7f1fb;font-weight:600':''}"><td class="r" data-hr="${i+1}" style="cursor:pointer;color:var(--blue);width:40px">${p0.off+i+1}</td>${(r.length?r:['']).slice(0,20).map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
   const L=S.log||{};
-  h+=`<div class="card"><h3>3. Clean-up rules</h3><div class="row" style="align-items:center">${cb('oTot',S.opt.skipTotals,'Skip total, sub-total, opening and closing balance rows — rows whose first cells start with:')}<input id="oWords" value="${esc(S.opt.totalWords)}" style="flex:1;min-width:300px"></div>
+  h+=`<div class="card"><h3>4. Clean-up rules</h3><div class="row" style="align-items:center">${cb('oTot',S.opt.skipTotals,'Skip total, sub-total, opening and closing balance rows — rows whose first cells start with:')}<input id="oWords" value="${esc(S.opt.totalWords)}" style="flex:1;min-width:300px"></div>
     <div class="row" style="margin-top:8px">${cb('oRep',S.opt.skipRepHdr,'Skip heading rows repeated inside the data (page breaks in printed reports)')}${S.multi?cb('oSrc',S.opt.srcCol,'Add a "Source" column showing the file and sheet'):''}</div>
     <div class="muted" style="margin:12px 0 4px"><b>Fill down blank cells</b> — for reports where the date, voucher number or party appears only on the first line of each voucher (Tally Day Book, SAP line items):</div>
     <div class="cols">${S.headersPre.filter(x=>x!=='Source').map(x=>`<label><input type="checkbox" data-fill="${esc(x)}" ${S.opt.fill.includes(x)?'checked':''}>${esc(x)}</label>`).join('')}</div>
@@ -293,15 +522,16 @@ function viewData(){
   const colSel=(k,ph)=>`<select data-m="${k}"><option value="">${ph||'— choose —'}</option>${S.headers.map(x=>`<option ${m[k]===x?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
   const am=S.amtMode,amOpt=(v,t,d)=>`<div class="opt ${am===v?'on':''}" data-am="${v}"><div class="ot">${t}</div><div class="od">${d}</div></div>`;
   h+=`<style>.opt{border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;background:#fff;flex:1 1 220px}.opt:hover{border-color:#9fb8d6}.opt.on{border-color:var(--blue);background:var(--blue-l);box-shadow:0 0 0 1px var(--blue) inset}.opt .ot{font-weight:600;font-size:13.5px}.opt .od{font-size:12px;color:var(--mut);margin-top:3px}.opts{display:flex;gap:10px;flex-wrap:wrap}</style>
-  <div class="card"><h3>4. Map your columns</h3><div class="muted" style="margin-bottom:6px"><b>a) How are the amounts given in your file?</b></div><div class="opts">
+  <div class="card"><h3>5. Map your columns</h3><div class="muted" style="margin-bottom:6px"><b>a) How are the amounts given in your file?</b></div><div class="opts">
     ${amOpt('single','One amount column','Minus signs or brackets show negatives. Example: Amount = 12,500 or (4,000).')}
     ${amOpt('split','Separate Debit and Credit columns','Each row has a value in one of the two columns.')}
     ${amOpt('ind','One amount column + a Dr / Cr column','A second column says Dr or Cr for each amount (Tally, SAP style).')}</div>
-    <div class="row" style="margin-top:12px">${am==='split'?F('Debit amount column *',colSel('amount'))+F('Credit amount column *',colSel('credit'))+F('Show as positive',`<select id="sSplitPos"><option value="dr" ${S.splitPos==='dr'?'selected':''}>Debits (credits become negative)</option><option value="cr" ${S.splitPos==='cr'?'selected':''}>Credits (debits become negative)</option></select>`)
-      :am==='ind'?F('Amount column *',colSel('amount'))+F('Dr / Cr column *',colSel('drcr'))+F('Treat as negative',`<select id="sDrNeg"><option value="cr" ${S.drcrNeg==='cr'?'selected':''}>Cr (credits negative)</option><option value="dr" ${S.drcrNeg==='dr'?'selected':''}>Dr (debits negative)</option></select>`)
+    <div class="row" style="margin-top:12px">${am==='split'?F('Debit amount column *',colSel('amount'))+F('Credit amount column *',colSel('credit'))+F('Show as positive',`<select id="sSplitPos" ${sideDC()?'disabled title="Set by the side chosen below"':''}><option value="dr" ${S.splitPos==='dr'?'selected':''}>Debits (credits become negative)</option><option value="cr" ${S.splitPos==='cr'?'selected':''}>Credits (debits become negative)</option></select>`)
+      :am==='ind'?F('Amount column *',colSel('amount'))+F('Dr / Cr column *',colSel('drcr'))+F('Treat as negative',`<select id="sDrNeg" ${sideDC()?'disabled title="Set by the side chosen below"':''}><option value="cr" ${S.drcrNeg==='cr'?'selected':''}>Cr (credits negative)</option><option value="dr" ${S.drcrNeg==='dr'?'selected':''}>Dr (debits negative)</option></select>`)
       :F('Amount column *',colSel('amount'))}</div>
-    <div class="muted" style="margin:6px 0 0">${am==='split'?'Amount used in the tests = Debit − Credit'+(S.splitPos==='cr'?', shown with credits positive.':'.'):am==='ind'?'Amount used in the tests = the amount, negative where the Dr / Cr column says '+(S.drcrNeg==='cr'?'Cr':'Dr')+'.':'Amount used in the tests = the value in this column.'}</div>
-    <div class="muted" style="margin:16px 0 6px"><b>b) Other columns</b> — map what your file has; leave the rest as "not available".</div><div class="grid2">${MAPF.filter(([k])=>!['amount','credit','drcr'].includes(k)).map(([k,l,hint])=>`<label class="f">${esc(l)}<select data-m="${k}"><option value="">— not available —</option>${S.headers.map(x=>`<option ${m[k]===x?'selected':''}>${esc(x)}</option>`).join('')}</select>${hint?`<span style="font-size:11px">${esc(hint)}</span>`:''}</label>`).join('')}</div>
+    ${sideOK()&&am==='single'?`<div class="note" style="margin-top:12px">With one amount column the tool cannot tell debit and credit lines apart, so <b>all lines are analysed</b>. To analyse one side, choose "Debit and credit columns" or "Amount + Dr / Cr column" above.</div>`:''}${sideOK()&&am!=='single'?`<div class="row" style="margin-top:12px;align-items:center"><span class="muted"><b>Which side to analyse?</b></span><div class="seg">${sideLabels().map(([v,l])=>`<button class="${S.side===v?'on':''}" data-side="${v}">${esc(l)}</button>`).join('')}</div><span class="muted">${S.side==='all'?'All lines are analysed.':'Only these lines are analysed and shown as positive amounts.'}</span></div>`:''}
+    <div class="muted" style="margin:6px 0 0">${sideOK()&&S.side!=='all'&&am!=='single'?'Amount used in the tests = the '+(sideDC()==='dr'?'debit':'credit')+' amount of each line on the chosen side.':am==='split'?'Amount used in the tests = Debit − Credit'+(S.splitPos==='cr'?', shown with credits positive.':'.'):am==='ind'?'Amount used in the tests = the amount, negative where the Dr / Cr column says '+(S.drcrNeg==='cr'?'Cr':'Dr')+'.':'Amount used in the tests = the value in this column.'}</div>
+    <div class="muted" style="margin:16px 0 6px"><b>b) Other columns</b> — map what your file has; leave the rest as "not available".</div><div class="grid2">${MAPF.filter(([k])=>!['amount','credit','drcr'].includes(k)).map(([k,l,hint])=>(l=k==='party'?(DTYPES[S.dtype]||DTYPES.general).party:l,0)||`<label class="f">${esc(l)}<select data-m="${k}"><option value="">— not available —</option>${S.headers.map(x=>`<option ${m[k]===x?'selected':''}>${esc(x)}</option>`).join('')}</select>${hint?`<span style="font-size:11px">${esc(hint)}</span>`:''}</label>`).join('')}</div>
     <div class="muted" style="margin:16px 0 6px"><b>c) Formats and options</b></div><div class="row">
       ${F('Date format',`<select id="sDF">${Object.entries(DFMT).map(([v,l])=>`<option value="${v}" ${S.dateFmt===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`+(S.dateFmt==='auto'&&m.date?`<span style="font-size:11px">Detected: ${S._dfAuto==='mdy'?'Month / Day / Year':'Day / Month / Year'}${S._dfEvid[0]+S._dfEvid[1]===0?' (no date proves it either way — day first assumed; choose a format if the data is month first)':''}</span>`:''),260)}
       ${F('Number format',`<select id="sNF"><option value="in" ${S.numFmt==='in'?'selected':''}>1,23,456.78 (Indian / international)</option><option value="eu" ${S.numFmt==='eu'?'selected':''}>1.234,56 (comma decimal)</option></select>`)}
@@ -310,13 +540,13 @@ function viewData(){
     h+=`<div class="muted" style="margin:14px 0 4px"><b>Check:</b> how the tool reads the first rows with this mapping</div><div class="tw" style="max-height:250px"><table><thead><tr><th class="r">Row</th>${S.multi?'<th>Source</th>':''}${m.date?'<th>Date as in file</th><th>Date as read</th>':''}<th class="r">Amount as in file</th><th class="r">Amount as read</th>${m.party?'<th>Party</th>':''}${m.doc?'<th>Voucher</th>':''}</tr></thead><tbody>
     ${smp.map(o=>`<tr><td class="r">${o._xr}</td>${S.multi?`<td>${esc(o._src)}</td>`:''}${m.date?`<td>${esc(o[m.date])}</td><td style="${o._date?'':'color:var(--red)'}">${o._date?dmy(o._date):'not read'}</td>`:''}<td class="r">${esc([o[m.amount],S.amtMode==='split'&&m.credit?o[m.credit]:'',S.amtMode==='ind'&&m.drcr?o[m.drcr]:''].filter(x=>x!==''&&x!=null).join(' | '))}</td><td class="r" style="${o._sAmt==null?'color:var(--red)':''}">${o._sAmt==null?'not read':fmt(o._sAmt)}</td>${m.party?`<td>${esc(o._party)}</td>`:''}${m.doc?`<td>${esc(o._doc)}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
   h+=`</div>`;
-  h+=`<div class="card"><h3>5. Row filters <span class="muted" style="font-weight:400">(optional — keep only the rows you want to analyse)</span></h3>
+  h+=`<div class="card"><h3>6. Row filters <span class="muted" style="font-weight:400">(optional — keep only the rows you want to analyse)</span></h3>
     ${S.filters.map((f,i)=>`<div class="row" style="margin-bottom:8px"><select data-fc="${i}"><option value="">— column —</option>${S.headers.map(x=>`<option ${f.col===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
       <select data-fo="${i}">${Object.entries(FOPS).map(([v,l])=>`<option value="${v}" ${f.op===v?'selected':''}>${l}</option>`).join('')}</select>
       ${['blank','nblank'].includes(f.op)?'':`<input data-fv="${i}" value="${esc(f.val||'')}" placeholder="${['gte','lte'].includes(f.op)?'amount':'values, comma separated'}" style="width:260px">`}<button class="btn sm" data-fx="${i}">Remove</button></div>`).join('')}
     <button class="btn sm" id="bAddF">+ Add filter</button> <span class="muted">Example: Voucher type is any of "Payment, Journal" · Narration contains none of "reversal".</span></div>`;
   const profs=profGet(),pn=Object.keys(profs);
-  h+=`<div class="card"><h3>6. Mapping profiles <span class="muted" style="font-weight:400">(save these settings for the next file in the same layout)</span></h3><div class="row">
+  h+=`<div class="card"><h3>7. Mapping profiles <span class="muted" style="font-weight:400">(save these settings for the next file in the same layout)</span></h3><div class="row">
     ${F('Save current settings as',`<input id="pName" placeholder="e.g. Tally Day Book" style="width:200px">`)}<button class="btn" id="pSave">Save profile</button>
     ${pn.length?F('Saved profiles',`<select id="pSel">${pn.map(n=>`<option>${esc(n)}</option>`).join('')}</select>`)+'<button class="btn" id="pLoad">Apply</button><button class="btn" id="pDel">Delete</button>':''}
     <button class="btn" id="pExp">Copy profile (to share)</button><button class="btn" id="pImpT">Paste a profile</button></div>
@@ -329,7 +559,7 @@ function bindData(){
   dr.ondragover=e=>{e.preventDefault();dr.classList.add('hv')};dr.ondragleave=()=>dr.classList.remove('hv');
   dr.ondrop=e=>{e.preventDefault();dr.classList.remove('hv');e.dataTransfer.files.length&&addFiles([...e.dataTransfer.files])};
   $('#bDemo').onclick=demoData;const on=(id,ev,fn)=>{const e=$('#'+id);if(e)e[ev]=fn};
-  on('bClr','onclick',()=>{S.files=[];S.parts=[];S.raw=[];S.headers=[];S.headersPre=[];S.mapped=false;S.err.data='';render()});
+  on('bClr','onclick',()=>{S.dtypeAuto=true;S.stmtAuto=true;S.det=null;S.dtype='general';S.soft='auto';S.files=[];S.parts=[];S.raw=[];S.headers=[];S.headersPre=[];S.mapped=false;S.err.data='';S.opt.fill=[];S.opt.unpivot=[];S.filters=[];S.headerRow=1;S.headerRows=1;render()});
   on('sDelim','onchange',e=>{S.delim=e.target.value;reparseCsv();buildRows(false)});
   document.querySelectorAll('[data-part]').forEach(c=>c.onchange=()=>{S.parts[+c.dataset.part].on=c.checked;if(!S.parts.some(p=>p.on)){c.checked=true;S.parts[+c.dataset.part].on=true;toast('Keep at least one sheet');return}buildRows(false)});
   on('sHdr','onchange',e=>{S.headerRow=Math.max(1,+e.target.value||1);buildRows(true)});
@@ -355,7 +585,12 @@ function bindData(){
   on('pExp','onclick',()=>copyText(JSON.stringify({caatProfile:1,...profSnap()})));
   on('pImpT','onclick',()=>{$('#pImpBox').style.display='block'});
   on('pImpGo','onclick',()=>{try{profApply(JSON.parse($('#pImp').value))}catch(e){toast('That text is not a valid profile')}});
-  on('bApply','onclick',()=>{S.params={};applyMap()})}
+  on('bApply','onclick',()=>{S.params={};applyMap()});
+  document.querySelectorAll('[data-dt]').forEach(d=>d.onclick=()=>{S.dtype=d.dataset.dt;S.dtypeAuto=false;if(S.dtype!=='bank'){S.soft='auto'}else if(S.stmtAuto&&S.det)S.soft=S.det.stmt?'bankstmt':'auto';S.side=S.dtype==='daybook'?'dr':'pay';presetChanged()});
+  on('bRedetect','onclick',e=>{e.preventDefault();S.dtypeAuto=true;S.stmtAuto=true;presetChanged()});
+  on('oStmt','onchange',e=>{S.stmtAuto=false;S.soft=e.target.checked?'bankstmt':'auto';presetChanged()});
+  document.querySelectorAll('[data-side]').forEach(d=>d.onclick=()=>{S.side=d.dataset.side;render()})}
+function presetChanged(){S.params={};if(S.parts.length){S.opt.fill=[];buildRows(true)}else render()}
 
 /* ============ Demo data ============ */
 function demoData(){
@@ -396,13 +631,13 @@ function demoData(){
   [210,890,1530,1999].forEach(i=>{const c=out[i].slice();c[0]='PV/25-26/'+String(no++).padStart(4,'0');out.push(c)});
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'Payments');
   const dn='Demo - Expense payments FY 2025-26 (synthetic)';S.files=[{id:'demo',name:dn,hash:'demo data',kind:'xlsx'}];S.parts=[{file:dn,sheet:'Payments',label:dn+' › Payments',aoa:out,off:0,on:true,fid:'demo'}];
-  Object.assign(S,{headerRow:1,headerRows:1,filters:[],dateFmt:'auto',numFmt:'in',abs:false,crNeg:false,drcrNeg:'cr'});S.opt.fill=[];S.opt.unpivot=[];S.err.data='';buildRows(false);
+  Object.assign(S,{headerRow:1,headerRows:1,filters:[],dateFmt:'auto',numFmt:'in',abs:false,crNeg:false,drcrNeg:'cr',splitPos:'dr',dtype:'general',soft:'auto',side:'pay',dtypeAuto:true,stmtAuto:true,det:null});S.opt.fill=[];S.opt.unpivot=[];S.err.data='';buildRows(false);
   S.amtMode='single';S.map={amount:'Amount',credit:'',drcr:'',party:'Party Name',date:'Date',doc:'Voucher No',vtype:'',cat:'Expense Head',desc:'Narration',gstin:'GSTIN',pan:'PAN',user:''};S.params={};applyMap();
 }
 
 /* ============ Column definitions ============ */
 function txnCols(){const m=S.map,c=[{k:'_xr',h:'Row',t:'int'}];if(S.multi)c.push({k:'_src',h:'Source'});
-  if(m.date)c.push({k:'_date',h:'Date',t:'date'});if(m.doc)c.push({k:'_doc',h:m.doc});if(m.vtype)c.push({k:'_vtype',h:m.vtype});if(m.party)c.push({k:'_party',h:m.party});
+  if(m.date)c.push({k:'_date',h:'Date',t:'date'});if(m.doc)c.push({k:'_doc',h:m.doc});if(m.ref)c.push({k:'_ref',h:m.ref});if(m.vtype)c.push({k:'_vtype',h:m.vtype});if(m.party)c.push({k:'_party',h:m.party});
   if(m.cat)c.push({k:'_cat',h:m.cat});c.push({k:'_amt',h:'Amount',t:'amt'});if(m.desc)c.push({k:'_desc',h:m.desc});return c}
 const T={amt:1,int:1,num:1,pct:1};
 function cell(v,t){if(t==='amt')return fmt(v);if(t==='int')return fmt0(v);if(t==='pct')return pct(v);if(t==='date')return dmy(v);
@@ -457,26 +692,38 @@ const TESTS=[
 
 {id:'gaps',name:'Check missing',needs:[],
  help:'<b>What it finds:</b> (1) gaps in a voucher or invoice number series — numbers that should exist but are absent from the data; (2) duplicate numbers in the series; (3) blank cells in every column.<p><b>How to read:</b> each gap needs an explanation — cancelled voucher, voided invoice, or an entry kept out of the books. Series are split by prefix (e.g. PV/25-26/ and JV/25-26/ are checked separately). <b>Useful for:</b> completeness assertion (SA 315), GST invoice-series review, SA 240.</p>',
- params:[{id:'col',l:'Document number column',t:'col',d:()=>S.map.doc},{id:'byPrefix',l:'Treat each prefix as a separate series',t:'bool',d:true},{id:'maxGap',l:'Gaps larger than this are a series break, not missing',t:'num',d:500}],
+ params:[{id:'col',l:'Document number column',t:'col',d:()=>S.map.doc},{id:'byPrefix',l:'Treat each prefix as a separate series',t:'bool',d:true},{id:'maxGap',l:'Gaps larger than this are a series break, not missing',t:'num',d:500},{id:'force',l:'Report gaps anyway, even if the column does not look like a series',t:'bool',d:false}],
  run(p){if(!p.col)throw new Error('Select the document number column.');
-  const ser=new Map();let blank=0,bad=0;
-  for(const r of S.rows){const v=String(r[p.col]??'').trim();if(!v){blank++;continue}const m=v.match(/^(.*?)(\d+)(\D*)$/);if(!m){bad++;continue}
-    const key=p.byPrefix?m[1]+'#'+m[3]:'(all numbers)';let s=ser.get(key);if(!s){s={nums:new Map(),w:0,lead:false,pre:m[1],suf:m[3]};ser.set(key,s)}
-    const n=parseInt(m[2],10);s.nums.set(n,(s.nums.get(n)||0)+1);s.w=Math.max(s.w,m[2].length);if(m[2].length>1&&m[2][0]==='0')s.lead=true}
+  const vt=S.map.vtype;let blank=0,bad=0;
+  const build=byType=>{const ser=new Map(),seen=new Set();blank=0;bad=0;
+    for(const r of allRows()){const v=String(r[p.col]??'').trim();if(!v){blank++;continue}const m=v.match(/^(.*?)(\d+)(\D*)$/);if(!m){bad++;continue}
+      const tp=vt?String(r[vt]??'').trim():'';if(sideOK()){const uk=tp+'\u0001'+v+'\u0001'+(r._date||'');if(seen.has(uk))continue;seen.add(uk)} // in books, one count per voucher, not per line
+      const key=(p.byPrefix?m[1]+'#'+m[3]:'(all numbers)')+(byType&&tp&&p.byPrefix?' ['+tp+']':'');let s=ser.get(key);if(!s){s={nums:new Map(),w:0,lead:false,pre:m[1],suf:m[3]};ser.set(key,s)}
+      const n=parseInt(m[2],10);s.nums.set(n,(s.nums.get(n)||0)+1);s.w=Math.max(s.w,m[2].length);if(m[2].length>1&&m[2][0]==='0')s.lead=true}
+    return ser};
+  const gapsOf=ser=>{let t=0;for(const s of ser.values()){const ns=[...s.nums.keys()].sort((a,b)=>a-b);for(let i=1;i<ns.length;i++){const d=ns[i]-ns[i-1]-1;if(d>0&&d<=p.maxGap)t+=d}for(const c of s.nums.values())if(c>1)t+=c-1}return t}; // VERA: gaps + duplicate numbers
+  let ser=build(false),numbering='',byTypeUsed=false;
+  if(vt&&p.byPrefix){const s2=build(true);if(s2.size>ser.size){const g1=gapsOf(ser),g2=gapsOf(s2);if(g2<g1){ser=s2;byTypeUsed=true;numbering='Each voucher type is numbered separately — gaps are checked within each type.'}else numbering='Voucher types share one numbering — gaps are checked across all types.'}}
+  ser=ser.size?ser:build(false);
   const sumR=[],gapR=[],dupR=[];let tm=0,td=0;
   for(const [k,s] of ser){const lab=x=>p.byPrefix?s.pre+(s.lead?String(x).padStart(s.w,'0'):x)+s.suf:x;
     const ns=[...s.nums.keys()].sort((a,b)=>a-b);let miss=0,dup=0,br=0,cnt=0;
-    for(const [n,c] of s.nums){cnt+=c;if(c>1){dup+=c-1;dupR.push({series:k,no:lab(n),times:c})}}
+    for(const [n,c] of s.nums){cnt+=c;if(c>1){dup+=c-1;dupR.push({series:k,no:lab(n),times:c,_n:n})}}
     for(let i=1;i<ns.length;i++){const d=ns[i]-ns[i-1]-1;if(d>0){if(d>p.maxGap){br++;continue}miss+=d;gapR.push({series:k,from:lab(ns[i-1]+1),to:lab(ns[i]-1),count:d})}}
     tm+=miss;td+=dup;sumR.push({series:k,count:cnt,first:lab(ns[0]),last:lab(ns[ns.length-1]),missing:miss,dups:dup,breaks:br})}
   sumR.sort((a,b)=>b.count-a.count);
+  let notSeries=false;const big=sumR.filter(x=>x.count>=20);
+  if(!p.force&&big.length){const dens=big.map(x=>{const s=ser.get(x.series);const ns=[...s.nums.keys()];return ns.length/(arrMax(ns)-arrMin(ns)+1)});if(Math.max(...dens)<0.6)notSeries=true}
+  if(notSeries)return{flag:0,notSeries:true,missing:0,dupNos:td,notes:['"'+p.col+'" does not look like a continuous numbered series: fewer than 60% of the numbers between the first and the last are present (typical of bank or cheque references). Gaps are therefore not reported. Tick "Report gaps anyway" to see them.'],
+    cards:[['Series found',fmt0(ser.size)],['Missing numbers','not applicable'],['Duplicate numbers',fmt0(td),td?'warn':'ok'],['Blank / unreadable doc nos.',fmt0(blank)+' / '+fmt0(bad)]],tables:[{title:'Series summary',cols:[{k:'series',h:'Series (# = number)'},{k:'count',h:'Documents',t:'int'},{k:'first',h:'First'},{k:'last',h:'Last'}],rows:sumR}]};
   const blk=S.headers.map(h=>{const b=S.rows.filter(r=>String(r[h]??'').trim()==='').length;return{col:h,blank:b,p:S.rows.length?b/S.rows.length:0}}).sort((a,b)=>b.blank-a.blank);
   const cards=[['Series found',fmt0(ser.size)],['Missing numbers',fmt0(tm),tm?'warn':'ok'],['Duplicate numbers',fmt0(td),td?'warn':'ok'],['Blank / unreadable doc nos.',fmt0(blank)+' / '+fmt0(bad),blank||bad?'warn':'ok']];
-  return{flag:tm+td,cards,tables:[
+  return{notes:numbering?[numbering+' The tool chose this because it leaves fewer gaps and duplicate numbers.']:[],flag:tm+td,missing:tm,dupNos:td,firstGaps:gapR.slice(0,3).map(x=>x.from+(x.count>1?' to '+x.to:'')).join(', '),cards,tables:[
    {title:'Series summary',cols:[{k:'series',h:'Series (# = number)'},{k:'count',h:'Documents',t:'int'},{k:'first',h:'First'},{k:'last',h:'Last'},{k:'missing',h:'Missing',t:'int'},{k:'dups',h:'Duplicates',t:'int'},{k:'breaks',h:'Series breaks',t:'int'}],rows:sumR},
    {title:'Missing numbers (gaps)',cols:[{k:'series',h:'Series'},{k:'from',h:'Missing from'},{k:'to',h:'Missing to'},{k:'count',h:'Count',t:'int'}],rows:gapR},
    {title:'Duplicate document numbers',cols:[{k:'series',h:'Series'},{k:'no',h:'Document no.'},{k:'times',h:'Times used',t:'int'}],rows:dupR,
-    drill:x=>({title:'Rows with '+x.no,rows:S.rows.filter(r=>String(r[p.col]).trim()===String(x.no))})},
+    drill:x=>({title:'Rows with '+x.no,rows:allRows().filter(r=>{const v=String(r[p.col]??'').trim(),m=v.match(/^(.*?)(\d+)(\D*)$/);if(!m||parseInt(m[2],10)!==x._n)return false; // VERA: same series and number as counted
+      const tp=vt?String(r[vt]??'').trim():'';return (p.byPrefix?m[1]+'#'+m[3]:'(all numbers)')+(byTypeUsed&&tp&&p.byPrefix?' ['+tp+']':'')===x.series})})},
    {title:'Blank cells by column',cols:[{k:'col',h:'Column'},{k:'blank',h:'Blank cells',t:'int'},{k:'p',h:'% of rows',t:'pct'}],rows:blk}]}}},
 
 {id:'dups',name:'Check duplicates',needs:[],
@@ -520,7 +767,7 @@ const TESTS=[
   const tv=sumBy(V,r=>Math.abs(r._amt)),tn=V.length;const bands=[];
   if(V.some(r=>r._amt<0))bands.push({lab:'Negative (below 0)',f:a=>a<0});
   const lims=[0,...b];lims.forEach((lo,i)=>{const hi=lims[i+1];bands.push({lab:hi!=null?fmt0(lo)+' to below '+fmt0(hi):fmt0(lo)+' and above',f:a=>a>=lo&&(hi==null||a<hi)})});
-  const agg=(lab,arr)=>{const v=arr.map(r=>r._amt);return{lab,n:arr.length,pn:tn?arr.length/tn:0,v:sumBy(v,x=>x),pv:tv?sumBy(v,x=>Math.abs(x))/tv:0,min:arr.length?v.reduce((a,b)=>b<a?b:a,Infinity):null,max:arr.length?v.reduce((a,b)=>b>a?b:a,-Infinity):null,avg:arr.length?sumBy(v,x=>x)/arr.length:null,_rows:arr}};
+  const agg=(lab,arr)=>{const v=arr.map(r=>r._amt);return{lab,n:arr.length,pn:tn?arr.length/tn:0,v:sumBy(v,x=>x),pv:tv?sumBy(v,x=>Math.abs(x))/tv:0,min:arr.length?arrMin(v):null,max:arr.length?arrMax(v):null,avg:arr.length?sumBy(v,x=>x)/arr.length:null,_rows:arr}};
   const st=bands.map(bd=>agg(bd.lab,V.filter(r=>bd.f(r._amt))));
   const cols=[{k:'lab',h:'Stratum'},{k:'n',h:'Count',t:'int'},{k:'pn',h:'% count',t:'pct'},{k:'v',h:'Value',t:'amt'},{k:'pv',h:'% value',t:'pct'},{k:'min',h:'Min',t:'amt'},{k:'max',h:'Max',t:'amt'},{k:'avg',h:'Average',t:'amt'}];
   const dr=x=>({title:x.lab,rows:x._rows.slice().sort(byAmtDesc)});
@@ -532,7 +779,7 @@ const TESTS=[
     const cm=cols.slice();cm[0]={k:'lab',h:'Month'};tables.push({title:'Monthly distribution',cols:cm,rows:mm,noSort:true,drill:dr})}
   const top=st.filter(x=>x.n).sort((a,c)=>c.pv-a.pv)[0];
   return{flag:null,cards:[['Transactions',fmt0(tn)],['Total value (absolute)',fmt(tv)],['Strata',fmt0(bands.length)],['Value concentrated in',top?top.lab+' ('+pct(top.pv)+')':'—']],
-   chart:barChart({labels:st.map(x=>x.lab.replace(' to below ','–').replace(' and above','+').replace('Negative (below 0)','<0')),series:[{name:'% of count',vals:st.map(x=>x.pn*100),c:'#00A651'},{name:'% of value',vals:st.map(x=>x.pv*100),c:'#0066CC'}],y:'%'}),tables}}},
+   chart:barChart({labels:st.map(x=>x.lab.replace(' to below ','–').replace(' and above','+').replace('Negative (below 0)','<0')),series:[{name:'% of count',vals:st.map(x=>x.pn*100),c:'#1A9948'},{name:'% of value',vals:st.map(x=>x.pv*100),c:'#2265C3'}],y:'%'}),tables}}},
 
 {id:'single',name:'Single transactions',needs:['party'],
  help:'<b>What it finds:</b> parties with only one transaction in the whole period — one-time vendors, customers or ledgers. Fictitious vendors, accommodation entries and wrongly named accounts often show up this way.<p><b>How to read:</b> start with the largest single items. Check that the party exists (GSTIN, PAN, bank details), that goods or services were received, and that approval was proper. <b>Useful for:</b> vendor master review, SA 240, SA 550 (related parties).</p>',
@@ -564,17 +811,20 @@ const TESTS=[
  params:[{id:'test',l:'Test',t:'sel',d:'first',o:[['first','First digit'],['second','Second digit'],['two','First two digits']]},{id:'sign',l:'Amounts to include',t:'sel',d:'pos',o:[['pos','Positive amounts'],['neg','Negative amounts'],['abs','Both (absolute)']]},{id:'min',l:'Ignore amounts below',t:'num',d:10}],
  run(p){const B=BEN[p.test];const pop=S.rows.filter(r=>{const a=r._sAmt;if(a==null||a===0)return false;if(p.sign==='pos'&&a<0)return false;if(p.sign==='neg'&&a>0)return false;return Math.abs(a)>=Math.max(p.min,p.test==='first'?1:10)});
   const N=pop.length;if(!N)throw new Error('No amounts left to test with these settings.');
+  const absA=pop.map(r=>Math.abs(r._sAmt)),rnd=absA.filter(a=>Math.abs(a-Math.round(a))<0.005&&Math.round(a)%100===0).length/N,dist=new Set(absA.map(a=>a.toFixed(2))).size/N,span=arrMax(absA)/Math.max(arrMin(absA),1e-9);
+  const why=N<300?'only '+fmt0(N)+' amounts — Benford needs several hundred or more':rnd>0.3?pct(rnd)+' of the amounts are round figures (multiples of ₹100), so they are not naturally arising':dist<0.5?'the same amounts repeat a lot (fixed fees, rents, salaries or assigned values)':span<100?'the amounts span less than two orders of magnitude':'';
   const cnt=new Map(B.dom.map(d=>[d,[]]));for(const r of pop)cnt.get(digitOf(r._sAmt,p.test))?.push(r);
   let chi=0,mad=0;const rows=B.dom.map(d=>{const c=cnt.get(d).length,po=c/N,pe=B.exp(d),df=po-pe;const cc=1/(2*N);const zz=(Math.abs(df)>cc?Math.abs(df)-cc:Math.abs(df))/Math.sqrt(pe*(1-pe)/N);
     chi+=(c-N*pe)**2/(N*pe);mad+=Math.abs(df);return{d,c,po,pe,df,z:zz,flag:zz>1.96?(df>0?'Spike':'Short'):'',_rows:cnt.get(d)}});
   mad/=B.dom.length;const [a1,a2,a3]=B.mad;const conf=mad<=a1?['Close conformity','ok']:mad<=a2?['Acceptable conformity','ok']:mad<=a3?['Marginal conformity','warn']:['Nonconformity','bad'];
   const spikes=rows.filter(r=>r.flag==='Spike');
-  const res={flag:conf[1]==='ok'?0:spikes.length||1,cards:[['Amounts tested',fmt0(N),N<500?'warn':''],['MAD',mad.toFixed(4)],['Verdict (Nigrini MAD)',conf[0],conf[1]],['Chi-square (5% critical)',chi.toFixed(2)+' ('+B.chi+')',chi>B.chi?'warn':'ok'],['Digits with spikes',spikes.length?spikes.map(r=>r.d).join(', '):'None',spikes.length?'warn':'ok']],
-   chart:barChart({labels:B.dom.map(String),series:[{name:'Actual %',vals:rows.map(r=>r.po*100),c:'#0066CC'}],line:{name:'Benford expected %',vals:rows.map(r=>r.pe*100),c:'#E8590C'},y:'%'}),
+  const res={suitable:!why,why,flag:why?0:(conf[1]==='ok'?0:spikes.length||1),cards:[['Amounts tested',fmt0(N),N<500?'warn':''],['MAD',mad.toFixed(4)],['Verdict (Nigrini MAD)',conf[0],conf[1]],['Chi-square (5% critical)',chi.toFixed(2)+' ('+B.chi+')',chi>B.chi?'warn':'ok'],['Digits with spikes',spikes.length?spikes.map(r=>r.d).join(', '):'None',spikes.length?'warn':'ok']],
+   chart:barChart({labels:B.dom.map(String),series:[{name:'Actual %',vals:rows.map(r=>r.po*100),c:'#2265C3'}],line:{name:'Benford expected %',vals:rows.map(r=>r.pe*100),c:'#E8590C'},y:'%'}),
    tables:[{title:B.lab+' test — click a digit to see its transactions',cols:[{k:'d',h:'Digit',t:'int'},{k:'c',h:'Count',t:'int'},{k:'po',h:'Actual %',t:'pct'},{k:'pe',h:'Expected %',t:'pct'},{k:'df',h:'Difference',t:'pct'},{k:'z',h:'Z-statistic',t:'num'},{k:'flag',h:'Result'}],rows,noSort:true,
     drill:x=>({title:'Amounts with '+B.lab.toLowerCase()+' '+x.d,rows:x._rows.slice().sort(byAmtDesc)})}],
    notes:[]};
-  if(N<500)res.notes.push('Only '+fmt0(N)+' amounts are being tested. Benford results are reliable mainly for larger populations (1,000+). Treat the verdict as indicative.');
+  if(why){res.notes.unshift('Not relied on: '+why+'. The digit table is shown for information only.');res.cards[2]=['Verdict','Not suitable for this data','']}
+  if(N<500&&!why)res.notes.push('Only '+fmt0(N)+' amounts are being tested. Benford results are reliable mainly for larger populations (1,000+). Treat the verdict as indicative.');
   if(chi>B.chi&&N>5000)res.notes.push('With large data sets the chi-square test rejects conformity very easily; rely more on MAD.');
   return res}},
 
@@ -621,7 +871,7 @@ const TESTS=[
       const cand=V.filter(r=>r._party&&r._date&&Math.abs(r._amt)<t&&Math.abs(r._amt)>=t*(+p.part||0)/100&&!used.has(r));
       for(const [pt,arr] of groupBy(cand,r=>r._party)){if(arr.length<2)continue;arr.sort((a,b)=>a._date<b._date?-1:a._date>b._date?1:0);
         let i=0;while(i<arr.length){const d0=dayNum(arr[i]._date);let j=i,s=0;const cl=[];while(j<arr.length&&dayNum(arr[j]._date)-d0<=p.win){cl.push(arr[j]);s+=Math.abs(arr[j]._amt);j++}
-          if(cl.length>=2&&s>=t){cl.forEach(r=>used.add(r));splits.push({t,party:pt,from:cl[0]._date,to:cl[cl.length-1]._date,n:cl.length,tot:s,mp:cl.reduce((a,r)=>Math.min(a,Math.abs(r._amt)),Infinity)/t,_rows:cl});i=j}else i++}}}}
+          if(cl.length>=2&&s>=t){cl.forEach(r=>used.add(r));splits.push({t,party:pt,from:cl[0]._date,to:cl[cl.length-1]._date,n:cl.length,tot:s,mp:arrMin(cl.map(r=>Math.abs(r._amt)))/t,_rows:cl});i=j}else i++}}}}
   if(p.split&&!(S.map.party&&S.map.date))notes.push('Split-transaction check needs both the Party and Date columns mapped.');
   below.sort((a,b)=>a._gap/a._t-b._gap/b._t);splits.sort((a,b)=>b.mp-a.mp);
   const fl=sumT.filter(x=>x.flag).length;
@@ -677,7 +927,7 @@ const tsv=(cols,rows)=>[cols.map(c=>c.h).join('\t'),...rows.map(r=>cols.map(c=>S
 async function copyText(t){try{await navigator.clipboard.writeText(t);toast('Copied — paste into Excel')}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');toast('Copied — paste into Excel')}catch(_){toast('Copy was blocked by the browser')}a.remove()}}
 
 /* ============ Params ============ */
-function getParams(t){if(!S.params[t.id]){const p={};t.params.forEach(x=>p[x.id]=typeof x.d==='function'?x.d():x.d);S.params[t.id]=p}return S.params[t.id]}
+function getParams(t){if(!S.params[t.id]){const p={},o=typeOverrides()[t.id]||{};t.params.forEach(x=>p[x.id]=(x.id in o)?o[x.id]:(typeof x.d==='function'?x.d():x.d));S.params[t.id]=p}return S.params[t.id]}
 function paramForm(t){const p=getParams(t);
   return t.params.map(x=>{const v=p[x.id];
     if(x.t==='num')return`<label class="f">${esc(x.l)}<input type="number" data-p="${x.id}" value="${esc(v)}" step="any"></label>`;
@@ -702,48 +952,39 @@ function runTest(t,quiet){
 }
 
 /* ============ Views ============ */
+const TABN=v=>v==='data'?'Data & Mapping':v==='overview'?'Insights':v==='sampling'?'Audit Sampling':(TBYID[v]?(TESTS.indexOf(TBYID[v])+1)+'. '+TBYID[v].name:v);
+S.tabs=['data'];S.scroll={};
+function openTab(v){if(v!=='data'&&!S.mapped){toast('Load data and apply mapping first');return}S.scroll[S.view]=window.scrollY;S.view=v;render();window.scrollTo(0,S.scroll[v]||0)}
+function closeTab_unused(v){const i=S.tabs.indexOf(v);if(i<0)return;S.tabs.splice(i,1);delete S.scroll[v];if(!S.tabs.length)S.tabs=['data'];if(S.view===v){S.view=S.tabs[Math.max(0,i-1)];render();window.scrollTo(0,S.scroll[S.view]||0)}else renderTabs()}
+function renderTabs(){}
 function render(){renderNav();const v=S.view;
-  if(v==='data')viewData();else if(!S.mapped){S.view='data';viewData()}else if(v==='overview')viewOverview();else if(v==='sampling')viewSampling();else viewTest(TBYID[v]);}
+  if(v==='data')viewData();else if(!S.mapped){S.view='data';viewData()}else if(v==='overview')viewOverview();else if(v==='sampling')viewSampling();else viewTest(TBYID[v]);renderTabs()}
 function renderNav(){
-  let h=`<div class="sec">Setup</div><a data-v="data" class="${S.view==='data'?'on':''}"><span class="n">⇪</span>Data &amp; Mapping</a>`;
-  h+=`<a data-v="overview" class="${S.view==='overview'?'on':''}"><span class="n">▦</span>Overview &amp; Run all</a><div class="sec">CAAT tests</div>`;
+  const dt=DTYPES[S.dtype]||DTYPES.general,rec=REC[S.dtype];
+  $('#dcard').innerHTML=`<div class="dt">${esc(dt.label)}${S.soft==='bankstmt'?' · bank statement':''}${S.det&&S.dtypeAuto&&S.parts.length?' <span style="font-weight:400;color:var(--mut)">(detected)</span>':''}</div><div class="df" title="${esc(S.fileName)}">${S.parts.length?esc(S.fileName):'No data loaded yet'}</div>${S.mapped?`<div class="df">${fmt0(S.rows.length)} rows analysed</div>`:''}`;
+  let h=`<div class="sec">Setup</div><a data-v="data" class="${S.view==='data'?'on':''}" title="Data & Mapping"><span class="n">⇪</span><span class="lb">Data &amp; Mapping</span></a>`;
+  h+=`<a data-v="overview" class="${S.view==='overview'?'on':''}" title="Insights"><span class="n">✦</span><span class="lb">Insights</span></a><div class="sec">CAAT tests${rec?' · ★ suits '+esc(dt.short):''}</div>`;
   TESTS.forEach((t,i)=>{const r=S.results[t.id];const dot=r?(r.flag==null?'<span class="dot">done</span>':`<span class="dot ${r.flag?'warn':'ok'}">${r.flag?fmt0(r.flag):'✓'}</span>`):'';
-    h+=`<a data-v="${t.id}" class="${S.view===t.id?'on':''}"><span class="n">${i+1}</span>${esc(t.name)}${dot}</a>`});
-  const sr=S.samp&&S.samp.res;h+=`<div class="sec">Sampling</div><a data-v="sampling" class="${S.view==='sampling'?'on':''}"><span class="n">◎</span>Audit Sampling${sr?`<span class="dot ok">${fmt0(sr.items.length)}</span>`:''}</a>`;
+    h+=`<a data-v="${t.id}" class="${S.view===t.id?'on':''}" title="${esc(t.name)}"><span class="n">${i+1}</span><span class="lb">${esc(t.name)}</span>${rec&&rec.includes(t.id)?'<span class="rec">★</span>':''}${dot}</a>`});
+  const sr=S.samp&&S.samp.res;h+=`<div class="sec">Sampling</div><a data-v="sampling" class="${S.view==='sampling'?'on':''}" title="Audit Sampling"><span class="n">◎</span><span class="lb">Audit Sampling</span>${sr?`<span class="dot ok">${fmt0(sr.items.length)}</span>`:''}</a>`;
   $('#nav').innerHTML=h;
-  $('#nav').querySelectorAll('a').forEach(a=>a.onclick=()=>{if(a.dataset.v!=='data'&&!S.mapped){toast('Load data and apply mapping first');return}S.view=a.dataset.v;render();window.scrollTo(0,0)});
-}
-function viewOverview(){
-  const R=S.rows,V=valid(),m=S.map;const pos=V.filter(r=>r._sAmt>0),neg=V.filter(r=>r._sAmt<0);
-  const ds=R.map(r=>r._date).filter(Boolean).sort();const parties=new Set(R.map(r=>r._party).filter(Boolean));
-  const unp=R.length-V.length,und=m.date?R.length-ds.length:0;
-  let h=`<h1>Overview</h1><p class="sub">${esc(S.fileName)}${S.sheet?' · sheet '+esc(S.sheet):''} — profile of the data, then run all tests in one click.</p>`;
-  h+=`<div class="cards">${[['Rows loaded',fmt0(R.length)],['Amounts read',fmt0(V.length),unp?'warn':'ok'],['Unreadable / blank amounts',fmt0(unp),unp?'warn':'ok'],['Total (net)',fmt(sumBy(V,r=>r._sAmt))],
-    ['Positive items',fmt0(pos.length)+' · '+fmt(sumBy(pos,r=>r._sAmt))],['Negative items',fmt0(neg.length)+' · '+fmt(sumBy(neg,r=>r._sAmt))],
-    ['Largest / smallest',V.length?fmt(V.reduce((a,r)=>r._amt>a?r._amt:a,-Infinity))+' / '+fmt(V.reduce((a,r)=>r._amt<a?r._amt:a,Infinity)):'—'],
-    ...(m.date?[['Date range',ds.length?dmy(ds[0])+' to '+dmy(ds[ds.length-1]):'—'],['Unreadable dates',fmt0(und),und?'warn':'ok']]:[]),
-    ...(m.party?[['Distinct parties',fmt0(parties.size)]]:[])].map(kpi).join('')}</div>`;
-  h+=`<div class="card"><div class="row" style="align-items:center"><h3 style="margin:0">Run all tests with default settings</h3><button class="btn p" id="bAll" style="margin-left:auto">▶ Run all tests</button></div>
-    <p class="muted" style="margin:6px 0 12px">Defaults are a sensible starting point. Open any test to change its thresholds and run it again.</p><div class="dash">`;
-  TESTS.forEach((t,i)=>{const r=S.results[t.id],e=S.err[t.id];let v='Not run',tone='';
-    if(e){v='Needs attention';tone='bad'}else if(r){if(r.flag==null){v='Done';tone='ok'}else{v=r.flag?fmt0(r.flag)+' item'+(r.flag>1?'s':'')+' to review':'Nothing flagged';tone=r.flag?'warn':'ok'}}
-    h+=`<div class="kpi ${tone}" data-go="${t.id}"><div class="l">${i+1}. ${esc(t.name)}</div><div class="v" style="font-size:15px">${esc(v)}</div>${e?`<div class="muted">${esc(e)}</div>`:r?`<div class="muted">${esc(r.cards[1]?r.cards[1][0]+': '+r.cards[1][1]:'')}</div>`:''}</div>`});
-  h+=`</div></div>`+footer();$('#main').innerHTML=h;
-  $('#bAll').onclick=()=>{TESTS.forEach(t=>runTest(t,true));render();toast('All tests run')};
-  document.querySelectorAll('[data-go]').forEach(d=>d.onclick=()=>{S.view=d.dataset.go;render();window.scrollTo(0,0)});
+  $('#nav').querySelectorAll('a').forEach(a=>a.onclick=()=>openTab(a.dataset.v));
 }
 function kpi([l,v,tone]){return`<div class="kpi ${tone||''}"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div></div>`}
 function viewTest(t){
   const i=TESTS.indexOf(t);const r=S.results[t.id],e=S.err[t.id];
-  let h=`<h1>${i+1}. ${esc(t.name)}</h1><p class="sub">${esc(S.fileName)}</p><div class="help">${t.help}</div>`;
-  h+=`<div class="card"><h3>Settings</h3><div class="row">${paramForm(t)}<div style="margin-left:auto;display:flex;gap:8px"><button class="btn p" id="bRun">▶ Run test</button>${r?'<button class="btn" id="bX1">Export this test</button>':''}</div></div></div>`;
-  if(e)h+=`<div class="err">${esc(e)}</div>`;
-  if(r){(r.notes||[]).forEach(n=>h+=`<div class="note">${esc(n)}</div>`);
-    h+=`<div class="cards">${r.cards.map(kpi).join('')}</div>`;
-    if(r.chart)h+=`<div class="card chart">${r.chart}</div>`;
-    r.tables.forEach((tb,j)=>h+=`<div class="card" id="tb${j}"></div>`);
-    h+=`<p class="muted">Run on ${r.at.toLocaleString('en-IN')} · ${esc(r.params)}</p>`}
-  h+=footer();$('#main').innerHTML=h;
+  const tn=TYPE_NOTES[t.id]&&TYPE_NOTES[t.id][S.dtype];
+  let L=`<div class="hdr"><div class="ht"><h1>${i+1}. ${esc(t.name)}</h1><p class="sub">${esc((DTYPES[S.dtype]||DTYPES.general).label)}${REC[S.dtype]&&REC[S.dtype].includes(t.id)?' · ★ well suited':''}</p></div>
+    <div class="acts"><button class="btn p" id="bRun">▶ ${r?'Run again':'Run test'}</button>${r?'<button class="btn" id="bX1">⤓ Export this test</button>':''}</div></div>
+    <details class="about" ${r?'':'open'}><summary>About this test</summary><div class="help">${t.help}</div></details>${tn?`<div class="note">${esc(tn)}</div>`:''}
+    <div class="ttl">Settings</div><div class="row">${paramForm(t)}</div>`;
+  if(e)L+=`<div class="err">${esc(e)}</div>`;
+  let R='';
+  if(r){R+=`<div class="cards">${r.cards.map(kpi).join('')}</div>`;(r.notes||[]).forEach(n=>R+=`<div class="note">${esc(n)}</div>`);
+    R+=`<div class="runinfo">Run on ${r.at.toLocaleString('en-IN')} · ${esc(r.params)}</div>`;
+    if(r.chart)R+=`<div class="card chart">${r.chart}</div>`;r.tables.forEach((tb,j)=>R+=`<div class="card" id="tb${j}"></div>`)}
+  else R=`<div class="empty"><div style="font-size:30px">▶</div><div style="margin-top:8px">Choose the settings above and click <b>Run test</b>.<br>The exceptions will appear here.</div></div>`;
+  $('#main').innerHTML=`<div class="split"><aside class="cp">${L}</aside><div class="res">${R}${footer()}</div></div>`;
   if(r)r.tables.forEach((tb,j)=>renderTable($('#tb'+j),tb));
   document.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{const m=S.map;const pre=[[m.doc],[m.party,m.amount,m.date],[m.party,m.amount],[m.amount,m.date],S.headers].filter(c=>c.every(Boolean))[+b.dataset.pre];
     document.querySelectorAll('[data-pc]').forEach(c=>c.checked=pre.includes(c.dataset.pc))});
@@ -895,9 +1136,12 @@ function spEval(){
   ev.total=(ev.proj||0)+keyMis;
   if(ev.nS<ev.nSAll)ev.notes.push(fmt0(ev.nSAll-ev.nS)+' of '+fmt0(ev.nSAll)+' sample items have no audited value yet. SA 530 expects every selected item to be tested; the projection below uses only the items tested so far.');
   if(ev.nKey<ev.nKeyAll)ev.notes.push(fmt0(ev.nKeyAll-ev.nKey)+' key items have no audited value yet.');
-  const tm=+p.tm;ev.tm=tm||null;const cmp=R.method==='mus'?ev.uml:ev.total;
-  if(tm>0){if(cmp<tm)ev.concl=[(R.method==='mus'?'Upper misstatement limit':'Projected misstatement')+' of ₹'+fmt(cmp)+' is below tolerable misstatement of ₹'+fmt(tm)+'. Subject to qualitative factors, the sample supports the recorded amount.','ok'];
-    else ev.concl=[(R.method==='mus'?'Upper misstatement limit':'Projected misstatement')+' of ₹'+fmt(cmp)+' is at or above tolerable misstatement of ₹'+fmt(tm)+'. Consider asking management to investigate, extending the testing, or adjusting the accounts (SA 530, SA 450).','bad'];
+  const tm=+p.tm;ev.tm=tm||null;
+  // VERA: key items are tested in full, so their overstatements add to the sample's upper misstatement limit
+  if(R.method==='mus'){ev.keyOver=sumBy(keyT,x=>Math.max(0,d(x)*(x._amt<0?-1:1)));ev.umlAll=ev.uml+ev.keyOver}
+  const cmp=R.method==='mus'?ev.umlAll:ev.total;
+  if(tm>0){if(cmp<tm)ev.concl=[(R.method==='mus'?'Upper misstatement limit (sample + key-item overstatements)':'Projected misstatement')+' of ₹'+fmt(cmp)+' is below tolerable misstatement of ₹'+fmt(tm)+'. Subject to qualitative factors, the sample supports the recorded amount.','ok'];
+    else ev.concl=[(R.method==='mus'?'Upper misstatement limit (sample + key-item overstatements)':'Projected misstatement')+' of ₹'+fmt(cmp)+' is at or above tolerable misstatement of ₹'+fmt(tm)+'. Consider asking management to investigate, extending the testing, or adjusting the accounts (SA 530, SA 450).','bad'];
     if(R.method!=='mus'&&cmp<tm&&cmp>=0.5*tm)ev.notes.push('No statistical upper limit is worked out for this method. Projected misstatement is more than half of tolerable misstatement, which may indicate unacceptable sampling risk.')}
   return ev}
 function spPopulationRows(R){return R._spRows||[]}
@@ -931,7 +1175,8 @@ function viewSampling(){
     .opts{display:flex;gap:10px;flex-wrap:wrap}.seg{display:inline-flex;border:1px solid #cbd2d9;border-radius:7px;overflow:hidden}.seg button{font:inherit;font-size:13px;border:0;background:#fff;padding:6px 14px;cursor:pointer;border-right:1px solid #cbd2d9}.seg button:last-child{border-right:0}.seg button.on{background:var(--blue);color:#fff}
     details.more{margin-top:10px}details.more summary{cursor:pointer;color:var(--blue);font-size:12.5px}details.more>div{margin-top:10px}.stepn{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;margin-right:8px}
     .pv{display:flex;gap:18px;flex-wrap:wrap;background:#f0f6fd;border:1px solid #cfe0f5;border-radius:9px;padding:10px 14px;margin-top:12px}.pv div{font-size:12px;color:var(--mut)}.pv b{display:block;font-size:17px;color:var(--ink)}</style>
-  <h1>Audit Sampling (SA 530)</h1><p class="sub">${esc(S.fileName)} — answer each step in plain words. Every value starts at a recommended setting and you can change any of it. The sample size updates as you go.</p>`;
+`;
+  h+=`<div class="split wide"><aside class="cp"><h1>Audit Sampling</h1><p class="sub">SA 530 · every value starts at a recommended setting and can be changed</p>`;
   h+=`<div class="card"><h3><span class="stepn">1</span>What are you testing?</h3><div class="opts">${pick('purpose','details','Amounts — tests of details','Are the recorded amounts right? Find misstatements and project them to the population.')}${pick('purpose','controls','A control — tests of controls','Did a control operate (approval, reconciliation, review)? Count deviations.')}</div></div>`;
   h+=`<div class="card"><h3><span class="stepn">2</span>Which items make up the population?</h3><div class="row">${F('Take items from',sel('src',[['all','All transactions'],['test','Exceptions found by a test']]))}
     ${p.src==='test'?F('Test',sel('srcTest',[['','— select a test that has been run —'],...testsRun.map(t=>[t.id,t.name])])):''}
@@ -969,13 +1214,15 @@ function viewSampling(){
     ${!ctl&&p.method!=='mus'?`<details class="more"><summary>More options — projection method</summary><div class="row">${F('Project misstatements by',sel('proj',[['ratio','Ratio (misstatement ÷ book value)'],['diff','Difference (average per item)']]))}</div></details>`:''}</div>`;
   h+=`<div class="card" style="display:flex;align-items:center;gap:12px"><span class="muted">Every choice above is recorded in the sampling plan and on the working paper.</span><button class="btn p" id="spGo" style="margin-left:auto;padding:9px 22px;font-size:14px">▶ Select sample</button></div>`;
   if(S.samp.err)h+=`<div class="err">${esc(S.samp.err)}</div>`;
+  h+=`</aside><div class="res">`;
+  if(!R)h+=`<div class="empty"><div style="font-size:30px">◎</div><div style="margin-top:8px">Answer the steps above and click <b>Select sample</b>.<br>The sample, the sampling plan and the evaluation will appear here.</div></div>`;
   if(R){(R.notes||[]).forEach(n=>h+=`<div class="note">${esc(n)}</div>`);
-    h+=`<h2 style="font-size:17px;margin:22px 0 10px">Selected sample</h2><div class="cards">${[['Population',fmt0(R.pop.n)+' items · ₹'+fmt(R.pop.v)],['Key items (100%)',fmt0(R.key.n)+' · ₹'+fmt(R.key.v),R.key.n?'warn':''],['Left to sample',fmt0(R.sp.n)+' · ₹'+fmt(R.sp.v)],
+    h+=`<h2 style="font-size:16px;margin:0 0 10px">Selected sample</h2><div class="cards">${[['Population',fmt0(R.pop.n)+' items · ₹'+fmt(R.pop.v)],['Key items (100%)',fmt0(R.key.n)+' · ₹'+fmt(R.key.v),R.key.n?'warn':''],['Left to sample',fmt0(R.sp.n)+' · ₹'+fmt(R.sp.v)],
       ['Sample size (planned / selected)',fmt0(R.nPlan)+' / '+fmt0(R.items.length-R.key.n)+(R.periods?' periods':'')],['Total items to test',fmt0(R.items.length)],['Value covered',pct(R.pop.v?(R.key.v+R.sv)/R.pop.v:0)],
       ...(R.J?[[R.method==='mus'?'Sampling interval (₹)':'Interval (items)',R.method==='mus'?fmt(R.J):R.J.toFixed(2)],[R.method==='mus'?'Random start (₹)':'Random start (item)',R.method==='mus'?fmt(R.start):(R.start+1).toFixed(2)]]:[]),[R.useSeed?'Seed number':'Seed number (drawn for this run)',String(R.seed)]].map(kpi).join('')}</div>
       <div class="card"><h3>Sampling plan</h3><div class="tw" style="max-height:none"><table><tbody>${R.plan.map(([a,b])=>`<tr><td style="width:240px;color:var(--mut)">${esc(a)}</td><td style="white-space:normal">${esc(b)}</td></tr>`).join('')}</tbody></table></div></div>`;
     if(R.strata)h+=`<div class="card" id="spStrata"></div>`;h+=`<div class="card" id="spList"></div><div id="spEval"></div>`}
-  h+=footer();$('#main').innerHTML=h;spPv();
+  h+=footer()+`</div></div>`;$('#main').innerHTML=h;spPv();
   document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=ev=>{ev.preventDefault();spRead();const [k,v]=b.dataset.pick.split(':');spSet(k,v);viewSampling()});
   document.querySelectorAll('[data-sp]').forEach(e=>e.onchange=()=>{const k=e.dataset.sp,before=p[k];spRead();spHook(k,before);if(e.tagName==='SELECT'||e.type==='checkbox')viewSampling();else{const ka=document.querySelector('[data-sp="keyAmt"]');if(ka&&k==='tm'&&p.keyFollow)ka.value=p.keyAmt;spPv()}});
   document.querySelectorAll('[data-spk]').forEach(e=>e.onchange=()=>{spRead();spPv()});
@@ -1044,7 +1291,7 @@ function spRenderEval(){const host=$('#spEval');if(!host)return;const R=S.samp.r
   if(!ev){host.innerHTML=`<div class="card"><h3>Evaluation</h3><div class="muted">Enter audited values in the table above. The projection of misstatements to the population appears here as you go.</div></div>`;return}
   let h=`<div class="card"><h3>Evaluation of results</h3>`;ev.notes.forEach(n=>h+=`<div class="note">${esc(n)}</div>`);
   const c=[['Items tested',fmt0(ev.nKey+ev.nS)+' of '+fmt0(ev.nKeyAll+ev.nSAll)],['Actual misstatement in key items',fmt(ev.keyMis),ev.keyMis?'warn':'ok']];
-  if(R.method==='mus'){c.push(['Projected misstatement (sample)',fmt(ev.proj),ev.proj?'warn':'ok'],['Basic precision (RF × interval)',fmt(ev.bp)],['Incremental allowance',fmt(ev.inc)],['Upper misstatement limit (sample)',fmt(ev.uml),ev.tm&&ev.uml>=ev.tm?'bad':''],['Understatements found (projected)',fmt(ev.under)])}
+  if(R.method==='mus'){c.push(['Projected misstatement (sample)',fmt(ev.proj),ev.proj?'warn':'ok'],['Basic precision (RF × interval)',fmt(ev.bp)],['Incremental allowance',fmt(ev.inc)],['Upper misstatement limit (sample)',fmt(ev.uml)],['Upper limit incl. key-item overstatements',fmt(ev.umlAll),ev.tm&&ev.umlAll>=ev.tm?'bad':''],['Understatements found (projected)',fmt(ev.under)])}
   else c.push(['Projected misstatement (sample)',fmt(ev.proj),ev.proj?'warn':'ok']);
   c.push(['Total: key items + projection',fmt(ev.total),ev.total?'warn':'ok'],['Tolerable misstatement',ev.tm?fmt(ev.tm):'Not entered']);
   h+=`<div class="cards">${c.map(kpi).join('')}</div>`;
@@ -1062,7 +1309,7 @@ function spExport(wb){const R=S.samp&&S.samp.res;if(!R)return;
   if(R.strata){a.push([],['Stratum','Items','Value','Sample size','Sample value']);R.strata.forEach(s=>a.push([s.lab,s.N,Math.round(s.V*100)/100,s.n,Math.round(s.nv*100)/100]))}
   if(R.purpose==='controls'){const e=ctlEval();if(e){a.push([],['Evaluation'],['Items tested',e.n],['Deviations',e.dev],['Sample deviation rate',Math.round(e.rate*1e4)/1e4]);if(e.udl!=null)a.push(['Upper deviation limit',Math.round(e.udl*1e4)/1e4],['Tolerable deviation rate',e.tdr]);a.push(['Indicated result',e.concl[0]])}}
   const ev=R.purpose==='controls'?null:spEval();if(ev){a.push([],['Evaluation'],['Items tested',ev.nKey+ev.nS],['Actual misstatement in key items',Math.round(ev.keyMis*100)/100],['Projected misstatement (sample)',Math.round(ev.proj*100)/100]);
-    if(R.method==='mus')a.push(['Basic precision',Math.round(ev.bp*100)/100],['Incremental allowance',Math.round(ev.inc*100)/100],['Upper misstatement limit (sample)',Math.round(ev.uml*100)/100]);
+    if(R.method==='mus')a.push(['Basic precision',Math.round(ev.bp*100)/100],['Incremental allowance',Math.round(ev.inc*100)/100],['Upper misstatement limit (sample)',Math.round(ev.uml*100)/100],['Upper limit incl. key-item overstatements',Math.round(ev.umlAll*100)/100]);
     a.push(['Total (key items + projection)',Math.round(ev.total*100)/100],['Tolerable misstatement',ev.tm||''],['Indicated result',ev.concl?ev.concl[0]:'']);ev.notes.forEach(n=>a.push(['Note',n]))}
   const w1=XLSX.utils.aoa_to_sheet(a);w1['!cols']=[{wch:34},{wch:90},{wch:18}];XLSX.utils.book_append_sheet(wb,w1,'Sampling plan');
   const cols=spCols();const b=[cols.map(c=>c.h),...R.items.map(spRowOut).map(x=>cols.map(c=>xval(x[c.k],c.t)))];
@@ -1075,7 +1322,7 @@ function exportWB(ids){
   const wb=XLSX.utils.book_new();const now=new Date();
   const info=[['CAAT Tools — Data analytics working paper'],['Disclaimer: '+DISCLAIMER],[],['Entity',$('#eEnt').value],['Period',$('#ePer').value],['Prepared by',$('#ePrep').value],['Date of preparation',now.toLocaleString('en-IN')],
     ['Source file',S.fileName],['Sheet',S.sheet],['Records analysed',S.rows.length],['Amounts read',valid().length],['SHA-256 of source file',S.hash],
-    ...dataLogLines(),['Amounts',S.amtMode==='split'?'Debit = '+S.map.amount+'; Credit = '+S.map.credit+'; amount = Debit − Credit'+(S.splitPos==='cr'?' (credits shown positive)':''):S.amtMode==='ind'?'Amount = '+S.map.amount+'; Dr/Cr column = '+S.map.drcr+'; '+(S.drcrNeg==='cr'?'Cr':'Dr')+' treated as negative':'Amount = '+S.map.amount],
+    ...dataLogLines(),['Amounts',S.amtMode==='split'?'Debit = '+S.map.amount+'; Credit = '+S.map.credit+'; amount = Debit − Credit'+(effSplitPos()==='cr'?' (credits shown positive)':''):S.amtMode==='ind'?'Amount = '+S.map.amount+'; Dr/Cr column = '+S.map.drcr+'; '+(effDrcrNeg()==='cr'?'Cr':'Dr')+' treated as negative':'Amount = '+S.map.amount],
     ['Other columns',MAPF.filter(([k])=>S.map[k]&&!['amount','credit','drcr'].includes(k)).map(([k,l])=>l+' = '+S.map[k]).join('; ')],['Absolute values',S.abs?'Yes':'No'],[],['Test','Key result','Parameters','Reviewed by / remarks']];
   ids.forEach(id=>{const r=S.results[id];info.push([TBYID[id].name,r.cards.map(c=>c[0]+': '+c[1]).join(' | '),r.params,''])});
   const ws0=XLSX.utils.aoa_to_sheet(info);ws0['!cols']=[{wch:28},{wch:70},{wch:60},{wch:30}];XLSX.utils.book_append_sheet(wb,ws0,'Summary');
@@ -1088,12 +1335,19 @@ function exportWB(ids){
   const fn='CAAT_'+(($('#eEnt').value||'Analysis').replace(/[^\w]+/g,'_'))+'_'+now.toISOString().slice(0,10)+'.xlsx';
   try{XLSX.writeFile(wb,fn);toast('Working papers exported: '+fn)}catch(e){toast('Download blocked here — use the offline copy of the tool')}
 }
-$('#bExport').onclick=()=>exportWB();
+$('#bExport').onclick=()=>{$('#wpDlg').classList.remove('on');exportWB()};
+$('#bWP').onclick=()=>{if(!S.mapped){toast('Load data and apply mapping first');return}$('#wpDlg').classList.add('on');setTimeout(()=>$('#eEnt').focus(),30)};
+$('#bWPx').onclick=()=>$('#wpDlg').classList.remove('on');
+$('#wpDlg').onclick=e=>{if(e.target.id==='wpDlg')e.target.classList.remove('on')};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#wpDlg').classList.remove('on')});
+try{if(localStorage.getItem('caat_col')==='1')document.body.classList.add('col')}catch(e){}
+$('#bCol').onclick=()=>{const c=document.body.classList.toggle('col');$('#bCol').textContent=c?'»':'«';try{localStorage.setItem('caat_col',c?'1':'0')}catch(e){}};
+if(document.body.classList.contains('col'))$('#bCol').textContent='»';
 ['eEnt','ePer','ePrep'].forEach(id=>{try{const v=localStorage.getItem('caat_'+id);if(v)$('#'+id).value=v}catch(e){}$('#'+id).oninput=e=>{try{localStorage.setItem('caat_'+id,e.target.value)}catch(_){}}});
 /* Desktop (Electron) bridge — inactive in a normal browser */
 if(window.caatDesktop){try{
   caatDesktop.onOpenFiles(list=>{S.view='data';addFiles(list.map(f=>new File([f.data],f.name)))});
-  caatDesktop.onNavigate(v=>{if(v==='data'||S.mapped){S.view=v;render();window.scrollTo(0,0)}else toast('Load data and apply mapping first')});
+  caatDesktop.onNavigate(v=>openTab(v));
   caatDesktop.onExport(()=>exportWB());
 }catch(e){}}
 render();

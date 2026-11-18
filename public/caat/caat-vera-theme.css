@@ -1,0 +1,102 @@
+/* ICAI VERA look for the embedded CAAT Tools.
+ *
+ * Loaded after the tool's own <style> so the tool uses the application's
+ * colours, type, radii, buttons, inputs, tables, navigation, dialog and toast
+ * (tokens copied from src/index.css). It only restyles; it does not change
+ * layout logic, ids or any behaviour. Rules the tool writes into its views at
+ * run time read the same variables, so they follow this theme too.
+ */
+:root{
+  --blue:hsl(215 70% 45%);--blue-l:hsl(215 50% 94%);
+  --green:hsl(142 71% 35%);--green-l:hsl(142 55% 93%);
+  --amber:hsl(38 92% 36%);--amber-l:hsl(38 92% 94%);
+  --red:hsl(0 72% 51%);--red-l:hsl(0 86% 97%);
+  --ink:hsl(222 47% 11%);--mut:hsl(215 16% 47%);--line:hsl(214 20% 88%);--bg:hsl(210 20% 98%);--card:#fff;
+  --input:hsl(214 20% 84%);--muted:hsl(210 20% 96%);--accent:hsl(215 50% 92%);--accent-ink:hsl(215 70% 35%);
+  --ring:hsl(215 70% 45% / .25);
+  --sh:0 1px 2px 0 hsl(222 47% 11% / .05);
+  --sh-lg:0 10px 15px -3px hsl(222 47% 11% / .1),0 4px 6px -4px hsl(222 47% 11% / .05);
+}
+body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-.01em}
+::selection{background:var(--accent)}
+
+/* inputs */
+input,select,textarea{border-color:var(--input);border-radius:6px;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--ring)}
+input[type=checkbox],input[type=radio]{accent-color:var(--blue)}
+
+/* buttons (shadcn "outline" / "default") */
+.btn{border-color:var(--input);border-radius:6px;font-weight:500;transition:background .15s,border-color .15s,color .15s}
+.btn:hover{background:var(--muted);border-color:var(--input)}
+.btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+.btn.p,.btn.g{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.p:hover,.btn.g:hover{background:hsl(215 70% 40%);border-color:hsl(215 70% 40%)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* cards, panels, KPI tiles */
+.card,.cp,.kpi{border-color:var(--line);border-radius:8px;box-shadow:var(--sh)}
+.cp .card{border-radius:0;box-shadow:none;border-top-color:var(--line)}
+.kpi .l{color:var(--mut);font-weight:500}
+.kpi .v{font-weight:600}
+.dash .kpi:hover{border-color:var(--blue);box-shadow:0 0 20px hsl(215 70% 45% / .1)}
+.help{background:var(--muted);border-color:var(--line);border-radius:8px}
+.note{background:var(--amber-l);color:hsl(38 92% 25%);border:1px solid hsl(38 92% 80%);border-radius:8px}
+.err{background:var(--red-l);color:hsl(0 72% 42%);border:1px solid hsl(0 72% 85%);border-radius:8px}
+.drop{border-color:var(--input);border-radius:8px;background:var(--muted)}
+.drop.hv{border-color:var(--blue);background:var(--blue-l)}
+.res .empty{border-color:var(--line);border-radius:8px;background:#fff}
+.cols{border-color:var(--line);background:var(--muted)}
+
+/* badges */
+.chip{border-radius:9999px;font-weight:500;background:var(--muted);color:var(--mut)}
+.chip.ok{background:var(--green-l);color:hsl(142 71% 27%)}
+.chip.warn{background:var(--amber-l);color:var(--amber)}
+.chip.bad{background:var(--red-l);color:hsl(0 72% 45%)}
+
+/* tables (VERA data-table) */
+.tw{border-color:var(--line);border-radius:8px;background:#fff}
+table{font-size:12px}
+th{background:hsl(210 20% 96%);color:var(--mut);font-weight:600;font-size:11.5px;border-bottom-color:var(--line);padding:6px 9px}
+td{border-bottom-color:hsl(214 20% 88% / .55);padding:5px 9px}
+tr.ck:hover td,.finds li:hover{background:hsl(210 20% 96%)}
+tr.sel td{background:var(--accent)}
+
+/* option tiles and segmented buttons written by the views */
+body .opt{border-radius:8px}
+body .opt:hover{border-color:hsl(215 50% 70%)}
+body .seg{border-color:var(--input);border-radius:6px}
+body .seg button{border-right-color:var(--input)}
+body .seg button.on{background:var(--blue);color:#fff}
+
+/* the tool's own navigation, styled like the VERA sidebar links */
+aside#side{border-right-color:var(--line);background:#fff}
+.brand{border-bottom-color:var(--line);font-weight:600;font-size:14px}
+.brand small{color:var(--mut)}
+.logo{background:var(--blue);border-radius:8px}
+.collapse{border-color:var(--input);border-radius:6px}
+.collapse:hover{background:var(--muted)}
+#dcard{border-bottom-color:var(--line)}
+nav .sec,.eng .sec{font-weight:500;letter-spacing:.05em}
+nav a{position:relative;border-radius:6px;font-weight:500;color:hsl(222 47% 20%);transition:background .15s,color .15s}
+nav a:hover{background:var(--muted);color:var(--ink)}
+nav a.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+nav a.on::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);height:20px;width:2px;border-radius:0 2px 2px 0;background:var(--blue)}
+nav a .n{background:var(--muted);border-radius:4px}
+nav a.on .n{background:var(--blue);color:#fff}
+nav a .rec{color:hsl(38 92% 45%)}
+.eng{border-top-color:var(--line)}
+
+/* dialog and toast (VERA dialog / sonner) */
+#wpDlg{background:rgba(0,0,0,.5)}
+#wpDlg .box{border:1px solid var(--line);border-radius:8px;box-shadow:var(--sh-lg);padding:22px 24px}
+#wpDlg h3{font-size:17px;font-weight:600}
+.toast{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:var(--sh-lg);border-radius:8px;font-weight:500}
+
+/* scrollbars like the app's scrollbar-thin */
+*{scrollbar-width:thin;scrollbar-color:hsl(214 20% 80%) transparent}
+
+/* Inside VERA the page header already names the tool: keep the panel heading
+   quieter. (The bridge adds class "vera" to <body> only when embedded.) */
+body.vera .logo{display:none}
+body.vera .brand{padding:10px 12px}

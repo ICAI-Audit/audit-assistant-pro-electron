@@ -114,7 +114,13 @@ async function launch() {
 }
 function cdp(method, params = {}) {
   const id = ++nextId;
-  return new Promise((resolve, reject) => { pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); });
+  // The timer also keeps Node alive: without it a reply that never comes ends the run silently with exit code 0.
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { if (pending.delete(id)) reject(new Error(`CDP ${method} timed out after 180 s`)); }, 180000);
+    const done = (fn) => (v) => { clearTimeout(timer); fn(v); };
+    pending.set(id, { resolve: done(resolve), reject: done(reject) });
+    socket.send(JSON.stringify({ id, method, params }));
+  });
 }
 async function evaluate(expression, contextId) {
   const r = await cdp('Runtime.evaluate', { expression: `(async () => (${expression}))()`, awaitPromise: true, returnByValue: true, ...(contextId ? { contextId } : {}) });
@@ -264,8 +270,9 @@ async function main() {
     return true;
   })()`);
   await waitCaat(`S.raw.length === ${bigRows}`, 60000);
-  const overview = await inCaat(`(() => { try { document.querySelector('#bApply').click(); return S.view + '|' + document.querySelector('#main').innerText.includes('Largest / smallest') } catch (e) { return 'error: ' + e.message } })()`);
-  check(`${bigRows.toLocaleString('en-IN')}-row ledger opens the Overview (fix 1)`, overview === 'overview|true', overview);
+  // Apply mapping runs every test (v0.10); none may fail with the call-stack error (fix 1).
+  const overview = await inCaat(`(() => { try { document.querySelector('#bApply').click(); const bad = Object.entries(S.err).filter(([, e]) => /call stack/i.test(String(e || ''))).map(([k]) => k); return S.view + '|' + (bad.join(',') || 'none') + '|' + ['strat', 'benford', 'gaps'].filter((k) => !S.results[k]).join(',') } catch (e) { return 'error: ' + e.message } })()`);
+  check(`${bigRows.toLocaleString('en-IN')}-row ledger opens Insights with no call-stack failures (fix 1)`, overview === 'overview|none|', overview);
   await inCaat(`(document.querySelector('#nav a[data-v="strat"]').click(), document.querySelector('#bRun').click(), true)`);
   check('stratification runs on the large ledger', await waitCaat(`Boolean(S.results.strat)`));
   await screenshot('02-large-ledger');
@@ -288,6 +295,15 @@ async function main() {
   check('audited value and evaluation restored', JSON.stringify(after.audit) === JSON.stringify(before.audit) && after.keyMis === before.keyMis, { before: before.keyMis, after: after.keyMis });
   check('entity name restored', after.ent === before.ent);
   check('sampling plan still records the seed as drawn for the run', await inCaat(`S.samp.res.plan.some(([k, v]) => k === 'Seed setting' && /^Off/.test(v))`));
+  // T-030 finding 8: key-item overstatements count in the MUS conclusion.
+  const mus = await inCaat(`(() => {
+    const k = S.samp.res.items.find((i) => i._type === 'Key');
+    if (!k || S.samp.res.method !== 'mus') return 'no key item / not MUS';
+    S.samp.audit[k._r] = String(Math.round((k._amt - 1000) * 100) / 100);
+    const ev = spEval();
+    return Math.round((ev.umlAll - ev.uml) * 100) / 100 + '|' + /key-item/.test(ev.concl ? ev.concl[0] : '');
+  })()`);
+  check('MUS upper limit includes key-item overstatements (finding 8)', mus === '1000|true', mus);
   await screenshot('03-restored');
 
   await openAsUser('caat-admin@example.invalid', password, eng2, '#/caat-tools');
@@ -296,6 +312,48 @@ async function main() {
   check('large-ledger workspace restored in engagement 2', JSON.stringify(after2) === JSON.stringify(before2), after2);
   await inCaat(`(document.querySelector('#nav a[data-v="data"]').click(), document.querySelector('#bClr').click(), true)`);
   await waitSaved('engagement 2 after removing files');
+
+  // ── T-030 review findings, synthetic data ──────────────────────────────
+  const rf = await inCaat(`(async () => {
+    const out = {};
+    // Each voucher type numbered 1..50 on its own, with one real duplicate (Payment 10).
+    const L = ['Voucher Type,Voucher No,Date,Party Name,Amount'];
+    for (const vt of ['Payment', 'Receipt']) for (let i = 1; i <= 50; i++) L.push(vt + ',' + i + ',' + String(1 + (i % 28)).padStart(2, '0') + '-04-2025,Party ' + (i % 7) + ',' + (1000 + i * 37));
+    L.push('Payment,10,15-04-2025,Party 3,4321');
+    S.files = []; S.parts = [];
+    await addFiles([new File([L.join('\\n')], 'series.csv')]);
+    S.dtypeAuto = false; S.dtype = 'general'; S.amtMode = 'single';
+    S.map = Object.assign(S.map, { amount: 'Amount', credit: '', drcr: '', vtype: 'Voucher Type', doc: 'Voucher No', party: 'Party Name', date: 'Date', gstin: '', pan: '' });
+    applyMap();
+    const g = S.results.gaps;
+    out.dupNos = g.dupNos;
+    const dt = g.tables.find((x) => /Duplicate document/.test(x.title));
+    out.drill = dt.rows.length ? dt.drill(dt.rows[0]).rows.length : -1;
+    out.insights = /of 11 tests run/.test(testsRunText());
+    // Side choice with one amount column (cash book)
+    S.dtype = 'cash'; S.side = 'pay'; S.amtMode = 'single'; applyMap();
+    out.singleSide = sideDC() === null && dataLogLines().some(([k, v]) => k === 'Side analysed' && /^All lines/.test(v));
+    // Side choice must not overwrite the user's sign settings
+    S.amtMode = 'ind'; S.map.drcr = 'Voucher Type'; S.drcrNeg = 'dr'; S.side = 'pay'; applyMap();
+    out.keepsSetting = S.drcrNeg === 'dr' && effDrcrNeg() === 'dr';
+    S.amtMode = 'single'; S.map.drcr = '';
+    // Unknown data type in an imported profile
+    try { profApply({ dtype: 'nonsense', soft: 'x', side: 'y', map: {} }); S.view = 'data'; render(); out.badProfile = S.dtype !== 'nonsense'; } catch (e) { out.badProfile = 'throws: ' + e.message; }
+    // Demo data starts from the default type
+    S.dtype = 'bank'; S.dtypeAuto = false; demoData();
+    out.demoType = S.dtype + '|' + S.dtypeAuto;
+    return JSON.stringify(out);
+  })()`);
+  const r = JSON.parse(rf);
+  check('Check missing keeps per-type numbering: only the real duplicate (finding 1)', r.dupNos === 1, r);
+  check('duplicate drill-down lists its rows (finding 3)', r.drill === 2, r);
+  check('Insights says how many tests ran when some could not (finding 7)', r.insights === true, r);
+  check('one amount column: side not applied and log says all lines (finding 2)', r.singleSide === true, r);
+  check('side choice leaves the user Dr/Cr sign setting unchanged (finding 4)', r.keepsSetting === true, r);
+  check('profile with an unknown data type does not break the Data view (finding 5)', r.badProfile === true, r);
+  check('demo data starts as a general listing (finding 6)', r.demoType === 'general|true', r);
+  await inCaat(`(document.querySelector('#nav a[data-v="data"]').click(), document.querySelector('#bClr').click(), true)`);
+  await waitSaved('engagement 2 after the findings checks');
   await closeApp();
 
   db = inspectDatabase();

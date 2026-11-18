@@ -1,5 +1,8 @@
 # Current status
 
+## T-053 CAAT Tools v0.10 (17 November 2026)
+
+On `caat_tools`, the embedded CAAT Tools was replaced by the owner-supplied v0.10 (new sidebar layout, data-type detection, Insights, export dialog, tests run on Apply mapping) and restyled with the VERA colours, type and components. The approved large-ledger loop fix and sampling wording fix were re-applied; SheetJS stays 0.20.3. Eight logic findings from the code review were fixed on the owner's instruction (see [CAAT_TOOLS.md](CAAT_TOOLS.md)). `npm run test:caat-ui` 38/38; owner UAT pending.
 ## T-053 to T-063 inventory note, shareholding %, menus, captions, Excel repair, toolbars and payables ageing (17 November 2026)
 
 - Branch `FSG-AM` at `8dc2165` (main after PR #117 and #118); Financial Statement Review only (F-009); uncommitted.

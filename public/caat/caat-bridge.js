@@ -21,6 +21,7 @@
   if (window.parent === window) return;
 
   var host = window.parent;
+  document.body.classList.add('vera'); // VERA theme tweaks (caat-vera-theme.css)
   var targetOrigin = location.protocol === 'file:' ? '*' : location.origin;
   var post = function (msg) { host.postMessage(msg, targetOrigin); };
 
@@ -77,6 +78,7 @@
       files: files,
       partsOn: S.parts.map(function (p) { return !!p.on; }),
       cfg: profSnap(),
+      auto: { dtype: S.dtypeAuto !== false, stmt: S.stmtAuto !== false },
       mapped: !!S.mapped,
       params: S.params || {},
       view: S.view,
@@ -167,6 +169,7 @@
       if (S.parts.length) {
         (st.partsOn || []).forEach(function (on, i) { if (S.parts[i]) S.parts[i].on = on; });
         if (!S.parts.some(function (p) { return p.on; })) S.parts[0].on = true;
+        if (st.auto) { S.dtypeAuto = st.auto.dtype !== false; S.stmtAuto = st.auto.stmt !== false; }
         if (st.cfg) profApply(st.cfg); else buildRows(false);
         S.err.data = notes.length ? 'These saved files could not be found and were not loaded: ' + notes.join(', ') : '';
 
@@ -177,7 +180,8 @@
             Object.keys(st.results || {}).forEach(function (id) {
               var t = TBYID[id];
               if (!t) return;
-              runTest(t, true);
+              // applyMap already runs every test; only run what it did not.
+              if (!S.results[id]) runTest(t, true);
               if (S.results[id] && st.results[id]) S.results[id].at = new Date(st.results[id]);
             });
             if (st.samp) {
