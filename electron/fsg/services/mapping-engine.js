@@ -621,7 +621,10 @@ export async function runMappingEngine(tbId, rsId, constitution, { excludeZero =
     // rather than being swallowed by the broad "Indirect Expenses" group match.
     const m2GroupHitsAll = m2InScope.filter(m => anyWordBoundaryMatch(allHierarchy, m.keywords))
     const m2GroupHitsPri1 = m2GroupHitsAll.filter(m => (m.priority || 1) <= 1)
-    const m2GroupHits = m2GroupHitsPri1.length > 0 ? m2GroupHitsAll : []
+    // T-062: when a specific (priority-1) group rule matches, the broad priority-2 fallbacks are dropped. They were kept
+    // alongside it, so a ledger under e.g. "Donation" inside "Indirect Expenses" hit both Donations and the
+    // "Indirect Expenses -> Miscellaneous expenses" fallback, and became a Conflict whenever its name broke no tie.
+    const m2GroupHits = m2GroupHitsPri1.length > 0 ? m2GroupHitsPri1 : []
 
     // Step B: NAME-BASED (FALLBACK — only if no priority-1 group matching)
     const m2NameHits  = m2GroupHits.length > 0
@@ -718,6 +721,13 @@ export async function runMappingEngine(tbId, rsId, constitution, { excludeZero =
       result.status        = 'conflict'
       result.confidence    = 'none'
       result.conflict_stage = 2
+      // T-062: Level 1 is known, only Level 2 is in doubt - file the ledger as "Uncategorised {Level 1}" (as when no
+      // Level 2 rule matches) so the statements and Notes show it under its head with a Fix button, instead of a line
+      // with no caption. The status stays Conflict and the candidates below remain the options to resolve it.
+      if (l1HasL2Children[result.mapping1_resultant]) {
+        result.mapping2_resultant = `Uncategorised ${result.mapping1_resultant}`
+        result.mapping3_resultant = null
+      }
       result.conflict_candidates = resolvedM2Hits.map(m => ({
         stage:              2,
         mapping1_resultant: m.mapping1_resultant,

@@ -161,6 +161,9 @@ async function launch() {
   });
   await cdp('Runtime.enable');
   await cdp('Page.enable');
+  // The page behaves as focused even when another window (VS Code, a dev copy of the app) is in front: without
+  // this, Chromium fires no blur event and a typed Reason of Variance is never saved in an unfocused test window.
+  await cdp('Emulation.setFocusEmulationEnabled', { enabled: true });
   await waitFor('Boolean(globalThis.electronAPI)', 20000, 'electronAPI');
 }
 function cdp(method, params = {}) {
@@ -202,6 +205,8 @@ async function goto(hash) {
 // opened by reloading, signing in through the real login form, then routing.
 // The saved engagement is restored by EngagementContext when the user signs in.
 async function openAsUser(email, password, engagement, hash) {
+  // Just after a relaunch the window can still be on its blank start page, where localStorage is denied.
+  await waitFor(`(() => { try { return /^(http|file|app)/.test(location.protocol) && !!localStorage } catch (_) { return false } })()`, 30000, 'app page loaded');
   await evaluate(`(localStorage.setItem('auditpro_current_engagement', ${JSON.stringify(JSON.stringify(engagement))}), location.hash = '#/auth', location.reload(), true)`);
   await sleep(2000);
   await waitFor(`Boolean(document.querySelector('#login-email'))`, 30000);
@@ -347,15 +352,15 @@ async function main() {
   }
   // T-038: General Notes is shown as Policy (Ctrl+Shift+O) and Features has no PPE.
   const topLabels = await evaluate(`[...document.querySelectorAll('.fsg-root [role=tablist] > button, .fsg-root nav button')].map(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim())`);
-  check('T-038 the menu shows Policy instead of General Notes', topLabels.includes('Policy') && !topLabels.includes('General Notes'), topLabels);
+  check('T-038 the menu shows A/c Policy instead of General Notes (T-057)', topLabels.includes('A/c Policy') && !topLabels.includes('General Notes'), topLabels);
   await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'Features')?.click(), true)`);
   await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
   const featureItems = await evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/[\\u25b4\\u25be\\u25b8\\u203a\\s]+/g, ' ').trim())`);
   check('T-038 the Features menu no longer lists PPE', featureItems.length > 0 && !featureItems.some(t => /^PPE\\b/.test(t)), featureItems);
   // T-045: renamed and reordered menu bar; the reconciliation is Features > Reco.
-  const T045_ORDER = ['Master', 'TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'Policy', 'Annex', 'Features', 'Exception', 'Review Financials'];
+  const T045_ORDER = ['Master', 'TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Features', 'Check Control', 'Review Financials'];
   const tabLabels = await evaluate(`[...document.querySelectorAll('.fsg-root [role=tablist] > button')].map(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim())`);
-  check('T-045 the menu bar reads Master > TB > Inventory > ... > Annex > Features > Exception > Review Financials', JSON.stringify(tabLabels) === JSON.stringify(T045_ORDER), tabLabels);
+  check('T-045 the menu bar reads Master > TB > Inventory > ... > Annex > Features > Check Control > Review Financials', JSON.stringify(tabLabels) === JSON.stringify(T045_ORDER), tabLabels);
   check('T-045 every menu fits on screen at 1280 px wide or more, even with the VERA sidebar open', await evaluate(`(() => { const n = document.querySelector('.fsg-root [role=tablist]'); return window.innerWidth < 1280 || n.scrollWidth <= n.clientWidth + 1 })()`),
     await evaluate(`(() => { const n = document.querySelector('.fsg-root [role=tablist]'); return { scroll: n.scrollWidth, client: n.clientWidth, window: window.innerWidth } })()`));
   check('T-045 the Features menu lists Reco', featureItems.includes('Reco'), featureItems);
@@ -378,6 +383,8 @@ async function main() {
   };
   await openRatioMenu();
   const ratioItems = await evaluate(subItems);
+  check('T-054 the Ratio submenu is fully on screen', await evaluate(`(() => { const m = document.querySelector('.fsg-root [role=menu] [role=menu]'); if (!m) return false; const r = m.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth })()`),
+    await evaluate(`(() => { const m = document.querySelector('.fsg-root [role=menu] [role=menu]'); const r = m && m.getBoundingClientRect(); return r ? { left: r.left, right: r.right, window: window.innerWidth, flip: m.dataset.flip } : null })()`));
   check('T-049 Features > Ratio lists Form 26 (Old Name - 3CD), Company Additional Disclosure Ratio and Analytical Ratios', JSON.stringify(ratioItems) === JSON.stringify(RATIO_ITEMS),
     { ratioItems, menu: await evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent + '|' + x.getAttribute('aria-expanded'))`) });
   for (let i = 0; i < RATIO_ITEMS.length; i++) {
@@ -399,7 +406,10 @@ async function main() {
     const box = `document.querySelector('.fsg-root td.fsg-change-col input[type=text]')`;
     const key = await evaluate(`${box}?.getAttribute('aria-label') || ''`);
     await evaluate(`(() => { const i = ${box}; i.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(reasonText)}); i.dispatchEvent(new Event('input', { bubbles: true })); i.blur(); return true })()`);
-    await sleep(1200);
+    // Wait until the reason is in the database (a fixed 1.2 s pause raced the save on a busy machine), then hide / show.
+    const savedKey = String(key).replace(/^Reason of variance: /, '');
+    check(`T-048 ${screen}: the typed reason reaches the database`, await waitFor(`(async () => { const r = await window.electronAPI.fsg.invoke('fsg:remarks:listByTB', 1); return !!r?.ok && (r.result || []).some(x => /_change$/.test(x.scope) && x.scope_key === ${JSON.stringify(savedKey)} && x.remark === ${JSON.stringify(reasonText)}) })()`, 15000), savedKey);
+    await sleep(300);
     await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
     check(`T-048 ${screen}: Variance Analysis again hides the columns`, await waitFor(`!(${changeHeads})`, 5000));
     await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
@@ -418,6 +428,8 @@ async function main() {
   await analyseChange('BS', 'Capital infusion of Rs 5 lakh in FY 2024-25');
   check(`T-050 ${'BS'}: the toolbar is one line with every button in view`, await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); const r = t && t.getBoundingClientRect(); return !!t && t.scrollWidth <= t.clientWidth + 1 && r.height < 48 && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.left >= r.left - 1 && x.right <= r.right + 1 }) })()`),
     await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); return t ? { scroll: t.scrollWidth, client: t.clientWidth, height: t.getBoundingClientRect().height, window: window.innerWidth } : null })()`));
+  check('T-060 BS: the toolbar no longer repeats "Balance Sheet" (the statement heading says it)', await evaluate(`!document.querySelector('.fsg-root .fsg-stmt-title') && !/^(Balance Sheet|Profit & Loss|Cash Flow Statement)/.test((document.querySelector('.fsg-root .fsg-stmt-toolbar')?.innerText || '').trim())`));
+  check('T-056 BS: both grand totals read TOTAL', await evaluate(`(() => { const t = [...document.querySelectorAll('.fsg-root tfoot td')].map(td => td.textContent.trim()); return t.filter(x => x === 'TOTAL').length >= 2 && !t.some(x => /^TOTAL (EQUITY|ASSETS)/.test(x)) })()`));
   check('T-050 BS: (i)-(iv) under (a) sit one step right, inside Particulars', await evaluate(`[...document.querySelectorAll('.fsg-root td')].some(td => /^i\\s*Tangible assets/.test(td.textContent.trim()) && td.querySelector('span.inline-block'))`));
   check('PL tab can be opened', await clickFsgButton('PL'));
   const pl = await waitFor(`/Profit/i.test(document.querySelector('.fsg-root')?.innerText || '') && /Revenue from operations/i.test(document.querySelector('.fsg-root').innerText)`, 30000);
@@ -426,11 +438,22 @@ async function main() {
   await analyseChange('PL', 'Sales up 12% - new dealer B2');
   check(`T-050 ${'PL'}: the toolbar is one line with every button in view`, await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); const r = t && t.getBoundingClientRect(); return !!t && t.scrollWidth <= t.clientWidth + 1 && r.height < 48 && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.left >= r.left - 1 && x.right <= r.right + 1 }) })()`),
     await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); return t ? { scroll: t.scrollWidth, client: t.clientWidth, height: t.getBoundingClientRect().height, window: window.innerWidth } : null })()`));
+  check('T-060 PL: the toolbar no longer repeats "Profit & Loss"', await evaluate(`!document.querySelector('.fsg-root .fsg-stmt-title') && !/^(Balance Sheet|Profit & Loss|Cash Flow Statement)/.test((document.querySelector('.fsg-root .fsg-stmt-toolbar')?.innerText || '').trim())`));
   await clickFsgButton('Notes');
   check('T-027 BS and PL notes show their respective dated column headings', await waitFor(`[...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='As at 31 March 2025') && [...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2025') && ![...document.querySelectorAll('.fsg-root th')].some(t=>/^(Current Year|Previous Year)$/.test(t.textContent.trim()))`),
     await evaluate(`[...new Set([...document.querySelectorAll('.fsg-root th')].map(t=>t.textContent.trim()).filter(t=>/Year|As at|For the year/.test(t)))].slice(0, 20)`));
   await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(b=>b.textContent.trim()==='Reviewed, Close')?.click(),true)`);
   await screenshot('03b-notes-dated');
+  // T-060: the Notes header in the statement-toolbar style - each group on one line, buttons of one height, one Previous Year TB selector.
+  check('T-060 Notes: the toolbar groups sit on one line each, one button height, nothing cut off', await evaluate(`(() => {
+    const t = document.querySelector('.fsg-root .fsg-notes-toolbar'); if (!t) return false; const r = t.getBoundingClientRect();
+    const groups = [...t.querySelectorAll('.fsg-stmt-group')];
+    return groups.length === 3 && groups.every(g => g.getBoundingClientRect().height <= 36) && t.scrollWidth <= t.clientWidth + 1
+      && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.right <= r.right + 1 }) })()`),
+    await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-notes-toolbar'); return t ? { h: t.getBoundingClientRect().height, groups: [...t.querySelectorAll('.fsg-stmt-group')].map(g => Math.round(g.getBoundingClientRect().height)), w: window.innerWidth } : null })()`));
+  check('T-060 Notes: the Previous Year TB selector is drawn at most once (it was twice for a branch)', await evaluate(`document.querySelectorAll('.fsg-root .fsg-notes-toolbar select').length <= 2`),
+    await evaluate(`document.querySelectorAll('.fsg-root .fsg-notes-toolbar select').length`));
+  await screenshot('03d-notes-toolbar');
   await analyseChange('Notes', 'Reclassified 3 ledgers from Other expenses');
   await clickFsgButton('Annex');
   await waitFor(`document.querySelector('.fsg-root')?.innerText.includes('Each note with its individual ledger')`);
@@ -466,7 +489,7 @@ async function main() {
   // Real key presses are cancelable, which is how FSG's handler keeps VERA's Ctrl+O (VERA Tools) from also firing.
   await evaluate(`(document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'O', code: 'KeyO', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })), true)`);
   check('T-038 Ctrl+Shift+O stays inside Financial Statement Review', await evaluate(`location.hash.includes('financial-statement-review') && !!document.querySelector('.fsg-root')`), await evaluate('location.hash'));
-  check('T-038 Ctrl+Shift+O opens Policy', await waitFor(`[...document.querySelectorAll('.fsg-root button.tab-active')].some(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'Policy')`, 5000),
+  check('T-038 Ctrl+Shift+O opens A/c Policy', await waitFor(`[...document.querySelectorAll('.fsg-root button.tab-active')].some(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'A/c Policy')`, 5000),
     await evaluate(`[...document.querySelectorAll('.fsg-root button.tab-active')].map(b => b.textContent.trim())`));
   check('T-043 Policy offers the blank / filled Excel format and its upload', await waitFor(`!!document.querySelector('.fsg-root .fsg-policy-blank') && !!document.querySelector('.fsg-root .fsg-policy-filled') && !!document.querySelector('.fsg-root .fsg-policy-upload')`, 10000));
 
@@ -477,6 +500,10 @@ async function main() {
   check('T-044 Upload TB offers Download all workings and Upload all workings', await waitFor(`!!document.querySelector('.fsg-root .fsg-workings-download') && !!document.querySelector('.fsg-root .fsg-workings-upload')`, 10000));
 
   check('Statement of Profit and Loss renders', pl, (await evaluate(`document.querySelector('.fsg-root')?.innerText || ''`)).slice(0, 1200));
+  check('T-055 the Exception report is shown as Check Control', await clickFsgButton('Check Control') && await waitFor(`/Check Control/.test(document.querySelector('.fsg-root h2')?.textContent || '') && !/variance/i.test(document.querySelector('.fsg-root')?.innerText || '')`, 15000));
+  check('T-054 CFS: the toolbar is one line with every button in view', await clickFsgButton('CFS') && await waitFor(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); if (!t) return false; const r = t.getBoundingClientRect(); return t.scrollWidth <= t.clientWidth + 1 && r.height < 48 && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.left >= r.left - 1 && x.right <= r.right + 1 }) })()`, 15000),
+    await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); return t ? { scroll: t.scrollWidth, client: t.clientWidth, height: t.getBoundingClientRect().height } : null })()`));
+  check('T-060 CFS: the toolbar no longer repeats "Cash Flow Statement"', await evaluate(`!document.querySelector('.fsg-root .fsg-stmt-title') && !/^(Balance Sheet|Profit & Loss|Cash Flow Statement)/.test((document.querySelector('.fsg-root .fsg-stmt-toolbar')?.innerText || '').trim())`));
   check('Review Financials tab can be opened', await clickFsgButton('Review Financials'));
   const gen = await waitFor(`/PDF|Excel/.test(document.querySelector('.fsg-root')?.innerText || '')`, 20000);
   await screenshot('04-generate-financials');

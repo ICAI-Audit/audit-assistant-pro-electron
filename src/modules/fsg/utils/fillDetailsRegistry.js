@@ -9,7 +9,7 @@
 // This is the "dynamically change the template as Fill Details forms are
 // added" mechanism.
 
-import { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from '../components/Notes/TradePayablesDisclosureForm'
+import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../components/Notes/TradePayablesDisclosureForm'
 import { TR_AGEING_ROWS, TR_AGEING_BUCKETS } from '../components/Notes/TradeReceivablesAgingForm'
 import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolve } from './tradeReceivablesNonCorp'
 import { INVESTMENT_REGISTRY } from './investmentWorkbook'
@@ -323,8 +323,10 @@ export const FILL_DETAILS_REGISTRY = [
       const msme = details?.msme || {}
       const rows = []
       for (const period of ['cy', 'py']) {
+        // T-063: blocked cells empty, Total Due / Total worked out (read back as such, never typed).
+        const pd = tpPeriodView(ag?.[period] || {})
         for (const r of TP_AGEING_ROWS) {
-          rows.push(['AGEING', period.toUpperCase(), r.label, ...TP_AGEING_BUCKETS.map(b => num(ag?.[period]?.[r.key]?.[b.key]) || '')])
+          rows.push(['AGEING', period.toUpperCase(), r.label, ...TP_AGEING_BUCKETS.map(b => num(pd?.[r.key]?.[b.key]) || '')])
         }
       }
       rows.push(['RECON', 'CY', 'MSME (as per TB)', num(ag?.tbCY?.msme) || ''])
@@ -342,8 +344,15 @@ export const FILL_DETAILS_REGISTRY = [
       rows.push(['FLAGS', '', 'Include MSME in Output (Yes/No)', yn(msme?.includeInOutput)])
       return rows
     },
-    fromRows(rows) {
+    fromRows(rows, header = []) {
       const labelToKey = new Map(TP_AGEING_ROWS.map(r => [r.label.trim().toLowerCase(), r.key]))
+      // Columns found by their heading, so a sheet downloaded before T-063 (the four
+      // periods only, no Unbilled / Not Due) still reads into the right columns.
+      const hdr = (header || []).map(h => String(h ?? '').trim().toLowerCase())
+      const colOf = new Map(TP_AGEING_BUCKETS.map((b, i) => {
+        const at = hdr.indexOf(b.label.toLowerCase())
+        return [b.key, at >= 3 ? at : (hdr.length ? -1 : 3 + i)]
+      }))
       const ageing = { cy: {}, py: {}, tbCY: { msme: '', others: '' }, tbPY: { msme: '', others: '' }, includeInOutput: false }
       const msme = { cy: { a: { principal: '', interest: '' }, b: '', c: '', d: '', e: '' },
                      py: { a: { principal: '', interest: '' }, b: '', c: '', d: '', e: '' },
@@ -356,7 +365,7 @@ export const FILL_DETAILS_REGISTRY = [
         if (section === 'AGEING') {
           const key = labelToKey.get(labelLower)
           if (!key || (period !== 'cy' && period !== 'py')) continue
-          ageing[period][key] = Object.fromEntries(TP_AGEING_BUCKETS.map((b, i) => [b.key, num(r[3 + i])]))
+          ageing[period][key] = Object.fromEntries(TP_AGEING_BUCKETS.map(b => [b.key, colOf.get(b.key) >= 0 ? num(r[colOf.get(b.key)]) : 0]))
         } else if (section === 'RECON') {
           if (period !== 'cy' && period !== 'py') continue
           const target = period === 'cy' ? ageing.tbCY : ageing.tbPY
@@ -373,6 +382,8 @@ export const FILL_DETAILS_REGISTRY = [
           else if (labelLower.startsWith('include msme')) msme.includeInOutput = isYes(r[3])
         }
       }
+      ageing.cy = tpPeriodView(ageing.cy)
+      ageing.py = tpPeriodView(ageing.py)
       return { ageing, msme }
     },
   },

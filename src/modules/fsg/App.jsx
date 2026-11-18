@@ -67,7 +67,7 @@ function fmtUploadedAt(v) {
 // label, same render case, just listed in more than one dropdown.
 // Screens whose figures come from the Trial Balance's closing balances: they say when those are revised by Adjustments.
 const ADJUSTMENT_NOTICE_TABS = new Set([
-  'BS', 'PL', 'CFS', 'Notes', 'Annex', 'Reco', 'Exception', 'Review Financials', 'Ratio: Form 26 (Old Name - 3CD)', 'Ratio: Company Additional Disclosure Ratio', 'Ratio: Analytical Ratios', 'Inventory',
+  'BS', 'PL', 'CFS', 'Notes', 'Annex', 'Reco', 'Check Control', 'Review Financials', 'Ratio: Form 26 (Old Name - 3CD)', 'Ratio: Company Additional Disclosure Ratio', 'Ratio: Analytical Ratios', 'Inventory',
   'Dep (Books)', 'Dep (Income Tax)', 'Tax Computation', 'Deferred Tax', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
   'Rectification / Recategorisation', 'Mapped TB (Remarks)',
 ])
@@ -75,13 +75,13 @@ const ADJUSTMENT_NOTICE_TABS = new Set([
 // is locked or final (Mapped TB and Rectification render their own).
 const LOCK_BANNER_TABS = new Set([
   'Upload TB', 'Actual TB', 'Mapped TB (Remarks)', 'Journal Entry', 'Inventory',
-  'Dep (Books)', 'Dep (Income Tax)', 'BS', 'PL', 'CFS', 'Notes', 'Policy', 'Annex', 'Reco',
+  'Dep (Books)', 'Dep (Income Tax)', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Reco',
   'Tax Computation', 'Deferred Tax', 'Ratio: Form 26 (Old Name - 3CD)', 'Ratio: Company Additional Disclosure Ratio', 'Ratio: Analytical Ratios', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
-  'Exception', 'Review Financials',
+  'Check Control', 'Review Financials',
 ])
 // T-038: "General Notes" is shown as "Policy" (Ctrl+Shift+O); PPE removed from Features.
 // T-045: Trial Balance shown as TB, Stock as Inventory, Annex & Reco as Annex (its reconciliation moved to Features > Reco), Generate Financials as Review Financials.
-const TABS = ['Master', 'TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'Policy', 'Annex', 'Features', 'Exception', 'Review Financials']
+const TABS = ['Master', 'TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Features', 'Check Control', 'Review Financials']
 // ICAI VERA: the Auditee is the engagement's client and the Financial Year comes
 // from the engagement, so Master has no Financial Period leaf (T-019).
 const TAB_GROUPS = {
@@ -375,7 +375,7 @@ export default function App({ context }) {
   // 'Dep (Books)' (formerly Dep (Comp)) was missing here, so on a branch entity that
   // tab never received the selected branch TB and showed "Load a Trial
   // Balance" although one was loaded (fixed 0.1.16).
-  const BRANCH_WORK_TABS = new Set(['Mapped TB', 'Mapped TB (Remarks)', 'Rectification / Recategorisation', 'Dep', 'Dep (Books)', 'Dep (Income Tax)', 'Inventory', 'Actual TB', 'Exception', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details'])
+  const BRANCH_WORK_TABS = new Set(['Mapped TB', 'Mapped TB (Remarks)', 'Rectification / Recategorisation', 'Dep', 'Dep (Books)', 'Dep (Income Tax)', 'Inventory', 'Actual TB', 'Check Control', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details'])
   // Tabs that offer a "Consolidated (all branches)" pill: one depreciation
   // schedule for the whole entity instead of one per branch (see utils/depStore.js).
   const DEP_CONSOL_TABS = new Set(['Dep (Books)', 'Dep (Income Tax)'])
@@ -389,7 +389,7 @@ export default function App({ context }) {
 
   // Policy (formerly General Notes, with the Financial Ratios) and the Cash Flow Statement belong to the entity as a whole: for an Auditee with branches they
   // are always the Consolidated ones, never a branch's.
-  const ENTITY_LEVEL_TABS = new Set(['Policy', 'CFS', 'Tax Computation', 'Deferred Tax'])
+  const ENTITY_LEVEL_TABS = new Set(['A/c Policy', 'CFS', 'Tax Computation', 'Deferred Tax'])
   const ITR_TABS = new Set(['ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details'])
   const isEntityLevelTab = isBranchEntity && ENTITY_LEVEL_TABS.has(activeTab)
 
@@ -401,7 +401,7 @@ export default function App({ context }) {
     // The Exception tab shows the Consolidated mode switch too, so it must see
     // the virtual consolidated TB in that mode (its inter-branch / GST /
     // consolidated-depreciation checks only exist there).
-    if ((isBranchViewTab || activeTab === 'Exception') && fsMode === 'consolidated') {
+    if ((isBranchViewTab || activeTab === 'Check Control') && fsMode === 'consolidated') {
       activeTBForDisplay = consolidatedVirtualTB
     } else if (DEP_CONSOL_TABS.has(activeTab) && selectedBranchTBId === '__consolidated__') {
       activeTBForDisplay = consolidatedVirtualTB
@@ -802,7 +802,7 @@ export default function App({ context }) {
             />
           </div>
         )
-      case 'Exception':
+      case 'Check Control':
         return (
           <div className="flex flex-col h-full overflow-hidden">
             {isBranchEntity && (
@@ -835,12 +835,12 @@ export default function App({ context }) {
             onBranchSelect={setSelectedBranchTBId}
           />
         )
-      case 'Policy':
+      case 'A/c Policy':
         return (
           <div className="flex flex-col h-full overflow-hidden">
             {isBranchEntity && (
               <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-800">
-                🔀 <strong>Consolidated</strong> Policy — the Financial Ratios are worked out from the Consolidated Balance Sheet and Profit &amp; Loss.
+                🔀 <strong>Consolidated</strong> A/c Policy — the Financial Ratios are worked out from the Consolidated Balance Sheet and Profit &amp; Loss.
               </div>
             )}
             <GeneralNotes

@@ -1,4 +1,4 @@
-import { noteColumnLabels } from '../../utils/statementDates'
+import { noteColumnLabels, statementColumnLabels } from '../../utils/statementDates'
 import React, { useState, useEffect, useRef } from 'react'
 import { useFinancials, fmtINR, displayAmt as rowAmt } from '../../hooks/useFinancials'
 import { mapSavedRowsToLiveNotes } from '../../utils/savedNoteData'
@@ -22,7 +22,7 @@ import { AnalyseChangeButton, AnalyseChangeProvider, useAnalyseChangeToggle, Cha
 import ShareCapitalForm from './ShareCapitalForm'
 import LongTermBorrowingsForm from './LongTermBorrowingsForm'
 import ShortTermBorrowingsForm from './ShortTermBorrowingsForm'
-import TradePayablesDisclosureForm, { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from './TradePayablesDisclosureForm'
+import TradePayablesDisclosureForm, { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from './TradePayablesDisclosureForm'
 import CashBankDetailsForm from './CashBankDetailsForm'
 import InvestmentsForm, { InvestmentDisclosure } from './InvestmentsForm'
 import { investmentKind } from '../../utils/investments'
@@ -202,7 +202,8 @@ function capPyExPL(saved) {
  * `rows`/`buckets` come from the form modules so labels always match the fill form.
  * `computeCell(periodData, computedType, bucketKey)` derives computed rows (e.g. Total Due).
  */
-function AgeingDisplayTable({ heading, periodData, rows, buckets, computeCell }) {
+function AgeingDisplayTable({ heading, periodData: rawPeriod, rows, buckets, computeCell, viewPeriod }) {
+  const periodData = viewPeriod ? viewPeriod(rawPeriod) : rawPeriod
   if (!periodData || Object.keys(periodData).length === 0) return null
   const cell = (row, bKey) => {
     if (row.computed && computeCell) return computeCell(periodData, row.computed, bKey)
@@ -220,11 +221,15 @@ function AgeingDisplayTable({ heading, periodData, rows, buckets, computeCell })
           <thead>
             <tr className="bg-indigo-50">
               <th rowSpan={2} className="border border-indigo-200 px-2 py-1 text-left font-semibold text-indigo-900 align-bottom w-[26%]">Particulars</th>
-              <th colSpan={buckets.length} className="border border-indigo-200 px-2 py-1 text-center font-semibold text-indigo-900">Outstanding for following periods from due date of payment</th>
+              {/* T-063: Unbilled / Not Due stand outside the "from due date" heading */}
+              {buckets.filter(b => b.notAged).map(b => (
+                <th key={b.key} rowSpan={2} className="border border-indigo-200 px-2 py-1 text-right font-semibold text-indigo-900 align-bottom">{b.label}</th>
+              ))}
+              <th colSpan={buckets.filter(b => !b.notAged).length} className="border border-indigo-200 px-2 py-1 text-center font-semibold text-indigo-900">Outstanding for following periods from due date of payment</th>
               <th rowSpan={2} className="border border-indigo-200 px-2 py-1 text-right font-semibold text-indigo-900 align-bottom">Total</th>
             </tr>
             <tr className="bg-indigo-50">
-              {buckets.map(b => (
+              {buckets.filter(b => !b.notAged).map(b => (
                 <th key={b.key} className="border border-indigo-200 px-2 py-1 text-right font-semibold text-indigo-900">{b.label}</th>
               ))}
             </tr>
@@ -576,7 +581,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
               // of Services (utils/revenueLines.js) are flagged like an
               // uncategorised line, and Fix asks for the split (their Level 3).
               const toSplit = unsplitSaleLine(note) === line
-              const l2Uncat = (line.level2 || '').toLowerCase().includes('uncategorised') || toSplit
+              const l2Uncat = (line.level2 || '').toLowerCase().includes('uncategorised') || toSplit || !!line.needsReview
               // A ledger mapped straight to this note's Level 1 with no Level
               // 2 at all (e.g. Purchase Accounts under "Cost of materials
               // consumed" — see mapping-engine.js's applyPurchaseAccountsOverride)
@@ -622,11 +627,16 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                     {l2Uncat && onFix && (
                       <button
                         onClick={() => onFix(
-                          fixFilterWith({ alie: note.alie, mapping1_resultant: note.title, mapping2_resultant: toSplit ? 'Sale' : line.level2 }, line.rows),
-                          toSplit ? 'Bifurcate: Sale of Goods / Sale of Services' : `Fix: ${line.level2}`
+                          line.needsReview
+                            ? fixFilterWith({ alie: note.alie, mapping1_resultant: note.title }, line.rows)
+                            : fixFilterWith({ alie: note.alie, mapping1_resultant: note.title, mapping2_resultant: toSplit ? 'Sale' : line.level2 }, line.rows),
+                          toSplit ? 'Bifurcate: Sale of Goods / Sale of Services' : line.needsReview ? `Review: ledgers mapped to ${note.title}` : `Fix: ${line.level2}`
                         )}
                         className="ml-2 px-1.5 py-0.5 text-[10px] rounded border border-red-400 text-red-700 bg-white hover:bg-red-100 transition font-normal"
-                      >{toSplit ? 'Bifurcate' : 'Fix'}</button>
+                      >{toSplit ? 'Bifurcate' : line.needsReview ? 'Review' : 'Fix'}</button>
+                    )}
+                    {line.needsReview && line.reviewNote && (
+                      <div className="text-[10px] font-normal text-red-600 mt-0.5" data-testid="stock-other-ledgers-note">{line.reviewNote}</div>
                     )}
                     {tbId && (
                       <span className="ml-1 align-middle">
@@ -909,8 +919,8 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
         {note.trPayablesAgingData && (note.trPayablesAgingData.cy || note.trPayablesAgingData.py) && (
           <div className="mt-6 pt-6 border-t-2 border-indigo-300 px-4 pb-4">
             <h3 className="text-sm font-bold text-indigo-900 mb-3">Trade Payables ageing schedule</h3>
-            <AgeingDisplayTable heading={periodLabels.cy} periodData={note.trPayablesAgingData.cy} rows={TP_AGEING_ROWS} buckets={TP_AGEING_BUCKETS} />
-            <AgeingDisplayTable heading={periodLabels.py} periodData={note.trPayablesAgingData.py} rows={TP_AGEING_ROWS} buckets={TP_AGEING_BUCKETS} />
+            <AgeingDisplayTable heading={periodLabels.cy} periodData={note.trPayablesAgingData.cy} rows={TP_AGEING_ROWS} buckets={TP_AGEING_BUCKETS} viewPeriod={tpPeriodView} />
+            <AgeingDisplayTable heading={periodLabels.py} periodData={note.trPayablesAgingData.py} rows={TP_AGEING_ROWS} buckets={TP_AGEING_BUCKETS} viewPeriod={tpPeriodView} />
           </div>
         )}
 
@@ -1953,103 +1963,75 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
     <AnalyseChangeProvider on={changeOn && !changePyOff} tbId={activeTB?.id} scope="notes" getRemark={getRemark} onRemarkSaved={onRemarkSaved}>
     <div className="flex flex-col h-full overflow-hidden">
       <Guard activeTB={activeTB} loading={loading} hasData={!!data} error={error}>
-        {/* T-046: compact header — title line with count, search and expand/collapse; below it one wrapping line of labelled groups. */}
-        <div className="px-5 py-2 border-b border-blue-100 shrink-0 bg-white">
-          <div className="flex items-center gap-3 flex-wrap">
+        {/* T-046 / T-060: a title line (count, search, expand / collapse), then one toolbar line in the Balance Sheet style:
+            Variance Analysis, then labelled groups - Previous Year, Fill Details Excel, Show - with one button style. */}
+        <div className="px-5 py-1.5 border-b border-blue-100 shrink-0 bg-white">
+          <div className="fsg-stmt-toolbar">
             <h2 className="font-bold text-blue-900 text-sm">Notes to Financial Statements</h2>
             {period && <span className="text-[11px] text-gray-400">{period}</span>}
             <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">{noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)} note{(noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)) !== 1 ? 's' : ''}</span>
             <div className="ml-auto flex items-center gap-2">
-              <AnalyseChangeButton on={changeOn && !changePyOff} onToggle={setChangeOn} disabled={changePyOff}
-                disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
               <div className="relative">
                 <input type="text" placeholder="Search notes..." value={search} onChange={e => setSearch(e.target.value)}
-                  className="border border-gray-300 rounded pl-2.5 pr-6 py-1 text-xs w-44 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-                {search && <button onClick={() => setSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs" title="Clear search">✕</button>}
+                  className="h-7 border border-gray-300 rounded-md pl-2.5 pr-6 text-xs w-48 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
+                {search && <button onClick={() => setSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs" style={{ height: 'auto', padding: 0 }} title="Clear search">✕</button>}
               </div>
-              <div className="flex items-center rounded border border-gray-300 overflow-hidden">
-                <button
-                  onClick={() => setExpandSignal(s => ({ v: true, n: s.n + 1 }))}
-                  className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                  title="Expand all notes"
-                >⊞ Expand All</button>
-                <button
-                  onClick={() => setExpandSignal(s => ({ v: false, n: s.n + 1 }))}
-                  className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
-                  title="Collapse all notes"
-                >⊟ Collapse All</button>
+              <div className="fsg-seg">
+                <button onClick={() => setExpandSignal(s => ({ v: true, n: s.n + 1 }))} className="text-gray-700 hover:bg-blue-50" title="Expand all notes">⊞ Expand All</button>
+                <button onClick={() => setExpandSignal(s => ({ v: false, n: s.n + 1 }))} className="text-gray-700 hover:bg-blue-50" title="Collapse all notes">⊟ Collapse All</button>
               </div>
             </div>
           </div>
-          <div className="fsg-notes-toolbar flex items-center gap-x-3 gap-y-1.5 flex-wrap mt-2">
-          <div className="flex items-center gap-2 flex-wrap rounded border border-gray-200 bg-gray-50 px-2 py-1">
-            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Previous Year</span>
-            <PYModeSelect activeTB={activeTB} onChanged={refresh} />
+        </div>
+        <div className="fsg-stmt-toolbar fsg-notes-toolbar px-5 py-1.5 border-b border-blue-100 bg-gray-50 shrink-0">
+          <AnalyseChangeButton on={changeOn && !changePyOff} onToggle={setChangeOn} disabled={changePyOff}
+            disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Previous Year</span>
+            <PYModeSelect activeTB={activeTB} onChanged={refresh} label="" />
+            {/* One selector (it was drawn twice for a branch): a branch on Manual PY cannot pick a Previous Year TB as well. */}
+            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange} label="TB:"
+              disabled={(isBranchEntity && manualPyOn) || changePyOff}
+              disabledTitle={changePyOff ? 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).' : 'Manual PY is ON for this branch — turn it off to select a Previous Year Trial Balance instead.'} />
             <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
               onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
-              disabled={(isBranchEntity && !!prevTB?.id) || (!!data?.pyMode && data.pyMode !== 'required')}
-              disabledTitle={(!!data?.pyMode && data.pyMode !== 'required') ? 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).' : 'A Previous Year Trial Balance is already selected for this branch — clear it below to use Manual PY instead.'} />
-            {isBranchEntity && (
-              <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-                disabled={manualPyOn || (!!data?.pyMode && data.pyMode !== 'required')}
-                disabledTitle={(!!data?.pyMode && data.pyMode !== 'required') ? 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).' : 'Manual PY is ON for this branch — turn it off to select a Previous Year Trial Balance instead.'} />
-            )}
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden">
-              <button onClick={downloadManualPyFilled}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-amber-50 border-r border-gray-300"
-                title="Download every Manual PY figure currently saved here — keep this safe before re-uploading a Trial Balance, since Manual PY figures do not carry over automatically">
-                ⬇ Manual PY
-              </button>
-              <button onClick={uploadManualPyFilled}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-amber-50"
-                title="Restore Manual PY figures from a previously-downloaded file — matched back by note title, rows with a blank amount are left untouched">
-                ⬆ Manual PY
-              </button>
+              disabled={(isBranchEntity && !!prevTB?.id) || changePyOff}
+              disabledTitle={changePyOff ? 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).' : 'A Previous Year Trial Balance is already selected for this branch — clear it to use Manual PY instead.'} />
+            <div className="fsg-seg">
+              <button onClick={downloadManualPyFilled} className="text-gray-700 hover:bg-amber-50"
+                title="Download every Manual PY figure currently saved here — keep this safe before re-uploading a Trial Balance, since Manual PY figures do not carry over automatically">⬇ Manual PY</button>
+              <button onClick={uploadManualPyFilled} className="text-gray-700 hover:bg-amber-50"
+                title="Restore Manual PY figures from a previously-downloaded file — matched back by note title, rows with a blank amount are left untouched">⬆ Manual PY</button>
             </div>
             {data?.manualPyEnabled && (
               <button onClick={() => setAddMajorHeadModal(true)}
-                className="px-2 py-1 text-xs border border-amber-300 rounded text-amber-700 hover:bg-amber-50"
+                className="border border-amber-300 bg-white text-amber-700 hover:bg-amber-50"
                 title="Add a Balance Sheet or P&L major head that has no balance this year, purely to record a Previous Year figure">
-                + Add PY-only Major Head
+                + PY-only Major Head
               </button>
             )}
-            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-              disabled={!!data?.pyMode && data.pyMode !== 'required'}
-              disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
           </div>
-          <div className="flex items-center gap-1.5 rounded border border-gray-200 bg-gray-50 px-2 py-1">
-            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mr-0.5">Fill Details Excel</span>
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden bg-white">
-              <button onClick={downloadFillDetailsBlank}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Download a pristine consolidated Excel template — one sheet per Fill Details note plus Inventory, ignoring anything already saved">
-                ⬇ Blank
-              </button>
-              <button onClick={downloadFillDetailsFilled}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Download everything currently saved (Fill Details forms + Inventory) — a backup/reference of your progress so far">
-                ⬇ Filled
-              </button>
-              <button onClick={uploadFillDetails}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
-                title="Upload a filled-in template — every non-blank sheet is saved at once, blank sheets are left untouched">
-                ⬆ Upload
-              </button>
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Fill Details Excel</span>
+            <div className="fsg-seg">
+              <button onClick={downloadFillDetailsBlank} className="text-gray-700 hover:bg-blue-50"
+                title="Download a pristine consolidated Excel template — one sheet per Fill Details note plus Inventory, ignoring anything already saved">⬇ Blank</button>
+              <button onClick={downloadFillDetailsFilled} className="text-gray-700 hover:bg-blue-50"
+                title="Download everything currently saved (Fill Details forms + Inventory) — a backup/reference of your progress so far">⬇ Filled</button>
+              <button onClick={uploadFillDetails} className="text-gray-700 hover:bg-blue-50"
+                title="Upload a filled-in template — every non-blank sheet is saved at once, blank sheets are left untouched">⬆ Upload</button>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded border border-gray-200 bg-gray-50 px-2 py-1">
-            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Show</span>
-            <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={showEmpty} onChange={e => setShowEmpty(e.target.checked)}
-                className="rounded border-gray-300" />
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Show</span>
+            <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={showEmpty} onChange={e => setShowEmpty(e.target.checked)} className="rounded border-gray-300" />
               Empty notes
             </label>
-            <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={showZeroRows} onChange={e => setShowZeroRows(e.target.checked)}
-                className="rounded border-gray-300" />
+            <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={showZeroRows} onChange={e => setShowZeroRows(e.target.checked)} className="rounded border-gray-300" />
               Zero-balance rows
             </label>
-          </div>
           </div>
         </div>
 
@@ -2181,7 +2163,7 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
         }
         // Trade Payables: MSME disclosure (all constitutions) + Ageing Schedule (Company only)
         if (title.includes('trade payable')) {
-          return <TradePayablesDisclosureForm {...commonProps} constitution={entity?.constitution} />
+          return <TradePayablesDisclosureForm {...commonProps} constitution={entity?.constitution} periodLabels={statementColumnLabels(activeTB, prevTB, 'bs')} />
         }
         // Trade Receivables: Ageing Schedule — Company only (hasForm above already gates the button)
         if (title.includes('trade receivable') && parseInt(entity?.constitution) === 3) {

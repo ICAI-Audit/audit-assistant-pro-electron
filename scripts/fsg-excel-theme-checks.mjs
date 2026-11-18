@@ -16,11 +16,17 @@ import * as XLSX from 'xlsx-js-style'
 import ExcelJS from 'exceljs'
 import { finishWorkbook, dataSheetNames, HOW_TO_SHEET } from './src/modules/fsg/utils/veraExcel.js'
 import { buildStockBlankTemplate, buildStockFilledWorkbook, parseStockWorkbook, stockExcelSpec } from './src/modules/fsg/components/Stock/stockWorkbook.js'
-export { XLSX, ExcelJS, finishWorkbook, dataSheetNames, HOW_TO_SHEET, buildStockBlankTemplate, buildStockFilledWorkbook, parseStockWorkbook, stockExcelSpec }
+import { buildPolicyBlankWorkbook, buildPolicyFilledWorkbook, withoutLegacyPolicyGuide, policyExcelSpec } from './src/modules/fsg/utils/policyWorkbook.js'
+import JSZip from 'jszip'
+import { buildFillDetailsWorkbook, fillDetailsExcelSpec, parseFillDetailsWorkbook } from './src/modules/fsg/components/GenerateFinancials/fillDetailsWorkbook.js'
+import { tpPeriodView } from './src/modules/fsg/components/Notes/TradePayablesDisclosureForm.jsx'
+export { buildFillDetailsWorkbook, fillDetailsExcelSpec, parseFillDetailsWorkbook, tpPeriodView }
+export { XLSX, ExcelJS, JSZip, finishWorkbook, dataSheetNames, HOW_TO_SHEET, buildStockBlankTemplate, buildStockFilledWorkbook, parseStockWorkbook, stockExcelSpec }
+export { buildPolicyBlankWorkbook, buildPolicyFilledWorkbook, withoutLegacyPolicyGuide, policyExcelSpec }
 `
 const dir = mkdtempSync(path.join(tmpdir(), 'fsg-excel-theme-'))
 const out = path.join(dir, 'bundle.mjs')
-await build({ stdin: { contents: entry, resolveDir: root, loader: 'js' }, bundle: true, platform: 'node', format: 'esm', outfile: out, logLevel: 'error',
+await build({ stdin: { contents: entry, resolveDir: root, loader: 'js' }, loader: { '.js': 'jsx' }, bundle: true, platform: 'node', format: 'esm', outfile: out, logLevel: 'error',
   banner: { js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);" } })
 const m = await import(pathToFileURL(out).href)
 
@@ -88,6 +94,67 @@ const fx = await exceljs(filled)
 check('filled amounts are real numbers in Excel', typeof fx.getWorksheet('Stock Filled').getCell('B2').value === 'number', fx.getWorksheet('Stock Filled').getCell('B2').value)
 // An old (unstyled) file still reads
 check('an old Inventory file without the guide still reads', m.parseStockWorkbook(m.buildStockFilledWorkbook({ 'Raw Materials': '1' }, {}, {}, {}, true, {})).opening['Raw Materials'] === '1')
+
+// T-059: Excel opened the Policy format only after a repair, and dropped its Type dropdown. Two causes in the finished
+// file: <sheetFormatPr> without its required defaultRowHeight, and the dropdown written twice with overlapping ranges
+// (ExcelJS sorted the cells as text, "B10" before "B2"). Both are in veraExcel.js, so every FSG template is checked here.
+const rowsOf = (ref) => { const [a, b] = ref.split(':'); const n = (x) => Number(x.replace(/^[A-Z]+/, '')); return [n(a), n(b || a), a.replace(/\d+/g, '')] }
+const xmlCheck = async (label, bytes, wantRange) => {
+  const zip = await m.JSZip.loadAsync(bytes)
+  const xml = await Promise.all(Object.keys(zip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).map(f => zip.file(f).async('string')))
+  check(`T-059 ${label}: every sheet has the default row height Excel requires`, xml.every(x => !/<sheetFormatPr(?![^>]*defaultRowHeight)[^>]*>/.test(x)), xml.map(x => (x.match(/<sheetFormatPr[^>]*>/) || [''])[0]))
+  const refs = xml.flatMap(x => [...x.matchAll(/<dataValidation [^>]*sqref="([^"]+)"/g)].map(r => r[1]))
+  const ranges = refs.flatMap(r => r.split(' ')).map(rowsOf)
+  const overlap = ranges.some((a, i) => ranges.some((b, j) => j > i && a[2] === b[2] && a[0] <= b[1] && b[0] <= a[1]))
+  check(`T-059 ${label}: no two dropdowns overlap${wantRange ? `, and ${wantRange} is one range` : ''}`, !overlap && (!wantRange || refs.includes(wantRange)), refs)
+}
+const policyBlank = await m.finishWorkbook(m.withoutLegacyPolicyGuide(m.buildPolicyBlankWorkbook()), m.policyExcelSpec('template'))
+await xmlCheck('Policy format (blank)', policyBlank, 'B2:B201')
+await xmlCheck('Policy format (filled)', await m.finishWorkbook(m.withoutLegacyPolicyGuide(m.buildPolicyFilledWorkbook([{ header: 'Basis of preparation', contentHtml: '<p>One</p><ul><li><p>Two</p></li></ul>' }])), m.policyExcelSpec('filled')), 'B2:B201')
+const policyTypes = (await exceljs(policyBlank)).getWorksheet('Policy')
+check('T-059 Policy format: the Type dropdown offers Paragraph / Bullet / Table on row 2 and on row 150',
+  ['B2', 'B150'].every(a => (policyTypes.getCell(a).dataValidation?.formulae || [])[0] === '"Paragraph,Bullet,Table"'), ['B2', 'B150'].map(a => policyTypes.getCell(a).dataValidation))
+await xmlCheck('Inventory template', blank)
+await xmlCheck('Inventory filled', filled)
+
+// T-063: Trade Payables ageing in the owner's layout: Unbilled and Not Due before the four periods; grey cells refuse
+// entries (rows (i) to (iv): Unbilled / Not Due; an Undue row takes Not Due only, an Unbilled row Unbilled only).
+{
+  const tpNotes = [{ num: 7, title: 'Trade Payables', total: 2100 }]
+  const saved = { ageing: { cy: { msme: { less1y: 100, more3y: 2000 }, msme_undue: { less1y: 40 }, others_unbilled: { unbilled: 5 }, total_due: { less1y: 999 } }, py: {}, includeInOutput: true } }
+  const v = m.tpPeriodView(saved.ageing.cy)
+  check('T-063 old Undue figures move to Not Due; Total Due and Total are worked out',
+    v.msme_undue.notdue === 40 && v.msme_undue.less1y === '' && v.total_due.less1y === 100 && v.total.notdue === 40 && v.total.unbilled === 5 && v.total.more3y === 2000, v)
+  for (const blankFile of [true, false]) {
+    const label = blankFile ? 'Trade Payables template' : 'Trade Payables filled'
+    const wb = m.buildFillDetailsWorkbook(tpNotes, new Map([[7, saved]]), null, { blank: blankFile, constitution: 3 })
+    const bytes = await m.finishWorkbook(wb, m.fillDetailsExcelSpec(wb))
+    await xmlCheck(label, bytes)
+    if (samplesAt) writeFileSync(path.join(samplesAt, `Sample - ${label}.xlsx`), bytes)
+    const x = await exceljs(bytes)
+    const ws = x.worksheets.find(w => /Trade Payables/.test(w.name))
+    const hdr = ws.getRow(4).values.slice(1, 10).map(String)
+    check(`T-063 ${label}: columns Unbilled, Not Due, then the four periods`, hdr.slice(3).join('|') === 'Unbilled|Not Due|Less than 1 yr.|1-2 yrs.|2-3 yrs.|More than 3 yrs.', hdr)
+    const rowOf = (lbl) => { let at = 0; ws.eachRow((r, n) => { if (!at && r.getCell(3).value === lbl) at = n }); return at }
+    const grey = (a) => ws.getCell(a).fill?.fgColor?.argb === 'FFBFBFBF'
+    const shut = (a) => ws.getCell(a).dataValidation?.type === 'custom' && ws.getCell(a).dataValidation?.formulae?.[0] === 'FALSE'
+    const i = rowOf('(i) MSME'), u = rowOf('MSME - Undue'), ub = rowOf('MSME - Unbilled dues'), td = rowOf('Total Due')
+    check(`T-063 ${label}: (i) MSME Unbilled / Not Due grey and refuse entry; its periods open`, grey(`D${i}`) && grey(`E${i}`) && shut(`D${i}`) && shut(`E${i}`) && !grey(`F${i}`) && !shut(`I${i}`), [i, ws.getCell(`D${i}`).dataValidation])
+    check(`T-063 ${label}: MSME - Undue takes Not Due only (Unbilled and periods grey, refuse entry)`, ['D', 'F', 'G', 'H', 'I'].every(c => grey(`${c}${u}`) && shut(`${c}${u}`)) && !grey(`E${u}`) && !shut(`E${u}`), u)
+    check(`T-063 ${label}: MSME - Unbilled dues takes Unbilled only (Not Due and periods grey, refuse entry)`, ['E', 'F', 'G', 'H', 'I'].every(c => grey(`${c}${ub}`) && shut(`${c}${ub}`)) && !grey(`D${ub}`) && !shut(`D${ub}`), ub)
+    check(`T-063 ${label}: Total Due is not an input cell`, ws.getCell(`F${td}`).fill?.fgColor?.argb !== 'FFFFF9DB' && !shut(`F${td}`), td)
+    if (!blankFile) {
+      const back = m.parseFillDetailsWorkbook(m.XLSX.read(bytes, { type: 'array' }), { constitution: 3 }).results[0]?.data?.ageing?.cy
+      check('T-063 filled Trade Payables reads back: Not Due 40, Total 2,145', back?.msme_undue?.notdue === 40 && back?.total?.notdue === 40 && Math.round((back?.total ? Object.values(back.total).reduce((s, n) => s + n, 0) : 0)) === 2145, back)
+    }
+  }
+  // A file downloaded before T-063 (four period columns only) still reads into the right columns.
+  const old = m.XLSX.utils.aoa_to_sheet([['Note 7'], ['Trade Payables'], [], ['Section', 'Period', 'Particulars', 'Less than 1 yr.', '1-2 yrs.', '2-3 yrs.', 'More than 3 yrs.'],
+    ['AGEING', 'CY', '(ii) Others', 10, 0, 0, 30], ['AGEING', 'CY', 'Others - Undue', 7, 0, 0, 0]])
+  const owb = m.XLSX.utils.book_new(); m.XLSX.utils.book_append_sheet(owb, old, 'N7 Trade Payables')
+  const ob = m.parseFillDetailsWorkbook(owb, { constitution: 3 }).results[0]?.data?.ageing?.cy
+  check('T-063 an old four-column Trade Payables sheet still reads (Undue moves to Not Due)', ob?.others?.less1y === 10 && ob?.others?.more3y === 30 && ob?.others_undue?.notdue === 7 && ob?.total?.notdue === 7, ob)
+}
 
 if (samplesAt) {
   writeFileSync(path.join(samplesAt, 'Sample - Inventory Template.xlsx'), blank)

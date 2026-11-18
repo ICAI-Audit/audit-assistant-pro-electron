@@ -8,12 +8,44 @@ import { SHAREHOLDER_SHEET, shareholderTemplateExcelSpec } from './shareCapitalD
 const INP = 'w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
 const NUM = INP + ' text-right font-mono'
 const LABEL = 'block text-[10px] text-gray-500 mb-0.5 font-medium'
+const PCT_CELL = 'px-2 py-1 border border-gray-200 text-right font-mono text-gray-700 bg-gray-50'
+const PCT_TITLE = 'Calculated: the holder\'s shares / total shares of this type at the end of the year (Share Classes tab)'
 
 // Money: always 2 decimals ("34.00", not "34"). Shares: a count, never
 // fractional — no decimals, ever ("1,00,000", not "1,00,000.00").
 function fmtN(n) { return n != null && n !== '' && !isNaN(n) ? Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' }
 function fmtShares(n) { return n != null && n !== '' && !isNaN(n) ? Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '' }
 function num(v) { return parseFloat(v) || 0 }
+
+// ── T-053 shareholding % ──────────────────────────────────────────────────────
+// A holder's % = their shares / the total shares of the same type (Equity or Preference) at the end of that year,
+// across EVERY class of that type. A class's closing shares: the Reconciliation (Opening + Issued - Bought back), as
+// the Balance Sheet tally uses; else Subscribed & Fully Paid-up; else Subscribed; else Issued. Before T-053 only the
+// first class counted, Preference holders were divided by the Equity total, and the % only changed on Import or
+// "Recalculate %", so a typed or edited number of shares left a stale %.
+export function classClosingShares(cls, yr) {
+  const c = (cls && cls[yr]) || {}
+  return (num(c.openingShares) + num(c.issuedDuringYear) - num(c.deletedDuringYear)) || num(c.paidUp) || num(c.subscribed) || num(c.issued)
+}
+export function shareTotals(classes, kind) {
+  const list = (classes || []).filter(c => (c.type || 'Equity') === kind)
+  return { cy: list.reduce((s, c) => s + classClosingShares(c, 'cy'), 0), py: list.reduce((s, c) => s + classClosingShares(c, 'py'), 0) }
+}
+const pctOf = (shares, total) => (String(shares ?? '').trim() === '' || !total ? '' : (num(shares) / total * 100).toFixed(2))
+/** The form data with every % worked out again from the shares and the share classes. */
+export function withShareholdingPercent(data) {
+  const eq = shareTotals(data.classes, 'Equity'), pref = shareTotals(data.classes, 'Preference')
+  const rows = (list, t) => (list || []).map(r => ({ ...r, cyPct: pctOf(r.cyShares, t.cy), pyPct: pctOf(r.pyShares, t.py) }))
+  return {
+    ...data,
+    shareholders5pctEquity: rows(data.shareholders5pctEquity, eq),
+    shareholders5pctPreference: rows(data.shareholders5pctPreference, pref),
+    promoters: (data.promoters || []).map(r => ({ ...r, pctTotal: pctOf(r.shares, (r.class === 'Preference' ? pref : eq).cy) })),
+  }
+}
+const pctKey = (d) => JSON.stringify([
+  (d.shareholders5pctEquity || []).map(r => [r.cyPct, r.pyPct]), (d.shareholders5pctPreference || []).map(r => [r.cyPct, r.pyPct]),
+  (d.promoters || []).map(r => r.pctTotal)])
 
 // ── Empty share class template ────────────────────────────────────────────────
 function emptyClass(name = '', type = 'Equity') {
@@ -214,9 +246,9 @@ function ShareholderTable({ title, rows, onChange }) {
             <tr key={i}>
               <td className="px-1 py-0.5 border border-gray-200"><input className={INP} value={r.name} onChange={e => setRow(i, 'name', e.target.value)} placeholder="Name" /></td>
               <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.cyShares} onChange={e => setRow(i, 'cyShares', e.target.value)} /></td>
-              <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.cyPct} onChange={e => setRow(i, 'cyPct', e.target.value)} placeholder="%" /></td>
+              <td className={PCT_CELL} title={PCT_TITLE}>{r.cyPct !== '' && r.cyPct != null ? `${r.cyPct}%` : ''}</td>
               <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.pyShares} onChange={e => setRow(i, 'pyShares', e.target.value)} /></td>
-              <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.pyPct} onChange={e => setRow(i, 'pyPct', e.target.value)} placeholder="%" /></td>
+              <td className={PCT_CELL} title={PCT_TITLE}>{r.pyPct !== '' && r.pyPct != null ? `${r.pyPct}%` : ''}</td>
               <td className="px-1 py-0.5 border border-gray-200 text-center">
                 <button onClick={() => removeRow(i)} className="text-red-400 hover:text-red-600 text-[10px]">✕</button>
               </td>
@@ -259,7 +291,7 @@ function PromoterTable({ rows, onChange }) {
                 </select>
               </td>
               <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.shares} onChange={e => setRow(i, 'shares', e.target.value)} /></td>
-              <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.pctTotal} onChange={e => setRow(i, 'pctTotal', e.target.value)} placeholder="%" /></td>
+              <td className={PCT_CELL} title={PCT_TITLE}>{r.pctTotal !== '' && r.pctTotal != null ? `${r.pctTotal}%` : ''}</td>
               <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.pctChange} onChange={e => setRow(i, 'pctChange', e.target.value)} placeholder="%" /></td>
               <td className="px-1 py-0.5 border border-gray-200 text-center">
                 <button onClick={() => removeRow(i)} className="text-red-400 hover:text-red-600 text-[10px]">✕</button>
@@ -363,6 +395,12 @@ export default function ShareCapitalForm({ tbId, entityId, useEntityLevel, noteN
       const closing = num(cls.cy.openingShares) + num(cls.cy.issuedDuringYear) - num(cls.cy.deletedDuringYear)
       return s + closing * num(cls.faceValue)
     }, 0), [data.classes])
+
+  // T-053: the % follows the shares and the Share Classes, whatever changed them (typing, Import, a class edit, a saved file).
+  useEffect(() => {
+    const next = withShareholdingPercent(data)
+    if (pctKey(next) !== pctKey(data)) setData(next)
+  }, [data])
 
   const bsAmt = bsShareCapital != null ? Math.abs(bsShareCapital) : null
   const tallies = bsAmt != null && Math.abs(totalCYAmount - bsAmt) < 1

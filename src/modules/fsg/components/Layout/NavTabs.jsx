@@ -31,10 +31,10 @@ export const TOP_SHORTCUTS = {
   'PL': 'L',
   'CFS': 'C',
   'Notes': 'N',
-  'Policy': 'O',
+  'A/c Policy': 'O',   // T-057: formerly Policy
   'Annex': 'X',
   'Features': 'U',
-  'Exception': 'E',
+  'Check Control': 'E',   // T-055: formerly Exception
   'Review Financials': 'F',
 }
 
@@ -202,6 +202,8 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
   }
 
   const openChildren = openGroup ? groups?.[openGroup] : null
+  // The dropdown is 240 px wide (w-60) and a second-level list 288 px (w-72).
+  const subOpensLeft = !!dropdownPos && typeof window !== 'undefined' && dropdownPos.left + 240 + 288 > window.innerWidth - 8
   const itemCls = (isActive, isHi) =>
     `w-full text-left px-4 py-2 text-sm transition flex items-center justify-between ${
       isHi ? 'bg-blue-100 text-blue-900' : isActive ? 'bg-blue-50 text-blue-800 font-semibold' : 'hover:bg-blue-50 text-gray-800'
@@ -270,7 +272,10 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
                     <KeyLabel text={child} k={ck} /><span className="text-[9px] opacity-70">▸</span>
                   </button>
                   {openSub === child && (
-                    <div role="menu" className="absolute left-full top-0 -mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-56 py-1">
+                    // T-054: a second-level list opens to the LEFT of the dropdown when the right side has no room
+                    // (Features is near the right edge of the bar), so no item is cut off the screen.
+                    <div role="menu" data-flip={subOpensLeft ? 'left' : 'right'}
+                      className={`absolute ${subOpensLeft ? 'right-full mr-1' : 'left-full'} top-0 -mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-72 py-1`}>
                       {leaves.map((leaf, li) => (
                         <button
                           key={leaf}

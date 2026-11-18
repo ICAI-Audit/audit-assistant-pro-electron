@@ -130,6 +130,9 @@ function decorateDataSheet(wbx, ws, spec, mode, state) {
   }
 
   ws.properties.tabColor = { argb: BLUE }
+  // T-059: a SheetJS sheet comes in with no default row height; ExcelJS then writes <sheetFormatPr customHeight="1"/>
+  // without the defaultRowHeight Excel requires, and Excel reports the sheet as damaged.
+  if (!ws.properties.defaultRowHeight) ws.properties.defaultRowHeight = 15
   ws.views = [{ state: 'frozen', xSplit: spec.freezeCols || 0, ySplit: headerRow, showGridLines: false, zoomScale: 100 }]
 
   // Title rows above the header (note number, sheet title): keep, make them read as a title.
@@ -165,6 +168,25 @@ function decorateDataSheet(wbx, ws, spec, mode, state) {
     }
   }
 
+  // T-063: cells that take no entry (e.g. Trade Payables Unbilled / Not Due on an aged row): grey and locked by a
+  // rule Excel enforces (any entry is refused). One validation per range, as for the dropdowns below (see T-059).
+  for (const range of spec.blockedCells || []) {
+    const [a, b = a] = String(range).toUpperCase().split(':')
+    const from = ws.getCell(a), to = ws.getCell(b)
+    for (let r = from.row; r <= to.row; r++) {
+      for (let c = from.col; c <= to.col; c++) {
+        const cell = ws.getRow(r).getCell(c)
+        cell.value = null
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } }
+      }
+    }
+    ws.dataValidations.add(`${a}:${b}`, {
+      type: 'custom', allowBlank: false, formulae: ['FALSE'],
+      showErrorMessage: true, errorStyle: 'stop', errorTitle: 'No entry here',
+      error: 'This cell is not used in the schedule (grey). Enter the amount in a white or yellow cell of this row.',
+    })
+  }
+
   // Rows after the table (notes such as "Note: ..."): grey italic, never part of the table.
   for (let r = endRow + 1; r <= ws.rowCount; r++) {
     ws.getRow(r).eachCell({ includeEmpty: false }, c => { c.font = { italic: true, size: 9, color: { argb: GREY_TEXT } }; c.alignment = { wrapText: false } })
@@ -187,14 +209,18 @@ function decorateDataSheet(wbx, ws, spec, mode, state) {
     const from = v.fromRow || headerRow + 1
     const to = v.toRow || (v.openEnded ? Math.max(endRow, headerRow + 200) : endRow)
     const formula = listFormula(wbx, v.list, state)
+    // T-059: one validation for the whole range. Set cell by cell, ExcelJS 4.4 squeezes the cells back into ranges
+    // after sorting their addresses as text ("B10" before "B2"), so a dropdown crossing row 10 was written twice with
+    // overlapping ranges (B10:B201 and B2:B201): Excel reported the file as damaged and dropped the dropdown on repair.
+    // Excel also caps the prompt title at 32 characters and the prompt / error text at 255.
+    ws.dataValidations.add(`${col}${from}:${col}${to}`, {
+      type: 'list', allowBlank: true, formulae: [formula],
+      showErrorMessage: v.strict !== false, errorStyle: v.strict === false ? 'warning' : 'stop',
+      errorTitle: 'Choose from the list', error: String(v.error || `Pick one of the listed values for ${v.name || 'this column'}.`).slice(0, 255),
+      showInputMessage: !!v.prompt, promptTitle: String(v.name || '').slice(0, 32), prompt: String(v.prompt || '').slice(0, 255),
+    })
     for (let r = from; r <= to; r++) {
       const cell = ws.getCell(`${col}${r}`)
-      cell.dataValidation = {
-        type: 'list', allowBlank: true, formulae: [formula],
-        showErrorMessage: v.strict !== false, errorStyle: v.strict === false ? 'warning' : 'stop',
-        errorTitle: 'Choose from the list', error: v.error || `Pick one of the listed values for ${v.name || 'this column'}.`,
-        showInputMessage: !!v.prompt, promptTitle: v.name || '', prompt: v.prompt || '',
-      }
       if (v.openEnded && r > endRow) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: INPUT } }
         cell.border = BORDER
