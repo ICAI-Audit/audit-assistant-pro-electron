@@ -29,6 +29,7 @@ import { elapsedText, formatBytes, plural } from '../format';
 import Thumb from '../Thumb';
 import HintButton from '../HintButton';
 import MiddleName from '../MiddleName';
+import { isOfficeFile, officeInfo } from '../officeFiles';
 import { TOOL_ICONS } from '../toolIcons';
 import { WHY_LINE_MS, WhyContext } from '../whyLine';
 import { toolInfo } from '../toolRules';
@@ -286,7 +287,7 @@ export function FileChip({ file }: { file: WorkingFile }) {
       <div className="min-w-0">
         <MiddleName name={file.name} className="text-sm font-medium text-foreground" />
         <p className="text-xs text-muted-foreground">
-          {file.pageCount === null ? 'Image' : plural(file.pageCount, 'page')} · {formatBytes(file.size)}
+          {isOfficeFile(file) ? officeInfo(file).label : file.pageCount === null ? 'Image' : plural(file.pageCount, 'page')} · {formatBytes(file.size)}
         </p>
       </div>
     </div>

@@ -29,19 +29,20 @@ import { formatPageList, parsePageList } from '@/lib/pdf-tools/pageList';
 import { addPageNumbers, type PageNumberRunOptions } from '@/lib/pdf-tools/pageNumbers';
 import { defaultResultName, operationSummary } from '@/lib/pdf-tools/resultNames';
 import { LIST_MAX_BYTES, LIST_WARN_BYTES, listHeldBytes, newFileId } from '@/lib/pdf-tools/workingList';
-import { PdfToolsError, PHASE_TWO_ERROR_MESSAGES, type PhaseTwoToolId, type ToolId, type WorkingFile } from '@/lib/pdf-tools/types';
+import { PdfToolsError, PHASE_TWO_ERROR_MESSAGES, type ToolId, type WorkingFile } from '@/lib/pdf-tools/types';
 import { nextPaint, yieldToUi } from './canvasUtils';
 import { formatBytes, plural } from './format';
 import { compressToFit, sizesText, type CompressFitOptions } from './compressFit';
 import { browserImageRecoder } from './imageRecoder';
 import { IMAGE_ENCODE_FAILED, OUT_OF_MEMORY } from './canvasUtils';
 import { numberedResultName } from './fileGroups';
+import { isOfficeFile, OFFICE_INPUT_REASON, officeInfo } from './officeFiles';
 import { carriedFilesNotice } from './carriedNotice';
 import { OPEN_TIMEOUT, RENDER_UNAVAILABLE, RENDERER_RESTARTED, renderPage, type RenderedImage } from './pdfRenderer';
 import { RenderTimeoutError, type Priority } from './renderQueue';
 import { resolveResultName, resolveStem, rgbToHex } from './toolOptions';
 import { splitIntoFiles, type SplitPartsRunOptions } from './splitRun';
-import { RUN_MODULES, type PhaseTwoRunOptions } from './toolModules';
+import { RUN_MODULES, type ModuleRunOptions, type ModuleToolId, type PhaseThreeRunOptions, type PhaseTwoRunOptions } from './toolModules';
 import {
   Cancelled,
   markFlags,
@@ -61,7 +62,7 @@ import {
 // The step contract (what a step receives and returns, and what a phase 2 run module exports) is at the
 // top of toolStep.ts. The phase 2 tools' options types live in their run modules (toolModules.ts).
 export type { RunContext } from './toolStep';
-export type { PhaseTwoRunOptions } from './toolModules';
+export type { PhaseThreeRunOptions, PhaseTwoRunOptions } from './toolModules';
 
 export interface MergeRunOptions {
   name?: string;
@@ -110,7 +111,7 @@ export interface PdfToImagesRunOptions {
   stem?: string;
 }
 
-export interface ToolRunOptions extends PhaseTwoRunOptions {
+export interface ToolRunOptions extends PhaseTwoRunOptions, PhaseThreeRunOptions {
   merge: MergeRunOptions;
   split: SplitRunOptions;
   'delete-pages': DeletePagesRunOptions;
@@ -613,9 +614,9 @@ async function pdfIntoImages(run: Run, inputs: WorkingFile[], opts: PdfToImagesR
  * A phase 2 tool's step, from its run module (loaded the first time the tool runs). A module that is still
  * the integration stub, or that cannot be loaded, runs nothing and says why.
  */
-function phaseTwoStep<T extends PhaseTwoToolId>(tool: T) {
-  return async (run: Run, inputs: WorkingFile[], opts: PhaseTwoRunOptions[T]): Promise<Made> => {
-    let module: RunModule<PhaseTwoRunOptions[T]>;
+function phaseTwoStep<T extends ModuleToolId>(tool: T) {
+  return async (run: Run, inputs: WorkingFile[], opts: ModuleRunOptions[T]): Promise<Made> => {
+    let module: RunModule<ModuleRunOptions[T]>;
     try {
       module = await RUN_MODULES[tool]();
     } catch {
@@ -642,6 +643,11 @@ const STEPS_BY_TOOL: { [T in ToolId]: (run: Run, inputs: WorkingFile[], opts: To
   watermark: phaseTwoStep('watermark'),
   protect: phaseTwoStep('protect'),
   redact: phaseTwoStep('redact'),
+  'pdf-to-excel': phaseTwoStep('pdf-to-excel'),
+  'pdf-to-word': phaseTwoStep('pdf-to-word'),
+  'document-check': phaseTwoStep('document-check'),
+  compare: phaseTwoStep('compare'),
+  ocr: phaseTwoStep('ocr'),
 };
 
 /**
@@ -657,7 +663,7 @@ export function withUniqueNames(files: WorkingFile[], inList: readonly WorkingFi
     taken.add(name.toLowerCase());
   };
   const fallback = (file: WorkingFile) => {
-    const extension = file.kind === 'pdf' ? 'pdf' : file.mimeType === 'image/png' ? 'png' : 'jpg';
+    const extension = file.kind === 'pdf' ? 'pdf' : isOfficeFile(file) ? officeInfo(file).extension : file.mimeType === 'image/png' ? 'png' : 'jpg';
     let name = '';
     for (let n = 2; name === '' || taken.has(name.toLowerCase()); n++) name = `result (${n}).${extension}`;
     take(file, name);
@@ -722,6 +728,9 @@ export async function runTool<T extends ToolId>(
   const run: Run = new StepRun(tool, ctx, { ...defaultDeps, ...overrides });
   try {
     run.check();
+    // The rule; the toolbar's reason is the convenience (T-064, decision 9). Without it Merge, which takes any
+    // two files, would read a workbook as a PDF and end as "could not finish".
+    if (inputs.some(isOfficeFile)) throw wrongInput(OFFICE_INPUT_REASON);
     run.ensureRoom();
     const made = await STEPS_BY_TOOL[tool](run, inputs, options);
     run.check();

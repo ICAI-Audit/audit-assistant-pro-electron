@@ -55,6 +55,16 @@ export function defaultResultName(
       return pdfName(stem, detail?.stampOnly ? '_stamped' : '_watermarked');
     case 'protect':
       return pdfName(stem, '_protected');
+    case 'pdf-to-excel':
+      return cleanFileName(fitStem(stem, '.xlsx'), 'xlsx');
+    case 'pdf-to-word':
+      return cleanFileName(fitStem(stem, '.docx'), 'docx');
+    case 'document-check':
+      return pdfName(stem, '_check');
+    case 'compare':
+      return pdfName(stem, '_changes');
+    case 'ocr':
+      return pdfName(stem, '_searchable');
     case 'resize-crop':
       return pdfName(stem, detail?.pageBoxMode === 'trim' ? '_cropped' : detail?.pageBoxMode === 'margin' ? '_with_margins' : '_resized');
   }
@@ -121,6 +131,16 @@ export function operationSummary(tool: AnyToolId, detail: Record<string, string 
       return 'Added watermark';
     case 'protect':
       return 'Protected with a password (AES-256)';
+    case 'pdf-to-excel':
+      return 'Converted to Excel';
+    case 'pdf-to-word':
+      return 'Converted to Word';
+    case 'document-check':
+      return 'Document check';
+    case 'compare':
+      return 'Compared 2 files';
+    case 'ocr':
+      return 'Made searchable';
     case 'resize-crop':
       // The run step writes its own record line (pagebox/pageBoxForm.ts pageBoxRecord); this keeps the switch whole.
       return detail.mode === 'trim' ? 'Trimmed pages' : detail.mode === 'margin' ? 'Added margins to pages' : 'Resized pages';

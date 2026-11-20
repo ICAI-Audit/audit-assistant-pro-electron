@@ -45,6 +45,7 @@ import { formatBytes, plural, unsavedLine, unsavedWarning } from './format';
 import { convertedNote } from './intake';
 import HintButton from './HintButton';
 import MiddleName from './MiddleName';
+import { isOfficeFile, officeInfo } from './officeFiles';
 import { focusQuietly } from './quietFocus';
 import Thumb from './Thumb';
 import QuietTip from './viewer/QuietTip';
@@ -246,6 +247,8 @@ function describe(file: WorkingFile): string {
   // A converted TIFF says so, never "Image, PNG" (TIFF-report.md 7.3): "Converted from a 12-page TIFF" | "Converted from TIFF".
   const converted = convertedNote(file);
   if (converted) return converted;
+  // An Excel or Word result has no pages to count: it says what it is.
+  if (isOfficeFile(file)) return officeInfo(file).label;
   if (file.kind === 'image') return `Image, ${file.mimeType === 'image/png' ? 'PNG' : 'JPG'}`;
   return file.pageCount === null ? 'PDF' : plural(file.pageCount, 'page');
 }
@@ -359,6 +362,21 @@ function ThumbView({ file, onView }: { file: WorkingFile; onView: (id: string, o
   );
 }
 
+/**
+ * An Excel or Word result's tile (T-064, decision 9). There is no viewer for it: the tile says, on hover, what
+ * to do instead ("Save it, then open it in Excel."); the row says the same to a screen reader.
+ */
+function OfficeTip({ file }: { file: WorkingFile }) {
+  const info = officeInfo(file);
+  return (
+    <QuietTip text={info.tip}>
+      <div data-testid="pdf-tools-row-office" className="shrink-0 rounded-sm">
+        <Thumb file={file} width={36} alt={`${info.label}: ${file.name}`} className="h-[48px]" />
+      </div>
+    </QuietTip>
+  );
+}
+
 function RemoveButton({ name, onRemove, hint = 'Remove from the list' }: { name: string; onRemove: () => void; hint?: string }) {
   return (
     <Tooltip>
@@ -399,6 +417,8 @@ interface RowProps {
 const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selected, member = false, onToggle, onMove, onRemove, onView }: RowProps) {
   const origin = ORIGINS[file.origin];
   const checkId = `pdf-tools-check-${file.id}`;
+  // An Excel or Word result: a tile in place of the preview, and no View action (there is nothing to view here).
+  const office = isOfficeFile(file);
   // A file inside a group moves with its group; the keys are still kept from VERA Tools' tab shortcut.
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>) =>
     moveKey(event, (direction) => {
@@ -412,6 +432,7 @@ const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selecte
       data-name={file.name}
       data-row-id={file.id}
       data-member={member ? 'true' : undefined}
+      data-kind={file.kind}
       onKeyDown={onKeyDown}
       className={cn('flex items-center gap-3 py-1 pr-3 transition-colors sm:pr-4', member ? 'pl-12 sm:pl-14' : 'pl-3 sm:pl-4', selected ? 'bg-accent/50' : 'hover:bg-muted/40')}
     >
@@ -425,7 +446,9 @@ const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selecte
         onCheckedChange={(checked) => onToggle(file.id, checked === true)}
         aria-label={`Select ${file.name}`}
       />
-      {onView ? (
+      {office ? (
+        <OfficeTip file={file} />
+      ) : onView ? (
         <ThumbView file={file} onView={onView} />
       ) : (
         <Thumb file={viewableFile(file)} width={36} alt={file.kind === 'pdf' ? `First page of ${file.name}` : `Preview of ${file.name}`} className="h-[48px]" />
@@ -439,14 +462,17 @@ const FileRow = memo(function FileRow({ file, position, isFirst, isLast, selecte
             {origin.label}
           </span>
           <span aria-hidden="true">·</span>
-          <span>{describe(file)}</span>
+          <span data-testid="pdf-tools-row-kind">
+            {describe(file)}
+            {office && <span className="sr-only">{`. ${officeInfo(file).tip}`}</span>}
+          </span>
           <span aria-hidden="true">·</span>
           <span className="tabular-nums">{formatBytes(file.size)}</span>
           <FileTags file={file} />
         </span>
       </label>
       <div className="flex shrink-0 items-center gap-0.5">
-        {onView && <ViewButton file={file} onView={onView} />}
+        {onView && !office && <ViewButton file={file} onView={onView} />}
         {!member && <MoveButtons name={file.name} isFirst={isFirst} isLast={isLast} onMove={(direction) => onMove(file.id, direction)} />}
         <RemoveButton name={file.name} onRemove={() => onRemove(file.id)} />
       </div>

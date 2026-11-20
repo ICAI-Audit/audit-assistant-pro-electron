@@ -6,14 +6,16 @@ export type PhaseOneToolId = 'merge' | 'split' | 'delete-pages' | 'compress' | '
  * result names and summaries (resultNames.ts) cover them from the start.
  */
 export type PhaseTwoToolId = 'bookmarks' | 'redact' | 'organise-pages' | 'watermark' | 'protect' | 'resize-crop';
+/** The tools of phase 3 (T-064): PDF to Excel, PDF to Word, Document check, Compare and Make searchable ('ocr'). */
+export type PhaseThreeToolId = 'pdf-to-excel' | 'pdf-to-word' | 'document-check' | 'compare' | 'ocr';
 /** Every tool id, built or not yet built. */
-export type AnyToolId = PhaseOneToolId | PhaseTwoToolId;
+export type AnyToolId = PhaseOneToolId | PhaseTwoToolId | PhaseThreeToolId;
 /**
  * Every tool with an entry in the `Record<ToolId, …>` tables (icons, rules, dialogs, run steps). A phase 2
  * tool's run module says whether it is built yet (`BUILT` in its run module, see toolStep.ts); one that is
  * not is shown on the toolbar as "Soon" and never runs.
  */
-export type ToolId = PhaseOneToolId | PhaseTwoToolId;
+export type ToolId = PhaseOneToolId | PhaseTwoToolId | PhaseThreeToolId;
 export type FileOrigin = 'computer' | 'vault' | 'result';
 /** 'download': handed to a download (no save dialog was available); its completion cannot be seen. */
 export type Destination = 'computer' | 'download' | 'vault' | 'working-paper';
@@ -103,7 +105,8 @@ export interface VaultRecord {
 export interface WorkingFile {
   id: string;
   name: string;
-  kind: 'pdf' | 'image';
+  /** 'office': an Excel workbook or Word document made by a tool (told apart by `mimeType`); never a tool input. */
+  kind: 'pdf' | 'image' | 'office';
   mimeType: string;
   origin: FileOrigin;
   bytes: Uint8Array;

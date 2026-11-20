@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { FileWarning, RotateCw } from 'lucide-react';
+import { FileSpreadsheet, FileText, FileWarning, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PdfToolsError, type WorkingFile } from '@/lib/pdf-tools/types';
+import { isOfficeFile, officeInfo } from './officeFiles';
 import { isAbortError, RENDER_UNAVAILABLE, renderImageThumbnail, renderThumbnail, thumbnails, whenRendererIdle } from './pdfRenderer';
 import type { Priority } from './renderQueue';
 
@@ -33,12 +34,43 @@ const KEEP_MARGIN = '800px 0px';
 const WORDS_FROM = 80;
 
 /**
+ * In place of a preview for an Excel workbook or a Word document (T-064, decision 9): a tile of the same size
+ * with the kind's icon and its letters. Nothing is drawn from the file, so nothing waits and nothing can fail.
+ */
+export function OfficeTile({ file, width, alt, className }: Pick<ThumbProps, 'file' | 'width' | 'className'> & { alt?: string }) {
+  const info = officeInfo(file);
+  const Icon = info.type === 'word' ? FileText : FileSpreadsheet;
+  return (
+    <div
+      className={cn('relative flex shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded border bg-muted/60', className)}
+      style={{ width }}
+      data-testid="pdf-tools-office-tile"
+      data-office={info.type}
+      // Named where a picture would have its description; silent where the picture is decoration (alt "").
+      {...(alt === '' ? { 'aria-hidden': true } : { role: 'img', 'aria-label': alt ?? info.label })}
+    >
+      <Icon className={cn('h-4 w-4 shrink-0', info.type === 'word' ? 'text-primary' : 'text-success')} aria-hidden="true" />
+      {width >= 32 && (
+        <span className="text-[8px] font-semibold leading-none tracking-wide text-muted-foreground" aria-hidden="true">
+          {info.short}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * A page or image preview in a box of fixed size, so nothing moves when it arrives. Previews are shared
  * (pdfRenderer.ts `thumbnails`): a page drawn for the page panel shows at once in Organise pages at the
  * same size (QA-FIX C). A box that is waiting says so; a preview that failed is tried once more when the
- * renderer is idle, and then offers Try again (QA-FIX D).
+ * renderer is idle, and then offers Try again (QA-FIX D). An Excel or Word result has no preview: its tile.
  */
-export default function Thumb({ file, pageIndex = 0, width, alt, className, scrollRoot, priority = 'normal', retryButton = true }: ThumbProps) {
+export default function Thumb(props: ThumbProps) {
+  if (isOfficeFile(props.file)) return <OfficeTile file={props.file} width={props.width} alt={props.alt} className={props.className} />;
+  return <DrawnThumb {...props} />;
+}
+
+function DrawnThumb({ file, pageIndex = 0, width, alt, className, scrollRoot, priority = 'normal', retryButton = true }: ThumbProps) {
   const box = useRef<HTMLDivElement>(null);
   const lazy = Boolean(scrollRoot);
   const [near, setNear] = useState(!lazy);
@@ -187,7 +219,11 @@ export default function Thumb({ file, pageIndex = 0, width, alt, className, scro
           {/* Only a box whose drawing is due pulses. A long file's page panel holds hundreds of boxes far out of
               view that never draw: pulsing, they made every frame restyle and re-layer them all (about 80 ms a
               frame on a busy machine, all the time), and each turn a run gives the screen paid for one such frame. */}
-          <div className={cn('absolute inset-1 rounded-sm bg-muted', near && 'animate-pulse')} aria-hidden="true" />
+          {/* Nor does any box pulse behind an open dialog (T-064; a dialog marks the screen behind it data-aria-hidden):
+              a run's page reads go before the previews, so the boxes in view kept waiting, and pulsing, for the whole
+              run. On a 500-page statement converted straight after it was added, that made the run two to three times
+              longer (60 to 80 s in place of 25 to 30 s), all of it the window drawing the pulse. */}
+          <div className={cn('absolute inset-1 rounded-sm bg-muted', near && 'animate-pulse [[data-aria-hidden=true]_&]:animate-none')} aria-hidden="true" />
           {words && (
             <span className="relative text-[11px] text-muted-foreground" aria-hidden="true">
               {drawing ? 'Drawing…' : 'Waiting…'}

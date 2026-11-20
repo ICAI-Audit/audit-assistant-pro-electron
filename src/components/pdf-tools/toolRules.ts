@@ -1,4 +1,5 @@
 import { PROTECTED_OUTPUT_REASON, type ToolId, type WorkingFile } from '@/lib/pdf-tools/types';
+import { isOfficeFile, OFFICE_INPUT_REASON } from './officeFiles';
 
 export type ToolGroup = 'Organise' | 'Prepare' | 'Convert' | 'Review';
 
@@ -20,7 +21,7 @@ export interface ComingSoonTool {
 /**
  * Every tool, in the toolbar's order (design section 4: Organise: Merge, Split, Delete pages, Organise
  * pages, Resize or crop pages, Compress; Prepare: Page numbers, Watermark, Redact, Bookmarks, Protect;
- * Convert: Images to PDF, PDF to images). A phase 2 tool whose run module is still a stub (toolModules.ts) is shown in its place
+ * Convert: Images to PDF, PDF to images, PDF to Excel, PDF to Word; Review: Document check, Compare). A phase 2 or 3 tool whose run module is still a stub (toolModules.ts) is shown in its place
  * as "Soon".
  */
 export const TOOLS: ToolInfo[] = [
@@ -37,15 +38,15 @@ export const TOOLS: ToolInfo[] = [
   { id: 'protect', group: 'Prepare', label: 'Protect', description: 'Make a copy of one PDF that opens only with a password.' },
   { id: 'images-to-pdf', group: 'Convert', label: 'Images to PDF', description: 'Turn the selected images into one PDF, one image per page.' },
   { id: 'pdf-to-images', group: 'Convert', label: 'PDF to images', description: 'Save pages of one PDF as PNG or JPG images.' },
+  { id: 'pdf-to-excel', group: 'Convert', label: 'PDF to Excel', description: 'Turn tables in a PDF into a workbook.' },
+  { id: 'pdf-to-word', group: 'Convert', label: 'PDF to Word', description: 'Turn a PDF into an editable document.' },
+  { id: 'ocr', group: 'Convert', label: 'Make searchable', description: 'Recognise the text of scanned pages (OCR).' },
+  { id: 'document-check', group: 'Review', label: 'Document check', description: 'See what a PDF holds: pages, signatures, protection and text.' },
+  { id: 'compare', group: 'Review', label: 'Compare', description: 'Find the differences in text between two versions of a PDF.' },
 ];
 
 /** Tools of a later phase: always "Soon" (owner decision T-022: no visible placeholder is removed). */
-export const COMING_SOON: ComingSoonTool[] = [
-  { key: 'pdf-to-excel', group: 'Convert', label: 'PDF to Excel', description: 'Turn tables in a PDF into a workbook.' },
-  { key: 'pdf-to-word', group: 'Convert', label: 'PDF to Word', description: 'Turn a PDF into an editable document.' },
-  { key: 'ocr', group: 'Convert', label: 'Make searchable', description: 'Recognise the text of scanned pages (OCR).' },
-  { key: 'review', group: 'Review', label: 'Review', description: 'Document checks and version comparison, once their scope is agreed.' },
-];
+export const COMING_SOON: ComingSoonTool[] = [];
 
 export const TOOL_GROUPS: ToolGroup[] = ['Organise', 'Prepare', 'Convert', 'Review'];
 
@@ -91,6 +92,9 @@ function exactlyOnePdf(selected: WorkingFile[], action: string): ToolAvailabilit
 
 /** Whether a tool can run on the current selection and, if not, what the user must change. */
 export function toolAvailability(tool: ToolId, selected: WorkingFile[]): ToolAvailability {
+  // An Excel workbook or a Word document is a result to save, never an input (T-064, decision 9): Merge too,
+  // which otherwise takes any two files.
+  if (selected.some(isOfficeFile)) return { enabled: false, reason: OFFICE_INPUT_REASON };
   // A result of Protect is never an input (design 5.18): its password is not kept to open it again.
   if (selected.some((f) => f.protectedOutput)) return { enabled: false, reason: PROTECTED_OUTPUT_REASON };
   switch (tool) {
@@ -116,6 +120,16 @@ export function toolAvailability(tool: ToolId, selected: WorkingFile[]): ToolAva
       return exactlyOnePdf(selected, 'protect it with a password');
     case 'pdf-to-images':
       return exactlyOnePdf(selected, 'turn into images');
+    case 'pdf-to-excel':
+      return exactlyOnePdf(selected, 'turn into a workbook');
+    case 'pdf-to-word':
+      return exactlyOnePdf(selected, 'turn into a Word document');
+    case 'ocr':
+      return exactlyOnePdf(selected, 'make searchable');
+    case 'document-check':
+      return exactlyOnePdf(selected, 'check');
+    case 'compare':
+      return selected.length === 2 && selected.every(isPdf) ? { enabled: true } : { enabled: false, reason: 'Select exactly two PDFs to compare.' };
     case 'compress':
       if (selected.length === 0) return { enabled: false, reason: 'Select one or more PDFs to compress.' };
       return selected.every(isPdf) ? { enabled: true } : { enabled: false, reason: 'Only PDFs can be compressed. Untick the images.' };
