@@ -56,13 +56,14 @@ import FileList from './FileList';
 import { fileMessageId, RESULT_MESSAGE } from './fileMessages';
 import { formatBytes, plainMessage } from './format';
 import HintButton from './HintButton';
+import { isOfficeFile } from './officeFiles';
 import PagePanel from './PagePanel';
 import { clearThumbnails, releasePdfRenderer } from './pdfRenderer';
 import type { RunResult } from './runTool';
 import { FOCUS_GRACE_MS, FOLDER_NOT_CHOSEN, PICKER_STALL_MS, planSaveResult, watchSave, type SaveReport } from './savePlan';
 import { cleanedName, saveAsZip, saveManyToFolder, saveOne, SaveFailedError, type SaveOutcome } from './saveToComputer';
 import ToolBar from './ToolBar';
-import { toolFlags, toolIsBuilt, useBuiltTools } from './toolModules';
+import { toolIsBuilt, useBuiltTools } from './toolModules';
 import { shouldDropContext } from './contextGuard';
 import { delayedBusy } from './delayedBusy';
 import { focusAfterListChange } from './listFocus';
@@ -96,8 +97,6 @@ const RESULT_TOAST = RESULT_MESSAGE;
 /** Long enough to reach its buttons (UX audit C6.10). */
 const RESULT_TOAST_MS = 10_000;
 
-// Which phase 2 tools are built is read as soon as this screen's code loads (toolModules.ts).
-void toolFlags.load();
 
 /**
  * Each tool's dialog. Phase 2's are loaded when first opened (each is its own chunk, owned by its dialog
@@ -117,6 +116,11 @@ const TOOL_DIALOGS: Record<ToolId, ComponentType<ToolDialogProps>> = {
   watermark: lazy(() => import('./dialogs/WatermarkDialog')),
   protect: lazy(() => import('./dialogs/ProtectDialog')),
   redact: lazy(() => import('./dialogs/RedactDialog')),
+  'pdf-to-excel': lazy(() => import('./dialogs/PdfToExcelDialog')),
+  'pdf-to-word': lazy(() => import('./dialogs/PdfToWordDialog')),
+  'document-check': lazy(() => import('./dialogs/DocumentCheckDialog')),
+  compare: lazy(() => import('./dialogs/CompareDialog')),
+  ocr: lazy(() => import('./dialogs/OcrDialog')),
 };
 
 /** The read-only bookmark list beside the page panel (lane W2-B's), loaded with the first file that has bookmarks. */
@@ -180,7 +184,7 @@ function showFolderNotChosen(): void {
 }
 
 export default function PdfTools() {
-  // First, before any hook: the screen waits (its Suspense) until it knows which tools are built.
+  // Which tools are built is known at once (toolModules.ts); no tool code is loaded to show the screen.
   const builtTools = useBuiltTools();
   const { state, contextKey, store } = useWorkingList();
   const selected = useMemo(() => selectedInOrder(state), [state]);
@@ -273,16 +277,18 @@ export default function PdfTools() {
     toast.error('The tool could not be opened', { description: 'Try again; if this keeps happening, restart the application.' });
   }, []);
   const viewFile = useCallback((fileId: string, opener: HTMLElement) => {
+    // An Excel or Word result has no pages to show (T-064, decision 9): its row offers no View, and none opens.
+    if (store.getState().files.some((f) => f.id === fileId && isOfficeFile(f))) return;
     toast.dismiss(RESULT_TOAST); // it would sit over the viewer
     // The row's first-page thumbnail, if drawn, is shown enlarged until the sharp drawing arrives.
     const thumb = opener.closest('[data-testid="pdf-tools-row"]')?.querySelector<HTMLImageElement>('img[data-testid="pdf-tools-thumb"]');
     setViewing({ fileId, opener, placeholder: thumb?.src ?? null, key: Date.now() });
-  }, []);
+  }, [store]);
   const closeViewer = useCallback(() => setViewing(null), []);
   // The page panel's viewer (a click on a page, T1-11): the result message would sit over it too.
   const dismissResultToast = useCallback(() => toast.dismiss(RESULT_TOAST), []);
   // Looked up in the guarded list: a file that has left it (or another engagement's) is never shown.
-  const viewed = viewing ? (state.files.find((f) => f.id === viewing.fileId) ?? null) : null;
+  const viewed = viewing ? (state.files.find((f) => f.id === viewing.fileId && !isOfficeFile(f)) ?? null) : null;
   useEffect(() => {
     if (viewing && !viewed) setViewing(null);
   }, [viewing, viewed]);

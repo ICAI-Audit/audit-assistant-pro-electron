@@ -1308,6 +1308,56 @@ describe('a name collision never ends the run as a damaged file', () => {
     const named = withUniqueNames([pdf('x.pdf', A2, 2), { ...image('x.png', png), name: 'x.pdf', groupId: 'g' }, { ...image('x.png', png), name: 'y.png', groupId: 'g' }], taken, throwing);
     expect(named.map((f) => f.name)).toEqual(['result (3).pdf', 'result (2).png', 'y.png']);
   });
+
+  it('the plain name of a workbook ends in .xlsx and of a Word document in .docx, never .jpg (T-064)', () => {
+    const throwing = () => {
+      throw new TypeError('match is not iterable');
+    };
+    const taken = [workbook('x.xlsx'), document('x.docx')];
+    const named = withUniqueNames([workbook('x.xlsx'), document('x.docx')], taken, throwing);
+    expect(named.map((f) => f.name)).toEqual(['result (2).xlsx', 'result (2).docx']);
+    // the usual numbering keeps the extension as well
+    expect(withUniqueNames([workbook('x.xlsx'), document('x.docx')], taken).map((f) => f.name)).toEqual(['x (2).xlsx', 'x (2).docx']);
+  });
+});
+
+// ---- Excel and Word results are never a tool's input (T-064, decision 9) -----------------------
+
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+function workbook(name: string): WorkingFile {
+  return { ...pdf(name, new Uint8Array([0x50, 0x4b, 3, 4]), 0), kind: 'office', mimeType: XLSX, origin: 'result', pageCount: null };
+}
+function document(name: string): WorkingFile {
+  return { ...workbook(name), mimeType: DOCX };
+}
+
+describe('a workbook or a Word document as a tool input', () => {
+  it('is refused by Merge and by every other tool before anything runs, in one sentence, and nothing is added', async () => {
+    const cases: [Parameters<typeof runTool>[0], WorkingFile[], unknown][] = [
+      ['merge', [pdf('A.pdf', A2, 2), workbook('T.xlsx')], {}],
+      ['merge', [document('T.docx'), pdf('A.pdf', A2, 2)], {}],
+      ['split', [workbook('T.xlsx')], { mode: 'range', from: 1, to: 1 }],
+      ['delete-pages', [document('T.docx')], { pages: '1' }],
+      ['compress', [pdf('A.pdf', A2, 2), workbook('T.xlsx')], { level: 'recommended' }],
+      ['page-numbers', [workbook('T.xlsx')], { numbers: defaultPageNumberOptions(1) }],
+      ['images-to-pdf', [image('a.png', png), document('T.docx')], { pageSize: 'a4-auto', marginPt: 28 }],
+      ['pdf-to-images', [workbook('T.xlsx')], { pages: 'all', format: 'png', dpi: 100 }],
+      ['watermark', [document('T.docx')], {}],
+      ['pdf-to-excel', [workbook('T.xlsx')], { sheets: 'one-sheet' }],
+      ['pdf-to-word', [document('T.docx')], {}],
+      ['document-check', [workbook('T.xlsx')], {}],
+      ['compare', [pdf('A.pdf', A2, 2), document('T.docx')], { earlierId: 'x' }],
+    ];
+    for (const [tool, inputs, options] of cases) {
+      const { ctx, deps, files, progress } = setup();
+      const mergePdfs = vi.fn();
+      await expect(runTool(tool, inputs, options as never, ctx, { ...deps, mergePdfs }), tool).rejects.toMatchObject({ code: 'wrong-input', message: 'Excel and Word results cannot be used by a tool.' });
+      expect(files(), tool).toEqual([]);
+      expect(mergePdfs, tool).not.toHaveBeenCalled();
+      expect(progress, tool).not.toHaveBeenCalled();
+    }
+  });
 });
 
 // ---- the file in hand: protection and what a copy still carries (QA-FIX E and A) -------------

@@ -4,7 +4,7 @@
 // control that opened it when it closes, and it cannot be closed while files are being sent (Stop
 // finishes the file being sent and leaves the rest). The hooks are in useDestinationDialog.ts.
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
-import { AlertCircle, AlertTriangle, FileText, Image as ImageIcon, Loader2, Lock, type LucideIcon } from 'lucide-react';
+import { AlertCircle, AlertTriangle, FileSpreadsheet, FileText, Image as ImageIcon, Loader2, Lock, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { forgetMatchedText } from '@/lib/pdf-tools/matchedText';
 import type { WorkingFile } from '@/lib/pdf-tools/types';
 import { batchNames, EVIDENCE_TYPES, sameNameInVault, vaultName, type EvidenceType } from '../destinations';
 import { formatBytes } from '../format';
+import { isOfficeFile, officeInfo } from '../officeFiles';
 import type { VaultFileRow } from '../vaultBytes';
 import { Field, FileChip, IndeterminateBar, Notice } from './ToolDialog';
 import { ignoreHeldKey } from '../dialogKeys';
@@ -210,7 +211,9 @@ export function DestinationFrame({
 
 // ---- the vault form ----------------------------------------------------------------------------
 
-const KIND_ICON = { pdf: FileText, image: ImageIcon } as const;
+const KIND_ICON = { pdf: FileText, image: ImageIcon, office: FileSpreadsheet } as const;
+/** The small icon beside a name in a batch: a Word document is not shown as a spreadsheet. */
+const kindIcon = (file: WorkingFile): LucideIcon => (isOfficeFile(file) && officeInfo(file).type === 'word' ? FileText : KIND_ICON[file.kind]);
 
 /** Name(s), evidence type and working-paper reference, with a warning for names the vault already has. */
 /**
@@ -315,7 +318,7 @@ export function VaultFormFields({
           <p className="text-sm font-medium leading-none">Names in the Evidence Vault</p>
           <ol className="max-h-64 space-y-2 overflow-y-auto rounded-md border bg-muted/20 p-2.5">
             {files.map((file, index) => {
-              const Kind = KIND_ICON[file.kind];
+              const Kind = kindIcon(file);
               return (
                 <li key={file.id} className="flex items-start gap-2.5">
                   <span className="mt-2.5 w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground" aria-hidden="true">

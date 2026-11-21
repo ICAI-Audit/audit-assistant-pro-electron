@@ -7,7 +7,7 @@ import { createWorkingListStore } from '@/lib/pdf-tools/workingList';
 import { PdfToolsError, type WorkingFile } from '@/lib/pdf-tools/types';
 import { runTool, type RunContext, type RunDeps } from './runTool';
 import { pageNumberRunNotes, watermarkRunNotes } from './marks/markNotes';
-import { CHECK_NOTICE_BYTES, CHECKING_RESULT, markFlags, markNotes, onePdf, type ToolStep } from './toolStep';
+import { CHECK_NOTICE_BYTES, CHECKING_RESULT, markFlags, markNotes, onePdf, Run, type ToolStep } from './toolStep';
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -63,6 +63,29 @@ function setup() {
 }
 
 const watermarkOptions = { options: { pages: 'first' as const, tokens: { date: '14-11-2026', client: '' } }, name: '' };
+
+describe('"protection removed" on a record (QA-FIX E; T-064 contract section 4)', () => {
+  const run = (tool: ConstructorParameters<typeof Run>[0]) => {
+    const { ctx } = setup();
+    return new Run(tool, ctx, { inspectPdf: async () => { throw new Error('not used'); }, paint: async () => undefined, yieldToUi: async () => undefined, newId: () => 'id-1', maxBytes: 1e9, warnBytes: 1e9 });
+  };
+  const unlocked = () => pdf('Locked.pdf', A2, 2, { wasProtected: true });
+
+  it('is said for a tool whose result is a copy of an unlocked file, PDF to Excel and PDF to Word included', () => {
+    for (const tool of ['merge', 'compress', 'watermark', 'pdf-to-excel', 'pdf-to-word'] as const) expect(run(tool).protectionRemoved([unlocked()]), tool).toBe(true);
+  });
+
+  it('is never said for Protect, nor for a report about the files: Document check and Compare', () => {
+    for (const tool of ['protect', 'document-check', 'compare'] as const) {
+      expect(run(tool).protectionRemoved([unlocked()]), tool).toBe(false);
+      const row = run(tool).result({ name: 'r.pdf', bytes: A2, kind: 'pdf', mimeType: 'application/pdf', pageCount: 2 }, [unlocked()], { summary: 'Report', options: {} });
+      expect(row.operation, tool).toMatchObject({ summary: 'Report' });
+      expect(row.operation?.flags, tool).toBeUndefined();
+    }
+    const row = run('pdf-to-word').result({ name: 'r.docx', bytes: A2, kind: 'office', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', pageCount: null }, [unlocked()], { summary: 'Converted to Word: 2 pages', options: {} });
+    expect(row.operation).toMatchObject({ summary: 'Converted to Word: 2 pages; protection removed', flags: { protectionRemoved: true } });
+  });
+});
 
 describe('a phase 2 run module through runTool (the step contract)', () => {
   it("runs a built module's step, which checks, verifies and names its result like a phase 1 step", async () => {

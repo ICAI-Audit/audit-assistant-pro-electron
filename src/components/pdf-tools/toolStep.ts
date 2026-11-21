@@ -192,10 +192,11 @@ export class Run<D extends StepDeps = StepDeps> {
 
   /**
    * Whether a source's password or restrictions were taken off when it was opened (QA-FIX E): the record says
-   * "protection removed". Not for Protect, whose result has a password of its own.
+   * "protection removed". Not for Protect, whose result has a password of its own, nor for Document check and
+   * Compare (T-064): their result is a report about the files, not a copy of one.
    */
   protectionRemoved(sources: readonly WorkingFile[]): boolean {
-    return this.tool !== 'protect' && sources.some((f) => f.wasProtected);
+    return this.tool !== 'protect' && this.tool !== 'document-check' && this.tool !== 'compare' && sources.some((f) => f.wasProtected);
   }
 
   result(made: MadeFile, sources: WorkingFile[], record: Pick<OperationRecord, 'summary' | 'options' | 'flags'>, groupId?: string): WorkingFile {

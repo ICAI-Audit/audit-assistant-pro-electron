@@ -22,6 +22,51 @@ const pdf = () => file('pdf');
 const img = () => file('image');
 const enabled = (tool: ToolId, selection: WorkingFile[]) => toolAvailability(tool, selection).enabled;
 
+describe('phase 3 tool availability', () => {
+  it('offers PDF to Excel, PDF to Word and Document check for exactly one PDF', () => {
+    for (const tool of ['pdf-to-excel', 'pdf-to-word', 'document-check'] as const) {
+      expect(enabled(tool, [pdf()]), tool).toBe(true);
+      expect(enabled(tool, []), tool).toBe(false);
+      expect(enabled(tool, [pdf(), pdf()]), tool).toBe(false);
+      expect(toolAvailability(tool, [img()]).reason, tool).toMatch(/not an image/);
+    }
+  });
+
+  it('offers Make searchable for exactly one PDF, never for an image, and says what to select', () => {
+    expect(toolAvailability('ocr', [pdf()])).toEqual({ enabled: true });
+    expect(toolAvailability('ocr', [])).toEqual({ enabled: false, reason: 'Select exactly one PDF to make searchable.' });
+    expect(toolAvailability('ocr', [pdf(), pdf()])).toEqual({ enabled: false, reason: 'Select exactly one PDF to make searchable.' });
+    expect(toolAvailability('ocr', [img()])).toEqual({ enabled: false, reason: 'Select a PDF, not an image, to make searchable.' });
+  });
+
+  it('offers Compare for exactly two PDFs and says so otherwise', () => {
+    expect(enabled('compare', [pdf(), pdf()])).toBe(true);
+    for (const selection of [[], [pdf()], [pdf(), pdf(), pdf()], [pdf(), img()]]) {
+      expect(toolAvailability('compare', selection)).toEqual({ enabled: false, reason: 'Select exactly two PDFs to compare.' });
+    }
+  });
+});
+
+describe('an Excel or Word result is never a tool input (T-064, decision 9)', () => {
+  const office = (mimeType: string, name: string): WorkingFile => ({ ...pdf(), name, kind: 'office', mimeType, origin: 'result', pageCount: null });
+  const workbook = () => office('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'a.xlsx');
+  const document = () => office('application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'a.docx');
+
+  it('disables every tool, Merge too, with one reason, when a ticked row is a workbook or a Word document', () => {
+    for (const tool of TOOLS.map((t) => t.id)) {
+      for (const selection of [[workbook()], [document()], [pdf(), workbook()], [pdf(), document()], [pdf(), pdf(), workbook()], [img(), document()]]) {
+        expect(toolAvailability(tool, selection), tool).toEqual({ enabled: false, reason: 'Excel and Word results cannot be used by a tool.' });
+      }
+    }
+  });
+
+  it('leaves the tools as they were once the office row is unticked', () => {
+    expect(enabled('merge', [pdf(), pdf()])).toBe(true);
+    expect(enabled('compare', [pdf(), pdf()])).toBe(true);
+    expect(enabled('pdf-to-excel', [pdf()])).toBe(true);
+  });
+});
+
 describe('toolAvailability', () => {
   it('lists every tool once, in the toolbar order of design section 4', () => {
     expect(TOOLS.map((t) => `${t.group}: ${t.id}`)).toEqual([
@@ -38,17 +83,18 @@ describe('toolAvailability', () => {
       'Prepare: protect',
       'Convert: images-to-pdf',
       'Convert: pdf-to-images',
+      'Convert: pdf-to-excel',
+      'Convert: pdf-to-word',
+      'Convert: ocr',
+      'Review: document-check',
+      'Review: compare',
     ]);
     for (const tool of TOOLS) expect(TOOL_ICONS[tool.id], tool.id).toBeTruthy();
   });
 
-  it('keeps the four tools of a later phase as "Soon", and no phase 2 tool among them', () => {
-    expect(COMING_SOON.map((t) => `${t.group}: ${t.label}`)).toEqual([
-      'Convert: PDF to Excel',
-      'Convert: PDF to Word',
-      'Convert: Make searchable',
-      'Review: Review',
-    ]);
+  it('keeps no placeholder now that Make searchable is built (T-064), and no tool of the toolbar among them', () => {
+    expect(COMING_SOON.map((t) => `${t.group}: ${t.label}`)).toEqual([]);
+    expect(toolInfo('ocr')).toMatchObject({ group: 'Convert', label: 'Make searchable' });
     const built = new Set<string>(TOOLS.map((t) => t.id));
     expect(COMING_SOON.filter((t) => built.has(t.key))).toEqual([]);
   });

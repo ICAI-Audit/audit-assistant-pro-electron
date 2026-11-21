@@ -39,6 +39,19 @@
 // record (counts and choices only), a Stop during a run, and the values typed or redacted found nowhere afterwards;
 // a group ticked by hand ticks its possible values too (a labelled name and address); "Add a box" with its two
 // ways, the mouse (a real drag on the page) and the keyboard.
+// Phase 3 (T-064): the toolbar with PDF to Excel, PDF to Word, Document check and Compare usable and only "Make
+// searchable" as "soon"; PDF to Excel end to end on a statement made here (the preview, both sheet choices, the
+// workbook read back with exceljs, the write worker); PDF to Word (the .docx unzipped with jszip); an Excel or
+// Word result as a row of the list (its tile, no viewer, no page panel, refused by every tool) and to all three
+// destinations (computer as a file, to a folder and as one zip; the Evidence Vault; a working paper); Document
+// check on a signed file and on a file opened with its password; Compare on a draft and a later version; a
+// scanned file in both converters; a 500-page statement through both, with the window's longest task read from a
+// DevTools trace, and Stop; and no word of a file in any record. Make searchable (OCR, on this computer): a
+// three-page scan the test draws itself in the application's window (a ruled ledger as a picture, a page of
+// text, a blank scanned page): the dialog's count and estimate, the result and its message, its text read back
+// with pdf.js, the picture unchanged, its record, the result through PDF to Excel, and Stop inside a page.
+//   PDF_TOOLS_TEST_ONLY=phase3 runs the set-up, the first sign-in and then only the phase 3 scenarios.
+//   PDF_TOOLS_TEST_OCR_TIMING=1 also times a six-page A4 scan through Make searchable (notes only; about 2 minutes).
 // Throughout: the renderer's network requests and errors.
 //
 // Result bytes are read the way the app saves them: the browser's save and folder pickers are
@@ -76,6 +89,8 @@ const { PDFDocument: EncryptingPDFDocument } = require('@cantoo/pdf-lib');
 
 const { PDFDocument, StandardFonts } = pdfLib;
 const PACKAGED_APP = process.env.PDF_TOOLS_TEST_APP ? path.resolve(process.env.PDF_TOOLS_TEST_APP) : null;
+// Only the phase 3 scenarios, straight after the first sign-in (for work on them; the whole run is the test).
+const ONLY_PHASE_THREE = process.env.PDF_TOOLS_TEST_ONLY === 'phase3';
 
 const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'icai-vera-pdf-tools-ui-'));
 const profilePath = path.join(runtimeRoot, 'user-data');
@@ -100,6 +115,20 @@ const REDACT_ABSENT_WORD = 'Zephyrquill Marrow';
 // A labelled name and address, which the find lists as possible matches (Balanced does not tick them).
 const REDACT_NAME = 'Zorvane Quillfeather';
 const REDACT_ADDRESS = 'Flat 12, Orchard Residency, Baner Road, Pune 411045';
+// Phase 3 (T-064): invented words written inside the files made here; none may reach a record.
+const P3 = {
+  payee: 'Zorvex Quillmart',
+  account: '000123456789012',
+  heading: 'Zentrix Quarterly Review',
+  paragraph:
+    'The invented committee met in the Quillon meeting room and went through the receivables listed below one by one, asking for the supporting papers of each balance that had stayed open for more than ninety days at the end of the quarter under review.',
+  table: [['Item', 'Owner', 'Amount'], ['Stationery', 'Accounts team', '4,500.00'], ['Courier', 'Front office', '1,250.00']],
+  signer: 'Signer Omega Example',
+  reason: 'Approved for the invented filing',
+  feeEarlier: '4,20,000',
+  feeLater: '4,50,000',
+  addedWords: 'subject to Vexillum approval',
+};
 const FILES = {
   two: 'Synthetic two pages.pdf',
   three: 'Synthetic three pages.pdf',
@@ -138,6 +167,15 @@ const FILES = {
   redactShort: 'Synthetic statement to redact.pdf',
   redactLong: 'Synthetic long statement to redact.pdf',
   redactLetter: 'Synthetic letter to redact.pdf',
+  // Phase 3 (T-064): a statement inside ruling lines (3 pages, and 500 pages), a note with a heading, a paragraph and
+  // a table, a letter with an invented signature, and two versions of an agreement.
+  p3Statement: 'Synthetic bank statement.pdf',
+  p3Long: 'Synthetic statement 500 pages.pdf',
+  p3Note: 'Synthetic review note.pdf',
+  p3Form: 'Synthetic acknowledgement form.pdf',
+  p3Signed: 'Synthetic signed letter.pdf',
+  p3Draft: 'Synthetic agreement draft.pdf',
+  p3Final: 'Synthetic agreement final.pdf',
 };
 // INT2 (lane SPLIT): the main sections of FILES.ledgerMarked (titles with characters a file name cannot hold, Hindi, a duplicate).
 const SECTIONS = ['Sales & Receivables', 'Purchases: Payables', 'Bank/Cash', 'करदाता विवरण', 'Notes', 'Notes', 'Fixed assets', 'Payroll?', 'Taxes <GST>', 'Closing "entries"'];
@@ -148,16 +186,18 @@ const IMAGE_SIZES = { wide: [400, 300], tall: [300, 450] };
 const KEEP_DRAWING_SWITCHES = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'];
 const BUILT_TOOLS = ['merge', 'split', 'delete-pages', 'compress', 'page-numbers', 'images-to-pdf', 'pdf-to-images'];
 // The tools that stay "soon"; the phase 2 tools, all usable (a tool whose run module's BUILT is false goes into
-// PHASE_TWO_SOON).
-const SOON_TOOLS = ['pdf-to-excel', 'pdf-to-word', 'ocr', 'review'];
+// PHASE_TWO_SOON). Phase 3 (T-064): its five tools are built and usable too, Make searchable ('ocr') the last: nothing is "soon".
+const SOON_TOOLS = [];
 const PHASE_TWO_TOOLS = ['organise-pages', 'resize-crop', 'watermark', 'redact', 'bookmarks', 'protect'];
 const PHASE_TWO_SOON = [];
+const PHASE_THREE_TOOLS = ['pdf-to-excel', 'pdf-to-word', 'ocr', 'document-check', 'compare'];
+const PHASE_THREE_SOON = [];
 // Stage 1b layout: in each group the usable tools in design order, then the quiet "soon" ones.
 const DESIGN_GROUPS = [
   ['merge', 'split', 'delete-pages', 'organise-pages', 'resize-crop', 'compress'],
   ['page-numbers', 'watermark', 'redact', 'bookmarks', 'protect'],
   ['images-to-pdf', 'pdf-to-images', 'pdf-to-excel', 'pdf-to-word', 'ocr'],
-  ['review'],
+  ['document-check', 'compare'],
 ];
 const expectedOrder = (usablePhaseTwo) => DESIGN_GROUPS.flatMap((g) => {
   const usable = g.filter((id) => BUILT_TOOLS.includes(id) || usablePhaseTwo.includes(id));
@@ -481,6 +521,253 @@ async function letterPdf() {
   return doc.save();
 }
 
+// ── Phase 3 (T-064): invented files for PDF to Excel, PDF to Word, Document check and Compare ──
+/** 1234555353 paise -> "1,23,45,553.53" (Indian grouping). */
+function indianAmount(paise) {
+  const whole = String(Math.floor(paise / 100));
+  const last3 = whole.slice(-3);
+  const rest = whole.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+  return `${rest ? `${rest},` : ''}${last3}.${String(paise % 100).padStart(2, '0')}`;
+}
+const P3_COLUMNS = [40, 100, 285, 385, 440, 495, 560]; // the statement's column edges, in points from the left
+const P3_HEADS = ['Date', 'Narration', 'Account', 'Debit', 'Credit', 'Balance'];
+/** Row n of the statement (from 1): what each cell says. The balance runs on from page to page. */
+function p3StatementRows(count) {
+  let balance = 1234567890;
+  const rows = [];
+  for (let n = 1; n <= count; n++) {
+    const debit = n % 3 === 0 ? 0 : 12500 + n * 37;
+    const credit = n % 3 === 0 ? 250000 + n * 11 : 0;
+    balance += credit - debit;
+    rows.push({
+      date: `${String(1 + ((n * 3) % 28)).padStart(2, '0')}-04-2025`,
+      narration: n === 1 ? `${P3.payee} invoice 114` : `Transfer ${n} to supplier`,
+      account: P3.account,
+      debit: debit ? indianAmount(debit) : '',
+      credit: credit ? indianAmount(credit) : '',
+      balance: indianAmount(balance),
+      balancePaise: balance,
+    });
+  }
+  return rows;
+}
+/** A4 pages of a bank statement inside ruling lines: a heading line, then one table per page. */
+async function p3StatementPdf(pages, rowsPerPage) {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const all = p3StatementRows(pages * rowsPerPage);
+  const top = 780;
+  const rowHeight = 18;
+  for (let p = 0; p < pages; p++) {
+    const page = doc.addPage(A4);
+    page.drawText(`Synthetic statement of account, page ${p + 1} of ${pages}`, { x: 40, y: 805, size: 11, font: bold });
+    for (let r = 0; r <= rowsPerPage + 1; r++) page.drawLine({ start: { x: P3_COLUMNS[0], y: top - r * rowHeight }, end: { x: P3_COLUMNS[6], y: top - r * rowHeight }, thickness: 0.5 });
+    for (const x of P3_COLUMNS) page.drawLine({ start: { x, y: top }, end: { x, y: top - (rowsPerPage + 1) * rowHeight }, thickness: 0.5 });
+    const cell = (r, c, text, f = font) => {
+      if (!text) return;
+      const right = c >= 3;
+      const x = right ? P3_COLUMNS[c + 1] - 4 - f.widthOfTextAtSize(text, 9) : P3_COLUMNS[c] + 4;
+      page.drawText(text, { x, y: top - r * rowHeight - 12.5, size: 9, font: f });
+    };
+    P3_HEADS.forEach((h, c) => cell(0, c, h, bold));
+    for (let r = 1; r <= rowsPerPage; r++) {
+      const row = all[p * rowsPerPage + r - 1];
+      [row.date, row.narration, row.account, row.debit, row.credit, row.balance].forEach((text, c) => cell(r, c, text));
+    }
+  }
+  return doc.save();
+}
+/** Words wrapped to a width, so that the first word of the next line never fits on the line before. */
+function p3Wrap(text, font, size, width) {
+  const lines = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && font.widthOfTextAtSize(next, size) > width) {
+      lines.push(line);
+      line = word;
+    } else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+/** One A4 page: a large heading, a paragraph of several lines, and a small table inside ruling lines. */
+async function p3NotePdf() {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const page = doc.addPage(A4);
+  page.drawText(P3.heading, { x: 60, y: 770, size: 20, font: bold });
+  p3Wrap(P3.paragraph, font, 10, 470).forEach((line, i) => page.drawText(line, { x: 60, y: 730 - i * 14, size: 10, font }));
+  const edges = [60, 220, 380, 530];
+  const top = 640;
+  P3.table.forEach((_, r) => page.drawLine({ start: { x: edges[0], y: top - r * 20 }, end: { x: edges[3], y: top - r * 20 }, thickness: 0.5 }));
+  page.drawLine({ start: { x: edges[0], y: top - P3.table.length * 20 }, end: { x: edges[3], y: top - P3.table.length * 20 }, thickness: 0.5 });
+  for (const x of edges) page.drawLine({ start: { x, y: top }, end: { x, y: top - P3.table.length * 20 }, thickness: 0.5 });
+  P3.table.forEach((row, r) => row.forEach((text, c) => page.drawText(text, { x: edges[c] + 5, y: top - r * 20 - 14, size: 10, font: r === 0 ? bold : font })));
+  return doc.save();
+}
+/** What the acknowledgement-style form holds (invented), for the checks of P3-34 and P3-35. */
+const P3_FORM = { title: 'SAMPLE RETURN ACKNOWLEDGEMENT', side: 'Income Details', code: 'QZXCV0000W', amount: 679234, captionOfPicture: 'ZZ0000SAMPLE0000CAPTION' };
+/** A PNG of one grey or of red-green-blue samples, its data packed with zlib. */
+function p3Png(pixels, width, height, channels) {
+  const raw = Buffer.alloc((width * channels + 1) * height);
+  for (let y = 0; y < height; y++) Buffer.from(pixels.buffer, pixels.byteOffset + y * width * channels, width * channels).copy(raw, y * (width * channels + 1) + 1);
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const out = Buffer.alloc(8 + data.length + 4);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(zlib.crc32(body) >>> 0, 8 + data.length);
+    return out;
+  };
+  const head = Buffer.alloc(13);
+  head.writeUInt32BE(width, 0);
+  head.writeUInt32BE(height, 4);
+  head[8] = 8;
+  head[9] = channels === 1 ? 0 : 2;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', head), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+/**
+ * An acknowledgement-style form with invented data (the same page as the unit tests' form fixture): a title box
+ * with a side cell, label and value rows, a tall cell with turned text beside three rows of caption, number and
+ * right-aligned amount, a boxed sentence with underlined blanks, a picture with a caption, a faint picture
+ * behind the middle and a red underlined line at the foot; its lines are thin filled boxes in a pale colour.
+ */
+async function p3FormPdf() {
+  const { rgb, degrees } = pdfLib;
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const serif = await doc.embedFont(StandardFonts.TimesRoman);
+  const H = 842;
+  const pale = rgb(0xb9 / 255, 0xbf / 255, 0xdf / 255);
+  const black = rgb(0, 0, 0);
+  const text = (t, x, y, size, font = regular, color = black) => page.drawText(t, { x, y: H - y, size, font, color });
+  const centred = (t, x0, x1, y, size, font = regular, color = black) => {
+    const w = font.widthOfTextAtSize(t, size);
+    text(t, (x0 + x1) / 2 - w / 2, y, size, font, color);
+    return [(x0 + x1) / 2 - w / 2, (x0 + x1) / 2 + w / 2];
+  };
+  const hline = (x0, x1, y, color = pale, width = 0.6) => page.drawRectangle({ x: x0, y: H - y - width / 2, width: x1 - x0, height: width, color });
+  const vline = (x, y0, y1) => page.drawRectangle({ x: x - 0.3, y: H - y1, width: 0.6, height: y1 - y0, color: pale });
+  const [X0, X1, X2, X3, X4, X5, X6, X7, X8] = [40, 64, 130, 300, 400, 430, 440, 470, 555];
+  const [Y0, Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9] = [60, 110, 134, 158, 182, 206, 230, 290, 340, 362];
+  page.drawImage(await doc.embedPng(p3Png(new Uint8Array(40 * 40).fill(120), 40, 40, 1)), { x: 200, y: H - 340, width: 160, height: 160, opacity: 0.1 });
+  text('Reference number: ZX-0000-1234', 40, 42, 10, bold);
+  const date = 'Date of issue: 01-Jan-2030';
+  text(date, 555 - bold.widthOfTextAtSize(date, 10), 42, 10, bold);
+  hline(40, 555, 50, black);
+  for (const y of [Y0, Y1, Y2, Y3, Y6, Y7, Y8, Y9]) hline(X0, X8, y);
+  for (const y of [Y4, Y5]) hline(X1, X8, y);
+  vline(X0, Y0, Y9);
+  vline(X8, Y0, Y9);
+  vline(X7, Y0, Y1);
+  vline(X2, Y1, Y3);
+  vline(X3, Y2, Y3);
+  vline(X5, Y2, Y3);
+  vline(X1, Y3, Y6);
+  vline(X4, Y3, Y6);
+  vline(X6, Y3, Y6);
+  const [t0, t1] = centred(P3_FORM.title, X0, X7, 80, 11, bold);
+  hline(t0, t1, 81.5, black, 0.7);
+  centred('(issued for a made-up sample only)', X0, X7, 96, 7.5, serif);
+  centred('Sample Year', X7, X8, 80, 9);
+  centred('2030-31', X7, X8, 96, 9);
+  text('Code', 46, 126, 8);
+  text(P3_FORM.code, 136, 126, 8);
+  text('Status', 46, 150, 8);
+  text('Individual', 136, 150, 8);
+  text('Form', 306, 150, 8);
+  text('S-3', 436, 150, 8);
+  const side = bold.widthOfTextAtSize(P3_FORM.side, 8);
+  page.drawText(P3_FORM.side, { x: 55, y: H - ((Y3 + Y6) / 2 + side / 2), size: 8, font: bold, rotate: degrees(90) });
+  const amounts = ['0', '6,79,234', '(-) 70,000'];
+  ['Business loss of the year, if any', 'Total income', 'Tax payable or refundable'].forEach((caption, i) => {
+    const y = Y3 + 16 + i * 24;
+    text(caption, 70, y, 8);
+    text(String(i + 1), 406, y, 8);
+    text(amounts[i], 549 - regular.widthOfTextAtSize(amounts[i], 8), y, 8);
+  });
+  const blank = (t, x, y) => {
+    const w = regular.widthOfTextAtSize(t, 8);
+    text(t, x + 12, y, 8);
+    hline(x, x + w + 24, y + 1.5, black, 0.5);
+    return x + w + 24;
+  };
+  const piece = (t, x, y) => {
+    text(t, x, y, 8);
+    return x + regular.widthOfTextAtSize(t, 8) + 6;
+  };
+  let x = piece('Return transmitted on', 50, 252);
+  x = blank('01-Jan-2030', x, 252) + 6;
+  x = piece('from address', x, 252);
+  blank('10.0.0.1', x, 252);
+  x = piece('and verified by', 50, 272);
+  x = blank('SAMPLE PERSON', x, 272) + 6;
+  x = piece('using code', x, 272);
+  blank('ABC123', x, 272);
+  text('System generated', 60, 310, 8);
+  text('Sample code', 60, 326, 8);
+  const stripes = new Uint8Array(60 * 20 * 3);
+  for (let i = 0; i < 60 * 20; i++) stripes.fill((i % 60) % 4 < 2 ? 0 : 255, i * 3, i * 3 + 3);
+  page.drawImage(await doc.embedPng(p3Png(stripes, 60, 20, 3)), { x: 250, y: H - 322, width: 120, height: 24 });
+  centred(P3_FORM.captionOfPicture, 250, 370, 334, 7, bold);
+  const red = rgb(1, 0, 0);
+  const [f0, f1] = centred('DO NOT SEND THIS SAMPLE ANYWHERE', X0, X8, 354, 8, bold, red);
+  hline(f0, f1, 355.5, red, 0.6);
+  void [X5, Y4, Y5];
+  return doc.save();
+}
+/** Two pages of text with an invented signature dictionary in a signature field (no certificate: /Contents is zeros). */
+async function p3SignedPdf() {
+  const { PDFHexString, PDFName, PDFString } = pdfLib;
+  const doc = await PDFDocument.load(await textPdf('Synthetic signed letter for the board', 2, A4), { updateMetadata: false });
+  const { context } = doc;
+  const first = doc.getPage(0);
+  const sig = context.register(
+    context.obj({
+      Type: 'Sig',
+      Filter: 'Adobe.PPKLite',
+      SubFilter: 'adbe.pkcs7.detached',
+      ByteRange: [0, 10, 20, 30],
+      Contents: PDFHexString.of('00'.repeat(64)),
+      Name: PDFString.of(P3.signer),
+      M: PDFString.of("D:20261117140500+05'30'"),
+      Reason: PDFString.of(P3.reason),
+    }),
+  );
+  const widget = context.register(context.obj({ Type: 'Annot', Subtype: 'Widget', FT: 'Sig', T: PDFString.of('Signature1'), V: sig, Rect: [0, 0, 0, 0], F: 132, P: first.ref }));
+  first.node.set(PDFName.of('Annots'), context.obj([widget]));
+  doc.catalog.set(PDFName.of('AcroForm'), context.obj({ Fields: [widget], SigFlags: 3 }));
+  return doc.save({ useObjectStreams: false });
+}
+/** Six A4 pages of an agreement. The later version changes an amount on page 2 and adds a few words on page 5. */
+async function p3AgreementPdf(later) {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (let n = 1; n <= 6; n++) {
+    const page = doc.addPage(A4);
+    let body = `Clause ${n}. The parties agree that the services described in schedule ${n} are supplied on the terms set out in this invented agreement, and that each invoice is paid within thirty days of its date.`;
+    if (n === 2) body += ` The fee for the year is Rs. ${later ? P3.feeLater : P3.feeEarlier} before tax.`;
+    if (n === 5) body += ` Either party may end the agreement by notice in writing${later ? ` ${P3.addedWords}` : ''} at any time.`;
+    page.drawText(`Synthetic agreement, page ${n}`, { x: 60, y: 780, size: 12, font });
+    p3Wrap(body, font, 10, 470).forEach((line, i) => page.drawText(line, { x: 60, y: 750 - i * 14, size: 10, font }));
+  }
+  return doc.save();
+}
+async function makePhaseThreeFixtures(write) {
+  write(FILES.p3Statement, await p3StatementPdf(3, 12));
+  write(FILES.p3Long, await p3StatementPdf(500, 30));
+  write(FILES.p3Note, await p3NotePdf());
+  write(FILES.p3Form, await p3FormPdf());
+  write(FILES.p3Signed, await p3SignedPdf());
+  write(FILES.p3Draft, await p3AgreementPdf(false));
+  write(FILES.p3Final, await p3AgreementPdf(true));
+}
+
 async function makeFixtures() {
   fs.mkdirSync(fixturesPath);
   const write = (name, bytes) => fs.writeFileSync(path.join(fixturesPath, name), bytes);
@@ -539,6 +826,7 @@ async function makeFixtures() {
   write(FILES.redactShort, await statementPdf(2));
   write(FILES.redactLong, await statementPdf(16));
   write(FILES.redactLetter, await letterPdf());
+  await makePhaseThreeFixtures(write);
 }
 
 // ── Database read outside the app (Electron as Node: better-sqlite3 is built for Electron) ──
@@ -982,12 +1270,36 @@ async function pressWith(key, modifiers) {
   await cdp('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode: KEY_CODES[key], modifiers });
   await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: KEY_CODES[key], modifiers });
 }
-/** UX-GAP: a real mouse click (or double-click) in the middle of the element, after scrolling it into view. */
+/**
+ * UX-GAP: a real mouse click (or double-click) in the middle of the element, after scrolling it into view and once
+ * it stands still. A dialog grows and slides into place for a fifth of a second as it opens; a point read from a
+ * frame of that movement is no longer on a small button when the click arrives (T-064: this is what made UX-4, and
+ * UX-3 before it, fail now and then: the press landed on the row beside the arrow). A user clicks what has stopped
+ * moving, so the click waits, for at most a second, until nothing the element sits in is still being animated into
+ * place and its place has been the same for two frames.
+ */
 async function mouseClick(selector, clickCount = 1) {
-  const at = await evaluate(`(() => {
+  const at = await evaluate(`(async () => {
     const el = document.querySelector(${q(selector)});
     if (!el) return null;
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const frame = () => new Promise((done) => { const late = setTimeout(done, 60); requestAnimationFrame(() => { clearTimeout(late); done(); }); });
+    const settling = () => {
+      for (let node = el; node instanceof Element; node = node.parentElement) {
+        if (node.getAnimations().some((a) => a.playState === 'running' && a.effect && a.effect.getComputedTiming().iterations !== Infinity)) return true;
+      }
+      return false;
+    };
+    const place = () => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].join(','); };
+    const end = performance.now() + 1000;
+    let last = '';
+    let still = 0;
+    while (performance.now() < end && (still < 2 || settling())) {
+      await frame();
+      const now = place();
+      still = now === last ? still + 1 : 0;
+      last = now;
+    }
     const r = el.getBoundingClientRect();
     return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
   })()`);
@@ -2033,9 +2345,9 @@ async function scenarioBookmarksStageOne() {
   };
   const keysResult = await toolbarKeys();
   check(
-    'INT-11 the toolbar is one Tab stop; Right moves to the next tool, End to the last ("Review · soon"), Home back to Merge, and Left stops at the start',
+    'INT-11 the toolbar is one Tab stop; Right moves to the next tool, End to the last (Compare), Home back to Merge, and Left stops at the start',
     keysResult.stops === 1 && keysResult.tabbable === 1 && keysResult.first === 'pdf-tools-tool-merge' && keysResult.second === 'pdf-tools-tool-split' &&
-      keysResult.last === 'review' && keysResult.home === 'pdf-tools-tool-merge' && keysResult.stays === 'pdf-tools-tool-merge',
+      keysResult.last === 'pdf-tools-tool-compare' && keysResult.home === 'pdf-tools-tool-merge' && keysResult.stays === 'pdf-tools-tool-merge',
     keysResult,
   );
 
@@ -3992,6 +4304,1216 @@ async function scenarioFixB() {
   );
 }
 
+// ── Phase 3 (T-064): PDF to Excel, PDF to Word, Document check, Compare; Excel and Word results as rows ──
+
+// The window's main-thread tasks between two marks, from a DevTools trace: each task's time on the clock and
+// its processor time (the thread's own time, which a busy machine does not stretch).
+let p3Trace = null;
+function p3HookTrace() {
+  if (p3Trace) return;
+  p3Trace = { events: [], done: null };
+  const keep = new Set(['RunTask', 'ThreadControllerImpl::RunTask', 'thread_name']);
+  socket.addEventListener('message', (event) => {
+    const s = event.data;
+    if (typeof s !== 'string' || !s.includes('"Tracing.')) return;
+    let m;
+    try {
+      m = JSON.parse(s);
+    } catch {
+      return;
+    }
+    if (m.method === 'Tracing.dataCollected') {
+      for (const e of m.params.value) {
+        if (keep.has(e.name) || (typeof e.name === 'string' && e.name.startsWith('p3-'))) p3Trace.events.push({ name: e.name, ph: e.ph, pid: e.pid, tid: e.tid, ts: e.ts, dur: e.dur, tdur: e.tdur });
+      }
+    } else if (m.method === 'Tracing.tracingComplete' && p3Trace.done) p3Trace.done();
+  });
+}
+/** Runs `work` (which sets the marks p3-from and p3-to in the page) under a trace; null when no trace could be taken. */
+async function p3Traced(work) {
+  p3HookTrace();
+  p3Trace.events = [];
+  let tracing = true;
+  try {
+    await cdp('Tracing.start', { transferMode: 'ReportEvents', traceConfig: { recordMode: 'recordAsMuchAsPossible', includedCategories: ['toplevel', 'blink.user_timing', '__metadata'] } });
+  } catch {
+    tracing = false;
+  }
+  const outcome = await work();
+  if (!tracing) return { outcome, tasks: null };
+  const done = new Promise((resolve) => (p3Trace.done = resolve));
+  await cdp('Tracing.end');
+  await Promise.race([done, sleep(WORK_MS)]);
+  p3Trace.done = null;
+  const ev = p3Trace.events;
+  const from = ev.find((e) => e.name === 'p3-from' && e.ph !== 'M');
+  const to = ev.find((e) => e.name === 'p3-to' && e.ph !== 'M');
+  if (!from || !to) return { outcome, tasks: null };
+  const tasks = ev.filter((e) => e.ph === 'X' && (e.name === 'RunTask' || e.name === 'ThreadControllerImpl::RunTask') && e.pid === from.pid && e.tid === from.tid && typeof e.dur === 'number' && e.ts + e.dur > from.ts && e.ts < to.ts);
+  const ms = (us) => Math.round((us || 0) / 100) / 10;
+  const byClock = tasks.slice().sort((a, b) => b.dur - a.dur);
+  const byProcessor = tasks.slice().sort((a, b) => (b.tdur || 0) - (a.tdur || 0));
+  return {
+    outcome,
+    tasks: {
+      count: tasks.length,
+      seconds: Math.round((to.ts - from.ts) / 1e5) / 10,
+      // [processor ms, clock ms] of the five longest by processor time, and [clock ms, processor ms] of the five longest on the clock
+      longestProcessorMs: ms(byProcessor[0]?.tdur),
+      longestClockMs: ms(byClock[0]?.dur),
+      processorOfLongestClockMs: ms(byClock[0]?.tdur),
+      top5Processor: byProcessor.slice(0, 5).map((t) => [ms(t.tdur), ms(t.dur)]),
+      top5Clock: byClock.slice(0, 5).map((t) => [ms(t.dur), ms(t.tdur)]),
+      over300Processor: tasks.filter((t) => (t.tdur || 0) > 300000).length,
+      over300Clock: tasks.filter((t) => t.dur > 300000).length,
+      processorTotalMs: ms(tasks.reduce((n, t) => n + (t.tdur || 0), 0)),
+    },
+  };
+}
+
+async function scenarioPhaseThree({ engA, clientA, clientB }, { programme, section, box }) {
+  step('T-064: PDF to Excel, PDF to Word, Document check, Compare');
+  // The vault rows and the audit programme used below are engagement A's: the earlier scenarios may have left B current.
+  if (clientB && (await evaluate(`(document.querySelector('header')?.innerText || '').includes(${q(clientB.name)})`))) {
+    await switchEngagementFromHeader(clientB.name, clientA.name);
+    await mustWaitFor(`(document.querySelector('header')?.innerText || '').includes(${q(clientA.name)}) && Boolean(document.querySelector('[data-testid="pdf-tools-root"]')) && document.querySelector('[data-testid="pdf-tools-add-from-vault"]')?.dataset.enabled === 'true'`, WORK_MS, 'PDF Tools in engagement A');
+  }
+  const ExcelJS = require('exceljs');
+  const JSZip = require('jszip');
+  const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const OFFICE_REASON = 'Excel and Word results cannot be used by a tool.';
+  const SCANNED = 'This file has no text to read; it looks scanned. Make it searchable first.';
+  const text = (selector) => evaluate(`document.querySelector(${q(selector)})?.innerText.replace(/\\s+/g, ' ').trim() ?? null`);
+  const closeToasts = () => evaluate(`(document.querySelectorAll('[data-sonner-toast] button[aria-label="Close toast"]').forEach((b) => b.click()), true)`);
+  const rowInfo = (id) =>
+    evaluate(`(() => {
+      const r = document.querySelector('[data-testid="pdf-tools-row"][data-row-id=${q(id)}]');
+      if (!r) return null;
+      return {
+        name: r.dataset.name, kind: r.dataset.kind, text: r.innerText.replace(/\\s+/g, ' ').trim(),
+        label: r.querySelector('[data-testid="pdf-tools-row-kind"]')?.childNodes[0]?.textContent.trim() ?? null,
+        tile: r.querySelector('[data-testid="pdf-tools-office-tile"]')?.dataset.office ?? null,
+        tileLetters: r.querySelector('[data-testid="pdf-tools-office-tile"]')?.innerText.trim() ?? null,
+        view: Boolean(r.querySelector('[data-testid="pdf-tools-file-view"]')),
+        picture: Boolean(r.querySelector('img[data-testid="pdf-tools-thumb"]')),
+        waiting: Boolean(r.querySelector('[data-thumb-state]')),
+      };
+    })()`);
+  const pagePanel = () => evaluate(`Boolean(document.querySelector('section[aria-label^="Pages of"]'))`);
+  const toolStates = () => evaluate(`Object.fromEntries([...document.querySelectorAll('[data-pdf-toolbar] [data-testid^="pdf-tools-tool-"]')].map((b) => [b.dataset.testid.replace('pdf-tools-tool-', ''), { enabled: b.dataset.enabled === 'true', says: b.querySelector('.sr-only')?.innerText.replace(/^\\. /, '') ?? null }]))`);
+  const logFor = (name, action) => poll(async () => (await pdfToolsLogs()).find((l) => (!action || l.action === action) && String(l.details).includes(`→ ${name} (`)) || null, UI_MS);
+  const optionsOf = (log) => (log ? JSON.parse(log.metadata).options : null);
+  const keysOf = (o) => (o ? Object.keys(o).sort() : null);
+  /** Runs the open dialog and waits for it to close (or to say something). */
+  const runOpen = async (limit = WORK_MS) => {
+    await mustWaitFor(`(() => { const b = document.querySelector('[data-testid="pdf-tools-run"]'); return Boolean(b) && b.disabled === false && b.getAttribute('aria-disabled') !== 'true'; })()`, WORK_MS, 'Run to be available');
+    await click(byTestId('pdf-tools-run'));
+    return waitFor(`(() => {
+      const d = document.querySelector('[data-testid="pdf-tools-dialog"]');
+      if (!d) return 'closed';
+      const message = d.querySelector('[data-testid="pdf-tools-dialog-error"], [data-testid="pdf-tools-dialog-notice"]');
+      return message ? message.innerText.replace(/\\s+/g, ' ') : '';
+    })()`, limit);
+  };
+  /** A screenshot kept for the integration lane's look at each dialog (PDF_TOOLS_TEST_SHOTS). */
+  const look = async (name) => {
+    if (!process.env.PDF_TOOLS_TEST_SHOTS) return;
+    await shotAt(`p3-${name}`, 1280, 720, false);
+    await shotAt(`p3-${name}`, 1280, 720, true);
+  };
+  // Workers started from now on, by name, with what each replied (never a file's content): which path wrote the workbook.
+  await evaluate(`(() => {
+    if (window.__p3Workers) return true;
+    const Real = window.Worker;
+    const seen = (window.__p3Workers = []);
+    function Watched(url, options) {
+      const worker = new Real(url, options);
+      const record = { name: (options && options.name) || '', replies: [], errors: 0 };
+      seen.push(record);
+      worker.addEventListener('message', (event) => {
+        const d = event.data;
+        record.replies.push(d && d.ok === true ? 'bytes ' + (d.bytes ? d.bytes.length : 0) : d && d.ok === false ? 'failed' : d && d.alive ? 'alive' : 'other');
+      });
+      worker.addEventListener('error', () => (record.errors += 1));
+      return worker;
+    }
+    Watched.prototype = Real.prototype;
+    window.Worker = Watched;
+    return true;
+  })()`);
+  const excelWorkers = () => evaluate(`window.__p3Workers.filter((w) => w.name === 'vera-pdf-tools-excel').map((w) => ({ wrote: w.replies.filter((r) => r.startsWith('bytes')), failed: w.replies.filter((r) => r === 'failed').length, errors: w.errors }))`);
+
+  // P3-1: the toolbar.
+  const bar = await evaluate(`({
+    order: [...document.querySelectorAll('[data-pdf-toolbar] button')].map((b) => b.dataset.soonTool || (b.dataset.testid || '').replace('pdf-tools-tool-', '')),
+    soon: [...document.querySelectorAll('[data-soon-tool]')].map((b) => b.dataset.soonTool + ': ' + b.innerText.replace(/\\s+/g, ' ').split(' . ')[0]),
+    groups: [...document.querySelectorAll('[data-pdf-toolbar] [role="group"]')].map((g) => g.getAttribute('aria-label') + ': ' + [...g.querySelectorAll('button')].map((b) => b.childNodes[b.childNodes.length - 2]?.textContent ?? '').join(', ')),
+    ocr: (() => { const b = document.querySelector('[data-testid="pdf-tools-tool-ocr"]'); return b ? { enabledAttr: b.dataset.enabled ?? null, soon: Boolean(b.dataset.soonTool), icon: Boolean(b.querySelector('svg')) } : null; })(),
+  })`);
+  // How much room the toolbar has to spare at 1280 x 720 (UX audit C13 wants at most three rows there).
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+  await sleep(500);
+  const fit = await evaluate(`(() => {
+    const barEl = document.querySelector('[data-pdf-toolbar]');
+    const edge = Math.round(barEl.getBoundingClientRect().right - parseFloat(getComputedStyle(barEl).paddingRight));
+    const rows = new Map();
+    for (const b of barEl.querySelectorAll('[data-toolbar-item]')) {
+      const r = b.getBoundingClientRect();
+      const top = Math.round(r.top);
+      rows.set(top, Math.max(rows.get(top) || 0, Math.round(r.right)));
+    }
+    return { rows: rows.size, spare: [...rows.values()].map((right) => edge - right) };
+  })()`);
+  if (process.env.PDF_TOOLS_TEST_SHOTS) await screenshot('int-p3-toolbar-1280x720-light');
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  await sleep(300);
+  note(`P3 toolbar at 1280 x 720: ${fit.rows} rows; room to spare on each row (px): ${fit.spare.join(', ')}`);
+  check(
+    'P3-1 the toolbar: Organise, Prepare, Convert (Images to PDF, PDF to images, PDF to Excel, PDF to Word, Make searchable) and Review (Document check, Compare); the five new tools are usable buttons, "Make searchable" among them, and nothing is "soon"; at 1280 x 720 it still takes three rows',
+    same(bar.order, DESIGN_GROUPS.flat()) && same(bar.soon, []) && bar.ocr?.enabledAttr !== null && bar.ocr?.soon === false &&
+      bar.groups[2] === 'Convert: Images to PDF, PDF to images, PDF to Excel, PDF to Word, Make searchable' && bar.groups[3] === 'Review: Document check, Compare' &&
+      fit.rows <= 3,
+    { ...bar, fit },
+  );
+
+  const [statement, reviewNote, signed, draft, final, scans] = await addAndWait([FILES.p3Statement, FILES.p3Note, FILES.p3Signed, FILES.p3Draft, FILES.p3Final, FILES.scans], 'the phase 3 files');
+
+  // P3-2: the PDF to Excel dialog and its preview.
+  await selectOnly([statement.id]);
+  await openTool('pdf-to-excel');
+  const PREVIEW = byTestId('pdf-tools-excel-preview');
+  await mustWaitFor(`document.querySelector(${q(PREVIEW)})?.dataset.status === 'ready'`, WORK_MS, 'the Excel preview');
+  const gridOf = () =>
+    evaluate(`(() => {
+      const rows = [...document.querySelectorAll('[data-testid="pdf-tools-excel-preview-grid"] tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => ({ t: td.innerText.trim(), n: td.dataset.number === 'true', right: getComputedStyle(td).textAlign === 'right' })));
+      return { page: document.querySelector('[data-testid="pdf-tools-excel-preview-page"]')?.innerText.trim(), kind: document.querySelector('[data-testid="pdf-tools-excel-preview-kind"]')?.innerText.trim(), rows };
+    })()`);
+  const first = await gridOf();
+  await look('excel-dialog');
+  const expected = p3StatementRows(36);
+  const dialog = {
+    all: await text(byTestId('pdf-tools-dialog')),
+    oneSheet: await evaluate(`document.querySelector('[data-testid="pdf-tools-excel-sheets-one-sheet"]')?.dataset.state ?? null`),
+    run: await runLabel(),
+    name: await evaluate(`document.querySelector('[data-testid="pdf-tools-result-name"]')?.value ?? null`),
+  };
+  await click(byTestId('pdf-tools-excel-preview-next'));
+  await mustWaitFor(`document.querySelector(${q(PREVIEW)})?.dataset.page === '2' && document.querySelector('[data-testid="pdf-tools-excel-preview-page"]')?.innerText.trim() === 'Page 2 of 3'`, WORK_MS, 'page 2 of the preview');
+  const second = await gridOf();
+  const row1 = first.rows[2] || [];
+  check(
+    'P3-2 PDF to Excel opens on a 3-page statement with a preview of page 1: the table found from the lines drawn, its heading row and 12 rows in six columns, the amounts right-aligned as numbers and the date and the account number as text; Next shows page 2; "All pages on one sheet" is chosen and the button reads "Make Excel workbook"',
+    first.page === 'Page 1 of 3' && first.kind === 'Table found from the lines drawn on the page.' &&
+      same(first.rows[1]?.map((c) => c.t), P3_HEADS) && first.rows.length === 14 &&
+      same(row1.map((c) => c.t), [expected[0].date, expected[0].narration, expected[0].account, expected[0].debit, expected[0].credit, expected[0].balance]) &&
+      same(row1.map((c) => c.n), [false, false, false, true, false, true]) && row1[5].right && !row1[0].right &&
+      second.rows[2]?.[5]?.t === expected[12].balance &&
+      dialog.oneSheet === 'checked' && dialog.run === 'Make Excel workbook' && Boolean(dialog.all?.includes('Put the tables of this PDF into an Excel workbook. Amounts become numbers you can add up.')) &&
+      Boolean(dialog.all?.includes('Will be saved as Synthetic bank statement.xlsx')),
+    { page: first.page, kind: first.kind, rows: first.rows.length, head: first.rows[1]?.map((c) => c.t), row1, page2: second.rows[2]?.map((c) => c.t), dialog: { ...dialog, all: dialog.all?.slice(0, 400) } },
+  );
+
+  // P3-3: the run, all pages on one sheet; the row.
+  let before = await unitIds();
+  const excelOutcome = await runOpen();
+  const xlsx = excelOutcome === 'closed' ? await newUnit(before, 'row') : null;
+  const xlsxRow = xlsx ? await rowInfo(xlsx.id) : null;
+  const excelToast = await toastsText();
+  const afterExcel = { panel: await pagePanel(), tools: await toolStates(), why: await text(byTestId('pdf-tools-why')) };
+  await evaluate(`(document.querySelector('[data-testid="pdf-tools-row"][data-row-id=${q(xlsx?.id ?? '')}]')?.scrollIntoView({ block: 'center' }), true)`);
+  await look('office-row');
+  check(
+    'P3-3 the run adds "Synthetic bank statement.xlsx" as a row of its own: a tile with the letters XLSX in place of a preview, "Excel workbook" and its size in place of a page count, "Not saved", no View action and no page panel; the message says "3 pages, 1 sheet, 42 rows."',
+    excelOutcome === 'closed' && xlsxRow?.name === 'Synthetic bank statement.xlsx' && xlsxRow.kind === 'office' && xlsxRow.tile === 'excel' && xlsxRow.tileLetters === 'XLSX' &&
+      xlsxRow.label === 'Excel workbook' && /Result · Excel workbook ?\. Save it, then open it in Excel\. · [\d.]+ (KB|MB) Not saved/.test(xlsxRow.text) && !/\bpages?\b/.test(xlsxRow.text.replace('Save it', '')) &&
+      !xlsxRow.view && !xlsxRow.picture && !xlsxRow.waiting && afterExcel.panel === false &&
+      excelToast.includes('Made Synthetic bank statement.xlsx') && excelToast.includes('3 pages, 1 sheet, 42 rows.'),
+    { excelOutcome, xlsxRow, excelToast, panel: afterExcel.panel },
+  );
+  if (!xlsx) throw new Error('PDF to Excel made no row; the following checks need it.');
+
+  // P3-4: a ticked office row disables every tool, with the reason; its tile says what to do instead.
+  await closeToasts();
+  const onlyOffice = await toolStates();
+  await click(byTestId('pdf-tools-tool-merge'));
+  const whyLine = (await waitFor(`(() => { const t = document.querySelector('[data-testid="pdf-tools-why"]')?.innerText.trim(); return t && t.startsWith('Excel and Word') ? t : null; })()`, UI_MS)) || null;
+  await selectOnly([statement.id, xlsx.id]);
+  const withPdf = await toolStates();
+  await selectOnly([xlsx.id]);
+  const tile = `[data-testid="pdf-tools-row"][data-row-id="${xlsx.id}"] [data-testid="pdf-tools-row-office"]`;
+  const at = await evaluate(`(() => { const r = document.querySelector(${q(tile)}).getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+  // The pointer comes onto the tile and moves about on it, as a hand does (a tooltip waits for that).
+  const tipShown = `[...document.querySelectorAll('[role="tooltip"]')].map((t) => t.innerText.trim()).find((t) => t.startsWith('Save it')) || null`;
+  let tip = null;
+  for (let k = 0; k < 12 && !tip; k++) {
+    await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: k === 0 ? at.x - 60 : at.x - 4 + (k % 5) * 2, y: at.y + (k % 3) });
+    tip = (await waitFor(tipShown, 400)) || null;
+  }
+  await mouseClick(tile);
+  await sleep(400);
+  const viewerOpened = await exists(byTestId('pdf-tools-viewer'));
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 });
+  const allRefuse = (states) => Object.values(states).length === 18 && Object.values(states).every((s) => s.enabled === false && s.says === OFFICE_REASON);
+  check(
+    'P3-4 with the workbook ticked, alone or beside a PDF, every one of the 18 tools (Merge and Make searchable too) is unavailable and says "Excel and Word results cannot be used by a tool."; a click on Merge says it under the toolbar; the tile\'s tip is "Save it, then open it in Excel." and a click on it opens no viewer',
+    allRefuse(onlyOffice) && allRefuse(withPdf) && whyLine === OFFICE_REASON && tip === 'Save it, then open it in Excel.' && viewerOpened === false,
+    { onlyOffice: Object.entries(onlyOffice).filter(([, s]) => s.enabled || s.says !== OFFICE_REASON), withPdf: Object.entries(withPdf).filter(([, s]) => s.enabled || s.says !== OFFICE_REASON), whyLine, tip, viewerOpened },
+  );
+
+  // P3-5: saved to the computer (the test's downloads folder), then read back with exceljs.
+  const readWorkbook = async (bytes) => {
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(bytes);
+    return book;
+  };
+  const cellsOf = (sheet) => {
+    const cells = [];
+    sheet.eachRow((row, r) => row.eachCell((cell, c) => cells.push({ r, c, type: cell.type, value: cell.value, numFmt: cell.numFmt })));
+    return cells;
+  };
+  const NUMBER = ExcelJS.ValueType.Number;
+  const STRING = ExcelJS.ValueType.String;
+  let xlsxBytes = null;
+  let xlsxSavedAs = null;
+  let xlsxAction = 'Saved to computer';
+  await selectOnly([xlsx.id]);
+  if (PACKAGED_APP) {
+    // No entry script keeps a download out of Electron's own Save As window: through the stand-in picker instead.
+    const [file] = await saveSelected(1);
+    xlsxBytes = file.bytes;
+    xlsxSavedAs = file.name;
+  } else {
+    xlsxAction = 'Sent to download';
+    await evaluate(`(window.__pdfToolsTestPicker = window.showSaveFilePicker, window.showSaveFilePicker = undefined, true)`);
+    await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-dest-computer"]')?.dataset.enabled === 'true'`, UI_MS, 'Save to computer to be available');
+    await click(byTestId('pdf-tools-dest-computer'));
+    const target = path.join(downloadsPath, 'Synthetic bank statement.xlsx');
+    const arrived = await poll(async () => (fs.existsSync(target) && fs.statSync(target).size > 0 && !fs.existsSync(`${target}.crdownload`) ? target : null), WORK_MS);
+    await waitFor(`/Download started/.test(document.querySelector('[data-testid="pdf-tools-row"][data-row-id=${q(xlsx.id)}]')?.innerText || '')`, UI_MS);
+    await evaluate(`(window.showSaveFilePicker = window.__pdfToolsTestPicker, true)`);
+    if (arrived) {
+      await sleep(300);
+      xlsxBytes = fs.readFileSync(target);
+      xlsxSavedAs = path.basename(target);
+    }
+  }
+  const book = xlsxBytes ? await readWorkbook(xlsxBytes) : null;
+  const sheet = book?.worksheets[0];
+  const cells = sheet ? cellsOf(sheet) : [];
+  const balanceCell = cells.find((c) => c.type === NUMBER && c.value === expected[0].balancePaise / 100);
+  const lastBalance = cells.find((c) => c.type === NUMBER && c.value === expected[35].balancePaise / 100);
+  const dateCell = cells.find((c) => c.value === expected[0].date);
+  const accountCell = cells.find((c) => c.value === P3.account);
+  const sameRow = balanceCell ? cells.filter((c) => c.r === balanceCell.r).map((c) => c.value) : null;
+  const xlsxLog = await logFor('Synthetic bank statement.xlsx', xlsxAction);
+  check(
+    `P3-5 the workbook saved to the computer (${PACKAGED_APP ? 'the stand-in save window' : "the test's downloads folder"}) keeps its name and reads back with exceljs as one sheet "All pages": the first balance is a number cell (12345553.53) shown with Indian grouping and two decimals, in the same row as its date and account number, both text cells in the Text format; the last page's balance is there too`,
+    xlsxSavedAs === 'Synthetic bank statement.xlsx' && book?.worksheets.length === 1 && sheet.name === 'All pages' &&
+      Boolean(balanceCell) && /","/.test(balanceCell.numFmt || '') && /0\.00/.test(balanceCell.numFmt || '') && Boolean(lastBalance) &&
+      dateCell?.type === STRING && dateCell.numFmt === '@' && accountCell?.type === STRING && accountCell.numFmt === '@' &&
+      same(sameRow, [expected[0].date, expected[0].narration, expected[0].account, 125.37, expected[0].balancePaise / 100]) &&
+      book.creator === 'ICAI VERA' && !book.title,
+    { xlsxSavedAs, sheets: book?.worksheets.map((s) => s.name), balanceCell, lastBalance: Boolean(lastBalance), dateCell, accountCell, sameRow, creator: book?.creator },
+  );
+  check(
+    'P3-6 the save is recorded as "Converted to Excel: 3 pages, 1 sheet" with the file\'s SHA-256 and no page count, and the record holds the nine counts and the sheet choice only',
+    String(xlsxLog?.details).startsWith('Converted to Excel: 3 pages, 1 sheet → Synthetic bank statement.xlsx (SHA-256 ') && xlsxLog.engagement_id === engA.id &&
+      JSON.parse(xlsxLog.metadata).sha256 === sha256(xlsxBytes) &&
+      same(optionsOf(xlsxLog), { sheetMode: 'one-sheet', pages: 3, sheets: 1, rows: 42, numberCells: 72, tablesRuled: 3, tablesAligned: 0, pagesAsText: 0, pagesNoText: 0 }),
+    { details: xlsxLog?.details, options: optionsOf(xlsxLog) },
+  );
+
+  // P3-7: one sheet per page.
+  await selectOnly([statement.id]);
+  await openTool('pdf-to-excel');
+  await mustWaitFor(`document.querySelector(${q(PREVIEW)})?.dataset.status === 'ready'`, WORK_MS, 'the Excel preview');
+  await choose(byTestId('pdf-tools-excel-sheets-per-page'));
+  before = await unitIds();
+  const perPageOutcome = await runOpen();
+  const perPage = perPageOutcome === 'closed' ? await newUnit(before, 'row') : null;
+  let perPageBook = null;
+  if (perPage) {
+    await selectOnly([perPage.id]);
+    const [file] = await saveSelected(1);
+    perPageBook = { name: file.name, book: await readWorkbook(file.bytes) };
+  }
+  const perPageSheets = perPageBook?.book.worksheets.map((s) => ({ name: s.name, rows: s.actualRowCount, balance: cellsOf(s).filter((c) => c.c === 6 && c.type === NUMBER).length })) ?? null;
+  check(
+    'P3-7 "One sheet per page" gives a second workbook, "Synthetic bank statement (2).xlsx", saved through the save window under that name, with the sheets Page_1, Page_2 and Page_3, each with its 12 balances as numbers in column F',
+    perPageOutcome === 'closed' && perPage?.name === 'Synthetic bank statement (2).xlsx' && perPageBook?.name === 'Synthetic bank statement (2).xlsx' &&
+      same(perPageSheets?.map((s) => s.name), ['Page_1', 'Page_2', 'Page_3']) && perPageSheets.every((s) => s.balance === 12),
+    { perPageOutcome, name: perPage?.name, saved: perPageBook?.name, perPageSheets },
+  );
+  const excelPath = await excelWorkers();
+  check(
+    'P3-8 both workbooks were written off the window\'s thread: each run started the write worker, which replied with the file, without an error and without falling back',
+    excelPath.length === 2 && excelPath.every((w) => w.wrote.length === 1 && w.failed === 0 && w.errors === 0),
+    excelPath,
+  );
+
+  // P3-9: PDF to Word, end to end.
+  await closeToasts();
+  await selectOnly([reviewNote.id]);
+  await openTool('pdf-to-word');
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-run"]')?.disabled === false`, WORK_MS, 'the text check of PDF to Word');
+  const wordDialog = { all: await text(byTestId('pdf-tools-dialog')), run: await runLabel() };
+  await look('word-dialog');
+  before = await unitIds();
+  const wordOutcome = await runOpen();
+  const docx = wordOutcome === 'closed' ? await newUnit(before, 'row') : null;
+  const docxRow = docx ? await rowInfo(docx.id) : null;
+  const wordToast = await toastsText();
+  let docxFile = null;
+  let paragraphs = [];
+  let documentXml = '';
+  let zipNames = [];
+  if (docx) {
+    await selectOnly([docx.id]);
+    [docxFile] = await saveSelected(1);
+    const zip = await JSZip.loadAsync(docxFile.bytes);
+    zipNames = Object.keys(zip.files);
+    documentXml = await zip.file('word/document.xml').async('string');
+    // A line break inside a paragraph (the page's own line ends are kept) reads as the space it stands for.
+    const plain = (xml) => [...xml.replace(/<w:br\/>/g, '<w:t> </w:t>').matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('').replace(/&amp;/g, '&');
+    const body = documentXml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, '');
+    paragraphs = [...body.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map((m) => ({ style: /<w:pStyle w:val="([^"]+)"/.exec(m[0])?.[1] ?? null, text: plain(m[0]) })).filter((p) => p.text);
+    paragraphs.table = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map((t) => [...t[0].matchAll(/<w:tr[ >][\s\S]*?<\/w:tr>/g)].map((r) => [...r[0].matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)].map((c) => plain(c[0]))));
+  }
+  const wordLog = await logFor('Synthetic review note.docx', 'Saved to computer');
+  check(
+    'P3-9 PDF to Word on a one-page note (a heading, a paragraph, a ruled table): the dialog has no options, says what will be made and "Will be saved as Synthetic review note.docx"; the row reads "Word document" with a DOCX tile, no page count and no View action; the message counts "1 page: 1 paragraph, 1 heading, 1 table."',
+    wordDialog.run === 'Make Word document' && Boolean(wordDialog.all?.includes('A Word document that keeps the look of the pages: text, tables and pictures in their places, ready to edit. Fonts Word does not have are replaced by similar ones.')) &&
+      Boolean(wordDialog.all?.includes('Will be saved as Synthetic review note.docx')) &&
+      wordOutcome === 'closed' && docxRow?.name === 'Synthetic review note.docx' && docxRow.kind === 'office' && docxRow.tile === 'word' && docxRow.tileLetters === 'DOCX' && docxRow.label === 'Word document' &&
+      /Word document ?\. Save it, then open it in Word\./.test(docxRow.text) && !docxRow.view && !docxRow.picture &&
+      wordToast.includes('Made Synthetic review note.docx') && wordToast.includes('1 page: 1 paragraph, 1 heading, 1 table.'),
+    { wordDialog: { ...wordDialog, all: wordDialog.all?.slice(0, 400) }, wordOutcome, docxRow, wordToast },
+  );
+  check(
+    'P3-10 the saved .docx, unzipped with jszip: word/document.xml has the heading as Heading 1, the paragraph\'s lines in one paragraph (each line of the page ending in a line break), and one table with the three rows of three cells; no picture; the record is "Converted to Word: 1 page" with five counts only',
+    docxFile?.name === 'Synthetic review note.docx' && same(paragraphs.map((p) => [p.style, p.text]), [['Heading1', P3.heading], [null, P3.paragraph]]) &&
+      same(paragraphs.table, [P3.table]) && !zipNames.some((n) => n.startsWith('word/media')) && /<w:br\/>/.test(documentXml) &&
+      String(wordLog?.details).startsWith('Converted to Word: 1 page → Synthetic review note.docx (SHA-256 ') &&
+      same(optionsOf(wordLog), { pages: 1, paragraphs: 1, headings: 1, tables: 1, pagesNoText: 0 }),
+    { saved: docxFile?.name, paragraphs: paragraphs.map((p) => [p.style, p.text.slice(0, 60)]), table: paragraphs.table, details: wordLog?.details, options: optionsOf(wordLog) },
+  );
+  if (!docx) throw new Error('PDF to Word made no row; the following checks need it.');
+
+  // P3-11: the two office rows saved together, to a folder and as one zip.
+  await selectOnly([perPage.id, docx.id]);
+  const folder = (await saveSelected(2)).map((f) => ({ name: f.name, starts: f.bytes.subarray(0, 2).toString('latin1') }));
+  await evaluate(`(window.__pdfToolsTestSaved.length = 0, true)`);
+  await mouseClick(byTestId('pdf-tools-dest-computer-more'));
+  const zipItem = await waitFor(`Boolean([...document.querySelectorAll('[role="menuitem"]')].find((m) => m.innerText.includes('Save as one zip')))`, UI_MS);
+  if (zipItem) await evaluate(`([...document.querySelectorAll('[role="menuitem"]')].find((m) => m.innerText.includes('Save as one zip')).click(), true)`);
+  const zipped = zipItem && (await waitFor(`window.__pdfToolsTestSaved.length === 1`, WORK_MS)) ? await savedFile(0) : null;
+  const inZip = zipped ? Object.keys((await JSZip.loadAsync(zipped.bytes)).files).sort() : null;
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-dest-computer"]')?.dataset.enabled === 'true'`, WORK_MS, 'the zip save to finish');
+  check(
+    'P3-11 the workbook and the Word document saved together: to a folder as "Synthetic bank statement (2).xlsx" and "Synthetic review note.docx", and as one zip holding the same two names',
+    same(folder, [{ name: 'Synthetic bank statement (2).xlsx', starts: 'PK' }, { name: 'Synthetic review note.docx', starts: 'PK' }]) &&
+      Boolean(zipped?.name.endsWith('.zip')) && same(inZip, ['Synthetic bank statement (2).xlsx', 'Synthetic review note.docx']),
+    { folder, zip: zipped?.name, inZip },
+  );
+
+  // P3-12: the workbook into the Evidence Vault.
+  const evidenceBefore = (await selectRows('evidence_files', { engagement_id: engA.id })).map((r) => r.id);
+  await selectOnly([xlsx.id]);
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-dest-vault"]')?.dataset.enabled === 'true'`, UI_MS, 'Add to Evidence Vault to be available');
+  await click(byTestId('pdf-tools-dest-vault'));
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-vault-name"]')?.value === 'Synthetic bank statement.xlsx'`, UI_MS, 'the vault form with the workbook name');
+  const vaultChip = await text(byTestId('pdf-tools-vault-save'));
+  await look('office-vault-form');
+  // A name typed with another extension still ends in .xlsx.
+  await setInput(byTestId('pdf-tools-vault-name'), 'Statement for the file.pdf');
+  await click(byTestId('pdf-tools-vault-save-confirm'));
+  const vaultClosed = await waitFor(`!document.querySelector('[data-testid="pdf-tools-vault-save"]')`, WORK_MS);
+  const vaultError = vaultClosed ? null : await text(byTestId('pdf-tools-dest-error'));
+  if (!vaultClosed) await click(byTestId('pdf-tools-dest-cancel'));
+  const vaultRow = (await poll(async () => (await selectRows('evidence_files', { engagement_id: engA.id })).find((r) => !evidenceBefore.includes(r.id)) || null, UI_MS)) || null;
+  const vaultStored = vaultRow && fs.existsSync(evidencePath(vaultRow.file_path)) ? fs.readFileSync(evidencePath(vaultRow.file_path)) : null;
+  const vaultLog = vaultRow ? await logFor(vaultRow.name, 'Added to Evidence Vault') : null;
+  const vaultTag = await rowText(xlsx.id);
+  check(
+    'P3-12 Add to Evidence Vault takes the workbook: the form shows it as "Excel workbook"; a name typed as "….pdf" is kept as "Statement for the file.xlsx"; the vault row has that name and the Excel type, its stored bytes are the workbook (same SHA-256 as the record), and the row says "In Evidence Vault"',
+    Boolean(vaultChip?.includes('Excel workbook')) && Boolean(vaultClosed) && vaultRow?.name === 'Statement for the file.xlsx' && vaultRow.mime_type === XLSX_TYPE && /\.xlsx$/.test(vaultRow.file_path) &&
+      Boolean(vaultStored) && sha256(vaultStored) === sha256(xlsxBytes) && JSON.parse(vaultLog?.metadata || '{}').sha256 === sha256(xlsxBytes) && /In Evidence Vault/.test(vaultTag),
+    { vaultChip: vaultChip?.slice(0, 200), vaultClosed: Boolean(vaultClosed), vaultError, vaultRow: vaultRow && { name: vaultRow.name, mime_type: vaultRow.mime_type, file_path: vaultRow.file_path, file_type: vaultRow.file_type }, stored: Boolean(vaultStored), log: vaultLog?.details, tag: vaultTag },
+  );
+
+  // P3-13: the Word document onto a working paper (it goes into the vault first).
+  const attachedBefore = (await selectRows('audit_program_attachments', { audit_program_id: programme.id })).map((a) => a.id);
+  await selectOnly([docx.id]);
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-dest-working-paper"]')?.dataset.enabled === 'true'`, UI_MS, 'Attach to working paper to be available');
+  await click(byTestId('pdf-tools-dest-working-paper'));
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-wp-programme"]')?.innerText.includes(${q(programme.name)})`, UI_MS, 'the attach dialog with the programme chosen');
+  await chooseOption('pdf-tools-wp-section', section.name);
+  await chooseOption('pdf-tools-wp-box', box.header);
+  await click(byTestId('pdf-tools-wp-confirm'));
+  const wpClosed = await waitFor(`!document.querySelector('[data-testid="pdf-tools-wp-dialog"]')`, WORK_MS);
+  const wpError = wpClosed ? null : await text(byTestId('pdf-tools-dest-error'));
+  if (!wpClosed) await click(byTestId('pdf-tools-dest-cancel'));
+  const attachment = (await poll(async () => (await selectRows('audit_program_attachments', { audit_program_id: programme.id })).find((a) => !attachedBefore.includes(a.id)) || null, UI_MS)) || null;
+  const docxVault = (await selectRows('evidence_files', { engagement_id: engA.id })).find((r) => r.name === 'Synthetic review note.docx') || null;
+  const docxStored = docxVault && fs.existsSync(evidencePath(docxVault.file_path)) ? fs.readFileSync(evidencePath(docxVault.file_path)) : null;
+  const wpLog = await logFor('Synthetic review note.docx', 'Attached to working paper');
+  const wpTag = await rowText(docx.id);
+  check(
+    'P3-13 Attach to working paper takes the Word document: it is added to the vault as "Synthetic review note.docx" with the Word type and the same bytes, attached to the box under that name, recorded, and the row says "On working paper"',
+    Boolean(wpClosed) && attachment?.file_name === 'Synthetic review note.docx' && attachment.box_id === box.id && docxVault?.mime_type === DOCX_TYPE && attachment.file_path === docxVault.file_path &&
+      Boolean(docxStored) && Boolean(docxFile) && sha256(docxStored) === sha256(docxFile.bytes) && Boolean(wpLog) && /On working paper/.test(wpTag) && /In Evidence Vault/.test(wpTag),
+    { wpClosed: Boolean(wpClosed), wpError, attachment: attachment && { file_name: attachment.file_name, file_type: attachment.file_type, file_path: attachment.file_path }, docxVault: docxVault && { mime_type: docxVault.mime_type, file_path: docxVault.file_path }, log: wpLog?.details, tag: wpTag },
+  );
+
+  // P3-14: Document check on a signed file.
+  await closeToasts();
+  const factsOf = () => evaluate(`Object.fromEntries([...document.querySelectorAll('[data-testid="pdf-tools-check-row"]')].map((r) => [r.dataset.label, r.querySelector('dd').innerText.replace(/\\s+/g, ' ').trim()]))`);
+  await selectOnly([signed.id]);
+  await openTool('document-check');
+  await mustWaitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-check-facts"]'))`, WORK_MS, 'the facts of the signed file');
+  const signedFacts = await factsOf();
+  const signedDialog = { all: await text(byTestId('pdf-tools-dialog')), warning: await text(byTestId('pdf-tools-signed-warning')), run: await runLabel(), name: await evaluate(`document.querySelector('[data-testid="pdf-tools-dialog"] input')?.value ?? null`) };
+  await look('document-check-dialog');
+  before = await unitIds();
+  const checkOutcome = await runOpen();
+  const checkRow = checkOutcome === 'closed' ? await newUnit(before, 'row') : null;
+  const checkToast = await toastsText();
+  const checkRead = await saveAndRead(checkRow);
+  const checkText = (pageTexts(checkRead.pdf) || []).join(' ');
+  const VERIFY_NOTE = 'Open the file in Adobe Acrobat Reader to verify the signature.';
+  check(
+    'P3-14 Document check on a signed file shows its facts at once: 2 pages, "1 signature" with the note to verify it in Adobe Acrobat Reader, and "Signature 1" as stated in the file (the signer, the date in plain words, the reason); the dialog warns that the file is signed; the word "valid" is nowhere in it',
+    signedFacts.Pages === '2' && signedFacts['Digital signatures'] === `1 signature Shown as stated in the file. ${VERIFY_NOTE}` &&
+      Boolean(signedFacts['Signature 1']?.startsWith(`Signed by ${P3.signer} on 17 November 2026, 14:05 (UTC+05:30). Reason: ${P3.reason}.`)) &&
+      signedFacts['Searchable text'] === 'On all 2 pages' && signedFacts.Protection === 'No password or restrictions' &&
+      Boolean(signedDialog.warning?.includes('This file is signed. The result is a new file; the signed original is unchanged.')) &&
+      signedDialog.run === 'Add report to list' && signedDialog.name === 'Synthetic signed letter_check' && !/valid/i.test(signedDialog.all || 'valid'),
+    { signedFacts, signedDialog: { ...signedDialog, all: signedDialog.all?.slice(0, 300) } },
+  );
+  check(
+    'P3-15 "Add report to list" adds "Synthetic signed letter_check.pdf", one page, with no signature badge; read back with pdf.js it holds the same rows, the footer "Made by ICAI VERA PDF Tools on this computer · page 1 of 1", no title or author, and never the word "valid"',
+    checkOutcome === 'closed' && checkRow?.name === 'Synthetic signed letter_check.pdf' && /\b1 page\b/.test(checkRow.text) && !/Signed|Signature no longer valid|Still carries/.test(checkRow.text) &&
+      checkToast.includes('Report added: Synthetic signed letter_check.pdf') && checkRead.pdf?.pageCount === 1 &&
+      checkText.includes(`Signed by ${P3.signer} on 17 November 2026, 14:05 (UTC+05:30).`) && checkText.includes(VERIFY_NOTE) &&
+      checkText.includes('Made by ICAI VERA PDF Tools on this computer · page 1 of 1') && !/valid/i.test(checkText) && !/valid/i.test(checkToast),
+    { checkOutcome, row: checkRow?.text, checkToast, pages: checkRead.pdf?.pageCount, text: checkText.slice(0, 500) },
+  );
+
+  // P3-16: Document check on a file opened with its password.
+  await closeToasts();
+  await addFromComputer([FILES.locked]);
+  await mustWaitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-password-input"]'))`, WORK_MS, 'the password dialog');
+  await evaluate(`(document.querySelector('[data-testid="pdf-tools-password-input"]').focus(), true)`);
+  await cdp('Input.insertText', { text: PDF_PASSWORD });
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-password-submit"]')?.disabled === false`, UI_MS, 'the password submit button');
+  await click(byTestId('pdf-tools-password-submit'));
+  await mustWaitFor(`!document.querySelector('[data-testid="pdf-tools-password-input"]') && Boolean(document.querySelector('[data-testid="pdf-tools-row"][data-name=${q(FILES.locked)}]')) && ${INTAKE_IDLE}`, WORK_MS, 'the unlocked file');
+  const locked = (await rows()).filter((r) => r.name === FILES.locked).pop();
+  await selectOnly([locked.id]);
+  await openTool('document-check');
+  await mustWaitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-check-facts"]'))`, WORK_MS, 'the facts of the unlocked file');
+  const lockedFacts = await factsOf();
+  const lockedNotice = await text(byTestId('pdf-tools-protection-notice'));
+  before = await unitIds();
+  const lockedOutcome = await runOpen();
+  const lockedReport = lockedOutcome === 'closed' ? await newUnit(before, 'row') : null;
+  const lockedRead = await saveAndRead(lockedReport);
+  const lockedLog = lockedReport ? await logFor(lockedReport.name, 'Saved to computer') : null;
+  check(
+    'P3-16 Document check on a file opened with its password: the dialog says so ("Opened with its password", and that the copy in the list has none); the report\'s record is "Document check: 3 pages", not "protection removed", with five keys only (protection: password); the password is not in the report',
+    Boolean(lockedFacts.Protection?.startsWith('Opened with its password The copy in this list has no password; the original file still has one.')) && lockedFacts.Pages === '3' && Boolean(lockedNotice) &&
+      lockedOutcome === 'closed' && lockedReport?.name === 'Synthetic protected_check.pdf' && lockedRead.pdf?.pageCount === 1 &&
+      String(lockedLog?.details).startsWith('Document check: 3 pages → Synthetic protected_check.pdf (1 page, ') && !/protection removed/.test(lockedLog.details) &&
+      same(keysOf(optionsOf(lockedLog)), ['pages', 'pagesScanned', 'pagesWithText', 'protection', 'signatures']) && optionsOf(lockedLog).protection === 'password' &&
+      Boolean(lockedRead.file) && !lockedRead.file.bytes.includes(PDF_PASSWORD) && !/valid/i.test((pageTexts(lockedRead.pdf) || []).join(' ')),
+    { lockedFacts, lockedNotice, lockedOutcome, name: lockedReport?.name, details: lockedLog?.details, options: optionsOf(lockedLog) },
+  );
+
+  // P3-17: Compare on a draft and a later version.
+  await closeToasts();
+  await selectOnly([draft.id, final.id]);
+  await openTool('compare');
+  const versions = async () => ({
+    earlier: await text(byTestId('pdf-tools-compare-earlier')),
+    later: await text(byTestId('pdf-tools-compare-later')),
+    name: await evaluate(`document.querySelector('[data-testid="pdf-tools-result-name"]')?.value ?? null`),
+  });
+  const asListed = await versions();
+  await look('compare-dialog');
+  await click(byTestId('pdf-tools-compare-swap'));
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-compare-earlier"]')?.innerText.includes(${q(FILES.p3Final)})`, UI_MS, 'Swap to change the two versions');
+  const swapped = await versions();
+  await click(byTestId('pdf-tools-compare-swap'));
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-compare-earlier"]')?.innerText.includes(${q(FILES.p3Draft)})`, UI_MS, 'Swap to change them back');
+  const swappedBack = await versions();
+  const compareDialog = { all: await text(byTestId('pdf-tools-dialog')), run: await runLabel() };
+  before = await unitIds();
+  const compareOutcome = await runOpen();
+  const changes = compareOutcome === 'closed' ? await newUnit(before, 'row') : null;
+  const compareToast = await toastsText();
+  const changesRead = await saveAndRead(changes);
+  const changesText = (pageTexts(changesRead.pdf) || []).join(' ');
+  const compareLog = changes ? await logFor(changes.name, 'Saved to computer') : null;
+  check(
+    'P3-17 Compare on two ticked PDFs names them "Earlier version" and "Later version" in list order; Swap changes them over (and the report\'s name with them) and back; the button reads "Compare"',
+    Boolean(asListed.earlier?.startsWith(`Earlier version ${FILES.p3Draft}`)) && Boolean(asListed.later?.startsWith(`Later version ${FILES.p3Final}`)) && asListed.name === 'Synthetic agreement final_changes' &&
+      Boolean(swapped.earlier?.startsWith(`Earlier version ${FILES.p3Final}`)) && Boolean(swapped.later?.startsWith(`Later version ${FILES.p3Draft}`)) && swapped.name === 'Synthetic agreement draft_changes' &&
+      same(swappedBack, asListed) && compareDialog.run === 'Compare' &&
+      Boolean(compareDialog.all?.includes('Finds the words that differ between two versions of a PDF and lists them in a report. The files are not changed.')),
+    { asListed, swapped, swappedBack, run: compareDialog.run },
+  );
+  check(
+    'P3-18 the run says "2 of 6 pages differ." and adds "Synthetic agreement final_changes.pdf"; the report read with pdf.js has the summary ("Pages that differ: 2 of 6"), then page 2 with the fee changed from the earlier to the later amount and page 5 with the added words, and no other page; its record holds ten counts only',
+    compareOutcome === 'closed' && changes?.name === 'Synthetic agreement final_changes.pdf' && compareToast.includes('2 of 6 pages differ.') &&
+      changesText.includes('Comparison of two versions') && changesText.includes('Pages that differ: 2 of 6') &&
+      changesText.includes('Earlier page 2 and later page 2') && changesText.includes('Earlier page 5 and later page 5') && !/Earlier page [1346] and/.test(changesText) &&
+      changesText.includes(P3.feeEarlier) && changesText.includes(P3.feeLater) && changesText.includes(P3.addedWords) &&
+      String(compareLog?.details).startsWith('Compared 2 files: 2 of 6 pages differ → Synthetic agreement final_changes.pdf (') &&
+      same(optionsOf(compareLog), { pagesEarlier: 6, pagesLater: 6, pagesDiffer: 2, pagesOnlyEarlier: 0, pagesOnlyLater: 0, wordsAdded: 4, wordsRemoved: 0, wordsChanged: 1, pagesWithoutText: 0, pagesComparedCoarsely: 0 }),
+    { compareOutcome, name: changes?.name, compareToast, pages: changesRead.pdf?.pageCount, text: changesText.slice(0, 1500), details: compareLog?.details, options: optionsOf(compareLog) },
+  );
+  // The same file twice: nothing to report.
+  const [draftAgain] = await addAndWait([FILES.p3Draft], 'the draft a second time');
+  await selectOnly([draft.id, draftAgain.id]);
+  await openTool('compare');
+  before = await unitIds();
+  const sameOutcome = await runOpen();
+  const sameAfter = await unitIds();
+  await closeToolDialog();
+  check('P3-19 the same version twice: "No text differences found.", the dialog stays and nothing is added', Boolean(String(sameOutcome).startsWith('No text differences found.')) && same(sameAfter, before), { sameOutcome });
+
+  // P3-20: a scanned file blocks Run in both converters.
+  const blockedIn = async (tool, notice) => {
+    await selectOnly([scans.id]);
+    await openTool(tool);
+    const said = await waitFor(`document.querySelector(${q(byTestId(notice))})?.innerText.replace(/\\s+/g, ' ').trim()`, WORK_MS);
+    const waits = await runWaits();
+    await mouseClick(byTestId('pdf-tools-run'));
+    const why = await waitFor(`document.querySelector('[data-testid="pdf-tools-dialog-why"]')?.innerText.trim()`, UI_MS);
+    const still = await exists(byTestId('pdf-tools-dialog'));
+    if (tool === 'pdf-to-excel') await look('excel-scanned');
+    // The reason's tooltip is open over the button and would take the first Escape: Cancel closes the dialog.
+    await click(byTestId('pdf-tools-dialog-cancel'));
+    await mustWaitFor(`!document.querySelector('[data-testid="pdf-tools-dialog"]')`, UI_MS, 'the dialog to close');
+    return { said, waits, why, still };
+  };
+  before = await unitIds();
+  const scannedExcel = await blockedIn('pdf-to-excel', 'pdf-tools-excel-blocked');
+  const scannedWord = await blockedIn('pdf-to-word', 'pdf-tools-word-blocked');
+  check(
+    `P3-20 a scanned file (two pages, pictures only) cannot be run in PDF to Excel or PDF to Word: each dialog says "${SCANNED}", Run waits and a click on it gives the same reason; nothing is added`,
+    [scannedExcel, scannedWord].every((s) => s.said === SCANNED && s.waits === true && s.why === SCANNED && s.still) && same(await unitIds(), before),
+    { scannedExcel, scannedWord },
+  );
+
+  // P3-21 to P3-24: a 500-page statement through both converters, the window's longest task, and Stop.
+  step('T-064: a 500-page statement through PDF to Excel and PDF to Word');
+  await closeToasts();
+  const [long] = await addAndWait([FILES.p3Long], 'the 500-page statement');
+  const convertLong = async (tool, ready) => {
+    await selectOnly([long.id]);
+    await openTool(tool);
+    await mustWaitFor(ready, 3 * WORK_MS, `${tool} to be ready on 500 pages`);
+    await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-run"]')?.disabled === false`, WORK_MS, 'Run to be available');
+    const units = await unitIds();
+    // Behind the dialog no waiting preview may pulse: a run paid for a frame of it at every turn it gave the window.
+    const pulsing = await evaluate(`({ boxes: document.querySelectorAll('[data-pdf-toolbar], section[aria-label^="Pages of"] .animate-pulse').length - 1, moving: [...document.querySelectorAll('section[aria-label^="Pages of"] .animate-pulse')].filter((el) => getComputedStyle(el).animationName !== 'none').length })`);
+    let toast = '';
+    let stages = [];
+    const traced = await p3Traced(async () => {
+      await evaluate(`(performance.mark('p3-from'), true)`);
+      // In the page: when each step of the run was first shown (its label without the page numbers), in ms from Run.
+      await evaluate(`(() => {
+        const from = performance.now();
+        const seen = (window.__p3Stages = []);
+        const timer = setInterval(() => {
+          const p = document.querySelector('[data-testid="pdf-tools-progress"]');
+          if (!document.querySelector('[data-testid="pdf-tools-dialog"]')) return clearInterval(timer);
+          const label = p ? p.innerText.split('\\n')[0].replace(/\\d[\\d,]*/g, 'n').trim() : '';
+          if (label && !seen.some((s) => s[0] === label)) seen.push([label, Math.round(performance.now() - from)]);
+        }, 100);
+        return true;
+      })()`);
+      await click(byTestId('pdf-tools-run'));
+      const outcome = await waitFor(`(() => {
+        const d = document.querySelector('[data-testid="pdf-tools-dialog"]');
+        if (!d) return 'closed';
+        const message = d.querySelector('[data-testid="pdf-tools-dialog-error"], [data-testid="pdf-tools-dialog-notice"]');
+        return message ? message.innerText.replace(/\\s+/g, ' ') : '';
+      })()`, 10 * WORK_MS);
+      await evaluate(`(performance.mark('p3-to'), true)`);
+      stages = await evaluate('window.__p3Stages');
+      // Read now: the message is gone by the time a long trace has been collected.
+      toast = (await waitFor(`[...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText.replace(/\\s+/g, ' ')).find((t) => t.startsWith('Made ')) || null`, UI_MS)) || '';
+      return outcome;
+    });
+    return { ...traced, row: traced.outcome === 'closed' ? await newUnit(units, 'row') : null, toast, stages, pulsing };
+  };
+  const stopLong = async (tool, ready) => {
+    await closeToasts();
+    await selectOnly([long.id]);
+    await openTool(tool);
+    await mustWaitFor(ready, 3 * WORK_MS, `${tool} to be ready on 500 pages`);
+    await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-run"]')?.disabled === false`, WORK_MS, 'Run to be available');
+    const units = await unitIds();
+    await click(byTestId('pdf-tools-run'));
+    const at = await waitFor(`(() => { const p = document.querySelector('[data-testid="pdf-tools-progress"]'); return p && p.dataset.phase === 'running' && /Reading page \\d{2,} of 500/.test(p.innerText) ? p.innerText.replace(/\\s+/g, ' ').trim() : null; })()`, WORK_MS);
+    const started = Date.now();
+    await click(byTestId('pdf-tools-cancel-run'));
+    const asked = await waitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-stop-confirm-yes"]'))`, UI_MS);
+    if (asked) await click(byTestId('pdf-tools-stop-confirm-yes'));
+    const said = await waitFor(`document.querySelector('[data-testid="pdf-tools-dialog"] [data-testid="pdf-tools-dialog-notice"]')?.innerText.replace(/\\s+/g, ' ').trim()`, WORK_MS);
+    const ms = Date.now() - started;
+    const after = await unitIds();
+    const toasts = await toastsText();
+    const state = await evaluate(`({ progress: document.querySelector('[data-testid="pdf-tools-progress"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? null, focus: document.activeElement?.dataset?.testid ?? document.activeElement?.tagName ?? null })`);
+    // Once the Stop question has gone (it takes the keys while it closes), Escape closes the dialog as usual.
+    await sleep(800);
+    await press('Escape');
+    const escapeCloses = Boolean(await waitFor(`!document.querySelector('[data-testid="pdf-tools-dialog"]')`, 3000));
+    if (await exists(byTestId('pdf-tools-dialog-cancel'))) await click(byTestId('pdf-tools-dialog-cancel'));
+    const closed = await waitFor(`!document.querySelector('[data-testid="pdf-tools-dialog"]')`, WORK_MS);
+    return { at, asked: Boolean(asked), said, ms, added: after.length - units.length, toasts, state, escapeCloses, closed: Boolean(closed) };
+  };
+  const excelReady = `document.querySelector(${q(PREVIEW)})?.dataset.status === 'ready'`;
+  const wordReady = `document.querySelector('[data-testid="pdf-tools-run"]')?.disabled === false`;
+  const TARGET_MS = 300;
+  const report = (name, t) =>
+    t ? `${name}: ${t.seconds} s, ${t.count} window tasks; longest by processor time ${t.longestProcessorMs} ms (${t.top5Processor[0]?.[1]} ms on the clock); longest on the clock ${t.longestClockMs} ms (${t.processorOfLongestClockMs} ms of processor time); over 0.3 s: ${t.over300Processor} by processor time, ${t.over300Clock} on the clock; five longest [processor, clock] ${JSON.stringify(t.top5Processor)}` : `${name}: no trace could be taken`;
+
+  const workersBefore = (await excelWorkers()).length;
+  const longExcel = await convertLong('pdf-to-excel', excelReady);
+  const longWorker = (await excelWorkers()).slice(workersBefore);
+  note(`P3 page previews waiting behind the dialog when the run began: ${longExcel.pulsing.boxes}, pulsing: ${longExcel.pulsing.moving}`);
+  note(`P3 timing ${report('PDF to Excel, 500 pages', longExcel.tasks)}; steps first shown at (ms) ${JSON.stringify(longExcel.stages)}`);
+  check(
+    'P3-21 PDF to Excel on a 500-page statement (15,000 entries) adds the workbook, written by the worker (not on the window\'s thread): "500 pages, 1 sheet, 16,000 rows."; behind the dialog no waiting page preview pulses',
+    longExcel.outcome === 'closed' && longExcel.row?.name === 'Synthetic statement 500 pages.xlsx' && longExcel.toast.includes('500 pages, 1 sheet, 16,000 rows.') &&
+      longWorker.length === 1 && longWorker[0].wrote.length === 1 && longWorker[0].failed === 0 && longWorker[0].errors === 0 && longExcel.pulsing.moving === 0,
+    { outcome: longExcel.outcome, row: longExcel.row?.text, toast: longExcel.toast, longWorker, pulsing: longExcel.pulsing },
+  );
+  if (longExcel.tasks) {
+    check(
+      `P3-22 during that run no task of the window took more than ${TARGET_MS} ms of processor time (longest ${longExcel.tasks.longestProcessorMs} ms; on the clock ${longExcel.tasks.longestClockMs} ms)`,
+      longExcel.tasks.longestProcessorMs <= TARGET_MS,
+      longExcel.tasks,
+    );
+  } else skip('P3-22 the longest window task of the 500-page PDF to Excel run', 'no trace could be taken');
+  const stopExcel = await stopLong('pdf-to-excel', excelReady);
+
+  const longWord = await convertLong('pdf-to-word', wordReady);
+  note(`P3 timing ${report('PDF to Word, 500 pages', longWord.tasks)}; steps first shown at (ms) ${JSON.stringify(longWord.stages)}`);
+  check(
+    'P3-23 PDF to Word on the same 500 pages adds the Word document: "500 pages: 500 headings, 500 tables."',
+    longWord.outcome === 'closed' && longWord.row?.name === 'Synthetic statement 500 pages.docx' && /500 pages: .*500 tables\./.test(longWord.toast),
+    { outcome: longWord.outcome, row: longWord.row?.text, toast: longWord.toast },
+  );
+  if (longWord.tasks) {
+    check(
+      `P3-24 during that run no task of the window took more than ${TARGET_MS} ms of processor time (longest ${longWord.tasks.longestProcessorMs} ms; on the clock ${longWord.tasks.longestClockMs} ms)`,
+      longWord.tasks.longestProcessorMs <= TARGET_MS,
+      longWord.tasks,
+    );
+  } else skip('P3-24 the longest window task of the 500-page PDF to Word run', 'no trace could be taken');
+  const stopWord = await stopLong('pdf-to-word', wordReady);
+  note(`P3 Stop: PDF to Excel at "${stopExcel.at}" ended ${stopExcel.ms} ms after the Stop was pressed (the question included); PDF to Word at "${stopWord.at}" after ${stopWord.ms} ms; Escape then closes the dialog: ${stopExcel.escapeCloses}, ${stopWord.escapeCloses}`);
+  check(
+    'P3-25 Stop while each converter reads the 500 pages (asked first, then confirmed) lands: "Stopped. Nothing was added.", no row and no "Made" message',
+    [stopExcel, stopWord].every((s) => Boolean(s.at) && s.asked && s.said === 'Stopped. Nothing was added.' && s.added === 0 && !s.toasts.includes('Made ')),
+    { stopExcel, stopWord },
+  );
+
+  // P3-26: nothing from inside a document in any record of the four tools.
+  const words = [P3.payee, P3.account, expected[0].balance, '12345553.53', P3.heading, 'Quillon', P3.signer, P3.reason, P3.feeEarlier, P3.feeLater, P3.addedWords, 'Vexillum', 'Clause 2'];
+  const toolLogs = (await pdfToolsLogs()).filter((l) => ['pdf-to-excel', 'pdf-to-word', 'document-check', 'compare'].includes(JSON.parse(l.metadata || '{}').tool));
+  const byTool = Object.fromEntries(['pdf-to-excel', 'pdf-to-word', 'document-check', 'compare'].map((t) => [t, toolLogs.filter((l) => JSON.parse(l.metadata).tool === t).length]));
+  const found = words.filter((w) => toolLogs.some((l) => JSON.stringify(l).includes(w)));
+  const inDatabase = words.map((w) => findInDatabase(w).hits.length);
+  const inConsole = words.filter((w) => consoleMessages.some((m) => String(m.text).includes(w)));
+  check(
+    `P3-26 the ${toolLogs.length} activity entries of the four tools (Excel ${byTool['pdf-to-excel']}, Word ${byTool['pdf-to-word']}, Document check ${byTool['document-check']}, Compare ${byTool.compare}) hold no word from inside a file: not the payee, the account number, an amount, the heading, the signer, the reason or a word that differs; nor does any table of the database or the console`,
+    Object.values(byTool).every((n) => n >= 1) && found.length === 0 && inDatabase.every((n) => n === 0) && inConsole.length === 0,
+    { byTool, found, inDatabase, inConsole },
+  );
+  await closeToasts();
+
+  // ── P3-27 to P3-33: Make searchable (OCR, English, on this computer) ─────────────────────────────────────
+  step('T-064: Make searchable');
+  // Invented pages, drawn here in the application's own window and kept as pictures: a scan has no text.
+  const inr = (paise) => {
+    const [whole, fraction] = (paise / 100).toFixed(2).split('.');
+    const last = whole.slice(-3);
+    const rest = whole.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+    return `${rest ? `${rest},` : ''}${last}.${fraction}`;
+  };
+  const OCR = { payee: 'Halvick Traders', code: 'QZXCV0000W', narrations: ['Freight inward', 'Packing material', 'Courier charges', 'Office rent', 'Printing and stationery', 'Repairs to plant', 'Insurance premium', 'Telephone charges'] };
+  /** What to draw for a ledger page of the given size in pixels (300 to the inch): texts and ruling lines, and its amounts. */
+  const ledgerSpec = (w, h, rowCount, seed, unit = w / 1500) => {
+    const px = (n) => Math.round(n * unit);
+    const font = (size, bold) => `${bold ? 'bold ' : ''}${px(size)}px Arial, Helvetica, sans-serif`;
+    const texts = [
+      { s: `${OCR.payee}: purchases ledger`, x: px(70), y: px(110), font: font(50, true) },
+      { s: `PAN ${OCR.code}`, x: px(70), y: px(178), font: font(38) },
+      { s: 'Date', x: px(80), y: px(268), font: font(38, true) },
+      { s: 'Particulars', x: px(400), y: px(268), font: font(38, true) },
+      { s: 'Amount', x: px(1420), y: px(268), font: font(38, true), align: 'right' },
+    ];
+    const amounts = [];
+    let total = 0;
+    const rowStep = Math.min(px(70), Math.floor((h - px(290) - px(150)) / rowCount));
+    for (let i = 0; i < rowCount; i++) {
+      const paise = 1234567 + ((seed * 7919 + i * 104729) % 9000000) * 11 + i * 13;
+      total += paise;
+      amounts.push(inr(paise));
+      const y = px(290) + rowStep * (i + 1) - Math.round(rowStep * 0.3);
+      texts.push({ s: `${String(3 + (i % 26)).padStart(2, '0')}-04-2024`, x: px(80), y, font: font(38) });
+      texts.push({ s: OCR.narrations[(i + seed) % OCR.narrations.length], x: px(400), y, font: font(38) });
+      texts.push({ s: inr(paise), x: px(1420), y, font: font(38), align: 'right' });
+    }
+    const bottom = px(290) + rowStep * rowCount;
+    texts.push({ s: 'Total', x: px(400), y: bottom + px(62), font: font(40, true) });
+    texts.push({ s: inr(total), x: px(1420), y: bottom + px(62), font: font(40, true), align: 'right' });
+    const lines = [[px(60), px(218), px(1440), px(218)], [px(60), px(290), px(1440), px(290)], [px(60), bottom, px(1440), bottom], [px(60), bottom + px(90), px(1440), bottom + px(90)]];
+    for (const x of [60, 380, 1050, 1440]) lines.push([px(x), px(218), px(x), bottom + px(90)]);
+    return { w, h, texts, lines, amounts, total: inr(total), totalValue: total / 100 };
+  };
+  /** The picture of a page as JPEG bytes: drawn on a canvas in the window, black on white. */
+  const drawPicture = async (spec) => {
+    const base64 = await evaluate(`((spec) => {
+      const c = document.createElement('canvas');
+      c.width = spec.w;
+      c.height = spec.h;
+      const g = c.getContext('2d');
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#111111';
+      g.strokeStyle = '#222222';
+      g.lineWidth = Math.max(2, Math.round(spec.w / 500));
+      for (const t of spec.texts) { g.font = t.font; g.textAlign = t.align || 'left'; g.fillText(t.s, t.x, t.y); }
+      for (const l of spec.lines) { g.beginPath(); g.moveTo(l[0], l[1]); g.lineTo(l[2], l[3]); g.stroke(); }
+      return c.toDataURL('image/jpeg', 0.9).split(',')[1];
+    })(${JSON.stringify({ w: spec.w, h: spec.h, texts: spec.texts, lines: spec.lines })})`);
+    return Buffer.from(base64, 'base64');
+  };
+  const NOTE_TEXT = 'This page already has text: an invented covering note for the purchases ledger.';
+  /** A PDF of the given pages: a spec is a scanned page (one picture over the whole page), 'text' a page of real text. */
+  const scanPdf = async (pages) => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    for (const spec of pages) {
+      if (spec === 'text') {
+        doc.addPage([360, 252]).drawText(NOTE_TEXT, { x: 24, y: 200, size: 8, font });
+        continue;
+      }
+      const size = [(spec.w * 72) / 300, (spec.h * 72) / 300];
+      const image = await doc.embedJpg(await drawPicture(spec));
+      doc.addPage(size).drawImage(image, { x: 0, y: 0, width: size[0], height: size[1] });
+    }
+    return Buffer.from(await doc.save());
+  };
+  /** What both converters say of a page that is a scan with recognised text. */
+  const SCAN_SENTENCE = '1 page is a scan: its text was typed from recognition and the scan picture was left out. Check numbers against the page.';
+  const MADE_TOAST = `[...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText.replace(/\\s+/g, ' ')).find((t) => t.startsWith('Made ')) || null`;
+  /** The SHA-256 of each picture an office file holds under `folder`. */
+  const mediaHashes = async (bytes, folder) => {
+    const zip = await JSZip.loadAsync(bytes);
+    const names = Object.keys(zip.files).filter((n) => n.startsWith(folder) && n.length > folder.length);
+    return Promise.all(names.map(async (n) => sha256(await zip.file(n).async('nodebuffer'))));
+  };
+  /** The SHA-256 of the picture a scanned page of a PDF draws (its JPEG data, as the converters pass it on), or null. */
+  const pagePictureHash = async (bytes, pageIndex) => {
+    const doc = await PDFDocument.load(bytes);
+    const xobjects = doc.getPage(pageIndex).node.Resources()?.lookup(pdfLib.PDFName.of('XObject'));
+    const image = xobjects && typeof xobjects.keys === 'function' && xobjects.keys().length > 0 ? xobjects.lookup(xobjects.keys()[0]) : null;
+    return image && typeof image.getContents === 'function' ? sha256(Buffer.from(image.getContents())) : null;
+  };
+  const ledger = ledgerSpec(1500, 1050, 6, 1);
+  const blank = { w: 1500, h: 1050, texts: [], lines: [] };
+  const SCAN_NAME = 'Synthetic scanned ledger.pdf';
+  const SEARCHABLE_NAME = 'Synthetic scanned ledger_searchable.pdf';
+  const scanBytes = await scanPdf([ledger, 'text', blank]);
+  fs.writeFileSync(path.join(fixturesPath, SCAN_NAME), scanBytes);
+  const sourceRead = await readPdf(scanBytes);
+  const [scan, picture] = await addAndWait([SCAN_NAME, FILES.wide], 'the scanned ledger and an image');
+
+  // P3-27: who is offered the tool, and what the dialog says before Run.
+  await selectOnly([picture.id]);
+  const onImage = (await toolStates()).ocr;
+  await selectOnly([scan.id, statement.id]);
+  const onTwo = (await toolStates()).ocr;
+  await selectOnly([statement.id]);
+  await openTool('ocr');
+  const noScanSaid = await waitFor(`document.querySelector('[data-testid="pdf-tools-ocr-blocked"]')?.innerText.replace(/\\s+/g, ' ').trim()`, WORK_MS);
+  const noScanWaits = await runWaits();
+  before = await unitIds();
+  await mouseClick(byTestId('pdf-tools-run'));
+  const noScanWhy = await waitFor(`document.querySelector('[data-testid="pdf-tools-dialog-why"]')?.innerText.trim()`, UI_MS);
+  const noScanAdded = (await unitIds()).length - before.length;
+  await click(byTestId('pdf-tools-dialog-cancel'));
+  await mustWaitFor(`!document.querySelector('[data-testid="pdf-tools-dialog"]')`, UI_MS, 'the dialog to close');
+  await selectOnly([scan.id]);
+  const onScan = (await toolStates()).ocr;
+  await openTool('ocr');
+  await mustWaitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-ocr-plan"]'))`, WORK_MS, 'the count of pages to recognise');
+  const ocrDialog = {
+    title: await text('[data-testid="pdf-tools-dialog"] h2'),
+    plan: await text(byTestId('pdf-tools-ocr-plan')),
+    saidAs: await evaluate(`[...document.querySelectorAll('[data-testid="pdf-tools-dialog"] p')].map((p) => p.innerText.trim()).find((t) => t.startsWith('Will be saved as')) ?? null`),
+    run: await runLabel(),
+    waits: await runWaits(),
+  };
+  await look('ocr-dialog');
+  const NO_SCAN = 'Every page already has text; nothing to recognise.';
+  const PLAN = '2 of 3 pages have little or no text and will be recognised, about 5 to 20 seconds a page (about 10 to 40 seconds in all).';
+  check(
+    `P3-27 Make searchable is offered for one PDF only (an image: "Select a PDF, not an image, to make searchable."; two files: "Select exactly one PDF to make searchable."); on a file with no scanned page the dialog says "${NO_SCAN}", Run waits and nothing is added; on the three-page scan it says "${PLAN}" and "Will be saved as ${SEARCHABLE_NAME}", and the button is "Make searchable"`,
+    onImage?.enabled === false && onImage.says === 'Select a PDF, not an image, to make searchable.' && onTwo?.enabled === false && onTwo.says === 'Select exactly one PDF to make searchable.' && onScan?.enabled === true &&
+      noScanSaid === NO_SCAN && noScanWaits === true && noScanWhy === NO_SCAN && noScanAdded === 0 &&
+      ocrDialog.title === 'Make searchable' && ocrDialog.plan === PLAN && ocrDialog.saidAs === `Will be saved as ${SEARCHABLE_NAME}` && ocrDialog.run === 'Make searchable' && ocrDialog.waits === false,
+    { onImage, onTwo, onScan, noScanSaid, noScanWaits, noScanWhy, noScanAdded, ocrDialog },
+  );
+
+  // P3-28: the run, the row and the message; the window's longest task meanwhile.
+  /** In the page: when each label of the run was first shown, in ms from now (page numbers kept: they tell the pages apart). */
+  const watchLabels = () =>
+    evaluate(`(() => {
+      const from = (window.__ocrFrom = performance.now());
+      const seen = (window.__ocrStages = []);
+      clearInterval(window.__ocrStageTimer);
+      window.__ocrStageTimer = setInterval(() => {
+        const p = document.querySelector('[data-testid="pdf-tools-progress"]');
+        const label = p ? p.innerText.split('\\n')[0].replace(/, (about|a few)[^…]*/, '').trim() : '';
+        if (label && !seen.some((s) => s[0] === label)) seen.push([label, Math.round(performance.now() - from)]);
+      }, 50);
+      return true;
+    })()`);
+  /** Seconds each recognised page took, from the labels "Reading the text of page P (n of N)…" and the next label after them. */
+  const secondsPerPage = (stages) => {
+    const out = [];
+    for (let i = 0; i < stages.length; i++) {
+      const m = /^Reading the text of page (\d+)/.exec(stages[i][0]);
+      if (m && stages[i + 1]) out.push([Number(m[1]), Math.round((stages[i + 1][1] - stages[i][1]) / 100) / 10]);
+    }
+    return out;
+  };
+  const madeSearchable = async (limit) => {
+    const units = await unitIds();
+    let toast = '';
+    let stages = [];
+    const traced = await p3Traced(async () => {
+      await evaluate(`(performance.mark('p3-from'), true)`);
+      await watchLabels();
+      await click(byTestId('pdf-tools-run'));
+      const outcome = await waitFor(`(() => {
+        const d = document.querySelector('[data-testid="pdf-tools-dialog"]');
+        if (!d) return 'closed';
+        const message = d.querySelector('[data-testid="pdf-tools-dialog-error"], [data-testid="pdf-tools-dialog-notice"]');
+        return message ? message.innerText.replace(/\\s+/g, ' ') : '';
+      })()`, limit);
+      await evaluate(`(performance.mark('p3-to'), clearInterval(window.__ocrStageTimer), window.__ocrStages.push(['(the run ended)', Math.round(performance.now() - window.__ocrFrom)]), true)`);
+      stages = await evaluate('window.__ocrStages');
+      toast = (await waitFor(`[...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText.replace(/\\s+/g, ' ')).find((t) => t.startsWith('Made searchable')) || null`, UI_MS)) || '';
+      if (toast) await look('ocr-result');
+      return outcome;
+    });
+    return { ...traced, row: traced.outcome === 'closed' ? await newUnit(units, 'row') : null, toast, stages };
+  };
+  await closeToasts();
+  const ocrRun = await madeSearchable(10 * WORK_MS);
+  const numbersSaid = /(\d+) numbers? to check on page 1[.;]/.exec(ocrRun.toast);
+  note(`P3 timing ${report('Make searchable, 3 pages (2 recognised)', ocrRun.tasks)}; seconds a page [page, s] ${JSON.stringify(secondsPerPage(ocrRun.stages))}`);
+  note(`P3 Make searchable said: ${ocrRun.toast}`);
+  check(
+    `P3-28 Make searchable on the three-page scan adds "${SEARCHABLE_NAME}" (3 pages) and says: "2 of 3 pages recognised; 1 already had text.", "No words were found on page 3; it may be blank or too faint.", "Recognised text can be wrong: check numbers against the page." and, when it doubts any, how many numbers to check on page 1; never a percentage`,
+    ocrRun.outcome === 'closed' && ocrRun.row?.name === SEARCHABLE_NAME && /\b3 pages\b/.test(ocrRun.row.text) &&
+      ocrRun.toast.startsWith(`Made searchable: ${SEARCHABLE_NAME}`) && ocrRun.toast.includes('2 of 3 pages recognised; 1 already had text.') &&
+      ocrRun.toast.includes('No words were found on page 3; it may be blank or too faint.') && ocrRun.toast.includes('Recognised text can be wrong: check numbers against the page.') &&
+      !/to check/.test(ocrRun.toast.replace(numbersSaid?.[0] ?? '', '')) && !/%|confiden|took too long|could not be read/i.test(ocrRun.toast),
+    { outcome: ocrRun.outcome, row: ocrRun.row?.text, toast: ocrRun.toast },
+  );
+  if (ocrRun.tasks) {
+    check(
+      `P3-29 while the pages were recognised no task of the window took more than ${TARGET_MS} ms of processor time (longest ${ocrRun.tasks.longestProcessorMs} ms; on the clock ${ocrRun.tasks.longestClockMs} ms)`,
+      ocrRun.tasks.longestProcessorMs <= TARGET_MS,
+      ocrRun.tasks,
+    );
+  } else skip('P3-29 the longest window task of the Make searchable run', 'no trace could be taken');
+
+  // P3-30: the saved result read back; the picture as it was.
+  let searchable = null;
+  let searchableRead = null;
+  if (ocrRun.row) {
+    await selectOnly([ocrRun.row.id]);
+    [searchable] = await saveSelected(1);
+    searchableRead = await readPdf(searchable.bytes);
+  }
+  const pictureOf = async (bytes) => {
+    const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    const page = doc.getPage(0);
+    const xobjects = page.node.Resources()?.lookup(pdfLib.PDFName.of('XObject'), pdfLib.PDFDict);
+    const pictures = [];
+    for (const [, ref] of xobjects?.entries() ?? []) {
+      const stream = doc.context.lookup(ref);
+      if (stream instanceof pdfLib.PDFRawStream && stream.dict.get(pdfLib.PDFName.of('Subtype')) === pdfLib.PDFName.of('Image')) pictures.push(sha256(Buffer.from(stream.contents)));
+    }
+    return { pictures, size: [Math.round(page.getWidth()), Math.round(page.getHeight())] };
+  };
+  const pictureBefore = await pictureOf(scanBytes);
+  const pictureAfter = searchable ? await pictureOf(searchable.bytes) : null;
+  const ledgerText = searchableRead?.pages[0].text ?? '';
+  const compact = ledgerText.replace(/\s+/g, '');
+  const amountsRead = ledger.amounts.filter((a) => compact.includes(a)).length;
+  note(`P3 Make searchable read ${amountsRead} of the ledger's ${ledger.amounts.length} amounts exactly, and its total: ${compact.includes(ledger.total)}; words on the pages: ${(searchableRead?.pages ?? []).map((p) => (p.text ? p.text.split(' ').length : 0)).join(', ')}`);
+  check(
+    `P3-30 the saved result read back with pdf.js: the scanned ledger page, which had no text, now holds the invented total ${ledger.total}, the code ${OCR.code} and the payee; the page of text reads as before; the blank page has no text; page 1's picture is the same picture (the same bytes) on a page of the same size, and the file is still 3 pages`,
+    Boolean(searchableRead) && searchable.name === SEARCHABLE_NAME && searchableRead.pageCount === 3 && sourceRead.pages[0].text === '' &&
+      compact.includes(ledger.total) && compact.includes(OCR.code) && ledgerText.includes('Halvick') && amountsRead >= ledger.amounts.length - 1 &&
+      searchableRead.pages[1].text === sourceRead.pages[1].text && searchableRead.pages[1].text === NOTE_TEXT && searchableRead.pages[2].text === '' &&
+      pictureBefore.pictures.length === 1 && same(pictureAfter, pictureBefore) && searchableRead.producer === 'ICAI VERA',
+    { name: searchable?.name, pages: searchableRead?.pageCount, ledgerText: ledgerText.slice(0, 400), amountsRead, textPage: searchableRead?.pages[1].text, blankPage: searchableRead?.pages[2].text, pictureBefore, pictureAfter, producer: searchableRead?.producer },
+  );
+
+  // P3-31: its record.
+  const ocrLog = await logFor(SEARCHABLE_NAME, 'Saved to computer');
+  const ocrOptions = optionsOf(ocrLog);
+  const OCR_KEYS = ['charactersDropped', 'lowConfidenceWords', 'numbersToCheck', 'pages', 'pagesFaint', 'pagesPartlyRead', 'pagesRecognised', 'pagesSkipped', 'pagesTimedOut', 'words', 'wordsLeftOut'];
+  const ocrWords = [OCR.payee, 'Halvick', OCR.code, ledger.total, ...ledger.amounts, 'Freight inward', 'covering note'];
+  const ocrLogs = (await pdfToolsLogs()).filter((l) => JSON.parse(l.metadata || '{}').tool === 'ocr');
+  const ocrFound = ocrWords.filter((w) => ocrLogs.some((l) => JSON.stringify(l).includes(w)));
+  const ocrInDatabase = ocrWords.filter((w) => findInDatabase(w).hits.length > 0);
+  const ocrInConsole = ocrWords.filter((w) => consoleMessages.some((m) => String(m.text).includes(w)));
+  check(
+    'P3-31 the save is recorded as "Made searchable: 2 of 3 pages recognised" with the file\'s SHA-256, and the record holds the eleven counts only (3 pages, 2 recognised, 1 skipped, none out of time; the numbers to check as the message said); no recognised word is in a record, a table of the database or the console',
+    String(ocrLog?.details).startsWith(`Made searchable: 2 of 3 pages recognised → ${SEARCHABLE_NAME} (3 pages, SHA-256 `) && ocrLog.engagement_id === engA.id && JSON.parse(ocrLog.metadata).sha256 === sha256(searchable.bytes) &&
+      same(keysOf(ocrOptions), OCR_KEYS) && Object.values(ocrOptions).every((v) => Number.isInteger(v) && v >= 0) &&
+      ocrOptions.pages === 3 && ocrOptions.pagesRecognised === 2 && ocrOptions.pagesSkipped === 1 && ocrOptions.pagesTimedOut === 0 && ocrOptions.words > 20 &&
+      ocrOptions.numbersToCheck === Number(numbersSaid?.[1] ?? 0) &&
+      ocrLogs.length >= 1 && ocrFound.length === 0 && ocrInDatabase.length === 0 && ocrInConsole.length === 0,
+    { details: ocrLog?.details, options: ocrOptions, ocrFound, ocrInDatabase, ocrInConsole },
+  );
+
+  // P3-32: scan → searchable → Excel: the amount lands as a number.
+  let chain = { outcome: null };
+  if (ocrRun.row) {
+    await closeToasts();
+    await selectOnly([ocrRun.row.id]);
+    await openTool('pdf-to-excel');
+    await mustWaitFor(`document.querySelector(${q(PREVIEW)})?.dataset.status === 'ready' || Boolean(document.querySelector('[data-testid="pdf-tools-excel-blocked"]'))`, WORK_MS, 'the Excel preview of the searchable file');
+    const blocked = await text(byTestId('pdf-tools-excel-blocked'));
+    before = await unitIds();
+    const outcome = blocked ? blocked : await runOpen();
+    const said = outcome === 'closed' ? (await waitFor(MADE_TOAST, UI_MS)) || '' : '';
+    await closeToolDialog();
+    const sheetRow = outcome === 'closed' ? await newUnit(before, 'row') : null;
+    let numbers = [];
+    let name = null;
+    let media = null;
+    if (sheetRow) {
+      await selectOnly([sheetRow.id]);
+      const [file] = await saveSelected(1);
+      name = file.name;
+      const sheets = (await readWorkbook(file.bytes)).worksheets;
+      numbers = sheets.flatMap((s) => cellsOf(s)).filter((c) => c.type === NUMBER).map((c) => c.value);
+      media = await mediaHashes(file.bytes, 'xl/media/');
+    }
+    chain = { outcome, name, numbers: numbers.length, total: numbers.includes(ledger.totalValue), amounts: ledger.amounts.filter((a) => numbers.includes(Number(a.replace(/,/g, '')))).length, said, media };
+  }
+  check(
+    `P3-32 the chain scan → searchable → Excel: PDF to Excel no longer refuses the file, and the workbook "Synthetic scanned ledger_searchable.xlsx" holds the ledger's total as a number cell (${ledger.totalValue}) with at least ${ledger.amounts.length - 1} of its ${ledger.amounts.length} amounts as numbers`,
+    chain.outcome === 'closed' && chain.name === 'Synthetic scanned ledger_searchable.xlsx' && chain.total === true && chain.amounts >= ledger.amounts.length - 1,
+    chain,
+  );
+
+  // P3-36: scan → searchable → Word (and the workbook of P3-32): the words are typed once, the scan picture is not
+  // put under them, and both tools say so.
+  let scanWord = { outcome: null };
+  if (ocrRun.row) {
+    await closeToasts();
+    await selectOnly([ocrRun.row.id]);
+    await openTool('pdf-to-word');
+    await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-run"]')?.disabled === false`, WORK_MS, 'the text check of PDF to Word on the searchable file');
+    before = await unitIds();
+    const outcome = await runOpen();
+    const said = outcome === 'closed' ? (await waitFor(MADE_TOAST, UI_MS)) || '' : '';
+    await closeToolDialog();
+    const docRow = outcome === 'closed' ? await newUnit(before, 'row') : null;
+    scanWord = { outcome, said };
+    if (docRow) {
+      await selectOnly([docRow.id]);
+      const [file] = await saveSelected(1);
+      const zip = await JSZip.loadAsync(file.bytes);
+      const xml = (await zip.file('word/document.xml').async('string')).replace(/<mc:Fallback>[\s\S]*?<\/mc:Fallback>/g, '');
+      const typed = [...xml.matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)].map((m) => m[1]).join(' ');
+      const at = (needle) => xml.indexOf(needle);
+      Object.assign(scanWord, {
+        name: file.name,
+        // The pictures in the file, against the picture of each page of the scan.
+        media: await mediaHashes(file.bytes, 'word/media/'),
+        anchors: (xml.match(/<pic:pic /g) ?? []).length,
+        // The one picture left stands after the page of text: on the blank page, where no word stands over it.
+        pictureAfterNote: at('<pic:pic ') > at('covering note'),
+        total: typed.replace(/\s+/g, '').includes(ledger.total),
+        totalOnce: typed.replace(/\s+/g, '').split(ledger.total).length === 2,
+        payee: typed.includes('Halvick'),
+        note: typed.includes('covering note'),
+      });
+    }
+  }
+  const scanPictures = await Promise.all([0, 2].map((i) => pagePictureHash(scanBytes, i)));
+  check(
+    `P3-36 the chain scan → searchable → Word: the document "Synthetic scanned ledger_searchable.docx" holds the ledger's words typed once (the payee, the total ${ledger.total}) and the page of text, and NOT the picture of the scanned page under them (the only picture in the file is the blank page's, where no word stands over it); the workbook of P3-32 does not hold the scan picture either; both messages say "${SCAN_SENTENCE}"`,
+    scanWord.outcome === 'closed' && scanWord.name === 'Synthetic scanned ledger_searchable.docx' && scanWord.total === true && scanWord.totalOnce === true && scanWord.payee === true && scanWord.note === true &&
+      Boolean(scanPictures[0]) && Boolean(scanPictures[1]) && scanPictures[0] !== scanPictures[1] &&
+      Array.isArray(scanWord.media) && !scanWord.media.includes(scanPictures[0]) && scanWord.media.length === 1 && scanWord.media[0] === scanPictures[1] && scanWord.anchors === 1 && scanWord.pictureAfterNote === true &&
+      Array.isArray(chain.media) && !chain.media.includes(scanPictures[0]) &&
+      scanWord.said.includes(SCAN_SENTENCE) && String(chain.said).includes(SCAN_SENTENCE),
+    { scanWord, excel: { said: chain.said, media: chain.media }, scanPictures },
+  );
+
+  // P3-33: Stop inside a page adds nothing.
+  await closeToasts();
+  await selectOnly([scan.id]);
+  await openTool('ocr');
+  await mustWaitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-ocr-plan"]'))`, WORK_MS, 'the count of pages to recognise');
+  const stopOcr = async () => {
+    const units = await unitIds();
+    await click(byTestId('pdf-tools-run'));
+    const at = await waitFor(`(() => { const p = document.querySelector('[data-testid="pdf-tools-progress"]'); return p && p.dataset.phase === 'running' && /^Reading the text of page 1/.test(p.innerText) ? p.innerText.split('\\n')[0].trim() : null; })()`, WORK_MS);
+    await sleep(700); // inside the page: the engine is at work on it
+    const started = Date.now();
+    await click(byTestId('pdf-tools-cancel-run'));
+    const asked = await waitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-stop-confirm-yes"]'))`, UI_MS);
+    const confirmed = Date.now();
+    if (asked) await click(byTestId('pdf-tools-stop-confirm-yes'));
+    const said = await waitFor(`document.querySelector('[data-testid="pdf-tools-dialog"] [data-testid="pdf-tools-dialog-notice"]')?.innerText.replace(/\\s+/g, ' ').trim()`, WORK_MS);
+    const ms = Date.now() - started;
+    const afterConfirmMs = Date.now() - confirmed;
+    await sleep(2500); // a page that had been recognised meanwhile would have arrived by now
+    const toasts = await toastsText();
+    return { at, asked: Boolean(asked), said, ms, afterConfirmMs, added: (await unitIds()).length - units.length, toasts };
+  };
+  const stoppedOcr = await stopOcr();
+  await sleep(800);
+  await closeToolDialog();
+  note(`P3 Stop: Make searchable at "${stoppedOcr.at}" ended ${stoppedOcr.ms} ms after the Stop was pressed (the question included; ${stoppedOcr.afterConfirmMs} ms after it was confirmed)`);
+  check(
+    'P3-33 Stop while Make searchable reads page 1 (asked first, then confirmed) lands: "Stopped. Nothing was added.", no row and no "Made searchable" message',
+    Boolean(stoppedOcr.at) && stoppedOcr.asked && stoppedOcr.said === 'Stopped. Nothing was added.' && stoppedOcr.added === 0 && !stoppedOcr.toasts.includes('Made searchable'),
+    stoppedOcr,
+  );
+
+  // P3-34 and P3-35: an acknowledgement-style form through both converters; the saved files read back.
+  step('T-064: a ruled form to Word and to Excel');
+  await closeToasts();
+  const [formRow] = await addAndWait([FILES.p3Form], 'the acknowledgement-style form');
+  await selectOnly([formRow.id]);
+  await openTool('pdf-to-word');
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-run"]')?.disabled === false`, WORK_MS, 'the text check of PDF to Word on the form');
+  before = await unitIds();
+  const formWordOutcome = await runOpen();
+  const formDocx = formWordOutcome === 'closed' ? await newUnit(before, 'row') : null;
+  const formWord = { outcome: formWordOutcome };
+  if (formDocx) {
+    await selectOnly([formDocx.id]);
+    const [file] = await saveSelected(1);
+    const zip = await JSZip.loadAsync(file.bytes);
+    const xml = await zip.file('word/document.xml').async('string');
+    const cellsXml = [...xml.matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)].map((m) => m[0]);
+    const cellOf = (word) => cellsXml.filter((c) => c.includes(word));
+    const textOf = (cell) => [...(cell ?? '').matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('');
+    Object.assign(formWord, {
+      name: file.name,
+      tables: (xml.match(/<w:tbl>/g) ?? []).length,
+      sections: (xml.match(/<w:sectPr>/g) ?? []).length,
+      pageBreaks: (xml.match(/w:type="page"/g) ?? []).length,
+      titleSpan: /<w:gridSpan w:val="7"\/>/.test(cellOf(P3_FORM.title)[0] ?? ''),
+      sideCells: cellOf('Income').length,
+      sideTurned: /<w:textDirection w:val="btLr"\/>/.test(cellOf('Income')[0] ?? ''),
+      sideMerged: /<w:vMerge w:val="restart"\/>/.test(cellOf('Income')[0] ?? ''),
+      sideText: textOf(cellOf('Income')[0]),
+      amountRight: /<w:jc w:val="right"\/>/.test(cellOf('6,79,234')[0] ?? ''),
+      pictures: Object.keys(zip.files).filter((n) => /^word\/media\/.+/.test(n)).length,
+      anchors: (xml.match(/<pic:pic /g) ?? []).length,
+    });
+  }
+  check(
+    'P3-34 PDF to Word on an acknowledgement-style form: the saved document is one page (one section, no page break) with ONE table; the title is one cell over seven columns, the tall label is one merged cell with its text turned and in reading order ("Income Details"), the amount is set right, and both pictures are in the file and on the page',
+    formWord.outcome === 'closed' && formWord.name === 'Synthetic acknowledgement form.docx' && formWord.tables === 1 && formWord.sections === 1 && formWord.pageBreaks === 0 &&
+      formWord.titleSpan && formWord.sideCells === 1 && formWord.sideTurned && formWord.sideMerged && formWord.sideText === P3_FORM.side && formWord.amountRight && formWord.pictures === 2 && formWord.anchors === 2,
+    formWord,
+  );
+  await closeToasts();
+  await selectOnly([formRow.id]);
+  await openTool('pdf-to-excel');
+  await mustWaitFor(`document.querySelector('[data-testid="pdf-tools-run"]')?.disabled === false`, WORK_MS, 'the text check of PDF to Excel on the form');
+  before = await unitIds();
+  const formExcelOutcome = await runOpen();
+  const formXlsx = formExcelOutcome === 'closed' ? await newUnit(before, 'row') : null;
+  const formExcel = { outcome: formExcelOutcome };
+  if (formXlsx) {
+    await selectOnly([formXlsx.id]);
+    const [file] = await saveSelected(1);
+    const book = await readWorkbook(file.bytes);
+    const sheet = book.worksheets[0];
+    const found = {};
+    sheet.eachRow((row, r) => row.eachCell((cell, c) => {
+      if (cell.master !== cell) return;
+      // The title's cell also holds the smaller line under it.
+      if (typeof cell.value === 'string' && cell.value.startsWith(P3_FORM.title)) found.title = { r, c };
+      if (cell.value === P3_FORM.side) found.side = { r, c, turned: cell.alignment?.textRotation };
+      if (cell.value === P3_FORM.amount) found.amount = { r, c, type: cell.type };
+      if (cell.value === 'Date of issue: 01-Jan-2030') found.date = { r, c, align: cell.alignment?.horizontal };
+      if (cell.value === 'Reference number: ZX-0000-1234') found.reference = { r, c };
+      if (cell.value === '(-) 70,000') found.bracketed = { type: cell.type };
+    }));
+    const merges = Object.values(sheet._merges ?? {}).map((m) => m.model);
+    Object.assign(formExcel, {
+      name: file.name,
+      found,
+      titleMerged: Boolean(found.title && merges.some((m) => m.top === found.title.r && m.left === 1 && m.right === 7)),
+      sideMerged: Boolean(found.side && merges.some((m) => m.top === found.side.r && m.left === 1 && m.right === 1 && m.bottom === found.side.r + 2)),
+      pictures: sheet.getImages().length,
+      merges: merges.length,
+    });
+  }
+  check(
+    'P3-35 PDF to Excel on the same form: the saved workbook has the title merged over seven columns, the tall label merged over its three rows with its text turned and in reading order, the amount 6,79,234 as a number cell (and "(-) 70,000" left as text), the line above the form as two cells (the reference in column A, the date at the right in the last column), and the picture that stands on the page (not the faint one behind the text)',
+    formExcel.outcome === 'closed' && formExcel.name === 'Synthetic acknowledgement form.xlsx' && formExcel.titleMerged && formExcel.sideMerged && formExcel.found?.side?.turned === 90 &&
+      formExcel.found?.amount?.type === NUMBER && formExcel.found?.bracketed?.type === STRING && formExcel.found?.reference?.c === 1 && formExcel.found?.date?.c === 8 && formExcel.found.date.r === formExcel.found.reference.r &&
+      formExcel.found.date.align === 'right' && formExcel.pictures === 1,
+    formExcel,
+  );
+
+  // Timing only (PDF_TOOLS_TEST_OCR_TIMING=1): six A4 pages, five of them scans, once through and one Stop.
+  if (process.env.PDF_TOOLS_TEST_OCR_TIMING) {
+    step('T-064: Make searchable, six A4 pages (timing)');
+    const A4_PX = [2480, 3508];
+    const a4Ledger = (rowCount, seed) => ledgerSpec(A4_PX[0], A4_PX[1], rowCount, seed, 1.1); // 10 pt type, as a printed ledger
+    const six = [a4Ledger(38, 2), a4Ledger(38, 3), 'text', a4Ledger(24, 4), { w: A4_PX[0], h: A4_PX[1], texts: [], lines: [] }, a4Ledger(38, 5)];
+    const SIX_NAME = 'Synthetic scan six pages.pdf';
+    fs.writeFileSync(path.join(fixturesPath, SIX_NAME), await scanPdf(six));
+    const [sixRow] = await addAndWait([SIX_NAME], 'the six-page scan');
+    await closeToasts();
+    await selectOnly([sixRow.id]);
+    await openTool('ocr');
+    await mustWaitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-ocr-plan"]'))`, WORK_MS, 'the count of pages to recognise');
+    const sixPlan = await text(byTestId('pdf-tools-ocr-plan'));
+    const sixRun = await madeSearchable(20 * WORK_MS);
+    const perPage = secondsPerPage(sixRun.stages);
+    note(`P3 timing six A4 pages: plan "${sixPlan}"; ${report('Make searchable, 6 pages (5 recognised)', sixRun.tasks)}; seconds a page [page, s] ${JSON.stringify(perPage)}; steps ${JSON.stringify(sixRun.stages)}; said: ${sixRun.toast}`);
+    await closeToasts();
+    await selectOnly([sixRow.id]);
+    await openTool('ocr');
+    await mustWaitFor(`Boolean(document.querySelector('[data-testid="pdf-tools-ocr-plan"]'))`, WORK_MS, 'the count of pages to recognise');
+    const sixStop = await stopOcr();
+    await sleep(800);
+    await closeToolDialog();
+    note(`P3 Stop on the six A4 pages: at "${sixStop.at}" ended ${sixStop.ms} ms after the Stop was pressed (${sixStop.afterConfirmMs} ms after it was confirmed): "${sixStop.said}", rows added ${sixStop.added}`);
+  }
+  await closeToasts();
+}
+
 async function main() {
   for (const dir of [profilePath, downloadsPath, launchPath, shotsPath]) fs.mkdirSync(dir);
   fs.writeFileSync(path.join(launchPath, 'package.json'), JSON.stringify({ name: 'icai-vera-pdf-tools-ui-harness', version: '1.0.0', main: entryPath }));
@@ -4054,26 +5576,35 @@ async function main() {
   const toolbar = await evaluate(`({
     built: ${JSON.stringify(BUILT_TOOLS)}.map((id) => Boolean(document.querySelector('[data-testid="pdf-tools-tool-' + id + '"]'))),
     soon: [...document.querySelectorAll('[data-soon-tool]')].map((b) => ({ key: b.dataset.soonTool, ariaDisabled: b.getAttribute('aria-disabled'), text: b.innerText.replace(/\\s+/g, ' ') })),
+    phaseThree: ${JSON.stringify(PHASE_THREE_TOOLS)}.map((id) => ({ id, usable: Boolean(document.querySelector('[data-testid="pdf-tools-tool-' + id + '"]')), soon: Boolean(document.querySelector('[data-soon-tool="' + id + '"]')) })),
     phaseTwo: ${JSON.stringify(PHASE_TWO_TOOLS)}.map((id) => ({ id, usable: Boolean(document.querySelector('[data-testid="pdf-tools-tool-' + id + '"]')), soon: Boolean(document.querySelector('[data-soon-tool="' + id + '"]')) })),
     order: [...document.querySelectorAll('[data-pdf-toolbar] button')].map((b) => b.dataset.soonTool || (b.dataset.testid || '').replace('pdf-tools-tool-', '')),
   })`);
   const soonKeys = toolbar.soon.map((s) => s.key);
   note(`INT stage 1: toolbar order ${toolbar.order.join(', ')}; phase 2 ${toolbar.phaseTwo.map((t) => `${t.id}=${t.usable ? 'usable' : 'Soon'}`).join(', ')}`);
   check(
-    'extra (INT stage 1): the seven phase 1 tools are present; the four later tools are "soon"; Organise pages, Resize or crop pages, Watermark, Redact, Bookmarks and Protect are usable; every "soon" button is aria-disabled and says soon',
+    'extra (INT stage 1): the seven phase 1 tools are present; nothing is "soon"; the five phase 3 tools (PDF to Excel, PDF to Word, Make searchable, Document check, Compare) and Organise pages, Resize or crop pages, Watermark, Redact, Bookmarks and Protect are usable; every "soon" button is aria-disabled and says soon',
     toolbar.built.every(Boolean) &&
       SOON_TOOLS.every((k) => soonKeys.includes(k)) &&
-      soonKeys.every((k) => SOON_TOOLS.includes(k) || PHASE_TWO_SOON.includes(k)) &&
+      soonKeys.every((k) => SOON_TOOLS.includes(k) || PHASE_TWO_SOON.includes(k) || PHASE_THREE_SOON.includes(k)) &&
+      toolbar.phaseThree.every((t) => (PHASE_THREE_SOON.includes(t.id) ? t.soon && !t.usable : t.usable && !t.soon)) &&
       toolbar.phaseTwo.every((t) => (PHASE_TWO_SOON.includes(t.id) ? t.soon && !t.usable : t.usable && !t.soon)) &&
-      // a "soon" button's text is the label, then the description kept for screen readers
-      Boolean(toolbar.soon.find((s) => s.key === 'review')?.text.startsWith('Review \u00b7 soon .')) &&
       toolbar.soon.every((s) => s.ariaDisabled === 'true' && /Soon/i.test(s.text)) &&
-      JSON.stringify(toolbar.order) === JSON.stringify(expectedOrder(toolbar.phaseTwo.filter((t) => t.usable).map((t) => t.id))),
+      JSON.stringify(toolbar.order) === JSON.stringify(expectedOrder([...toolbar.phaseTwo, ...toolbar.phaseThree].filter((t) => t.usable).map((t) => t.id))),
     toolbar,
   );
   // INT2 (lane TIFF): the empty list says which files it takes, TIFF among them.
   const emptyHint = await evaluate(`document.querySelector('[data-testid="pdf-tools-root"]')?.innerText.replace(/\\s+/g, ' ') || ''`);
   check('T0 the empty list names the files it takes: "PDF, JPG, PNG, TIFF, WebP, BMP or GIF."', emptyHint.includes('PDF, JPG, PNG, TIFF, WebP, BMP or GIF.'), emptyHint.slice(0, 300));
+
+  if (ONLY_PHASE_THREE) {
+    await installSaveStubs();
+    await scenarioPhaseThree({ engA, clientA, clientB }, { programme, section, box });
+    pdfToolsWindows[0].end = Date.now();
+    await closeApp();
+    closingChecks();
+    return;
+  }
 
   // ── 3: two PDFs and their thumbnails ─────────────────────────────────────
   await addFromComputer([FILES.two, FILES.three]);
@@ -4399,10 +5930,15 @@ async function main() {
   await scenarioViewerSearch();
   await scenarioFixB();
   await scenarioRedact();
+  await scenarioPhaseThree(people, { programme, section, box });
   await scenarioLeaveQuestion(people);
   pdfToolsWindows[1].end = Date.now();
   await closeApp();
+  closingChecks();
+}
 
+/** After the application has closed: the requests it made, its errors, and what must be in no file of the profile. */
+function closingChecks() {
   // ── 13: network ──────────────────────────────────────────────────────────
   step('Network and errors');
   const duringPdfTools = (r) => pdfToolsWindows.some((w) => r.at >= w.start && r.at <= w.end);

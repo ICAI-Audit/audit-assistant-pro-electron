@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { RECORD_KEYS as EXCEL_RECORD_KEYS } from '@/components/pdf-tools/convert/excelForm';
+import { RECORD_KEYS as WORD_RECORD_KEYS } from '@/components/pdf-tools/convert/wordForm';
+import { RECORD_KEYS as OCR_RECORD_KEYS } from '@/components/pdf-tools/ocr/ocrForm';
+import { RECORD_KEYS as COMPARE_RECORD_KEYS } from '@/components/pdf-tools/review/compareForm';
+import { RECORD_KEYS as CHECK_RECORD_KEYS } from '@/components/pdf-tools/review/documentCheckForm';
 import { buildActivityEntry, HEADER_TEXT_TOKENS, isTokenTemplate, MARK_TEXT_TOKENS, typedTextRecord, WATERMARK_CHOICES } from './activity';
 import { PdfToolsError, type WorkingFile } from './types';
 
@@ -501,6 +506,80 @@ describe('buildActivityEntry', () => {
     // a PDF/A source: the record says the copy is no longer archival, and nothing else
     const archival = buildActivityEntry({ file: result({ operation: { ...protectedOp, options: { protection: 'AES-256', noLongerArchival: true, hint: 'x' } } }), destination: 'computer', sha256: SHA });
     expect(archival.metadata.options).toEqual({ protection: 'AES-256', noLongerArchival: true });
+  });
+
+  it('keeps only counts and choices in the records of the five phase 3 tools: never a word, an amount or a name from a document (T-064)', () => {
+    const entry = (tool: 'pdf-to-excel' | 'pdf-to-word' | 'document-check' | 'compare' | 'ocr', summary: string, options: Record<string, string | number | boolean>, over: Partial<WorkingFile> = {}) =>
+      buildActivityEntry({ file: result({ operation: { tool, summary, sources: [], options }, ...over }), destination: 'computer', sha256: SHA });
+    const stray = { signer: 'A. Invented Signer', firstCell: 'Opening balance', differing: 'Rs. 4,20,000', title: 'Board minutes', word: 'Zephyrquill' };
+
+    // PDF to Excel (convert/excelForm.ts RECORD_KEYS)
+    const excelOptions = { sheetMode: 'one-sheet', pages: 3, sheets: 1, rows: 142, numberCells: 250, tablesRuled: 3, tablesAligned: 0, pagesAsText: 0, pagesNoText: 0 };
+    const office = { name: 'Statement.xlsx', kind: 'office' as const, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pageCount: null };
+    const excel = entry('pdf-to-excel', 'Converted to Excel: 3 pages, 1 sheet', { ...excelOptions, ...stray }, office);
+    expect(excel.metadata.options).toEqual(excelOptions);
+    // An office row has no page count: the details name the file and its fingerprint only.
+    expect(excel.details.startsWith('Converted to Excel: 3 pages, 1 sheet → Statement.xlsx (SHA-256 ')).toBe(true);
+    expect(excel.metadata).toMatchObject({ tool: 'pdf-to-excel', resultName: 'Statement.xlsx', pageCount: null });
+    expect(entry('pdf-to-excel', 'x', { sheetMode: 'per-page', pages: 2 }).metadata.options).toEqual({ sheetMode: 'per-page', pages: 2 });
+    expect(entry('pdf-to-excel', 'x', { sheetMode: 'Sheet named after the client', pages: -1, rows: 1.5, sheets: '4' }).metadata.options).toEqual({});
+
+    // PDF to Word (convert/wordForm.ts RECORD_KEYS)
+    const wordOptions = { pages: 12, paragraphs: 48, headings: 6, tables: 3, pagesNoText: 0 };
+    expect(entry('pdf-to-word', 'Converted to Word: 12 pages', { ...wordOptions, ...stray }).metadata.options).toEqual(wordOptions);
+    expect(entry('pdf-to-word', 'x', { pages: 'twelve', headings: -2, firstHeading: 'Directors report' }).metadata.options).toEqual({});
+    // Pages that were scans with recognised text: a count for both converters, and nothing but a count.
+    expect(entry('pdf-to-word', 'x', { ...wordOptions, pagesFromScan: 2, ...stray }).metadata.options).toEqual({ ...wordOptions, pagesFromScan: 2 });
+    expect(entry('pdf-to-excel', 'x', { ...excelOptions, pagesFromScan: 1, ...stray }, office).metadata.options).toEqual({ ...excelOptions, pagesFromScan: 1 });
+    expect(entry('pdf-to-word', 'x', { ...wordOptions, pagesFromScan: 'page 1 of the ledger' }).metadata.options).toEqual(wordOptions);
+
+    // Document check (review/documentCheckForm.ts RECORD_KEYS)
+    const checkOptions = { pages: 12, signatures: 1, pagesWithText: 10, pagesScanned: 2, protection: 'password' };
+    expect(entry('document-check', 'Document check: 12 pages', { ...checkOptions, ...stray, author: 'Invented Author' }).metadata.options).toEqual(checkOptions);
+    for (const protection of ['none', 'password', 'restrictions']) expect(entry('document-check', 'x', { protection }).metadata.options).toEqual({ protection });
+    expect(entry('document-check', 'x', { protection: 'owner password 1234', signatures: 'Signed by A. Invented' }).metadata.options).toEqual({});
+
+    // Compare (review/compareForm.ts RECORD_KEYS)
+    const compareOptions = { pagesEarlier: 12, pagesLater: 13, pagesDiffer: 2, pagesOnlyEarlier: 0, pagesOnlyLater: 1, wordsAdded: 4, wordsRemoved: 3, wordsChanged: 6, pagesWithoutText: 0, pagesComparedCoarsely: 0 };
+    expect(entry('compare', 'Compared 2 files: 2 of 13 pages differ', { ...compareOptions, ...stray, removed: 'net profit', added: 'net loss' }).metadata.options).toEqual(compareOptions);
+    expect(entry('compare', 'x', { pagesDiffer: '2 of 13', wordsAdded: -1 }).metadata.options).toEqual({});
+
+    // Make searchable (ocr/ocrForm.ts RECORD_KEYS): eleven counts, never a recognised word
+    const ocrOptions = { pages: 12, pagesRecognised: 8, pagesSkipped: 4, pagesTimedOut: 0, words: 2400, lowConfidenceWords: 31, numbersToCheck: 14, pagesFaint: 1, charactersDropped: 2, wordsLeftOut: 310, pagesPartlyRead: 2 };
+    expect(entry('ocr', 'Made searchable: 8 of 12 pages recognised', { ...ocrOptions, ...stray, firstWord: 'Halvick', text: 'Invented ledger 1,23,456.78' }).metadata.options).toEqual(ocrOptions);
+    expect(entry('ocr', 'x', { words: 'Halvick Traders', numbersToCheck: -1, pagesFaint: 1.5 }).metadata.options).toEqual({});
+
+    for (const tool of ['pdf-to-excel', 'pdf-to-word', 'document-check', 'compare', 'ocr'] as const) {
+      const text = JSON.stringify(entry(tool, 'Summary', stray));
+      for (const value of Object.values(stray)) expect(text, tool).not.toContain(value);
+      // as an earlier step of a later result too
+      const later = buildActivityEntry({
+        file: result({ operation: { tool: 'merge', summary: 'Merged 2 files', sources: [], options: {}, earlier: [{ tool, summary: 'Summary', resultName: 'r.pdf', options: stray, resultId: 'e1' }], originalSources: [] } }),
+        destination: 'vault',
+        sha256: SHA,
+      });
+      expect((later.metadata.earlierSteps as { options: object }[])[0].options, tool).toEqual({});
+    }
+  });
+
+  it('allows exactly the keys each phase 3 tool records (its RECORD_KEYS), so a key added to a tool cannot be dropped unnoticed', () => {
+    const recorded: Record<'pdf-to-excel' | 'pdf-to-word' | 'document-check' | 'compare' | 'ocr', readonly string[]> = {
+      'pdf-to-excel': EXCEL_RECORD_KEYS,
+      'pdf-to-word': WORD_RECORD_KEYS,
+      'document-check': CHECK_RECORD_KEYS,
+      compare: COMPARE_RECORD_KEYS,
+      ocr: OCR_RECORD_KEYS,
+    };
+    for (const [tool, keys] of Object.entries(recorded) as [keyof typeof recorded, readonly string[]][]) {
+      // Each key with a count, then with each tool's one choice: whichever shape the key takes, it is kept.
+      const kept = new Set<string>();
+      for (const value of [1, 'one-sheet', 'none']) {
+        const options = Object.fromEntries([...keys, 'notRecorded'].map((key) => [key, value]));
+        const entry = buildActivityEntry({ file: result({ operation: { tool, summary: 'Summary', sources: [], options } }), destination: 'computer', sha256: SHA });
+        for (const key of Object.keys(entry.metadata.options as object)) kept.add(key);
+      }
+      expect([...kept].sort(), tool).toEqual([...keys].sort());
+    }
   });
 
   it('keeps only counts and choices in a Resize or crop pages record', () => {

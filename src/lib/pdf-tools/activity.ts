@@ -223,8 +223,8 @@ const SLOT_KEYS = ['top_left', 'top_center', 'top_right', 'bottom_left', 'bottom
 ] as const);
 
 /**
- * The only options a Redact, Protect, Resize or crop pages, Watermark or Page numbers record may hold (design
- * 5.9, 5.18, 5.19, 5.16, 5.17): counts and choices, never a redacted value, typed term, custom token, masked
+ * The only options a Redact, Protect, Resize or crop pages, Watermark, Page numbers, PDF to Excel, PDF to Word,
+ * Document check or Compare record may hold (design 5.9, 5.18, 5.19, 5.16, 5.17, 5.11, 5.13): counts and choices, never a redacted value, typed term, custom token, masked
  * text, anything about a password, or a text the user typed (a watermark, stamp, header, footer or the text
  * around a page number: only which ready-made text or token template was chosen, or that it was custom text
  * and how long), nor the logo's file name. Anything else, or a value of another shape, is left out of the
@@ -316,6 +316,43 @@ const RESTRICTED_OPTIONS: Partial<Record<ToolId, Record<string, (value: unknown)
     dateFormat: oneOf('dd-mm-yyyy', 'dd/mm/yyyy', 'yyyy-mm-dd', 'long'),
     numbersOn: isBoolean,
     ...Object.fromEntries(SLOT_KEYS),
+  },
+  // Phase 3 (T-064): counts and one choice each, the same keys as each tool's RECORD_KEYS. Never a cell, a
+  // heading, a signer's name, a document property or a word that differs.
+  // PDF to Excel (convert/excelForm.ts).
+  'pdf-to-excel': {
+    sheetMode: oneOf('one-sheet', 'per-page'),
+    pages: isCount,
+    sheets: isCount,
+    rows: isCount,
+    numberCells: isCount,
+    tablesRuled: isCount,
+    tablesAligned: isCount,
+    pagesAsText: isCount,
+    pagesNoText: isCount,
+    pagesFromScan: isCount,
+  },
+  // PDF to Word (convert/wordForm.ts).
+  'pdf-to-word': { pages: isCount, paragraphs: isCount, headings: isCount, tables: isCount, pagesNoText: isCount, pagesFromScan: isCount },
+  // Document check (review/documentCheckForm.ts).
+  'document-check': { pages: isCount, signatures: isCount, pagesWithText: isCount, pagesScanned: isCount, protection: oneOf('none', 'password', 'restrictions') },
+  // Make searchable: counts only (ocr/ocrForm.ts RECORD_KEYS); never a recognised word.
+  ocr: {
+    pages: isCount, pagesRecognised: isCount, pagesSkipped: isCount, pagesTimedOut: isCount, words: isCount, lowConfidenceWords: isCount,
+    numbersToCheck: isCount, pagesFaint: isCount, charactersDropped: isCount, wordsLeftOut: isCount, pagesPartlyRead: isCount,
+  },
+  // Compare (review/compareForm.ts).
+  compare: {
+    pagesEarlier: isCount,
+    pagesLater: isCount,
+    pagesDiffer: isCount,
+    pagesOnlyEarlier: isCount,
+    pagesOnlyLater: isCount,
+    wordsAdded: isCount,
+    wordsRemoved: isCount,
+    wordsChanged: isCount,
+    pagesWithoutText: isCount,
+    pagesComparedCoarsely: isCount,
   },
 };
 

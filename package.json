@@ -30,7 +30,8 @@
     "test:pdf-tools-ui": "npm run build && node scripts/test-pdf-tools-ui.cjs",
     "test:t003-authorization": "npm run build && node --test scripts/test-t003-authorization.cjs",
     "docs:check": "node scripts/check-project-docs.mjs",
-    "docs:inventory": "node scripts/check-project-docs.mjs --refresh-inventory"
+    "docs:inventory": "node scripts/check-project-docs.mjs --refresh-inventory",
+    "sync:ocr-assets": "node scripts/sync-ocr-assets.mjs"
   },
   "build": {
     "appId": "com.icai-vera.app",
@@ -189,6 +190,7 @@
     "@electron/rebuild": "^4.0.2",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
+    "@tesseract.js-data/eng": "1.0.0",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
     "@types/bcrypt": "^5.0.2",
@@ -209,6 +211,8 @@
     "lovable-tagger": "^1.1.13",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",

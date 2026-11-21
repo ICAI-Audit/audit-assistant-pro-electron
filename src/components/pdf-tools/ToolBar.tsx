@@ -99,20 +99,22 @@ function ToolButton({ label, icon: Icon, hint, enabled, soon, testId, soonKey, o
             setOpen(false); // the tool's dialog opens next; its tooltip must not stay above it
             onSelect?.();
           }}
+          // Buttons a little tighter than the list bar's (T-064): with PDF to Excel, PDF to Word, Document check and Compare
+          // as buttons, Convert and Review still share a row at 1280 x 720, so the toolbar stays three rows (UX audit C13).
           className={cn(
             'inline-flex shrink-0 items-center whitespace-nowrap rounded-md font-medium transition-colors',
             'ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             soon
               ? 'h-8 cursor-default px-1 text-[11px] font-normal text-muted-foreground hover:text-foreground'
               : enabled
-                ? 'h-8 gap-1.5 border border-border bg-card px-2 text-xs text-foreground shadow-sm hover:border-primary/60 hover:bg-accent hover:text-accent-foreground'
-                : 'h-8 cursor-not-allowed gap-1.5 border border-border/70 bg-muted/30 px-2 text-xs text-muted-foreground',
+                ? 'h-8 gap-1 border border-border bg-card px-1.5 text-xs text-foreground shadow-sm hover:border-primary/60 hover:bg-accent hover:text-accent-foreground'
+                : 'h-8 cursor-not-allowed gap-1 border border-border/70 bg-muted/30 px-1.5 text-xs text-muted-foreground',
           )}
         >
           {busy ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" aria-hidden="true" />
           ) : (
-            Icon && !soon && <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'opacity-70')} aria-hidden="true" />
+            Icon && !soon && <Icon className={cn('h-3.5 w-3.5 shrink-0', enabled ? 'text-primary' : 'opacity-70')} aria-hidden="true" />
           )}
           {soon ? soonLabel(label) : label}
           <span className="sr-only">{busy ? '. Opening…' : `. ${hint}`}</span>
@@ -204,7 +206,7 @@ export default function ToolBar({ selected, onToolSelected, built, onUnavailable
           const together = usable.length > 0 ? usable : later.splice(0, 1);
           return (
             <div key={group} role="group" aria-label={group} className="contents">
-              <span className={cn('inline-flex max-w-full flex-wrap items-center gap-1', groupIndex > 0 && 'ml-2.5')}>
+              <span className={cn('inline-flex max-w-full flex-wrap items-center gap-1', groupIndex > 0 && 'ml-1')}>
                 <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground" aria-hidden="true">
                   {group}
                 </span>
@@ -216,7 +218,7 @@ export default function ToolBar({ selected, onToolSelected, built, onUnavailable
   });
 
   return (
-    <div role="toolbar" aria-label="PDF Tools" aria-orientation="horizontal" data-pdf-toolbar onKeyDown={onKeyDown} className="rounded-lg border bg-card px-3 py-1.5 shadow-sm">
+    <div role="toolbar" aria-label="PDF Tools" aria-orientation="horizontal" data-pdf-toolbar onKeyDown={onKeyDown} className="rounded-lg border bg-card px-2 py-1.5 shadow-sm">
       <div className="flex flex-wrap items-center gap-x-1 gap-y-1">{groups}</div>
     </div>
   );
