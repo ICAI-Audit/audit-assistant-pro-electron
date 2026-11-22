@@ -29,8 +29,8 @@ describe('build information label', () => {
   });
 
   it('identifies the latest pulled main updates on the startup label', () => {
-    expect(html).toContain('Repository sync: origin/main (15 November 2026)');
-    expect(html).toContain('Update: PDF Tools phase 3');
+    expect(html).toContain('Repository sync: origin/main (21 November 2026)');
+    expect(html).toContain('Update: PDF Tools phase 3 (PR #121)');
     expect(buildDetailLines()).toContain('Source branch: main');
   });
 
