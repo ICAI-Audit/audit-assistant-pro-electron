@@ -1,0 +1,5 @@
+# Files copied from packages and checked by hash: keep their bytes exactly as committed.
+public/pdf-tools/ocr/** -text
+# Test fixtures and extracted data compared byte for byte: keep their bytes exactly as committed.
+src/lib/__fixtures__/taxAuditForm26/** -text
+scripts/tax-audit-form26/as-built.json -text

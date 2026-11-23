@@ -1,3 +1,5 @@
+> Historical schema document. The `tb_new_*` tables it describes were removed from the SQLite schema in T-019; an existing database drops them at start-up only when all of them are empty, after a backup. See [Financial Statement Review](project/FINANCIAL_STATEMENT_REVIEW.md) and [current status](project/CURRENT_STATUS.md).
+
 # Trial Balance New - Database Schema Documentation
 
 ## Overview

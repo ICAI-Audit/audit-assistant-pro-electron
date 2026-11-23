@@ -1,0 +1,1107 @@
+{
+  "note": "Recorded by scripts/test-tax-audit-ui.cjs --record from a build of src/pages/TaxAudit.tsx before the Form No. 26 chooser (task 19). Invented data only; dates, times and ids masked.",
+  "2024-25": {
+    "tabs": [
+      "Overview",
+      "Setup and Applicability",
+      "Acceptance and Eligibility",
+      "Compliance Tracker",
+      "Audit Programme",
+      "3CA/3CB",
+      "3CD Clause Workspace",
+      "Review Summary"
+    ],
+    "clausesText": "Tax Audit\n\nInvented Traders Private Limited - 2024-25\n\nTax Audit Beta v0.1 RC1\nIncome-tax Act, 1961\nRule 6G\nForm 3CA + 3CD\nNot assessed\nRefresh Prefill\nReview Queue\nOverview\nSetup and Applicability\nAcceptance and Eligibility\nCompliance Tracker\nAudit Programme\n3CA/3CB\n3CD Clause Workspace\nReview Summary\nAcceptance checklist is not completed. Clause work remains available.\n\nForm 3CD Clauses\n\n49 visible\n\n49\nAll\n49\nAttention\n43\nNeed Evidence\n14\nEvidence\n0\nRemarks\n0\nReviewed\n0\nPART A - BASIC PARTICULARS\n11 clauses · 5 pending\n1\nName of the assessee\nAuto-filled\n2\nAddress\n3\nPAN or Aadhaar number\n4\nIndirect tax registration details\n5\nStatus of the assessee\n6\nPrevious year\n7\nAssessment year\n8\nRelevant clause of section 44AB\n8a\nWhether the assessee has opted for taxation under section 115BA/115BAA/115BAB/115BAC/115BAD/115BAE\n9\nFirm or AOP/BOI partner or member details\n10\nNature of business or profession\nBOOKS AND METHOD OF ACCOUNTING\n4 clauses · 4 pending\n2 evidence\n11\nBooks of account and locations where books are kept\nEvidence\n12\nWhether profit and loss account includes presumptive income\n13\nMethod of accounting and changes therein\n14\nMethod of valuation of closing stock\nEvidence\nPROFIT AND GAINS ADJUSTMENTS\n6 clauses · 6 pending\n3 evidence\n15\nCapital asset converted into stock-in-trade\nEvidence\n16\nAmounts not credited to profit and loss account\n17\nTransfer of land or building below stamp value\nEvidence\n18\nDepreciation allowable under the Act\nEvidence\n24\nDeemed profits and gains under section 32AC/33AB/33ABA/33AC\n25\nAmounts chargeable under section 41\nDEDUCTIONS AND DISALLOWANCES\n7 clauses · 7 pending\n5 evidence\n19\nAmounts admissible under specified sections\n20\nEmployee contribution and bonus/commission details\nEvidence\n36(1)(ii)\nBonus or commission under section 36(1)(ii)\n0 rows\n36(1)(va)\nEmployee contribution under section 36(1)(va)\n0 rows\n21\nAmounts debited to profit and loss account and disallowances\nEvidence\n21(a)\nSpecified expenditure items\n0 rows · 1 warning\n21(b)\nSection 40(a) inadmissible amounts\n0 rows\n21(c)\nSection 40(b) / 40(ba) inadmissible amounts\n0 rows\n21(d)\nSection 40A(3) / 40A(3A)\n0 rows\n21(e)\nProvision for gratuity\n0 rows\n21(f)\nEmployer sums under section 40A(9)\n0 rows\n21(g)\nContingent liabilities\n0 rows\n21(h)\nSection 14A\n0 rows\n21(i)\nProviso to section 36(1)(iii)\n0 rows · 1 warning\n22\nMSMED payments and interest reporting\nEvidence\n22(i)\nInterest inadmissible\n0 rows\n22(ii)\nAmount required to be paid to micro and small enterprises\n0 rows\n22(iii)\nPaid within time / not paid within time\n0 rows\n23\nPayments to persons specified under section 40A(2)(b)\nEvidence\n26\nLiabilities covered by section 43B\nEvidence\n26(i)(A)\nOpening section 43B liabilities\n0 rows\n26(i)(B)\nCurrent year section 43B liabilities\n0 rows\n26(ii)\nIndirect taxes passed through profit and loss account\n0 rows\n27\nCENVAT/Input tax credit and prior period items\n27(a)\nCENVAT / Input Tax Credit\n0 rows\n27(b)\nPrior period income or expenditure\n0 rows\nLOANS, DEPOSITS AND SPECIFIED TRANSACTIONS\n7 clauses · 7 pending\n1 evidence\n29A\nAmount chargeable under section 56(2)(ix)\n29B\nAmount chargeable under section 56(2)(x)\n29B(a)\nMoney received\n0 rows\n29B(b)\nImmovable property received\n0 rows\n29B(c)\nOther specified property received\n0 rows\n30\nHundi borrowings and repayments under section 69D\n30A\nPrimary adjustment to transfer price under section 92CE\n30B\nLimitation on interest deduction under section 94B\n30B(a)\nInterest / similar expenditure details\n0 rows\n30B(b)\nComputation summary\n0 rows\n30C\nImpermissible avoidance arrangement under section 96\n31\nLoans, deposits and specified sums\nEvidence\n31(a)\nLoans or deposits accepted\n0 rows · 1 warning\n31(b)\nSpecified sums accepted\n0 rows · 1 warning\n31(ba)\nReceipts otherwise than permitted modes\n0 rows\n31(bb)\nReceipts by non-account payee cheque/draft\n0 rows\n31(bc)\nPayments otherwise than permitted modes\n0 rows\n31(bd)\nPayments by non-account payee cheque/draft\n0 rows\n31(c)\nRepayments made\n0 rows\n31(d)\nRepayments received otherwise than permitted modes\n0 rows\n31(e)\nRepayments received by non-account payee cheque/draft\n0 rows\nDEDUCTIONS, TAXES AND COMPLIANCE\n7 clauses · 7 pending\n1 evidence\n32\nBrought forward losses, depreciation and section 115BAA/115BAC details\n32(a)\nBrought forward loss / depreciation\n0 rows\n32(b)\nSection 79 shareholding change\n0 rows\n32(c)\nSpeculation loss\n0 rows\n32(d)\nSpecified business loss\n0 rows\n32(e)\nDeemed speculation business\n0 rows\n33\nDeductions under Chapter VIA and other sections\n34\nTDS/TCS compliance\nEvidence\n34(a)\nTDS/TCS deduction and collection summary\n0 rows · 1 warning\n34(b)\nTDS/TCS statement filing details\n0 rows · 1 warning\n34(c)\nInterest under section 201(1A) / 206C(7)\n0 rows · 1 warning\n36A\nDeemed dividend under section 2(22)(e)\n36A\nDeemed dividend under section 2(22)(e)\n0 rows · 1 warning\n36B\nAmount received for buyback of shares under section 2(22)(f)\n36B\nAmount received for buyback of shares under section 2(22)(f)\n0 rows · 1 warning\n42\nForm 61, Form 61A and Form 61B reporting\n42\nForm 61, Form 61A and Form 61B reporting\n0 rows · 1 warning\n43\nCountry-by-country reporting under section 286\n43\nCountry-by-country reporting under section 286\n0 rows · 1 warning\nQUANTITATIVE AND OTHER DETAILS\n7 clauses · 7 pending\n2 evidence\n35\nTrading and manufacturing quantitative details\nEvidence\n35(a)\nTrading goods\n0 rows\n35(b)(A)\nRaw materials\n0 rows\n35(b)(B)\nFinished products / by-products\n0 rows\n37\nCost audit report\n37\nCost audit report\n0 rows · 1 warning\n38\nCentral excise audit report\n38\nCentral excise audit report\n0 rows · 1 warning\n39\nService tax audit report\n39\nService tax audit report\n0 rows · 1 warning\n40\nAccounting ratios\n40\nAccounting ratios\n0 rows · 1 warning\n41\nDemand or refund under any tax law other than Income-tax Act and Wealth-tax Act\n41\nDemand or refund under other tax laws\n0 rows · 1 warning\n44\nGST expenditure break-up\nEvidence\n44\nGST expenditure break-up\n0 rows · 1 warning\nClause 1 · Name of the assessee\nAuto-filled\n·\nDraft\n·\nTA-3CD-1\nPrepared\nReviewed\nApprove\nClause guidance and source links\n\nForm 3CD Particulars\n\nName of the assessee\nSource: Client master / Tax audit setup\nAdditional Report Particulars\nContains text\n\nOptional report-facing narrative when structured fields are not sufficient.\n\nReview Remarks/Notes of Auditor- (For Internal Working paper only)\n\nOptional auditor review notes and working paper observations.\n\nQualification / observation required in report\n\nSources, Evidence and Review\n\n0 linked evidence file(s)\n\nLinked Evidence\n0\nNo evidence linked to this clause.\nAttach Existing Evidence\nSelect evidence file\nAttach\nUpload New Evidence\nUpload and Link\nEvidence files stay in the central Evidence Vault. Tax Audit stores only clause-level links and workpaper references.",
+    "overviewText": "Tax Audit\n\nInvented Traders Private Limited - 2024-25\n\nTax Audit Beta v0.1 RC1\nIncome-tax Act, 1961\nRule 6G\nForm 3CA + 3CD\nNot assessed\nRefresh Prefill\nReview Queue\nOverview\nSetup and Applicability\nAcceptance and Eligibility\nCompliance Tracker\nAudit Programme\n3CA/3CB\n3CD Clause Workspace\nReview Summary\nTax Audit Beta v0.1 RC1 - Phase 1: Structured Tax Audit Workflow\nBeta version for pilot testing. This tool assists in tax audit documentation and review. It does not replace the auditor's professional judgment or responsibility.\n\nAPPLICABILITY\n\nNot assessed\n\nForm 3CA + 3CD\n\nACCEPTANCE\n\nAcceptance pending\n\nEligibility checklist\n\nCOMPLIANCE TRACKER\n\nSpecified date pending\n\nSpecified date, filing and UDIN\n\nCLAUSE PROGRESS\n\n0%\n\n0 of 49 clauses moved from draft\n\nNEEDS INPUT\n\n43\n\nMissing or manual clauses\n\nSOURCE CONFLICTS\n\n0\n\nRequires source review\n\nEVIDENCE LINKED\n\n0\n\nClause workpapers attached\n\nAUDITOR REMARKS\n\n0\n\nQualification or observation flags\n\nCA Workflow Snapshot\n\nSETUP\n\nReady\n\nForm 3CA + 3CD - AY 2025-26\n\nAPPLICABILITY\n\nNot assessed\n\nBusiness turnover is required to assess section 44AB(a).\n\nACCEPTANCE\n\nAcceptance pending\n\nEligibility and professional acceptance\n\nCLAUSE REVIEW\n\n0/49\n\n43 need input - 0 conflicts\n\nEVIDENCE\n\n0/14\n\nLinked evidence against evidence-expected clauses\n\nEXPORT\n\nDraft enabled\n\nStatutory draft export available with readiness warnings\n\nProfessional Responsibility and Disclaimer\n\nAcknowledgement Pending\n\nAssistance Tool notice for Professional Judgment, Auditor Responsibility and Verification Required before report preparation.\n\nA. Purpose of the Tool\nB. Professional Judgment\nC. Auditor Responsibility\nD. Verification with Law and ICAI Guidance\nE. Data and Input Responsibility\nF. Limitation of Automated Outputs\nG. Documentation and Evidence\nH. Limitation of Use\nI. Final Report Responsibility\nI acknowledge that this tool is an assistance tool and does not replace my professional judgment or responsibility as tax auditor.\nAcknowledged by\nSave Acknowledgement\nKnown Limitations\nStatutory Form 3CD exports are draft outputs and require professional review before signing or portal upload.\nPortal filing is not part of this beta.\nIncome Tax portal schema upload is not part of this beta.\nGST, TDS and purchase register imports are not part of this beta.\nStructured clause capture is manual and requires professional review.\nThe Working Paper Report Pack is an internal working paper summary, not a signed report.\nPilot users should avoid using confidential client data unless specifically permitted by ICAI or their firm. For pilot testing, use dummy data or anonymised data where possible.\nPilot Diagnostics\nTax Audit module\nTax Audit Beta v0.1 RC1\nStatutory scope\nAY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD\nWorkflow phase\nPhase 1: Structured Tax Audit Workflow\nBuild mode\nproduction\n\nLocal data location and Electron runtime details are available in the packaged application diagnostics where exposed by the desktop shell.\n\n3CD Review Progress\n\n0 of 49 clauses moved from draft\n\n0%\n\nprepared / reviewed / approved",
+    "audits": [
+      {
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025",
+        "form_type": "3CA",
+        "financial_year": "2024-25",
+        "assessment_year": "2025-26",
+        "review_status": "draft"
+      }
+    ],
+    "clauses": [
+      {
+        "clause_key": "clause_1",
+        "clause_no": "1",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_10",
+        "clause_no": "10",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_11",
+        "clause_no": "11",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_12",
+        "clause_no": "12",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_13",
+        "clause_no": "13",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_14",
+        "clause_no": "14",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_15",
+        "clause_no": "15",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_16",
+        "clause_no": "16",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_17",
+        "clause_no": "17",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_18",
+        "clause_no": "18",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_19",
+        "clause_no": "19",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_2",
+        "clause_no": "2",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_20",
+        "clause_no": "20",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_21",
+        "clause_no": "21",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_22",
+        "clause_no": "22",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_23",
+        "clause_no": "23",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_24",
+        "clause_no": "24",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_25",
+        "clause_no": "25",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_26",
+        "clause_no": "26",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_27",
+        "clause_no": "27",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_29a",
+        "clause_no": "29A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_29b",
+        "clause_no": "29B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_3",
+        "clause_no": "3",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30",
+        "clause_no": "30",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30a",
+        "clause_no": "30A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30b",
+        "clause_no": "30B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30c",
+        "clause_no": "30C",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_31",
+        "clause_no": "31",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_32",
+        "clause_no": "32",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_33",
+        "clause_no": "33",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_34",
+        "clause_no": "34",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_35",
+        "clause_no": "35",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_36a",
+        "clause_no": "36A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_36b",
+        "clause_no": "36B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_37",
+        "clause_no": "37",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_38",
+        "clause_no": "38",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_39",
+        "clause_no": "39",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_4",
+        "clause_no": "4",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_40",
+        "clause_no": "40",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_41",
+        "clause_no": "41",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_42",
+        "clause_no": "42",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_43",
+        "clause_no": "43",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_44",
+        "clause_no": "44",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_5",
+        "clause_no": "5",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_6",
+        "clause_no": "6",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_7",
+        "clause_no": "7",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_8",
+        "clause_no": "8",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_8a",
+        "clause_no": "8a",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_9",
+        "clause_no": "9",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      }
+    ]
+  },
+  "2025-26": {
+    "tabs": [
+      "Overview",
+      "Setup and Applicability",
+      "Acceptance and Eligibility",
+      "Compliance Tracker",
+      "Audit Programme",
+      "3CA/3CB",
+      "3CD Clause Workspace",
+      "Review Summary"
+    ],
+    "clausesText": "Tax Audit\n\nInvented Traders Private Limited - 2025-26\n\nTax Audit Beta v0.1 RC1\nIncome-tax Act, 1961\nRule 6G\nAY review required\nForm 3CA + 3CD\nNot assessed\nRefresh Prefill\nReview Queue\nOverview\nSetup and Applicability\nAcceptance and Eligibility\nCompliance Tracker\nAudit Programme\n3CA/3CB\n3CD Clause Workspace\nReview Summary\nAcceptance checklist is not completed. Clause work remains available.\n\nForm 3CD Clauses\n\n49 visible\n\n49\nAll\n49\nAttention\n43\nNeed Evidence\n14\nEvidence\n0\nRemarks\n0\nReviewed\n0\nPART A - BASIC PARTICULARS\n11 clauses · 5 pending\n1\nName of the assessee\nAuto-filled\n2\nAddress\n3\nPAN or Aadhaar number\n4\nIndirect tax registration details\n5\nStatus of the assessee\n6\nPrevious year\n7\nAssessment year\n8\nRelevant clause of section 44AB\n8a\nWhether the assessee has opted for taxation under section 115BA/115BAA/115BAB/115BAC/115BAD/115BAE\n9\nFirm or AOP/BOI partner or member details\n10\nNature of business or profession\nBOOKS AND METHOD OF ACCOUNTING\n4 clauses · 4 pending\n2 evidence\n11\nBooks of account and locations where books are kept\nEvidence\n12\nWhether profit and loss account includes presumptive income\n13\nMethod of accounting and changes therein\n14\nMethod of valuation of closing stock\nEvidence\nPROFIT AND GAINS ADJUSTMENTS\n6 clauses · 6 pending\n3 evidence\n15\nCapital asset converted into stock-in-trade\nEvidence\n16\nAmounts not credited to profit and loss account\n17\nTransfer of land or building below stamp value\nEvidence\n18\nDepreciation allowable under the Act\nEvidence\n24\nDeemed profits and gains under section 32AC/33AB/33ABA/33AC\n25\nAmounts chargeable under section 41\nDEDUCTIONS AND DISALLOWANCES\n7 clauses · 7 pending\n5 evidence\n19\nAmounts admissible under specified sections\n20\nEmployee contribution and bonus/commission details\nEvidence\n36(1)(ii)\nBonus or commission under section 36(1)(ii)\n0 rows\n36(1)(va)\nEmployee contribution under section 36(1)(va)\n0 rows\n21\nAmounts debited to profit and loss account and disallowances\nEvidence\n21(a)\nSpecified expenditure items\n0 rows · 1 warning\n21(b)\nSection 40(a) inadmissible amounts\n0 rows\n21(c)\nSection 40(b) / 40(ba) inadmissible amounts\n0 rows\n21(d)\nSection 40A(3) / 40A(3A)\n0 rows\n21(e)\nProvision for gratuity\n0 rows\n21(f)\nEmployer sums under section 40A(9)\n0 rows\n21(g)\nContingent liabilities\n0 rows\n21(h)\nSection 14A\n0 rows\n21(i)\nProviso to section 36(1)(iii)\n0 rows · 1 warning\n22\nMSMED payments and interest reporting\nEvidence\n22(i)\nInterest inadmissible\n0 rows\n22(ii)\nAmount required to be paid to micro and small enterprises\n0 rows\n22(iii)\nPaid within time / not paid within time\n0 rows\n23\nPayments to persons specified under section 40A(2)(b)\nEvidence\n26\nLiabilities covered by section 43B\nEvidence\n26(i)(A)\nOpening section 43B liabilities\n0 rows\n26(i)(B)\nCurrent year section 43B liabilities\n0 rows\n26(ii)\nIndirect taxes passed through profit and loss account\n0 rows\n27\nCENVAT/Input tax credit and prior period items\n27(a)\nCENVAT / Input Tax Credit\n0 rows\n27(b)\nPrior period income or expenditure\n0 rows\nLOANS, DEPOSITS AND SPECIFIED TRANSACTIONS\n7 clauses · 7 pending\n1 evidence\n29A\nAmount chargeable under section 56(2)(ix)\n29B\nAmount chargeable under section 56(2)(x)\n29B(a)\nMoney received\n0 rows\n29B(b)\nImmovable property received\n0 rows\n29B(c)\nOther specified property received\n0 rows\n30\nHundi borrowings and repayments under section 69D\n30A\nPrimary adjustment to transfer price under section 92CE\n30B\nLimitation on interest deduction under section 94B\n30B(a)\nInterest / similar expenditure details\n0 rows\n30B(b)\nComputation summary\n0 rows\n30C\nImpermissible avoidance arrangement under section 96\n31\nLoans, deposits and specified sums\nEvidence\n31(a)\nLoans or deposits accepted\n0 rows · 1 warning\n31(b)\nSpecified sums accepted\n0 rows · 1 warning\n31(ba)\nReceipts otherwise than permitted modes\n0 rows\n31(bb)\nReceipts by non-account payee cheque/draft\n0 rows\n31(bc)\nPayments otherwise than permitted modes\n0 rows\n31(bd)\nPayments by non-account payee cheque/draft\n0 rows\n31(c)\nRepayments made\n0 rows\n31(d)\nRepayments received otherwise than permitted modes\n0 rows\n31(e)\nRepayments received by non-account payee cheque/draft\n0 rows\nDEDUCTIONS, TAXES AND COMPLIANCE\n7 clauses · 7 pending\n1 evidence\n32\nBrought forward losses, depreciation and section 115BAA/115BAC details\n32(a)\nBrought forward loss / depreciation\n0 rows\n32(b)\nSection 79 shareholding change\n0 rows\n32(c)\nSpeculation loss\n0 rows\n32(d)\nSpecified business loss\n0 rows\n32(e)\nDeemed speculation business\n0 rows\n33\nDeductions under Chapter VIA and other sections\n34\nTDS/TCS compliance\nEvidence\n34(a)\nTDS/TCS deduction and collection summary\n0 rows · 1 warning\n34(b)\nTDS/TCS statement filing details\n0 rows · 1 warning\n34(c)\nInterest under section 201(1A) / 206C(7)\n0 rows · 1 warning\n36A\nDeemed dividend under section 2(22)(e)\n36A\nDeemed dividend under section 2(22)(e)\n0 rows · 1 warning\n36B\nAmount received for buyback of shares under section 2(22)(f)\n36B\nAmount received for buyback of shares under section 2(22)(f)\n0 rows · 1 warning\n42\nForm 61, Form 61A and Form 61B reporting\n42\nForm 61, Form 61A and Form 61B reporting\n0 rows · 1 warning\n43\nCountry-by-country reporting under section 286\n43\nCountry-by-country reporting under section 286\n0 rows · 1 warning\nQUANTITATIVE AND OTHER DETAILS\n7 clauses · 7 pending\n2 evidence\n35\nTrading and manufacturing quantitative details\nEvidence\n35(a)\nTrading goods\n0 rows\n35(b)(A)\nRaw materials\n0 rows\n35(b)(B)\nFinished products / by-products\n0 rows\n37\nCost audit report\n37\nCost audit report\n0 rows · 1 warning\n38\nCentral excise audit report\n38\nCentral excise audit report\n0 rows · 1 warning\n39\nService tax audit report\n39\nService tax audit report\n0 rows · 1 warning\n40\nAccounting ratios\n40\nAccounting ratios\n0 rows · 1 warning\n41\nDemand or refund under any tax law other than Income-tax Act and Wealth-tax Act\n41\nDemand or refund under other tax laws\n0 rows · 1 warning\n44\nGST expenditure break-up\nEvidence\n44\nGST expenditure break-up\n0 rows · 1 warning\nClause 1 · Name of the assessee\nAuto-filled\n·\nDraft\n·\nTA-3CD-1\nPrepared\nReviewed\nApprove\nClause guidance and source links\n\nForm 3CD Particulars\n\nName of the assessee\nSource: Client master / Tax audit setup\nAdditional Report Particulars\nContains text\n\nOptional report-facing narrative when structured fields are not sufficient.\n\nReview Remarks/Notes of Auditor- (For Internal Working paper only)\n\nOptional auditor review notes and working paper observations.\n\nQualification / observation required in report\n\nSources, Evidence and Review\n\n0 linked evidence file(s)\n\nLinked Evidence\n0\nNo evidence linked to this clause.\nAttach Existing Evidence\nSelect evidence file\nAttach\nUpload New Evidence\nUpload and Link\nEvidence files stay in the central Evidence Vault. Tax Audit stores only clause-level links and workpaper references.",
+    "overviewText": "Tax Audit\n\nInvented Traders Private Limited - 2025-26\n\nTax Audit Beta v0.1 RC1\nIncome-tax Act, 1961\nRule 6G\nAY review required\nForm 3CA + 3CD\nNot assessed\nRefresh Prefill\nReview Queue\nOverview\nSetup and Applicability\nAcceptance and Eligibility\nCompliance Tracker\nAudit Programme\n3CA/3CB\n3CD Clause Workspace\nReview Summary\nTax Audit Beta v0.1 RC1 - Phase 1: Structured Tax Audit Workflow\nBeta version for pilot testing. This tool assists in tax audit documentation and review. It does not replace the auditor's professional judgment or responsibility.\nThis engagement is for AY 2026-27, while the configured Form 3CD library is tagged for AY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD. Verify the current Income-tax Rules, CBDT notifications and portal schema before relying on statutory export.\n\nAPPLICABILITY\n\nNot assessed\n\nForm 3CA + 3CD\n\nACCEPTANCE\n\nAcceptance pending\n\nEligibility checklist\n\nCOMPLIANCE TRACKER\n\nSpecified date pending\n\nSpecified date, filing and UDIN\n\nCLAUSE PROGRESS\n\n0%\n\n0 of 49 clauses moved from draft\n\nNEEDS INPUT\n\n43\n\nMissing or manual clauses\n\nSOURCE CONFLICTS\n\n0\n\nRequires source review\n\nEVIDENCE LINKED\n\n0\n\nClause workpapers attached\n\nAUDITOR REMARKS\n\n0\n\nQualification or observation flags\n\nCA Workflow Snapshot\n\nSETUP\n\nReady\n\nForm 3CA + 3CD - AY 2026-27\n\nAPPLICABILITY\n\nNot assessed\n\nBusiness turnover is required to assess section 44AB(a).\n\nACCEPTANCE\n\nAcceptance pending\n\nEligibility and professional acceptance\n\nCLAUSE REVIEW\n\n0/49\n\n43 need input - 0 conflicts\n\nEVIDENCE\n\n0/14\n\nLinked evidence against evidence-expected clauses\n\nEXPORT\n\nAY review\n\nThis engagement is for AY 2026-27, while the configured Form 3CD library is tagged for AY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD. Verify the current Income-tax Rules, CBDT notifications and portal schema before relying on statutory export.\n\nProfessional Responsibility and Disclaimer\n\nAcknowledgement Pending\n\nAssistance Tool notice for Professional Judgment, Auditor Responsibility and Verification Required before report preparation.\n\nA. Purpose of the Tool\nB. Professional Judgment\nC. Auditor Responsibility\nD. Verification with Law and ICAI Guidance\nE. Data and Input Responsibility\nF. Limitation of Automated Outputs\nG. Documentation and Evidence\nH. Limitation of Use\nI. Final Report Responsibility\nI acknowledge that this tool is an assistance tool and does not replace my professional judgment or responsibility as tax auditor.\nAcknowledged by\nSave Acknowledgement\nKnown Limitations\nStatutory Form 3CD exports are draft outputs and require professional review before signing or portal upload.\nPortal filing is not part of this beta.\nIncome Tax portal schema upload is not part of this beta.\nGST, TDS and purchase register imports are not part of this beta.\nStructured clause capture is manual and requires professional review.\nThe Working Paper Report Pack is an internal working paper summary, not a signed report.\nPilot users should avoid using confidential client data unless specifically permitted by ICAI or their firm. For pilot testing, use dummy data or anonymised data where possible.\nPilot Diagnostics\nTax Audit module\nTax Audit Beta v0.1 RC1\nStatutory scope\nAY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD\nWorkflow phase\nPhase 1: Structured Tax Audit Workflow\nBuild mode\nproduction\n\nLocal data location and Electron runtime details are available in the packaged application diagnostics where exposed by the desktop shell.\n\n3CD Review Progress\n\n0 of 49 clauses moved from draft\n\n0%\n\nprepared / reviewed / approved",
+    "audits": [
+      {
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025",
+        "form_type": "3CA",
+        "financial_year": "2025-26",
+        "assessment_year": "2026-27",
+        "review_status": "draft"
+      }
+    ],
+    "clauses": [
+      {
+        "clause_key": "clause_1",
+        "clause_no": "1",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_10",
+        "clause_no": "10",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_11",
+        "clause_no": "11",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_12",
+        "clause_no": "12",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_13",
+        "clause_no": "13",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_14",
+        "clause_no": "14",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_15",
+        "clause_no": "15",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_16",
+        "clause_no": "16",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_17",
+        "clause_no": "17",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_18",
+        "clause_no": "18",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_19",
+        "clause_no": "19",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_2",
+        "clause_no": "2",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_20",
+        "clause_no": "20",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_21",
+        "clause_no": "21",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_22",
+        "clause_no": "22",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_23",
+        "clause_no": "23",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_24",
+        "clause_no": "24",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_25",
+        "clause_no": "25",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_26",
+        "clause_no": "26",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_27",
+        "clause_no": "27",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_29a",
+        "clause_no": "29A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_29b",
+        "clause_no": "29B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_3",
+        "clause_no": "3",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30",
+        "clause_no": "30",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30a",
+        "clause_no": "30A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30b",
+        "clause_no": "30B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30c",
+        "clause_no": "30C",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_31",
+        "clause_no": "31",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_32",
+        "clause_no": "32",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_33",
+        "clause_no": "33",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_34",
+        "clause_no": "34",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_35",
+        "clause_no": "35",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_36a",
+        "clause_no": "36A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_36b",
+        "clause_no": "36B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_37",
+        "clause_no": "37",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_38",
+        "clause_no": "38",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_39",
+        "clause_no": "39",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_4",
+        "clause_no": "4",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_40",
+        "clause_no": "40",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_41",
+        "clause_no": "41",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_42",
+        "clause_no": "42",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_43",
+        "clause_no": "43",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_44",
+        "clause_no": "44",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_5",
+        "clause_no": "5",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_6",
+        "clause_no": "6",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_7",
+        "clause_no": "7",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_8",
+        "clause_no": "8",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_8a",
+        "clause_no": "8a",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_9",
+        "clause_no": "9",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      }
+    ]
+  },
+  "2026-27": {
+    "tabs": [
+      "Overview",
+      "Setup and Applicability",
+      "Acceptance and Eligibility",
+      "Compliance Tracker",
+      "Audit Programme",
+      "3CA/3CB",
+      "3CD Clause Workspace",
+      "Review Summary"
+    ],
+    "clausesText": "Tax Audit\n\nInvented Traders Private Limited - 2026-27\n\nTax Audit Beta v0.1 RC1\nIncome-tax Act, 1961\nRule 6G\nAY review required\nForm 3CA + 3CD\nNot assessed\nRefresh Prefill\nReview Queue\nOverview\nSetup and Applicability\nAcceptance and Eligibility\nCompliance Tracker\nAudit Programme\n3CA/3CB\n3CD Clause Workspace\nReview Summary\nAcceptance checklist is not completed. Clause work remains available.\n\nForm 3CD Clauses\n\n49 visible\n\n49\nAll\n49\nAttention\n43\nNeed Evidence\n14\nEvidence\n0\nRemarks\n0\nReviewed\n0\nPART A - BASIC PARTICULARS\n11 clauses · 5 pending\n1\nName of the assessee\nAuto-filled\n2\nAddress\n3\nPAN or Aadhaar number\n4\nIndirect tax registration details\n5\nStatus of the assessee\n6\nPrevious year\n7\nAssessment year\n8\nRelevant clause of section 44AB\n8a\nWhether the assessee has opted for taxation under section 115BA/115BAA/115BAB/115BAC/115BAD/115BAE\n9\nFirm or AOP/BOI partner or member details\n10\nNature of business or profession\nBOOKS AND METHOD OF ACCOUNTING\n4 clauses · 4 pending\n2 evidence\n11\nBooks of account and locations where books are kept\nEvidence\n12\nWhether profit and loss account includes presumptive income\n13\nMethod of accounting and changes therein\n14\nMethod of valuation of closing stock\nEvidence\nPROFIT AND GAINS ADJUSTMENTS\n6 clauses · 6 pending\n3 evidence\n15\nCapital asset converted into stock-in-trade\nEvidence\n16\nAmounts not credited to profit and loss account\n17\nTransfer of land or building below stamp value\nEvidence\n18\nDepreciation allowable under the Act\nEvidence\n24\nDeemed profits and gains under section 32AC/33AB/33ABA/33AC\n25\nAmounts chargeable under section 41\nDEDUCTIONS AND DISALLOWANCES\n7 clauses · 7 pending\n5 evidence\n19\nAmounts admissible under specified sections\n20\nEmployee contribution and bonus/commission details\nEvidence\n36(1)(ii)\nBonus or commission under section 36(1)(ii)\n0 rows\n36(1)(va)\nEmployee contribution under section 36(1)(va)\n0 rows\n21\nAmounts debited to profit and loss account and disallowances\nEvidence\n21(a)\nSpecified expenditure items\n0 rows · 1 warning\n21(b)\nSection 40(a) inadmissible amounts\n0 rows\n21(c)\nSection 40(b) / 40(ba) inadmissible amounts\n0 rows\n21(d)\nSection 40A(3) / 40A(3A)\n0 rows\n21(e)\nProvision for gratuity\n0 rows\n21(f)\nEmployer sums under section 40A(9)\n0 rows\n21(g)\nContingent liabilities\n0 rows\n21(h)\nSection 14A\n0 rows\n21(i)\nProviso to section 36(1)(iii)\n0 rows · 1 warning\n22\nMSMED payments and interest reporting\nEvidence\n22(i)\nInterest inadmissible\n0 rows\n22(ii)\nAmount required to be paid to micro and small enterprises\n0 rows\n22(iii)\nPaid within time / not paid within time\n0 rows\n23\nPayments to persons specified under section 40A(2)(b)\nEvidence\n26\nLiabilities covered by section 43B\nEvidence\n26(i)(A)\nOpening section 43B liabilities\n0 rows\n26(i)(B)\nCurrent year section 43B liabilities\n0 rows\n26(ii)\nIndirect taxes passed through profit and loss account\n0 rows\n27\nCENVAT/Input tax credit and prior period items\n27(a)\nCENVAT / Input Tax Credit\n0 rows\n27(b)\nPrior period income or expenditure\n0 rows\nLOANS, DEPOSITS AND SPECIFIED TRANSACTIONS\n7 clauses · 7 pending\n1 evidence\n29A\nAmount chargeable under section 56(2)(ix)\n29B\nAmount chargeable under section 56(2)(x)\n29B(a)\nMoney received\n0 rows\n29B(b)\nImmovable property received\n0 rows\n29B(c)\nOther specified property received\n0 rows\n30\nHundi borrowings and repayments under section 69D\n30A\nPrimary adjustment to transfer price under section 92CE\n30B\nLimitation on interest deduction under section 94B\n30B(a)\nInterest / similar expenditure details\n0 rows\n30B(b)\nComputation summary\n0 rows\n30C\nImpermissible avoidance arrangement under section 96\n31\nLoans, deposits and specified sums\nEvidence\n31(a)\nLoans or deposits accepted\n0 rows · 1 warning\n31(b)\nSpecified sums accepted\n0 rows · 1 warning\n31(ba)\nReceipts otherwise than permitted modes\n0 rows\n31(bb)\nReceipts by non-account payee cheque/draft\n0 rows\n31(bc)\nPayments otherwise than permitted modes\n0 rows\n31(bd)\nPayments by non-account payee cheque/draft\n0 rows\n31(c)\nRepayments made\n0 rows\n31(d)\nRepayments received otherwise than permitted modes\n0 rows\n31(e)\nRepayments received by non-account payee cheque/draft\n0 rows\nDEDUCTIONS, TAXES AND COMPLIANCE\n7 clauses · 7 pending\n1 evidence\n32\nBrought forward losses, depreciation and section 115BAA/115BAC details\n32(a)\nBrought forward loss / depreciation\n0 rows\n32(b)\nSection 79 shareholding change\n0 rows\n32(c)\nSpeculation loss\n0 rows\n32(d)\nSpecified business loss\n0 rows\n32(e)\nDeemed speculation business\n0 rows\n33\nDeductions under Chapter VIA and other sections\n34\nTDS/TCS compliance\nEvidence\n34(a)\nTDS/TCS deduction and collection summary\n0 rows · 1 warning\n34(b)\nTDS/TCS statement filing details\n0 rows · 1 warning\n34(c)\nInterest under section 201(1A) / 206C(7)\n0 rows · 1 warning\n36A\nDeemed dividend under section 2(22)(e)\n36A\nDeemed dividend under section 2(22)(e)\n0 rows · 1 warning\n36B\nAmount received for buyback of shares under section 2(22)(f)\n36B\nAmount received for buyback of shares under section 2(22)(f)\n0 rows · 1 warning\n42\nForm 61, Form 61A and Form 61B reporting\n42\nForm 61, Form 61A and Form 61B reporting\n0 rows · 1 warning\n43\nCountry-by-country reporting under section 286\n43\nCountry-by-country reporting under section 286\n0 rows · 1 warning\nQUANTITATIVE AND OTHER DETAILS\n7 clauses · 7 pending\n2 evidence\n35\nTrading and manufacturing quantitative details\nEvidence\n35(a)\nTrading goods\n0 rows\n35(b)(A)\nRaw materials\n0 rows\n35(b)(B)\nFinished products / by-products\n0 rows\n37\nCost audit report\n37\nCost audit report\n0 rows · 1 warning\n38\nCentral excise audit report\n38\nCentral excise audit report\n0 rows · 1 warning\n39\nService tax audit report\n39\nService tax audit report\n0 rows · 1 warning\n40\nAccounting ratios\n40\nAccounting ratios\n0 rows · 1 warning\n41\nDemand or refund under any tax law other than Income-tax Act and Wealth-tax Act\n41\nDemand or refund under other tax laws\n0 rows · 1 warning\n44\nGST expenditure break-up\nEvidence\n44\nGST expenditure break-up\n0 rows · 1 warning\nClause 1 · Name of the assessee\nAuto-filled\n·\nDraft\n·\nTA-3CD-1\nPrepared\nReviewed\nApprove\nClause guidance and source links\n\nForm 3CD Particulars\n\nName of the assessee\nSource: Client master / Tax audit setup\nAdditional Report Particulars\nContains text\n\nOptional report-facing narrative when structured fields are not sufficient.\n\nReview Remarks/Notes of Auditor- (For Internal Working paper only)\n\nOptional auditor review notes and working paper observations.\n\nQualification / observation required in report\n\nSources, Evidence and Review\n\n0 linked evidence file(s)\n\nLinked Evidence\n0\nNo evidence linked to this clause.\nAttach Existing Evidence\nSelect evidence file\nAttach\nUpload New Evidence\nUpload and Link\nEvidence files stay in the central Evidence Vault. Tax Audit stores only clause-level links and workpaper references.",
+    "overviewText": "Tax Audit\n\nInvented Traders Private Limited - 2026-27\n\nTax Audit Beta v0.1 RC1\nIncome-tax Act, 1961\nRule 6G\nAY review required\nForm 3CA + 3CD\nNot assessed\nRefresh Prefill\nReview Queue\nOverview\nSetup and Applicability\nAcceptance and Eligibility\nCompliance Tracker\nAudit Programme\n3CA/3CB\n3CD Clause Workspace\nReview Summary\nTax Audit Beta v0.1 RC1 - Phase 1: Structured Tax Audit Workflow\nBeta version for pilot testing. This tool assists in tax audit documentation and review. It does not replace the auditor's professional judgment or responsibility.\nThis engagement is for AY 2027-28, while the configured Form 3CD library is tagged for AY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD. Verify the current Income-tax Rules, CBDT notifications and portal schema before relying on statutory export.\n\nAPPLICABILITY\n\nNot assessed\n\nForm 3CA + 3CD\n\nACCEPTANCE\n\nAcceptance pending\n\nEligibility checklist\n\nCOMPLIANCE TRACKER\n\nSpecified date pending\n\nSpecified date, filing and UDIN\n\nCLAUSE PROGRESS\n\n0%\n\n0 of 49 clauses moved from draft\n\nNEEDS INPUT\n\n43\n\nMissing or manual clauses\n\nSOURCE CONFLICTS\n\n0\n\nRequires source review\n\nEVIDENCE LINKED\n\n0\n\nClause workpapers attached\n\nAUDITOR REMARKS\n\n0\n\nQualification or observation flags\n\nCA Workflow Snapshot\n\nSETUP\n\nReady\n\nForm 3CA + 3CD - AY 2027-28\n\nAPPLICABILITY\n\nNot assessed\n\nBusiness turnover is required to assess section 44AB(a).\n\nACCEPTANCE\n\nAcceptance pending\n\nEligibility and professional acceptance\n\nCLAUSE REVIEW\n\n0/49\n\n43 need input - 0 conflicts\n\nEVIDENCE\n\n0/14\n\nLinked evidence against evidence-expected clauses\n\nEXPORT\n\nAY review\n\nThis engagement is for AY 2027-28, while the configured Form 3CD library is tagged for AY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD. Verify the current Income-tax Rules, CBDT notifications and portal schema before relying on statutory export.\n\nProfessional Responsibility and Disclaimer\n\nAcknowledgement Pending\n\nAssistance Tool notice for Professional Judgment, Auditor Responsibility and Verification Required before report preparation.\n\nA. Purpose of the Tool\nB. Professional Judgment\nC. Auditor Responsibility\nD. Verification with Law and ICAI Guidance\nE. Data and Input Responsibility\nF. Limitation of Automated Outputs\nG. Documentation and Evidence\nH. Limitation of Use\nI. Final Report Responsibility\nI acknowledge that this tool is an assistance tool and does not replace my professional judgment or responsibility as tax auditor.\nAcknowledged by\nSave Acknowledgement\nKnown Limitations\nStatutory Form 3CD exports are draft outputs and require professional review before signing or portal upload.\nPortal filing is not part of this beta.\nIncome Tax portal schema upload is not part of this beta.\nGST, TDS and purchase register imports are not part of this beta.\nStructured clause capture is manual and requires professional review.\nThe Working Paper Report Pack is an internal working paper summary, not a signed report.\nPilot users should avoid using confidential client data unless specifically permitted by ICAI or their firm. For pilot testing, use dummy data or anonymised data where possible.\nPilot Diagnostics\nTax Audit module\nTax Audit Beta v0.1 RC1\nStatutory scope\nAY 2025-26 | Rule 6G | Forms 3CA, 3CB, 3CD\nWorkflow phase\nPhase 1: Structured Tax Audit Workflow\nBuild mode\nproduction\n\nLocal data location and Electron runtime details are available in the packaged application diagnostics where exposed by the desktop shell.\n\n3CD Review Progress\n\n0 of 49 clauses moved from draft\n\n0%\n\nprepared / reviewed / approved",
+    "audits": [
+      {
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025",
+        "form_type": "3CA",
+        "financial_year": "2026-27",
+        "assessment_year": "2027-28",
+        "review_status": "draft"
+      }
+    ],
+    "clauses": [
+      {
+        "clause_key": "clause_1",
+        "clause_no": "1",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_10",
+        "clause_no": "10",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_11",
+        "clause_no": "11",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_12",
+        "clause_no": "12",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_13",
+        "clause_no": "13",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_14",
+        "clause_no": "14",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_15",
+        "clause_no": "15",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_16",
+        "clause_no": "16",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_17",
+        "clause_no": "17",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_18",
+        "clause_no": "18",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_19",
+        "clause_no": "19",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_2",
+        "clause_no": "2",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_20",
+        "clause_no": "20",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_21",
+        "clause_no": "21",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_22",
+        "clause_no": "22",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_23",
+        "clause_no": "23",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_24",
+        "clause_no": "24",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_25",
+        "clause_no": "25",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_26",
+        "clause_no": "26",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_27",
+        "clause_no": "27",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_29a",
+        "clause_no": "29A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_29b",
+        "clause_no": "29B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_3",
+        "clause_no": "3",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30",
+        "clause_no": "30",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30a",
+        "clause_no": "30A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30b",
+        "clause_no": "30B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_30c",
+        "clause_no": "30C",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_31",
+        "clause_no": "31",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_32",
+        "clause_no": "32",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_33",
+        "clause_no": "33",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_34",
+        "clause_no": "34",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_35",
+        "clause_no": "35",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_36a",
+        "clause_no": "36A",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_36b",
+        "clause_no": "36B",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_37",
+        "clause_no": "37",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_38",
+        "clause_no": "38",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_39",
+        "clause_no": "39",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_4",
+        "clause_no": "4",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_40",
+        "clause_no": "40",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_41",
+        "clause_no": "41",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_42",
+        "clause_no": "42",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_43",
+        "clause_no": "43",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_44",
+        "clause_no": "44",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_5",
+        "clause_no": "5",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_6",
+        "clause_no": "6",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_7",
+        "clause_no": "7",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_8",
+        "clause_no": "8",
+        "prefill_status": "auto_filled",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_8a",
+        "clause_no": "8a",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      },
+      {
+        "clause_key": "clause_9",
+        "clause_no": "9",
+        "prefill_status": "needs_input",
+        "review_status": "draft",
+        "statutory_version": "ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025"
+      }
+    ]
+  }
+}

@@ -110,6 +110,7 @@ import {
 } from '@/lib/taxAuditForm3CDExport';
 import { getTaxAuditStatutoryVersionWarning, TAX_AUDIT_STATUTORY_SCOPE_LABEL } from '@/lib/taxAuditStatutoryVersion';
 import { resolveTaxAuditReportFormState } from '@/lib/taxAuditReportFormSelection';
+import { TaxAuditFormChooser } from '@/components/tax-audit/form26/TaxAuditFormChooser';
 
 const parseJson = <T,>(value: string | null | undefined, fallback: T): T => {
   if (!value) return fallback;
@@ -3276,7 +3277,7 @@ function ReviewSummaryPanel({
   );
 }
 
-export default function TaxAudit() {
+function TaxAudit3CD() {
   const { currentEngagement } = useEngagement();
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -3546,4 +3547,10 @@ export default function TaxAudit() {
       </Dialog>
     </div>
   );
+}
+
+const TAX_AUDIT_SHARED_PARTS = { EvidenceRail };
+
+export default function TaxAudit() {
+  return <TaxAuditFormChooser ThreeCd={TaxAudit3CD} parts={TAX_AUDIT_SHARED_PARTS} />;
 }
