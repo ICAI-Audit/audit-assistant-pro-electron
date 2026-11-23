@@ -155,7 +155,11 @@ CREATE TABLE IF NOT EXISTS trial_balances (
     eps_basic_cy              NUMERIC,
     eps_basic_py              NUMERIC,
     eps_diluted_cy            NUMERIC,
-    eps_diluted_py            NUMERIC
+    eps_diluted_py            NUMERIC,
+    -- T-071: version within the financial year and branch (1 to 3, shown _v1 to _v3)
+    tb_version                INTEGER,
+    -- T-072: 0 = mapping does not reuse earlier decisions for this Trial Balance
+    carry_rules               INTEGER NOT NULL DEFAULT 1 CHECK (carry_rules IN (0, 1))
 );
 
 -- closing_balance carries the revised balance:

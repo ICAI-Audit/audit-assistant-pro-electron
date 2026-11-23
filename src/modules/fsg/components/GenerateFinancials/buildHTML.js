@@ -5,7 +5,7 @@ import { auditorForDenomination } from '../../utils/signingRules'
 // Ageing schedule definitions shared with the fill-details forms
 // (single source of truth so PDF labels always match the forms)
 import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../Notes/TradePayablesDisclosureForm'
-import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell } from '../Notes/TradeReceivablesAgingForm'
+import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell, trPeriodView } from '../Notes/TradeReceivablesAgingForm'
 // Single source of truth for the Schedule III BS layout — shared with the
 // live BS screen and the Excel exporter, so PDF always matches both exactly.
 import { computeCompanyBSLayout, computeDynamicBSLayout } from '../../utils/bsStructure'
@@ -21,6 +21,7 @@ import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolv
 // PDF section/note order always matches (see plStructureCorp.js doc comment
 // on why raw expenseSections/incomeSections array order can't be trusted).
 import { EXPENSE_LINES, corpFaceTail, TAX_SECTION_RX } from '../../utils/plStructureCorp'
+import { taxLineNote } from '../../utils/deferredTaxNote'
 // Ledger → sub-note grouping — single source of truth shared with the live
 // Annexures UI and the Excel exporter.
 import { getSubnoteGroups, UNCLASSIFIED_LABEL, plNoteLines, bsNoteFallbackLines, subnoteGroupFigures, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
@@ -651,7 +652,7 @@ function buildPLPage(entity, activeTB, prevTB, data, auditor, signatories, signP
       sec.lines.forEach(line => {
         body += `<tr>
           <td class="indent-1">${esc(line.level2 || sec.level1)}</td>
-          <td class="center">${line.noteNum || sec.noteNum || ''}</td>
+          <td class="center">${taxLineNote(line, sec, data.notes).num || ''}</td>
           <td class="right">${fmtINR(line.total)}</td>
           <td class="right">${fmtINR(line.prevTotal)}</td>
         </tr>`
@@ -2008,8 +2009,8 @@ function renderAgeingSchedule(details, noteTitle, cyLabel = 'Current Year', pyLa
 
   const buildPeriod = (rawPd, heading) => {
     if (!rawPd) return ''
-    // T-063: Trade Payables blocked cells are nil and Total Due / Total are worked out.
-    const pd = isTP ? tpPeriodView(rawPd) : rawPd
+    // T-063 / T-069: blocked cells are nil and Total Due / Total are worked out.
+    const pd = isTP ? tpPeriodView(rawPd) : trPeriodView(rawPd)
     const any = AG_ROWS.some(r => AG_BUCKETS.some(b => Math.abs(cellVal(pd, r, b.key)) > 0.005))
     if (!any && !ag.includeInOutput && !details.includeInOutput) return ''
     let html = `<p style="font-weight:bold;font-size:9pt;margin:2.5mm 0 1mm;">${isTP ? 'Trade Payables' : 'Trade Receivables'} ageing schedule (${heading})</p>`

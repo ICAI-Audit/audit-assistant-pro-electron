@@ -52,6 +52,7 @@ const BOOLEAN_COLUMNS = new Set([
   'is_custom',
   'consolidated_manual_py',
   'consolidated_pl_closed_to_capital',
+  'carry_rules',
 ])
 
 export function attachDatabase(sqliteDb) {

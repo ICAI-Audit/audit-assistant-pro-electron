@@ -28,6 +28,7 @@ const COLUMNS = [
   { key: 'select', label: '', width: 44 },
   { key: 'name', label: 'Ledger in Books', width: 260 },
   { key: 'closing_balance', label: 'CY', width: 120 },
+  { key: 'drcr', label: 'Dr/Cr', width: 48 },
   { key: 'save', label: 'Save', width: 80 },
   { key: 'needs', label: 'To fix', width: 230 },
   { key: 'mapping1_resultant', label: 'Mapping 1', width: 210 },
@@ -75,6 +76,13 @@ function textValue(row, key) {
 function shownAmount(row) {
   const bal = parseFloat(row.closing_balance || 0)
   return (row.alie === 'ASSETS' || row.alie === 'Expenses') ? -bal : bal
+}
+
+// Dr or Cr of the balance as the Trial Balance carries it (stored Cr positive, Dr negative). The amount column shows a
+// Dr-side head positive, so without this a debit and a credit balance look alike.
+export function drCrOf(row, field = 'closing_balance') {
+  const bal = parseFloat(row?.[field] || 0)
+  return bal < -0.005 ? 'Dr' : bal > 0.005 ? 'Cr' : ''
 }
 
 // "To fix" filter: anything still to fix, complete, or one particular need.
@@ -400,6 +408,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
       }
       // Amount: >100000, <500, 1000-5000 … (utils/amountFilter.js)
       if (columnFilters.closing_balance && !amountPasses(columnFilters.closing_balance, shownAmount(r))) return false
+      if (columnFilters.drcr && drCrOf(r) !== columnFilters.drcr) return false
       const nf = columnFilters.needs
       if (nf) {
         const needs = ledgerNeeds(levelFormat, r)
@@ -439,7 +448,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   const allChecked = visibleLedgers.length > 0 && selectedVisibleCount === visibleLedgers.length
   const someChecked = selectedVisibleCount > 0 && !allChecked
   const totalWidth = columns.reduce((s, c) => s + c.width, 0)
-  const stickyLeft = { select: 0, name: 44, closing_balance: 304, save: 424 }
+  const stickyLeft = { select: 0, name: 44, closing_balance: 304, drcr: 424, save: 472 }
 
   // Auto-populate bulk pickers from selected rows (common values)
   useEffect(() => {
@@ -728,6 +737,20 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
           title={AMOUNT_FILTER_HELP}
           className={`w-full h-7 border rounded px-1.5 text-[11px] text-right bg-white focus:outline-none focus:ring-1 ${f?.invalid ? 'border-red-400 focus:ring-red-400' : 'border-blue-100 focus:ring-blue-400'}`}
         />
+      )
+    }
+    if (key === 'drcr') {
+      return (
+        <select
+          value={columnFilters.drcr || ''}
+          onChange={e => setFilter('drcr', e.target.value)}
+          title="Show only debit or only credit balances"
+          className="w-full h-7 border border-blue-100 rounded px-0.5 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+        >
+          <option value="">All</option>
+          <option value="Dr">Dr</option>
+          <option value="Cr">Cr</option>
+        </select>
       )
     }
     if (key === 'needs') {
@@ -1220,7 +1243,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                       <th
                         key={col.key}
                         style={stickyStyle(col.key, true)}
-                        className={`px-2 py-1.5 font-semibold text-blue-900 border-r border-blue-100 bg-blue-50 ${col.key === 'closing_balance' ? 'text-right' : col.key === 'select' || col.key === 'save' ? 'text-center' : 'text-left'} ${col.level && Number(scopeFilter?.focusLevel) === col.level ? 'ring-2 ring-inset ring-amber-400 !bg-amber-100' : ''} ${col.key === 'needs' ? 'text-red-800' : ''}`}
+                        className={`px-2 py-1.5 font-semibold text-blue-900 border-r border-blue-100 bg-blue-50 ${col.key === 'closing_balance' ? 'text-right' : col.key === 'select' || col.key === 'save' || col.key === 'drcr' ? 'text-center' : 'text-left'} ${col.level && Number(scopeFilter?.focusLevel) === col.level ? 'ring-2 ring-inset ring-amber-400 !bg-amber-100' : ''} ${col.key === 'needs' ? 'text-red-800' : ''}`}
                       >
                         {col.key === 'select' ? (
                           <input type="checkbox" checked={allChecked} ref={el => { if (el) el.indeterminate = someChecked }}
@@ -1275,6 +1298,13 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                           className={`px-2 py-1 text-right font-mono text-gray-700 border-r border-gray-100 ${stickyBg('closing_balance', isChecked)}`}
                         >
                           {fmtINR(rowAmt(row, 'closing_balance'))}
+                        </td>
+                        <td
+                          style={stickyStyle('drcr')}
+                          title={drCrOf(row) === 'Dr' ? 'Debit balance in the Trial Balance' : drCrOf(row) === 'Cr' ? 'Credit balance in the Trial Balance' : 'Nil balance'}
+                          className={`px-1 py-1 text-center text-[10px] font-semibold border-r border-gray-100 ${drCrOf(row) === 'Dr' ? 'text-blue-700' : 'text-amber-700'} ${stickyBg('drcr', isChecked)}`}
+                        >
+                          {drCrOf(row)}
                         </td>
                         <td
                           style={stickyStyle('save')}

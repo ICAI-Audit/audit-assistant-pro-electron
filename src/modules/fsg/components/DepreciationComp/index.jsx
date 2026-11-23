@@ -31,6 +31,13 @@ const TDI  = 'border border-gray-200 px-1 py-0.5'
 
 const num = v => parseFloat(String(v ?? '').replace(/,/g, '')) || 0
 const PPE_NOTE_RX = /property.*plant.*equipment|PPE|fixed assets/i
+// The P&L's depreciation head ("Depreciation and amortization expense") - its figure is compared with the schedule's
+// Depreciation For Year, as the Net Block is compared with the PPE note (owner, 23 November 2026).
+const PL_DEP_RX = /depreciation|amorti[sz]ation/i
+export function plDepreciation(data) {
+  const secs = (data?.expenseSections || []).filter(s => PL_DEP_RX.test(s.level1 || '') && !/uncategorised/i.test(s.level1 || ''))
+  return { cy: secs.reduce((t, s) => t + (parseFloat(s.total) || 0), 0), py: secs.reduce((t, s) => t + (parseFloat(s.prevTotal) || 0), 0), found: secs.length > 0 }
+}
 const ADD_NEW = '__add_new__'
 
 // Every field here is a plain typed number — no computation, no formula.
@@ -119,6 +126,7 @@ export default function DepreciationComp({ entity, activeTB }) {
   const [includeInPPENote, setIncludeInPPENote] = useState(false)
   const [pyTotals, setPyTotals] = useState({ ...EMPTY_PY_TOTALS })
   const [tbTotals, setTbTotals] = useState({ cy: 0, py: 0, loaded: false })
+  const [plDep, setPlDep] = useState({ cy: 0, py: 0, found: false, loaded: false })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [pulling, setPulling] = useState(false)
@@ -175,7 +183,7 @@ export default function DepreciationComp({ entity, activeTB }) {
   // attachNoteExtras() in useFinancials.js, which sources note.compScheduleTbCY/PY
   // the same way).
   useEffect(() => {
-    if (!activeTB?.id) { setTbTotals({ cy: 0, py: 0, loaded: false }); return }
+    if (!activeTB?.id) { setTbTotals({ cy: 0, py: 0, loaded: false }); setPlDep({ cy: 0, py: 0, found: false, loaded: false }); return }
     let cancelled = false
     fetchFinancialsData(activeTB, null, entity, null).then(data => {
       if (cancelled || !data) return
@@ -183,7 +191,8 @@ export default function DepreciationComp({ entity, activeTB }) {
       const cy = ppeNote?.rows?.reduce((s, r) => s + displayAmt(r, 'closing_balance'), 0) || 0
       const py = ppeNote?.rows?.reduce((s, r) => s + displayAmt(r, 'opening_balance'), 0) || 0
       setTbTotals({ cy, py, loaded: true })
-    }).catch(() => setTbTotals({ cy: 0, py: 0, loaded: false }))
+      setPlDep({ ...plDepreciation(data), loaded: true })
+    }).catch(() => { setTbTotals({ cy: 0, py: 0, loaded: false }); setPlDep({ cy: 0, py: 0, found: false, loaded: false }) })
     return () => { cancelled = true }
   }, [activeTB?.id, entity?.id])
 
@@ -242,6 +251,8 @@ export default function DepreciationComp({ entity, activeTB }) {
 
   const diffCY = totals.netBlockClose - tbTotals.cy
   const diffPY = totals.netBlockOpen - tbTotals.py
+  // Depreciation for the year: the schedule (Fill Details) less the P&L.
+  const depDiffCY = num(totals.depForYear) - plDep.cy
 
   const save = async (opts = {}) => {
     if (!tbId) return showToast('Load a Trial Balance first.')
@@ -387,6 +398,16 @@ export default function DepreciationComp({ entity, activeTB }) {
         <span>Net Block Closing (Table): <span className="font-bold text-orange-700 font-mono">{fmtINR(totals.netBlockClose)}</span></span>
         <span>Total as per Trial Balance (PPE Note): <span className="font-bold text-gray-800 font-mono">{tbTotals.loaded ? fmtINR(tbTotals.cy) : '…'}</span></span>
         <span>Difference: <span className={`font-bold font-mono ${Math.abs(diffCY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{tbTotals.loaded ? fmtINR(diffCY) : '…'}</span></span>
+        <span className="text-gray-400">|</span>
+        <span title="Previous Year: Net Block Opening of the table against the PPE note's opening balances">PY — Net Block Opening (Table): <span className="font-bold text-orange-700 font-mono">{fmtINR(totals.netBlockOpen)}</span></span>
+        <span>Trial Balance: <span className="font-bold text-gray-800 font-mono">{tbTotals.loaded ? fmtINR(tbTotals.py) : '…'}</span></span>
+        <span>Difference: <span className={`font-bold font-mono ${Math.abs(diffPY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{tbTotals.loaded ? fmtINR(diffPY) : '…'}</span></span>
+      </div>
+      <div className="flex items-center gap-6 px-5 py-1.5 bg-white border-b border-gray-100 shrink-0 text-xs text-gray-500">
+        <span>Depreciation For Year (Table): <span className="font-bold text-orange-700 font-mono">{fmtINR(totals.depForYear)}</span></span>
+        <span title="Depreciation and amortization expense of the Profit & Loss account">Depreciation as per P&L: <span className="font-bold text-gray-800 font-mono">{plDep.loaded ? fmtINR(plDep.cy) : '…'}</span></span>
+        <span>Difference: <span className={`font-bold font-mono ${Math.abs(depDiffCY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{plDep.loaded ? fmtINR(depDiffCY) : '…'}</span></span>
+        {plDep.loaded && !plDep.found && <span className="text-amber-700">No depreciation head in the P&L</span>}
       </div>
 
       <div className="flex-1 overflow-auto bg-white">
@@ -456,16 +477,6 @@ export default function DepreciationComp({ entity, activeTB }) {
                         )
                       })}
                       <td className="border border-gray-300 px-1.5 py-1"></td>
-                    </tr>
-                    <tr className="bg-gray-100 text-xs">
-                      <td colSpan={12} className="border border-gray-300 px-2 py-1.5">
-                        <div className="flex flex-wrap gap-x-6 gap-y-1">
-                          <span className="text-gray-600">Total as per Trial Balance — CY: <span className="font-mono font-semibold text-gray-800">{tbTotals.loaded ? fmtINR(tbTotals.cy) : '…'}</span></span>
-                          <span className="text-gray-600">PY: <span className="font-mono font-semibold text-gray-800">{tbTotals.loaded ? fmtINR(tbTotals.py) : '…'}</span></span>
-                          <span className="text-gray-600">Difference — CY: <span className={`font-mono font-semibold ${Math.abs(diffCY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{tbTotals.loaded ? fmtINR(diffCY) : '…'}</span></span>
-                          <span className="text-gray-600">PY: <span className={`font-mono font-semibold ${Math.abs(diffPY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{tbTotals.loaded ? fmtINR(diffPY) : '…'}</span></span>
-                        </div>
-                      </td>
                     </tr>
                   </tfoot>
                 </table>

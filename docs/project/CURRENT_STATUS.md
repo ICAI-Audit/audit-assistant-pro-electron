@@ -90,6 +90,26 @@
 ## T-053 CAAT Tools v0.10 (17 November 2026)
 
 On `caat_tools`, the embedded CAAT Tools was replaced by the owner-supplied v0.10 (new sidebar layout, data-type detection, Insights, export dialog, tests run on Apply mapping) and restyled with the VERA colours, type and components. The approved large-ledger loop fix and sampling wording fix were re-applied; SheetJS stays 0.20.3. Eight logic findings from the code review were fixed on the owner's instruction (see [CAAT_TOOLS.md](CAAT_TOOLS.md)). `npm run test:caat-ui` 38/38; owner UAT pending.
+## T-075 to T-079 Owner points: Dr / Cr, shareholding %, partners' profit, Deferred tax note, Dep (Books) (23 November 2026)
+
+- Branch `FSG-AM`; Financial Statement Review only (F-009); committed together with T-069 to T-074.
+- T-075 Dr / Cr column in Rectification / Recategorisation; T-076 shareholding % on upload corrected (every Equity class, no divide-by-1, commas, promoters' % change); T-077 partners' share of profit from the share %; T-078 Deferred tax line of the P&L points to the Balance Sheet Deferred tax note when it has a figure; T-079 Dep (Books) compares depreciation with the P&L. Details in [the handoff](SESSION_HANDOFF.md).
+- Checks: `scripts/fsg-owner-points-checks.mjs` 28/28 and the T-053 shareholding checks 6/6, run on their own; esbuild bundle and ESLint clean. Then `npm run test:fsg` 390/390 (4 PDF text checks skipped), `npm run test:fsg-ui` 139/139, Excel theme 61/61. T-080 figures font on screen. Owner UAT pending.
+
+## T-070 to T-074 Trial Balance upload: Tally by period, versions, carry-over, simple format (23 November 2026)
+
+- Branch `FSG-AM` at `3378148` (`origin/main` after PR #122, fast-forwarded the same day); Financial Statement Review only (F-009); committed together with T-069.
+- T-070 Tally Auto-Import by period; T-071 versions _v1 to _v3 per year and branch; T-072 copy manual work and carry Learned Ledger Rules to a new version (yes / no); T-073 simple Excel format (Trial Balance and Groups); T-074 ODBC-format upload withdrawn. Details in [the handoff](SESSION_HANDOFF.md) and [next tasks](NEXT_TASKS.md).
+- Checks: `npm run test:fsg` 362/362 (31 new, `scripts/fsg-tb-version-checks.mjs`); `node scripts/fsg-excel-theme-checks.mjs` 61/61. At commit (23 November 2026, with T-069 to T-080): `npm run test:fsg` 390/390 (4 PDF text checks skipped on win32-arm64), `npm run test:fsg-ui` 139/139, `node scripts/fsg-excel-theme-checks.mjs` 61/61. Not run: a live Tally import, owner UAT.
+
+## T-069 Trade Receivables ageing in the owner's layout (18 November 2026)
+
+- Branch `FSG-AM` at `1df122c` (main after PR #120, fast-forwarded the same day); Financial Statement Review only (F-009); committed and pushed on 23 November 2026 with T-070 to T-080.
+- T-069: Trade Receivables (Company) Fill Details ageing table in the owner's layout (screenshot of 18 November 2026): columns Unbilled, Not Due, then the five periods from the due date, then Total; heading "Trade Receivables ageing schedule (As at ...) - Outstanding for following periods from due date of payment". Grey cells take no entry, per the owner's choice "Strict": rows (i) to (iv) take Not Due and the periods (Unbilled grey, since unbilled dues have their own rows); the two Unbilled Dues rows take Unbilled only; Less: Provision is open. Total Due and Total Trade Receivable are worked out. Same layout in the Fill Details Excel (grey cells refuse entries; an old five-column file still reads by its headings), the Notes screen, PDF and Excel output. The form's Check and Check Control (TB vs Ageing Schedule) use the same total (`trScheduleTotal`). Older saved Unbilled Dues figures in the period columns move to Unbilled; totals unchanged. Shared helpers `trCellBlocked` / `trPeriodView` / `trScheduleTotal` in Notes/TradeReceivablesAgingForm.jsx.
+- Changed files: `src/modules/fsg/components/Notes/TradeReceivablesAgingForm.jsx`, `Notes/index.jsx`, `ExceptionReport/index.jsx`, `GenerateFinancials/buildHTML.js`, `buildExcel.js`, `fillDetailsWorkbook.js`, `utils/fillDetailsRegistry.js`, `utils/blankFormat.js`, `scripts/fsg-excel-theme-checks.mjs`, NEXT_TASKS, CURRENT_STATUS, this handoff.
+- Checks: `node scripts/fsg-excel-theme-checks.mjs` 61/61 (16 new); esbuild compile of the changed renderer files passed. At commit (23 November 2026, with T-069 to T-080): `npm run test:fsg` 390/390 (4 PDF text checks skipped on win32-arm64), `npm run test:fsg-ui` 139/139, `node scripts/fsg-excel-theme-checks.mjs` 61/61. Not run: owner UAT.
+- First executable next step: owner opens Notes > Trade Receivables > Fill Details, enters Not Due and Unbilled figures, and checks the Check table and Check Control.
+
 ## T-053 to T-063 inventory note, shareholding %, menus, captions, Excel repair, toolbars and payables ageing (17 November 2026)
 
 - Branch `FSG-AM` at `8dc2165` (main after PR #117 and #118); Financial Statement Review only (F-009); uncommitted.

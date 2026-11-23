@@ -7,7 +7,9 @@ import { fsgApi } from '../../api.js'
  * replace the old free-text "Period" input, auto-deriving the period string
  * as "{date_from} To {date_till}".
  */
-export default function FinancialPeriodPicker({ entity, value, onChange, allowCustom = true }) {
+// T-070: `required` marks the field compulsory (red asterisk); the value also carries
+// the year's dates and label so a screen can prefill or check dates against it.
+export default function FinancialPeriodPicker({ entity, value, onChange, allowCustom = true, required = false, label = 'Financial Period' }) {
   const [periods, setPeriods] = useState([])
   const [loading, setLoading] = useState(false)
   const [customMode, setCustomMode] = useState(false)
@@ -49,13 +51,13 @@ export default function FinancialPeriodPicker({ entity, value, onChange, allowCu
 
   return (
     <div>
-      <label className="block text-xs text-gray-500 mb-1">Financial Period</label>
+      <label className="block text-xs text-gray-500 mb-1">{label}{required && <span className="text-red-600"> *</span>}</label>
       <select
         value={value?.entityPeriodId || ''}
         onChange={e => {
           const id = parseInt(e.target.value)
           const ep = periods.find(p => p.id === id)
-          onChange(ep ? { entityPeriodId: ep.id, periodText: `${ep.date_from} To ${ep.date_till}` } : null)
+          onChange(ep ? { entityPeriodId: ep.id, periodText: `${ep.date_from} To ${ep.date_till}`, dateFrom: ep.date_from, dateTill: ep.date_till, yearLabel: ep.year_label } : null)
         }}
         className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
       >

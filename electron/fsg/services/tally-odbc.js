@@ -521,12 +521,14 @@ export async function listTallyCompanies(host, port) {
 }
 
 // ── Get Trial Balance from Tally (TallyPrime-compatible) ─────────────────────
+// T-070: the period chosen on the import screen is now sent (see staticVars);
+// the note below describes the request without one, kept for reference.
 // No company name or date range is sent — TallyPrime only ever has one
 // company open at a time, and omitting SVFROMDATE/SVTODATE makes Tally use
 // whatever period is currently active in its own UI (Alt+F2 / current
 // period), which avoids stalls when a guessed date range doesn't match the
 // company's books and Tally silently blocks on an internal prompt.
-export async function getTallyTrialBalance(host, port, company = null) {
+export async function getTallyTrialBalance(host, port, company = null, period = null) {
   const failures = []
   const collectionXml = `<ENVELOPE>
     <HEADER>
@@ -537,7 +539,7 @@ export async function getTallyTrialBalance(host, port, company = null) {
     </HEADER>
     <BODY><DESC>
       <STATICVARIABLES>
-        ${staticVars(company)}
+        ${staticVars(company, period)}
       </STATICVARIABLES>
       <TDL><TDLMESSAGE>
         <COLLECTION NAME="VERA Ledger TB" ISMODIFY="No">
@@ -561,7 +563,7 @@ export async function getTallyTrialBalance(host, port, company = null) {
     <BODY><EXPORTDATA><REQUESTDESC>
       <REPORTNAME>Trial Balance</REPORTNAME>
       <STATICVARIABLES>
-        ${staticVars(company)}
+        ${staticVars(company, period)}
       </STATICVARIABLES>
     </REQUESTDESC></EXPORTDATA></BODY>
   </ENVELOPE>`
@@ -592,12 +594,197 @@ export async function getTallyTrialBalance(host, port, company = null) {
 // ONCE per import (see tally:fetchTB) and threaded through every call, so the
 // Trial Balance, the masters and all three stock sources are guaranteed to come
 // from one and the same company.
-function staticVars(company) {
+//
+// T-070: `period` ({ from, to } as YYYY-MM-DD, either may be absent) names the
+// dates Tally computes balances for. Without it Tally uses whatever period is
+// set on its own screen (the behaviour before T-070). With it, a year other
+// than the one open on screen can be read from the same company, as long as
+// that year's entries are in the company's books.
+function staticVars(company, period = null) {
   const scope = company
     ? `
         <SVCURRENTCOMPANY>${xmlEscape(company)}</SVCURRENTCOMPANY>`
     : ''
-  return `<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>${scope}`
+  const from = period?.from ? `
+        <SVFROMDATE TYPE="Date">${tallyDate(period.from)}</SVFROMDATE>` : ''
+  const to = period?.to ? `
+        <SVTODATE TYPE="Date">${tallyDate(period.to)}</SVTODATE>` : ''
+  return `<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>${scope}${from}${to}`
+}
+
+// ── T-070: dates ─────────────────────────────────────────────────────────────
+// Tally reads YYYYMMDD in a request; it writes a date as YYYYMMDD or, in some
+// builds, as d-Mon-yy(yy). Both are turned back into YYYY-MM-DD.
+export function tallyDate(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) throw new Error(`Not a date: ${iso}`)
+  return `${m[1]}${m[2]}${m[3]}`
+}
+
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 }
+export function parseTallyDate(raw) {
+  const s = String(raw || '').trim()
+  let m = s.match(/^(\d{4})(\d{2})(\d{2})$/)
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`
+  m = s.match(/^(\d{1,2})[-\s/]([A-Za-z]{3})[A-Za-z]*[-\s/](\d{2,4})$/)
+  if (m && MONTHS[m[2].toLowerCase()]) {
+    const y = m[3].length === 2 ? `20${m[3]}` : m[3]
+    return `${y}-${String(MONTHS[m[2].toLowerCase()]).padStart(2, '0')}-${m[1].padStart(2, '0')}`
+  }
+  return null
+}
+
+/** The day before an ISO date, as an ISO date. */
+export function dayBefore(iso) {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
+// ── T-070: the company's books ───────────────────────────────────────────────
+// $BooksFrom is the date the company's books begin: Tally holds no entries
+// before it, so a period starting earlier cannot be read from this company
+// (the year may be in a separate, split company). Best-effort: null when the
+// field cannot be read, and the import then goes ahead without the check.
+export async function getTallyCompanyBooks(host, port, company = null) {
+  const xml = `<ENVELOPE>
+    <HEADER>
+      <VERSION>1</VERSION>
+      <TALLYREQUEST>Export</TALLYREQUEST>
+      <TYPE>Collection</TYPE>
+      <ID>VERA Company Books</ID>
+    </HEADER>
+    <BODY><DESC><TDL><TDLMESSAGE>
+      <COLLECTION NAME="VERA Company Books" ISMODIFY="No">
+        <TYPE>Company</TYPE>
+        <FETCH>Name,BooksFrom,StartingFrom</FETCH>
+      </COLLECTION>
+    </TDLMESSAGE></TDL></DESC></BODY>
+  </ENVELOPE>`
+  try {
+    const { body } = await tallyRequest(xml, host || DEFAULT_HOST, parseInt(port) || DEFAULT_PORT, TIMEOUT_MS)
+    dumpDebug('company-books-raw', body)
+    return parseCompanyBooks(body, company)
+  } catch (err) {
+    return { name: company || null, booksFrom: null, startingFrom: null, error: shortError(err) }
+  }
+}
+
+export function parseCompanyBooks(body, company = null) {
+  const re = /<COMPANY\b([^>]*)>([\s\S]*?)<\/COMPANY>/gi
+  const found = []
+  let m
+  while ((m = re.exec(String(body || ''))) !== null) {
+    const name = (attrValue(m[1], 'NAME') || tagValue(m[2], 'NAME') || '').trim()
+    found.push({ name, booksFrom: parseTallyDate(tagValue(m[2], 'BOOKSFROM')), startingFrom: parseTallyDate(tagValue(m[2], 'STARTINGFROM')) })
+  }
+  const want = String(company || '').trim().toLowerCase()
+  const hit = (want && found.find(f => f.name.toLowerCase() === want)) || (!want && found.length === 1 ? found[0] : null)
+  return hit || { name: company || null, booksFrom: null, startingFrom: null }
+}
+
+// ── T-070: balances as on the day before the period ─────────────────────────
+// Tally's $OpeningBalance on a ledger is the opening of the BOOKS, not of the
+// period asked for. When the period starts after the books begin, the
+// period's opening is the ledger's balance at the end of the previous day.
+export async function getTallyLedgerBalancesAsOf(host, port, company, toIso, booksFromIso = null) {
+  const xml = `<ENVELOPE>
+    <HEADER>
+      <VERSION>1</VERSION>
+      <TALLYREQUEST>Export</TALLYREQUEST>
+      <TYPE>Collection</TYPE>
+      <ID>VERA Ledger Opening</ID>
+    </HEADER>
+    <BODY><DESC>
+      <STATICVARIABLES>
+        ${staticVars(company, { from: booksFromIso, to: toIso })}
+      </STATICVARIABLES>
+      <TDL><TDLMESSAGE>
+        <COLLECTION NAME="VERA Ledger Opening" ISMODIFY="No">
+          <TYPE>Ledger</TYPE>
+          <FETCH>Name,Parent,OpeningBalance,DebitTotals,CreditTotals,ClosingBalance</FETCH>
+        </COLLECTION>
+      </TDLMESSAGE></TDL>
+    </DESC></BODY>
+  </ENVELOPE>`
+  const { body } = await tallyRequest(xml, host, port, LONG_TIMEOUT_MS)
+  if (!looksLikeLedgerCollection(body)) throw new Error(`the balances on ${toIso} could not be read from Tally (${body.substring(0, 180)})`)
+  return body
+}
+
+// ── T-070: the period's opening, checked ledger by ledger ───────────────────
+// A Trial Balance row must satisfy  opening + debit - credit = closing.
+// Tally's behaviour for a period that is not the one open on its screen is
+// not the same in every build, so the figures are never assumed: for each
+// ledger the reading that satisfies that identity is taken.
+//   rowsA  the period's export (from..to): closing at `to`, the period's totals
+//   rowsB  the export to the day before `from`: closing = the period's opening
+// Readings tried, in order:
+//   1. opening = B's closing, totals as A gives them (Tally gave period totals)
+//   2. opening = B's closing, totals = A's less B's (Tally gave totals from
+//      the start of the books); where a ledger fits both, the reading that
+//      fits most ledgers is taken, since Tally answers one way throughout
+//   3. opening = nil (Tally already started an income / expense ledger afresh)
+// An income or expense ledger always starts the financial year at nil: if
+// Tally carried its earlier balance in, only the year's movement is kept
+// (opening nil, closing = debit - credit), as on Tally's own Trial Balance.
+// A ledger no reading fits keeps B's closing as opening and is listed in
+// `unmatched`, so the screen can say so instead of hiding it.
+export function periodiseTallyRows(rowsA, rowsB, ledgerMap = {}) {
+  const TOL = 1
+  const near = (a, b) => Math.abs(a - b) < TOL
+  const byName = new Map((rowsB || []).map(r => [r.name.trim().toLowerCase(), r]))
+  // Which readings fit each ledger. Reading 2 needs the totals to the period's
+  // end to be at least the totals to the day before (they include them).
+  const fits = (rowsA || []).map(a => {
+    const b = byName.get(a.name.trim().toLowerCase())
+    const oB = b ? b.closing_net : 0
+    const close = a.closing_net
+    return {
+      a, b, oB, close,
+      period: near(oB + a.debit - a.credit, close),
+      cumulative: !!b && a.debit >= b.debit - TOL && a.credit >= b.credit - TOL
+        && near(oB + (a.debit - b.debit) - (a.credit - b.credit), close),
+      fresh: near(a.debit - a.credit, close),
+    }
+  })
+  // Tally answers one way for the whole company: where a ledger fits both
+  // the first two readings (no movement before the period), the way most
+  // ledgers fit decides.
+  const onlyPeriod = fits.filter(f => f.period && !f.cumulative).length
+  const onlyCumulative = fits.filter(f => f.cumulative && !f.period).length
+  const tallyMode = onlyCumulative > onlyPeriod ? 'cumulative' : 'period'
+
+  const counts = { periodTotals: 0, cumulativeTotals: 0, freshStart: 0, incomeExpenseReset: 0, unmatched: 0, tallyMode }
+  const unmatched = []
+  const out = fits.map(({ a, b, oB, close, period, cumulative, fresh }) => {
+    const isRevenue = ledgerMap[a.name.trim().toLowerCase()]?.isRevenue === true
+    let opening, debit = a.debit, credit = a.credit
+    const useCumulative = cumulative && (!period || tallyMode === 'cumulative')
+    if (useCumulative) {
+      opening = oB; debit = Math.max(0, a.debit - b.debit); credit = Math.max(0, a.credit - b.credit); counts.cumulativeTotals++
+    } else if (period) { opening = oB; counts.periodTotals++ }
+    else if (fresh) { opening = 0; counts.freshStart++ }
+    else { opening = oB; counts.unmatched++; unmatched.push(a.name) }
+
+    let closing = close
+    if (isRevenue && Math.abs(opening) >= TOL) {
+      closing = close - opening
+      opening = 0
+      counts.incomeExpenseReset++
+    }
+    return {
+      ...a,
+      debit, credit,
+      opening_dr: opening > 0 ? opening : 0,
+      opening_cr: opening < 0 ? -opening : 0,
+      opening_net: opening,
+      closing_dr: closing > 0 ? closing : 0,
+      closing_cr: closing < 0 ? -closing : 0,
+      closing_net: closing,
+    }
+  })
+  return { rows: out, report: { ...counts, unmatchedNames: unmatched.slice(0, 20) } }
 }
 
 // ── Get aggregate Opening/Closing Stock value from Tally's Stock Items ───────
@@ -612,7 +799,7 @@ function staticVars(company) {
 // the user to bifurcate it by category first. Best-effort: a company with no
 // inventory feature enabled simply returns zeros, this must never fail the
 // TB import.
-export async function getTallyStockTotals(host, port, company = null) {
+export async function getTallyStockTotals(host, port, company = null, period = null) {
   const xml = `<ENVELOPE>
     <HEADER>
       <VERSION>1</VERSION>
@@ -622,7 +809,7 @@ export async function getTallyStockTotals(host, port, company = null) {
     </HEADER>
     <BODY><DESC>
       <STATICVARIABLES>
-        ${staticVars(company)}
+        ${staticVars(company, period)}
       </STATICVARIABLES>
       <TDL><TDLMESSAGE>
         <COLLECTION NAME="VERA Stock Items" ISMODIFY="No">
@@ -712,7 +899,7 @@ export async function getTallyStockTotals(host, port, company = null) {
 // sign is normalised with abs() at the total level — same reasoning as
 // getTallyStockTotals: a wholesale Dr-side sign convention must not flip the
 // total negative.
-export async function getTallyStockLedgers(host, port, company = null) {
+export async function getTallyStockLedgers(host, port, company = null, period = null) {
   const xml = `<ENVELOPE>
     <HEADER>
       <VERSION>1</VERSION>
@@ -722,7 +909,7 @@ export async function getTallyStockLedgers(host, port, company = null) {
     </HEADER>
     <BODY><DESC>
       <STATICVARIABLES>
-        ${staticVars(company)}
+        ${staticVars(company, period)}
       </STATICVARIABLES>
       <TDL><TDLMESSAGE>
         <COLLECTION NAME="VERA Stock Ledgers" ISMODIFY="No">
@@ -792,13 +979,13 @@ export async function getTallyStockLedgers(host, port, company = null) {
 // mismatch can be inspected against real data instead of guessed at — the
 // per-item sign convention in getTallyStockTotals was guessed wrong twice
 // before that dump existed.
-export async function getTallyPLStock(host, port, company = null) {
+export async function getTallyPLStock(host, port, company = null, period = null) {
   const xml = `<ENVELOPE>
     <HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER>
     <BODY><EXPORTDATA><REQUESTDESC>
       <REPORTNAME>Profit and Loss</REPORTNAME>
       <STATICVARIABLES>
-        ${staticVars(company)}
+        ${staticVars(company, period)}
       </STATICVARIABLES>
     </REQUESTDESC></EXPORTDATA></BODY>
   </ENVELOPE>`
@@ -869,14 +1056,27 @@ function materiallyDifferent(a, b) {
   return diff > MATERIAL_ABS && diff / Math.max(a, b) > MATERIAL_REL
 }
 
-export async function resolveStockFigures(host, port, company = null) {
+export async function resolveStockFigures(host, port, company = null, period = null) {
   // All three are best-effort and independent — run them together so a slow
   // or unavailable source costs no extra wall-clock time on import.
   const [inventory, stockInHand, pl] = await Promise.all([
-    getTallyStockTotals(host, port, company),
-    getTallyStockLedgers(host, port, company),
-    getTallyPLStock(host, port, company),
+    getTallyStockTotals(host, port, company, period),
+    getTallyStockLedgers(host, port, company, period),
+    getTallyPLStock(host, port, company, period),
   ])
+  // T-070: the Inventory Register's $OpeningValue and a Stock-in-Hand ledger's
+  // $OpeningBalance are the opening of the BOOKS. For a period that starts
+  // later, the opening stock is the closing stock of the previous day, read
+  // the same way. (Tally's own P&L for the period already shows its opening.)
+  if (period?.openingAsOf) {
+    const prior = { from: period.booksFrom || null, to: period.openingAsOf }
+    const [invPrior, sihPrior] = await Promise.all([
+      getTallyStockTotals(host, port, company, prior),
+      getTallyStockLedgers(host, port, company, prior),
+    ])
+    if (!invPrior.error) inventory.openingStockTotal = invPrior.closingStockTotal
+    if (!sihPrior.error) stockInHand.openingStockTotal = sihPrior.closingStockTotal
+  }
 
   const candidates = []
   if (pl.plOpening > 0 || pl.plClosing > 0) {

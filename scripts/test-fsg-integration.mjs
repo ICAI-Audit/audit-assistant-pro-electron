@@ -25,6 +25,8 @@ import { checkPolicyFormat } from './fsg-policy-checks.mjs'
 import { checkWorkings } from './fsg-workings-checks.mjs'
 import { checkAnalyseChange } from './fsg-analyse-change-checks.mjs'
 import { checkInventoryNote, checkShareholding, checkOpeningSurplusLabel, checkConflictFallback } from './fsg-inventory-note-checks.mjs'
+import { checkTbVersions } from './fsg-tb-version-checks.mjs'
+import { checkOwnerPoints } from './fsg-owner-points-checks.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
@@ -407,21 +409,37 @@ async function main() {
   try { db.prepare(`DELETE FROM clients WHERE id = 'c1'`).run() } catch (e) { restricted = /FOREIGN KEY/.test(e.message) }
   check('deleting a client with statement data is refused', restricted)
 
+  // T-071: at most three Trial Balances per financial year and branch. The checks
+  // below each upload their own; before an upload that would be a fourth, the
+  // oldest earlier check's Trial Balance is deleted (never the main one above),
+  // as a user would delete a version they no longer need.
+  const staffWithRoom = async (channel, ...args) => {
+    for (let i = 0; i < 5 && /^tb:upload/.test(channel) && args[0]?.entityPeriodId; i++) {
+      const st = await staff('tb:versionStatus', { entityPeriodId: args[0].entityPeriodId, branchName: args[0].branchName || '' })
+      const oldest = st.ok && st.result.full ? st.result.versions.filter(v => v.id !== tbId).sort((a, b) => a.id - b.id)[0] : null
+      if (!oldest) break
+      await staff('tb:delete', oldest.id)
+    }
+    return staff(channel, ...args)
+  }
+
   await checkMissingAlie({ db, root, userData, check, staff, partner, entityId, periodId, defaultRs })
   await checkInvestments({ db, root, userData, check, staff, partner, entityId, periodId, defaultRs,
     renderPdf: html => partner('financials:renderPDF', html) })
   await checkLevel1Fallbacks({ Database, root, userData, originalDb: db, check,
     renderPdf: html => partner('financials:renderPDF',html) })
-  await checkTbImport({ db, root, userData, check, staff, entityId, periodId, defaultRs })
-  await checkQueue({ db, check, staff, entityId, periodId, defaultRs })
+  await checkTbImport({ db, root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkQueue({ db, check, staff: staffWithRoom, entityId, periodId, defaultRs })
   await checkNaming({ db, root, check, staff, entityId, defaultRs })
   await checkPolicyFormat({ root, userData, check })
-  await checkWorkings({ db, check, staff, partner, entityId, periodId, defaultRs })
-  await checkAnalyseChange({ root, userData, check, staff, entityId, periodId, defaultRs })
-  await checkInventoryNote({ db, root, userData, check, staff, entityId, periodId, defaultRs })
+  await checkWorkings({ db, check, staff: staffWithRoom, partner, entityId, periodId, defaultRs })
+  await checkAnalyseChange({ root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkInventoryNote({ db, root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
   await checkShareholding({ root, userData, check })
-  await checkOpeningSurplusLabel({ db, root, userData, check, staff, entityId, periodId, defaultRs })
-  await checkConflictFallback({ db, check, staff, entityId, periodId, defaultRs })
+  await checkOpeningSurplusLabel({ db, root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkConflictFallback({ db, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkTbVersions({ db, root, check, staff, partner, entityId, defaultRs })
+  await checkOwnerPoints({ root, userData, check })
 
   const failed = results.filter((x) => !x.pass)
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`)

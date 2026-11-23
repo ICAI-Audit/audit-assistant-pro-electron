@@ -128,7 +128,18 @@ async function snapshotUserRows(tbId) {
   return rows
 }
 
-async function applyCarryForward(tbId, entityId, sameTBSnapshot) {
+async function applyCarryForward(tbId, entityId, sameTBSnapshot, { carryRules = true } = {}) {
+  // T-072: the owner chose not to carry earlier decisions to this version of
+  // the Trial Balance: only decisions made on this Trial Balance itself are
+  // kept across a re-run; learned rules and other Trial Balances are not read.
+  if (!carryRules) {
+    const own = new Map()
+    for (const p of sameTBSnapshot || []) {
+      const key = (p.name || '').trim().toLowerCase()
+      if (key && !own.has(key)) own.set(key, { ...p, own: true })
+    }
+    return applyDecisions(tbId, own)
+  }
   // Decisions on the entity's OTHER TBs, split by year: the same Financial
   // Period and branch as this TB (the copy being replaced by a re-upload) —
   // then every other year, LATEST year first. Ordered by the year, never by
@@ -184,6 +195,11 @@ async function applyCarryForward(tbId, entityId, sameTBSnapshot) {
     const key = (p.name || '').trim().toLowerCase()
     if (key && !byName.has(key)) byName.set(key, p)
   }
+  return applyDecisions(tbId, byName)
+}
+
+// Writes the chosen earlier decision (by ledger name) onto this TB's fresh rows.
+async function applyDecisions(tbId, byName) {
   if (byName.size === 0) return 0
 
   const { rows: fresh } = await query(
@@ -254,7 +270,7 @@ async function resolveLevelFormatIds(tbId) {
 // format row.
 async function applyLearnedRulesToEntityTBs(entityId) {
   const { rows: tbs } = await query(
-    `SELECT tb.id, ep.locked
+    `SELECT tb.id, ep.locked, tb.carry_rules
        FROM trial_balances tb
        LEFT JOIN entity_periods ep ON ep.id = tb.entity_period_id
       WHERE tb.entity_id = $1`,
@@ -263,6 +279,7 @@ async function applyLearnedRulesToEntityTBs(entityId) {
   let applied = 0, tbsTouched = 0, tbsLocked = 0
   for (const tb of tbs) {
     if (tb.locked) { tbsLocked++; continue }
+    if (tb.carry_rules === false) continue   // T-072: this version was set not to take learned rules
     const { rowCount } = await query(
       `UPDATE mapped_tb AS mt SET
          mapping1_resultant = lr.mapping1_resultant,
@@ -395,6 +412,7 @@ async function propagateToOtherTBs(entityId, ledgerNameKey, patch, sourceTbId) {
      JOIN financial_periods fp ON fp.id = ep.financial_period_id
      WHERE tb.entity_id = $1 AND tb.id <> $2
        AND ep.locked IS NOT TRUE
+       AND tb.carry_rules <> 0            -- T-072: a version set not to take earlier decisions
        AND fp.date_from < $4
        AND LOWER(TRIM(tr.name)) = $3
        AND mt.hand_fixed IS NOT TRUE`,   // never over a fix the CA made on that period itself
@@ -426,6 +444,14 @@ export function registerMappedTBHandlers() {
        JOIN entities e ON e.id = tb.entity_id WHERE tb.id = $1`, [tbId]
     )
     if (!tb) throw new Error('Trial Balance not found.')
+    // T-072: the choice made when this version was uploaded (carry the learned
+    // ledger rules and earlier categorisation, or not) is kept on the Trial
+    // Balance, so every later re-run honours it.
+    let carryRules = tb.carry_rules !== false
+    if (typeof options.carryRules === 'boolean') {
+      carryRules = options.carryRules
+      await query(`UPDATE trial_balances SET carry_rules = $1 WHERE id = $2`, [carryRules ? 1 : 0, tbId])
+    }
     // Preserve this TB's own user decisions across the re-run
     const userSnapshot = await snapshotUserRows(tbId)
     await query(`DELETE FROM mapped_tb WHERE tb_id = $1`, [tbId])
@@ -435,7 +461,7 @@ export function registerMappedTBHandlers() {
     })
     await persistMappingResults(results)
     // Re-apply finalised categorisation (this TB's snapshot + entity's other TBs)
-    const carriedForward = await applyCarryForward(tbId, tb.entity_id, userSnapshot)
+    const carriedForward = await applyCarryForward(tbId, tb.entity_id, userSnapshot, { carryRules })
     return {
       total:       results.length,
       high:        results.filter(r => r.confidence === 'high').length,
@@ -445,6 +471,7 @@ export function registerMappedTBHandlers() {
       discrepancy: results.filter(r => r.status === 'discrepancy').length,
       unmapped:    results.filter(r => r.status === 'unmapped').length,
       carriedForward,
+      carryRules,
     }
   })
 

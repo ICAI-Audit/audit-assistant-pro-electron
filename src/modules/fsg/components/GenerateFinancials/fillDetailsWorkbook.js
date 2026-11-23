@@ -13,6 +13,7 @@ import { appendShareCapitalDetailsSheet, shareCapitalDetailsSheetSpec } from '..
 import { appendCfsSheet, cfsSheetSpec, CFS_SHEET } from '../CFS/cfsWorkbook'
 import { INVESTMENT_FIELDS } from '../../utils/investmentWorkbook'
 import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpCellBlocked } from '../Notes/TradePayablesDisclosureForm'
+import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trCellBlocked } from '../Notes/TradeReceivablesAgingForm'
 import { INVESTMENT_CATEGORIES, INVESTMENT_RELATIONSHIPS } from '../../utils/investments'
 import { HOW_TO_SHEET, LISTS_SHEET } from '../../utils/veraExcel'
 
@@ -286,8 +287,15 @@ function registrySheetSpec(entry, dataRows) {
     case 'trade-receivables-aging': {
       dataRows.forEach((row, i) => {
         const r = first + i
-        if (/^include in output/i.test(label(row, 1))) { cells(r, [2]); pick(2, FILL_DETAILS_LISTS.yesNo, 'Include in Output', r, r) }
-        else cells(r, range(2, lastColIdx))
+        if (/^include in output/i.test(label(row, 1))) { cells(r, [2]); pick(2, FILL_DETAILS_LISTS.yesNo, 'Include in Output', r, r); return }
+        // T-069: grey, locked cells where the schedule takes no entry (rows (i) to (iv): Unbilled;
+        // Unbilled Dues rows: Not Due and the five periods).
+        const ageRow = TR_AGEING_ROWS.find(x => x.label.toLowerCase() === label(row, 1).toLowerCase())
+        if (!ageRow || ageRow.computed) return
+        const open = [], shut = []
+        TR_AGEING_BUCKETS.forEach((b, j) => (trCellBlocked(ageRow, b.key) ? shut : open).push(2 + j))
+        cells(r, open)
+        shut.forEach((c, k) => { if (k === 0 || shut[k - 1] !== c - 1) { let e = c; while (shut.includes(e + 1)) e++; blocked.push(`${L(c)}${r}:${L(e)}${r}`) } })
       })
       amount = range(2, lastColIdx)
       break

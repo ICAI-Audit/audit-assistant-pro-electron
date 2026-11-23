@@ -57,6 +57,49 @@ function sumField(rows, field, get = (r) => r) {
   return rows.reduce((s, r) => s + num(get(r)[field]), 0)
 }
 
+// ── Partners: the P&L profit divided by the profit-sharing % (owner, 23 November 2026) ──
+// Each partner whose % is typed gets profit x % / 100, rounded to the paisa; when the %s add up to 100 and no figure was
+// typed over, the rounding goes to the last of them so the shares add up to the profit exactly. A partner whose share was
+// typed over (profitManual) is left alone, as is a partner with no % (an old saved figure stays as it was). An LLP's share
+// goes to the Current Account (3b), by its own % or else the % of the Contribution table.
+const round2 = (v) => Math.round(v * 100) / 100
+const hasPct = (v) => String(v ?? '').trim() !== '' && Number.isFinite(parseFloat(v))
+export function partnerSharePct(row, isLLP) {
+  if (!isLLP) return hasPct(row?.sharePct) ? parseFloat(row.sharePct) : null
+  if (hasPct(row?.current?.sharePct)) return parseFloat(row.current.sharePct)
+  return hasPct(row?.contrib?.sharePct) ? parseFloat(row.contrib.sharePct) : null
+}
+export function splitProfitByShare(rows, profit, isLLP = false) {
+  if (profit == null || profit === '' || !Number.isFinite(Number(profit)) || !Array.isArray(rows)) return rows
+  const P = Number(profit)
+  const fieldsOf = (r) => (isLLP ? (r.current || {}) : r)
+  const withPct = rows.map((r, i) => ({ i, pct: partnerSharePct(r, isLLP), manual: !!fieldsOf(r).profitManual })).filter(x => x.pct != null)
+  const auto = withPct.filter(x => !x.manual)
+  if (!auto.length) return rows
+  const shares = new Map(auto.map(x => [x.i, round2(P * x.pct / 100)]))
+  const totalPct = withPct.reduce((t, x) => t + x.pct, 0)
+  if (Math.abs(totalPct - 100) < 1e-6 && auto.length === withPct.length) {
+    const diff = round2(P - [...shares.values()].reduce((t, v) => t + v, 0))
+    if (diff) { const last = auto[auto.length - 1].i; shares.set(last, round2(shares.get(last) + diff)) }
+  }
+  let changed = false
+  const out = rows.map((r, i) => {
+    if (!shares.has(i)) return r
+    const v = shares.get(i), f = fieldsOf(r)
+    if (String(f.shareOfProfit ?? '').trim() !== '' && Number(f.shareOfProfit) === v) return r
+    changed = true
+    return isLLP ? { ...r, current: { ...f, shareOfProfit: v } } : { ...r, shareOfProfit: v }
+  })
+  return changed ? out : rows
+}
+/** What the strip above the partners' table shows: profit to divide, the %s typed and what is still undivided. */
+export function profitSplitSummary(rows, profit, isLLP = false) {
+  const fieldsOf = (r) => (isLLP ? (r.current || {}) : r)
+  const pcts = (rows || []).map(r => partnerSharePct(r, isLLP)).filter(p => p != null)
+  const divided = (rows || []).reduce((t, r) => t + num(fieldsOf(r).shareOfProfit), 0)
+  return { profit: Number(profit) || 0, totalPct: round2(pcts.reduce((t, p) => t + p, 0)), anyPct: pcts.length > 0, divided: round2(divided), undivided: round2((Number(profit) || 0) - divided) }
+}
+
 // ── Sole owner's Share of Profit cell ───────────────────────────────────────
 // Seeded from the P&L, but always editable. The P&L's own bottom line is not
 // automatically what belongs in the capital account — tax and other
@@ -64,17 +107,16 @@ function sumField(rows, field, get = (r) => r) {
 // makes the account tally with the Balance Sheet is a different one, and only
 // the preparer can say which. Once edited the cell is marked manual and the
 // auto-fill leaves it alone; ↺ puts the P&L figure back.
-function ProfitCell({ value, manual, onEdit, onReset }) {
+function ProfitCell({ value, manual, onEdit, onReset, autoTitle = 'Taken from the P&L. Type here to override.', manualTitle = 'Entered manually — the P&L figure will not overwrite this', resetTitle = 'Restore the figure from the P&L' }) {
   return (
     <div className="flex items-center gap-1">
       <input
         className={NUM} type="number" value={value ?? ''}
         onChange={e => onEdit?.(e.target.value)}
-        title={manual ? 'Entered manually — the P&L figure will not overwrite this'
-                      : 'Taken from the P&L. Type here to override.'}
+        title={manual ? manualTitle : autoTitle}
       />
       {manual && (
-        <button onClick={onReset} title="Restore the figure from the P&L"
+        <button onClick={onReset} title={resetTitle}
           className="shrink-0 text-[10px] text-blue-500 hover:text-blue-700 leading-none px-0.5">↺</button>
       )}
     </div>
@@ -133,6 +175,13 @@ function SingleAccountTable({ rows, py, onRowsChange, onPyChange, partyLabel, al
                   {isSingleOwner && i === 0 ? (
                     <ProfitCell value={r.shareOfProfit} manual={!!plManual.cy}
                       onEdit={v => onProfitEdit?.('cy', v)} onReset={() => onProfitReset?.('cy')} />
+                  ) : hasPct(r.sharePct) ? (
+                    <ProfitCell value={r.shareOfProfit} manual={!!r.profitManual}
+                      autoTitle={`P&L profit x ${r.sharePct}%. Type here to override.`}
+                      manualTitle="Entered manually — the share % will not overwrite this"
+                      resetTitle="Work out again from the P&L profit and the share %"
+                      onEdit={v => onRowsChange(rows.map((x, ri) => ri === i ? { ...x, shareOfProfit: v, profitManual: true } : x))}
+                      onReset={() => onRowsChange(rows.map((x, ri) => ri === i ? { ...x, profitManual: false } : x))} />
                   ) : (
                     <input className={NUM} type="number" value={r.shareOfProfit} onChange={e => setRow(i, 'shareOfProfit', e.target.value)} />
                   )}
@@ -311,7 +360,18 @@ function LLPAccountTables({ rows, pyContrib, pyCurrent, onRowsChange, onPyContri
                   <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.current.remuneration} onChange={e => setRowSub(i, 'current', 'remuneration', e.target.value)} /></td>
                   <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.current.interest} onChange={e => setRowSub(i, 'current', 'interest', e.target.value)} /></td>
                   <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.current.withdrawals} onChange={e => setRowSub(i, 'current', 'withdrawals', e.target.value)} /></td>
-                  <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.current.shareOfProfit} onChange={e => setRowSub(i, 'current', 'shareOfProfit', e.target.value)} /></td>
+                  <td className="px-1 py-0.5 border border-gray-200">
+                    {partnerSharePct(r, true) != null ? (
+                      <ProfitCell value={r.current.shareOfProfit} manual={!!r.current.profitManual}
+                        autoTitle={`P&L profit x ${partnerSharePct(r, true)}%. Type here to override.`}
+                        manualTitle="Entered manually — the share % will not overwrite this"
+                        resetTitle="Work out again from the P&L profit and the share %"
+                        onEdit={v => onRowsChange(rows.map((x, ri) => ri === i ? { ...x, current: { ...x.current, shareOfProfit: v, profitManual: true } } : x))}
+                        onReset={() => onRowsChange(rows.map((x, ri) => ri === i ? { ...x, current: { ...x.current, profitManual: false } } : x))} />
+                    ) : (
+                      <input className={NUM} type="number" value={r.current.shareOfProfit} onChange={e => setRowSub(i, 'current', 'shareOfProfit', e.target.value)} />
+                    )}
+                  </td>
                   <td className="px-2 py-1 border border-gray-200 text-right font-mono font-semibold bg-blue-50">{fmtN(closingOf(r.current))}</td>
                 </tr>
               ))}
@@ -420,6 +480,16 @@ export default function OwnersCapitalAccountForm({
     })
   }, [isSingleOwner, data.variant, plNetProfit, plPrevNetProfit, loadTick])
 
+  // Partners (Partnership firm, LLP): the P&L profit divided by each partner's share % as it is typed (splitProfitByShare).
+  useEffect(() => {
+    if (isSingleOwner || plNetProfit == null) return
+    setData(d => {
+      const rows = splitProfitByShare(d.rows, plNetProfit, d.variant === 'llp')
+      return rows === d.rows ? d : { ...d, rows }
+    })
+  }, [isSingleOwner, plNetProfit, data.rows, loadTick])
+  const split = !isSingleOwner && plNetProfit != null ? profitSplitSummary(data.rows, plNetProfit, data.variant === 'llp') : null
+
   // Typing in a Share of Profit cell marks that side manual; ↺ hands it back to
   // the P&L (the auto-fill effect above then re-seeds it on the next pass).
   const editProfit = (side, value) => setData(d => ({
@@ -497,6 +567,20 @@ export default function OwnersCapitalAccountForm({
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {split && (
+            <div className="mb-2 px-3 py-1.5 rounded border border-blue-200 bg-blue-50 text-xs text-gray-700 flex flex-wrap gap-x-5 gap-y-1 items-center">
+              <span>{split.profit < 0 ? 'Loss' : 'Profit'} for the year as per the P&L: <span className="font-mono font-semibold">₹{fmtN(Math.abs(split.profit))}</span></span>
+              <span>Divided by the share %{data.variant === 'llp' ? ' (to the Current Account)' : ''}: type each partner's % and the share is worked out.</span>
+              {split.anyPct && (
+                <span className={Math.abs(split.totalPct - 100) < 1e-6 ? 'text-green-700' : 'text-red-700 font-semibold'}>
+                  Share % total: {split.totalPct}%{Math.abs(split.totalPct - 100) < 1e-6 ? ' ✓' : ' (should be 100%)'}
+                </span>
+              )}
+              {split.anyPct && Math.abs(split.undivided) >= 0.01 && (
+                <span className="text-red-700">Not yet divided: <span className="font-mono">₹{fmtN(split.undivided)}</span></span>
+              )}
+            </div>
+          )}
           {data.variant === 'llp' ? (
             <LLPAccountTables
               rows={data.rows}

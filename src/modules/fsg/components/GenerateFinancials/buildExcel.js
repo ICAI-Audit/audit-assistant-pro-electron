@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx-js-style'  // fork of xlsx that preserves cell style
 import { netCreditPurchasesWorking } from '../../utils/ratios'
 import { DENOMINATIONS, displayAmt, processRows } from '../../hooks/useFinancials'
 import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../Notes/TradePayablesDisclosureForm'
-import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell } from '../Notes/TradeReceivablesAgingForm'
+import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell, trPeriodView } from '../Notes/TradeReceivablesAgingForm'
 // Single source of truth for the Schedule III BS layout — shared with the
 // live BS screen so Excel always matches the UI exactly (numbering,
 // zero-value uncategorised suppression, everything).
@@ -12,6 +12,7 @@ import { computeCompanyBSLayout, computeDynamicBSLayout } from '../../utils/bsSt
 // Single source of truth for the Company/LLP PL expense-line bucketing —
 // shared with the live PL screen so Excel always matches the UI exactly.
 import { EXPENSE_LINES, corpFaceTail, TAX_SECTION_RX } from '../../utils/plStructureCorp'
+import { taxLineNote } from '../../utils/deferredTaxNote'
 // Single source of truth for the non-corporate (constitution=1: Individual/
 // Proprietorship/Partnership) PL sequence — shared with the live PL screen
 // and the PDF exporter.
@@ -810,7 +811,7 @@ function buildNonCorpPLSheet(entity, activeTB, prevTB, data, { denomination, aud
         break
       case 'sub': {
         rows.push([`   (${item.alpha}) ${item.label}`, item.noteNum || '', scale(item.cy), scale(item.py)])
-        if (item.noteNum) { noteLinks.push({ row: rowIdx, col: 1, noteNum: item.noteNum }); formulaCells.push({ rowIdx, noteNum: item.noteNum }) }
+        if (item.noteNum) { noteLinks.push({ row: rowIdx, col: 1, noteNum: item.noteNum }); if (!item.noteRef) formulaCells.push({ rowIdx, noteNum: item.noteNum }) }
         break
       }
       case 'subtotal':
@@ -1092,9 +1093,11 @@ function buildPLSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   if (taxSecs.length > 0) {
     taxSecs.forEach(sec => sec.lines.forEach(line => {
       rowIdx = rows.length
-      rows.push([`   ${line.level2 || sec.level1}`, line.noteNum || sec.noteNum || '', scale(line.total), scale(line.prevTotal)])
-      const nn = line.noteNum || sec.noteNum
-      if (nn) { noteLinks.push({ row: rowIdx, col: 1, noteNum: nn }); formulaCells.push({ rowIdx, noteNum: nn }) }
+      // The Deferred tax line points to the Balance Sheet's Deferred tax note (a link only: its amount is the charge of
+      // the year, not that note's balance, so no formula to the note) - utils/deferredTaxNote.js.
+      const { num: nn, ref } = taxLineNote(line, sec, data.notes)
+      rows.push([`   ${line.level2 || sec.level1}`, nn || '', scale(line.total), scale(line.prevTotal)])
+      if (nn) { noteLinks.push({ row: rowIdx, col: 1, noteNum: nn }); if (!ref) formulaCells.push({ rowIdx, noteNum: nn }) }
     }))
   } else {
     rows.push([`   (1) Current tax`, '', scale(0), scale(0)])
@@ -1736,8 +1739,8 @@ function buildNoteDetailRows(noteTitle, details, noteNum, scale, cyTotal, period
         row.computed ? trComputedCell(pd, row.computed, bKey) : num(pd?.[row.key]?.[bKey])
       const buildPeriod = (rawPd, heading) => {
         if (!rawPd) return
-        // T-063: Trade Payables blocked cells are nil and Total Due / Total are worked out.
-        const pd = isTP ? tpPeriodView(rawPd) : rawPd
+        // T-063 / T-069: blocked cells are nil and Total Due / Total are worked out.
+        const pd = isTP ? tpPeriodView(rawPd) : trPeriodView(rawPd)
         const any = AG_ROWS.some(r => AG_BUCKETS.some(b => Math.abs(cellVal(pd, r, b.key)) > 0.005))
         if (!any && !ag.includeInOutput && !details.includeInOutput) return
         rows.push([])

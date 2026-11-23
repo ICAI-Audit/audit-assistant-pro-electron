@@ -11,7 +11,7 @@ import { useFinancials, fmtINR, displayAmt } from '../../hooks/useFinancials'
 import { indexSavedNoteRows, parsedNoteData } from '../../utils/savedNoteData'
 import PYTBSelector from '../shared/PYTBSelector'
 import { TP_AGEING_BUCKETS, TP_MSME_ROWS, TP_OTHERS_ROWS, tpPeriodView } from '../Notes/TradePayablesDisclosureForm'
-import { TR_AGEING_BUCKETS, trComputedCell } from '../Notes/TradeReceivablesAgingForm'
+import { trScheduleTotal } from '../Notes/TradeReceivablesAgingForm'
 import { ncAgeingResolve } from '../../utils/tradeReceivablesNonCorp'
 import { computeTax } from '../../utils/taxComputation'
 import { resolveGroup, todayLocal, figuresOf, buildTaxInput, loadDepIT, loadTaxComputationSaved } from '../../utils/taxComputationIO'
@@ -283,7 +283,7 @@ export default function ExceptionReport({ entity, activeTB, prevTB, activeRsId, 
         }
       } else if (note) {
         const det = noteDetails(note)
-        const grand = (pd) => TR_AGEING_BUCKETS.reduce((s, b) => s + trComputedCell(pd, 'grand', b.key), 0)
+        const grand = trScheduleTotal   // T-069: Unbilled / Not Due columns, grey cells nil
         if (det?.cy) {
           const schedCY = grand(det.cy)
           const schedPY = grand(det.py)

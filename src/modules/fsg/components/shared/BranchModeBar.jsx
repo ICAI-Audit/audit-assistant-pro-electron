@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { ConsolidationContext, resolveConsolidationSelection, loadOverride, saveOverride } from '../../utils/consolidationSelection'
+import { tbVersionSuffix } from '../../utils/tbVersions'
 
 // Under "Consolidated": which Trial Balances are added together for the Current Year and for the Previous Year.
 function ConsolidationPicker() {
@@ -12,7 +13,7 @@ function ConsolidationPicker() {
     return () => { dead = true }
   }, [ctx?.entityId, ctx?.entityPeriodId, ctx?.consKey])
   if (!ctx?.entityId || !sel || !sel.tbs.length) return null
-  const label = (t) => `${t.branch_name || 'TB #' + t.id} (${t.period || 'no period'})`
+  const label = (t) => `${t.branch_name || 'TB #' + t.id} (${t.period || 'no period'}${tbVersionSuffix(t)})`
   const toggle = (side, id) => {
     const cur = side === 'cy' ? sel.cyIds : sel.pyIds
     const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]
@@ -104,7 +105,7 @@ export default function BranchModeBar({ fsMode, onFsModeChange, branchTBList = [
         <div className="flex items-center gap-1 px-3 pb-1.5 overflow-x-auto">
           <span className="text-[10px] text-gray-400 mr-1 shrink-0">Branch:</span>
           {branchTBList.map(t => {
-            const label = t.branch_name || t.period || `TB #${t.id}`
+            const label = `${t.branch_name || t.period || `TB #${t.id}`}${tbVersionSuffix(t)}`
             const active = t.id === selectedBranchTBId
             return (
               <button
