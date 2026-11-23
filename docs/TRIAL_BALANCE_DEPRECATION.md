@@ -1,3 +1,5 @@
+> Historical note. Both modules it describes were removed in T-019: `/trial-balance` now redirects to `/financial-statement-review`, and there is no `/trial-balance-new` route. See [Financial Statement Review](project/FINANCIAL_STATEMENT_REVIEW.md) and [current status](project/CURRENT_STATUS.md).
+
 # Trial Balance Module Deprecation
 
 ## Overview

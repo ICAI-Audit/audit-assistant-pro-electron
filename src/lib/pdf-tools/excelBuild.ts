@@ -763,6 +763,106 @@ const widthOfPoints = (pt: number) => Math.round(Math.max(0.6, pt / 5.3) * 10) /
 
 const width = (chars: number, max: number) => Math.round(Math.min(max, Math.max(MIN_WIDTH, chars * 1.1 + 2)) * 10) / 10;
 
+/** How far from its cell's left edge the text of a grid cell starts; null for turned text and a cell over several columns. */
+function startOf(cell: GridCell): number | null {
+  if (cell.turn !== 0 || cell.colSpan !== 1) return null;
+  let x0 = Infinity;
+  for (const w of cell.words) if ((w.turn ?? 0) === 0 && w.x0 < x0) x0 = w.x0;
+  return Number.isFinite(x0) ? x0 - cell.x0 : null;
+}
+
+/** How far from its cell's left edge the text of each column of a grid usually starts: a caption set in further is indented. */
+function gridStarts(grid: Grid, C: number): number[] {
+  const starts: number[] = [];
+  for (const cell of grid.cells) {
+    const at = startOf(cell);
+    if (at !== null && cell.col < C) starts[cell.col] = Math.min(starts[cell.col] ?? Infinity, at);
+  }
+  return starts;
+}
+
+// ---- a picture never hides text -----------------------------------------------------------------------
+// The sheet writes a text at the left edge of its column, wherever it starts in that column on the page; a picture
+// keeps its distance from that edge. So a picture standing left of a text on the page (a logo before a name) would
+// lie over the start of that text on the sheet. Places are reckoned in points of the page: where the sheet will
+// write each text, and where it will put the picture. A picture that would lie over a text there is given empty
+// rows of its own just above (SheetBuilder.pictureAlone); every other picture stands beside its rows as before.
+
+/** A picture and a text overlapping by more than this many points across lie over each other. */
+const HIDES_ACROSS_PT = 1;
+/** ... and by more than this share of the lower of the two, down the page (a picture just under a line is not over it). */
+const HIDES_DOWN_SHARE = 0.3;
+
+/**
+ * Where a text will stand on the sheet, line by line (a cell may hold several lines, and a picture may stand beside
+ * them): where the page shows each line, and, when the text is written at its column's left edge, there.
+ */
+function textPlaces(words: readonly Word[], edge: number | null, out: Extent[]): void {
+  const upright = words.filter((w) => (w.turn ?? 0) === 0 && w.text.trim() !== '').sort((a, b) => a.y0 - b.y0);
+  let line: Word[] = [];
+  let y1 = -Infinity;
+  const close = () => {
+    const b = extentOf(line);
+    if (!b) return;
+    out.push(b);
+    if (edge !== null && Math.abs(edge - b.x0) > 0.01) out.push({ x0: edge, x1: edge + (b.x1 - b.x0), y0: b.y0, y1: b.y1 });
+  };
+  for (const w of upright) {
+    // A word that starts above the middle of the line's last stretch is on that line; else a new line starts.
+    if (line.length > 0 && w.y0 < y1 - 0.5 * (w.y1 - w.y0)) {
+      line.push(w);
+      y1 = Math.max(y1, w.y1);
+    } else {
+      close();
+      line = [w];
+      y1 = w.y1;
+    }
+  }
+  close();
+}
+
+/** Where the texts of a table will stand on the sheet (textPlaces): a number, and a text set at the middle or the right, where the page shows it. */
+function tablePlaces(table: Table, seen: AlignedLooks | null): Extent[] {
+  const out: Extent[] = [];
+  if (table.grid && table.source === 'ruled') {
+    const starts = gridStarts(table.grid, Math.min(table.grid.xs.length - 1, EXCEL_MAX_COLUMNS));
+    for (const cell of table.grid.cells) {
+      if (cell.words.length === 0) continue;
+      if (cell.turn !== 0) {
+        out.push({ x0: cell.x0, x1: cell.x1, y0: cell.y0, y1: cell.y1 });
+        continue;
+      }
+      const isNumber = parseAmount(fitCell(cell.text.trim())) !== null;
+      const align = sitting(cell, isNumber).align ?? (isNumber ? 'right' : 'left');
+      const at = startOf(cell);
+      textPlaces(cell.words, align === 'left' ? cell.x0 + (at === null ? 0 : Math.max(0, at - (starts[cell.col] ?? at))) : null, out);
+    }
+    return out;
+  }
+  const rows = seen?.rows ?? table.rows;
+  rows.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      if (cell.words.length === 0) return;
+      const look = seen?.looks[r]?.[c];
+      const align = look?.align ?? (parseAmount(fitCell(cell.text.trim())) !== null ? 'right' : 'left');
+      const edge = table.columns[Math.min(c, table.columns.length - 1)];
+      textPlaces(cell.words, align === 'left' && edge !== undefined ? edge + (look?.indent ?? 0) * INDENT_PT : null, out);
+    });
+  });
+  return out;
+}
+
+/** Whether a picture, put on the sheet no further left than `edge` (the left edge of the sheet's first column on the page), would lie over one of these texts. */
+function hidesText(box: Extent, edge: number, places: readonly Extent[]): boolean {
+  const x0 = Math.max(box.x0, edge);
+  const x1 = x0 + (box.x1 - box.x0);
+  for (const t of places) {
+    if (Math.min(x1, t.x1) - Math.max(x0, t.x0) <= HIDES_ACROSS_PT) continue;
+    if (Math.min(box.y1, t.y1) - Math.max(box.y0, t.y0) > HIDES_DOWN_SHARE * Math.min(box.y1 - box.y0, t.y1 - t.y0)) return true;
+  }
+  return false;
+}
+
 class SheetBuilder {
   readonly rows: CellPlan[][] = [];
   /** Longest table cell text per column; longest text line (column A). */
@@ -872,6 +972,20 @@ class SheetBuilder {
   }
 
   /**
+   * A picture that would hide text where it stands on the page (hidesText): empty rows of its own, from here, hold
+   * it in its size, and what it stood over or left of follows under it. `col` as SheetPicture's.
+   */
+  pictureAlone(file: PictureFile, box: { x0: number; y0: number; x1: number; y1: number }, col: number): void {
+    const tall = box.y1 - box.y0;
+    const n = Math.max(1, Math.min(60, Math.ceil(tall / DEFAULT_ROW_PT)));
+    const row = this.rows.length;
+    const from = Math.max(box.y0, this.reached());
+    for (let k = 0; k < n; k++) this.push([], from < box.y1 ? [from + ((box.y1 - from) * k) / n, from + ((box.y1 - from) * (k + 1)) / n] : null);
+    const scale = Math.min(1, Math.max(MIN_PICTURE_SCALE, (n * DEFAULT_ROW_PT) / tall));
+    this.pictures.push({ file, col, row, width: Math.max(1, Math.round(((box.x1 - box.x0) * scale * 96) / 72)), height: Math.max(1, Math.round((tall * scale * 96) / 72)) });
+  }
+
+  /**
    * A table row; returns how many cells became numbers. `cells` are the row's cells, for how their words are
    * set; `looks` what the page shows of each cell besides (a fill, a border, an indent: alignedLooks).
    */
@@ -926,18 +1040,7 @@ class SheetBuilder {
     const C = Math.min(grid.xs.length - 1, EXCEL_MAX_COLUMNS);
     const rows: CellPlan[][] = Array.from({ length: R }, () => []);
     let numbers = 0;
-    // How far from its cell's left edge the text of each column usually starts: a caption set in further is indented.
-    const starts: number[] = [];
-    const startOf = (cell: GridCell): number | null => {
-      if (cell.turn !== 0 || cell.colSpan !== 1) return null;
-      let x0 = Infinity;
-      for (const w of cell.words) if ((w.turn ?? 0) === 0 && w.x0 < x0) x0 = w.x0;
-      return Number.isFinite(x0) ? x0 - cell.x0 : null;
-    };
-    for (const cell of grid.cells) {
-      const at = startOf(cell);
-      if (at !== null && cell.col < C) starts[cell.col] = Math.min(starts[cell.col] ?? Infinity, at);
-    }
+    const starts = gridStarts(grid, C);
     for (const cell of grid.cells) {
       if (cell.col >= C) continue;
       const whole = fitCell(cell.text.trim());
@@ -1066,11 +1169,43 @@ function* planWork(pages: readonly PageLayout[], mode: SheetMode, pictures?: rea
     const waiting = sheetPictures(page, pictures?.[page.pageIndex]);
     /** Pictures standing wholly in a stretch of the page that holds no row get rows of their own there. */
     const roomed = new Set<Picture>();
+    /** Pictures that would hide text where they stand: placed already, in rows of their own (pictureAlone). */
+    const alone = new Set<Picture>();
     const roomBefore = (y: number) => {
       for (const p of waiting) {
-        if (roomed.has(p.box) || p.box.y1 > y + 2 || p.box.y0 < target.reached() - 2) continue;
+        if (roomed.has(p.box) || alone.has(p.box) || p.box.y1 > y + 2 || p.box.y0 < target.reached() - 2) continue;
         roomed.add(p.box);
         target.room(Math.max(p.box.y0, target.reached()), p.box.y1);
+      }
+    };
+    // Where the page's text starts and ends across the page: the sheet's one column, on a page with no table.
+    let left = Infinity;
+    let right = -Infinity;
+    if (waiting.length > 0) {
+      for (const w of wordsOf(page)) {
+        if (w.x0 < left) left = w.x0;
+        if (w.x1 > right) right = w.x1;
+      }
+    }
+    /** The column a picture's left edge stands in, with the share of that column before it. */
+    const columnOf = (box: Picture): number => {
+      const frame = frameAt(box.y0, box.y1);
+      if (frame) {
+        const c = columnAt(frame.columns, box.x0);
+        const next = c + 1 < frame.columns.length ? frame.columns[c + 1] : frame.right;
+        return c + Math.max(0, Math.min(0.95, (box.x0 - frame.columns[c]) / Math.max(1, next - frame.columns[c])));
+      }
+      return right > left ? Math.max(0, Math.min(0.9, (box.x0 - left) / (right - left))) : 0;
+    };
+    /** Before texts are written at these places: a picture that would lie over one of them gets rows of its own first. */
+    const clearOf = (places: () => Extent[], edge: number) => {
+      let known: Extent[] | null = null;
+      for (const p of waiting) {
+        if (roomed.has(p.box) || alone.has(p.box)) continue;
+        known ??= places();
+        if (!hidesText(p.box, edge, known)) continue;
+        alone.add(p.box);
+        target.pictureAlone(p.file, p.box, columnOf(p.box));
       }
     };
     for (const block of page.blocks as readonly Block[]) {
@@ -1085,20 +1220,19 @@ function* planWork(pages: readonly PageLayout[], mode: SheetMode, pictures?: rea
           const y: [number, number] | undefined = turned ? undefined : [line.y0, line.y1];
           const frame = turned ? null : frameAt(line.y0, line.y1);
           const pieces = turned ? [line.words] : linePieces(line);
+          /** The line as it goes on the sheet when its pieces stand in cells of their own; null when it is one text in column A. */
+          let set: { words: readonly Word[]; col: number; last?: number; align?: 'center' | 'right' }[] | null = null;
           if (pieces.length >= 2) {
             // Pieces set apart: each in the column it starts in; the last, when it ends at the table's right edge, in the column it ends in.
             let col = -1;
-            target.textPieces(
-              pieces.map((words, k) => {
-                const x0 = words[0].x0;
-                const x1 = Math.max(...words.map((w) => w.x1));
-                const atEnd = frame !== null && k === pieces.length - 1 && Math.abs(x1 - frame.right) <= PIECE_EDGE_PT;
-                const at = frame ? columnAt(frame.columns, atEnd ? x1 - SAME_EDGE_PT : x0 + SAME_EDGE_PT) : k;
-                col = Math.max(col + 1, at);
-                return atEnd && col === at && col > 0 ? { words, col, align: 'right' as const } : { words, col };
-              }),
-              y,
-            );
+            set = pieces.map((words, k) => {
+              const x0 = words[0].x0;
+              const x1 = Math.max(...words.map((w) => w.x1));
+              const atEnd = frame !== null && k === pieces.length - 1 && Math.abs(x1 - frame.right) <= PIECE_EDGE_PT;
+              const at = frame ? columnAt(frame.columns, atEnd ? x1 - SAME_EDGE_PT : x0 + SAME_EDGE_PT) : k;
+              col = Math.max(col + 1, at);
+              return atEnd && col === at && col > 0 ? { words, col, align: 'right' as const } : { words, col };
+            });
           } else if (frame && frame.columns.length >= 2 && pieces[0].length > 0) {
             // One piece that does not start at the table's left edge stands where the page sets it: centred over the
             // whole table, across its columns; over several of its columns, across those; else in the column it lies
@@ -1109,15 +1243,29 @@ function* planWork(pages: readonly PageLayout[], mode: SheetMode, pictures?: rea
             const first = columnAt(frame.columns, x0 + SAME_EDGE_PT);
             const last = Math.min(end, columnAt(frame.columns, x1 - SAME_EDGE_PT));
             const setIn = x0 - frame.left > CENTRED_MIN_PT;
-            if (setIn && Math.abs((x0 + x1) / 2 - (frame.left + frame.right) / 2) <= PIECE_EDGE_PT) target.textPieces([{ words: pieces[0], col: 0, last: end, align: 'center' }], y);
-            else if (setIn && first > 0 && first <= end && last > first) target.textPieces([{ words: pieces[0], col: first, last, align: 'center' }], y);
+            if (setIn && Math.abs((x0 + x1) / 2 - (frame.left + frame.right) / 2) <= PIECE_EDGE_PT) set = [{ words: pieces[0], col: 0, last: end, align: 'center' }];
+            else if (setIn && first > 0 && first <= end && last > first) set = [{ words: pieces[0], col: first, last, align: 'center' }];
             else if (setIn && first > 0 && first <= end) {
               const c0 = frame.columns[first];
               const c1 = frame.ends[first] ?? c0;
               const align = Math.abs(x1 - c1) <= PIECE_EDGE_PT ? ('right' as const) : x0 - c0 > 2 && Math.abs((x0 + x1) / 2 - (c0 + c1) / 2) <= PIECE_EDGE_PT ? ('center' as const) : undefined;
-              target.textPieces([{ words: pieces[0], col: first, ...(align ? { align } : {}) }], y);
-            } else target.textLine(lineText(line).trim(), line.words, y);
-          } else target.textLine((line.turn !== undefined ? line.words.map((w) => w.text).join(' ') : lineText(line)).trim(), line.words, y);
+              set = [{ words: pieces[0], col: first, ...(align ? { align } : {}) }];
+            }
+          }
+          if (!turned && waiting.length > 0) {
+            // The sheet's first column starts at the nearest table's left edge, or where the page's text starts.
+            const edge = frame ? frame.columns[0] : left;
+            const cells = set;
+            clearOf(() => {
+              const places: Extent[] = [];
+              if (!cells) textPlaces(line.words, edge, places);
+              // A piece set at the middle, at the right or over several columns stands where the page shows it.
+              else for (const piece of cells) textPlaces(piece.words, piece.align || piece.last !== undefined ? null : frame ? (frame.columns[piece.col] ?? null) : piece.col === 0 ? edge : null, places);
+              return places;
+            }, edge);
+          }
+          if (set) target.textPieces(set, y);
+          else target.textLine((line.turn !== undefined ? line.words.map((w) => w.text).join(' ') : lineText(line)).trim(), line.words, y);
         }
         since += block.lines.length;
       } else {
@@ -1128,12 +1276,14 @@ function* planWork(pages: readonly PageLayout[], mode: SheetMode, pictures?: rea
         if (!carried && mode === 'one-sheet' && target.hadTable) target.blank();
         target.hadTable = true;
         roomBefore(table.y0);
+        // A table read from its text also shows what the page draws on its rows (alignedLooks).
+        const seen = !(table.grid && table.source === 'ruled') && table.source === 'aligned' && table.columns.length > 0 && table.columns.length <= EXCEL_MAX_COLUMNS ? alignedLooks(table) : null;
+        // A table's rows stay together: a picture that would lie over the text of one of them stands above the table.
+        if (waiting.length > 0) clearOf(() => tablePlaces(table, seen), table.columns[0] ?? left);
         if (table.grid && table.source === 'ruled') {
           report.numberCells += target.gridTable(table.grid);
           since += table.grid.cells.length;
         } else {
-          // A table read from its text also shows what the page draws on its rows (alignedLooks).
-          const seen = table.source === 'aligned' && table.columns.length > 0 && table.columns.length <= EXCEL_MAX_COLUMNS ? alignedLooks(table) : null;
           if (seen) target.pageWidths(seen.widths);
           const rows = seen?.rows ?? table.rows;
           for (let r = 0; r < rows.length; r++) {
@@ -1155,22 +1305,7 @@ function* planWork(pages: readonly PageLayout[], mode: SheetMode, pictures?: rea
     }
     if (waiting.length > 0) {
       roomBefore(Infinity);
-      let left = Infinity;
-      let right = -Infinity;
-      for (const w of wordsOf(page)) {
-        if (w.x0 < left) left = w.x0;
-        if (w.x1 > right) right = w.x1;
-      }
-      for (const p of waiting) {
-        const frame = frameAt(p.box.y0, p.box.y1);
-        let col = 0;
-        if (frame) {
-          const c = columnAt(frame.columns, p.box.x0);
-          const next = c + 1 < frame.columns.length ? frame.columns[c + 1] : frame.right;
-          col = c + Math.max(0, Math.min(0.95, (p.box.x0 - frame.columns[c]) / Math.max(1, next - frame.columns[c])));
-        } else if (right > left) col = Math.max(0, Math.min(0.9, (p.box.x0 - left) / (right - left)));
-        target.picture(p.file, p.box, col);
-      }
+      for (const p of waiting) if (!alone.has(p.box)) target.picture(p.file, p.box, columnOf(p.box));
     }
     if (tables === 0 && !little) report.pagesAsText++;
     yield;

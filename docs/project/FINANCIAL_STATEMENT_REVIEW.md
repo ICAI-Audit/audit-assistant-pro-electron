@@ -1,5 +1,18 @@
 # Financial Statement Review (T-019)
 
+## Note from the Tax Audit work (21 November 2026)
+
+To whoever maintains Financial Statement Review. This is a request to consider, not a change: no file of this module was touched.
+
+- **What clashes.** The ratio screen under Features > Ratio has the menu label and heading "Form 26 (Old Name - 3CD)" (T-049; `src/modules/fsg/App.jsx`, `src/modules/fsg/components/Ratio/Form3CD.jsx`). It is a ratio sheet: turnover, gross profit and the like for two years.
+- **Why it matters.** Form No. 26 is also the name of the statutory tax audit report under section 63 of the Income-tax Act, 2025 (sources verified on 21 November 2026). The Tax Audit module adds that form (task T-067, feature F-032). Two different screens are then called "Form 26", and a user could take the ratio sheet for the statutory form.
+- **A suggestion.** A neutral label, for example "Ratios for tax audit (Form 3CD clause 40 / Form 26 clause 12(d))". The clause numbers are verified: Form No. 26 clause 12(d) corresponds to Form 3CD clause 40.
+- **Whose choice.** Yours: keep the label, change it, or choose other words.
+- **What the Tax Audit work will do.** Nothing in this module. It will not change any Financial Statement Review file.
+- **Update, 23 November 2026.** Form No. 26 is now in the Tax Audit module (T-067, F-032, uncommitted). The first wording of this note (21 November 2026) said that the section and the clause numbers were still being checked; both were verified on 21 November 2026, and the points above now state them. Still no Financial Statement Review file was changed.
+
+Written on the owner's instruction of 21 November 2026. The short form of this note is in [next tasks](NEXT_TASKS.md#notes-for-other-modules). Thank you.
+
 Owner additions, 13 November 2026:
 
 T-027 now covers BS/P&L-related Notes and ledger Annexures, including applicable supporting disclosure/ageing tables. BS headings use As at, P&L headings For the year ended, with the same selected CY/PY dates as the faces. Shared Excel sheets repeat the proper dated headings per note, preserving existing formula column positions. Opening/Closing movement meanings remain. This supersedes the earlier face-only scope below. T-028 removes Cloudtail MCA publication UI, automatic publication on final PDF/Excel generation, API/IPC policies and snapshot publishing/serialization code. Existing fs_snapshots table/records are retained for data preservation but have no current feature handlers; finalisation/signing/normal exports remain. No client data is sent to Git or any external service by this work.

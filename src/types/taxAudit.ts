@@ -1,4 +1,6 @@
-export type TaxAuditStatutoryVersion = 'ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025';
+export type TaxAuditStatutoryVersion =
+  | 'ITA_TAX_AUDIT_AY_2025_26_RULE_6G_NOTIF_23_2025'
+  | 'ITA_2025_FORM_26_RULE_47_NOTIF_22_2026';
 
 export type TaxAuditFormType = '3CA' | '3CB';
 
