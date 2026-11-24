@@ -5,40 +5,44 @@ import { parseZohoTB, buildTBRowsFromZoho } from '../../utils/zohoParsers'
 import { parseBusyTB, buildTBRowsFromBusy } from '../../utils/busyParsers'
 import FinancialPeriodPicker from '../shared/FinancialPeriodPicker'
 import WorkingsModal, { workingsResultText } from './WorkingsModal'
+import VersionCarryModal from './VersionCarryModal'
 import { fsgApi } from '../../api.js'
 import { finishWorkbook } from '../../utils/veraExcel'
-import { tbTemplateExcelSpec, workingsExcelSpec } from '../../utils/tbExcelSpecs'
+import { workingsExcelSpec } from '../../utils/tbExcelSpecs'
+import { checkTbVersionRoom, tbDisplayName } from '../../utils/tbVersions'
+import SimpleTbUploadModal, { downloadSimpleTbTemplate } from './SimpleTbUploadModal'
 
-// Every TB is compulsorily tied to a real Financial Period — checks whether
-// that period already has a TB (branch entities excepted, since one TB per
-// branch per period is the normal, expected shape there) and asks for
-// confirmation rather than silently allowing a duplicate. Returns true if
-// the caller should proceed with the upload.
-async function confirmIfPeriodAlreadyHasTB(entityPeriodId, hasBranches) {
-  if (!entityPeriodId || hasBranches) return true
+// Every TB is compulsorily tied to a real Financial Period. T-071: each upload
+// for the same year (and branch) is a new version, _v1 to _v3; a fourth is
+// refused with the way out (utils/tbVersions.js). When earlier versions exist,
+// say which version this upload becomes and offer a backup of the latest
+// version's workings first. Returns true if the caller should go ahead.
+export async function confirmIfPeriodAlreadyHasTB(entityPeriodId, branchName = '') {
+  const { proceed, status } = await checkTbVersionRoom(entityPeriodId, branchName)
+  if (!proceed) return false
+  const existing = status?.versions || []
+  if (existing.length === 0) return true
   try {
-    const existing = await fsgApi?.getTBsForEntityPeriod(entityPeriodId) || []
-    if (existing.length === 0) return true
+    const latest = [...existing].sort((a, b) => b.id - a.id)[0]
     // T-044: remind the user of the work done on the existing Trial Balance, and offer a backup first.
     let workings = []
-    try { workings = ((await fsgApi?.workingsSummary(existing[0].id))?.areas || []).filter(a => a.count > 0) } catch { /* best-effort */ }
+    try { workings = ((await fsgApi?.workingsSummary(latest.id))?.areas || []).filter(a => a.count > 0) } catch { /* best-effort */ }
     if (workings.length) {
       const list = workings.map(a => `  • ${a.label} (${a.count})`).join('\n')
       if (window.confirm(
-        `The Trial Balance already uploaded for this year (${existing[0].filename || `#${existing[0].id}`}) has your workings:\n\n${list}\n\n` +
-        'After the upload you will be offered to carry them over to the new Trial Balance.\n\n' +
+        `The latest Trial Balance of this year (${tbDisplayName(latest)}) has your workings:\n\n${list}\n\n` +
+        'After the upload you will be asked whether to copy them, and the Learned Ledger Rules, to the new version.\n\n' +
         'Download a backup of all these workings now (one Excel file)?\nOK = download the backup first     Cancel = continue without a backup'
       )) {
-        await downloadWorkingsFile(existing[0].id)
+        await downloadWorkingsFile(latest.id)
       }
     }
-    return window.confirm(
-      `This Financial Period already has ${existing.length} Trial Balance${existing.length > 1 ? 's' : ''} uploaded ` +
-      `(${existing.map(t => t.filename || `#${t.id}`).join(', ')}). Upload another one for the same period anyway?`
-    )
-  } catch {
-    return true  // best-effort check — don't block upload if it fails
-  }
+  } catch { /* best-effort: the backup offer never blocks the upload */ }
+  return window.confirm(
+    `${status.yearLabel || 'This financial year'}${branchName ? ` (branch ${branchName})` : ''} already has: ` +
+    `${existing.map(t => tbDisplayName(t)).join(', ')}.\n\n` +
+    `This upload will be saved as version _v${status.next} (at most ${status.limit} versions are kept). Continue?`
+  )
 }
 
 // T-044: every working of one Trial Balance as one Excel file. Returns true when saved.
@@ -98,63 +102,11 @@ async function chooseStockSource(stockTotals) {
   return fallback
 }
 
-// ── Small modal to capture period (and branch name) before upload ─────────
-function UploadModal({ entity, filePath, hasBranches, onConfirm, onCancel }) {
-  const [periodPick, setPeriodPick] = useState(null)
-  const [branchName, setBranchName] = useState('')
-  const [checking, setChecking] = useState(false)
-  const doConfirm = async () => {
-    if (!periodPick?.entityPeriodId) return
-    setChecking(true)
-    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, hasBranches)
-    setChecking(false)
-    if (!proceed) return
-    onConfirm(periodPick.periodText || '', branchName, periodPick.entityPeriodId)
-  }
-  const containerRef = useModalKeys({ onClose: onCancel, onConfirm: doConfirm })
-  return (
-    <div className="modal-backdrop" onClick={onCancel}>
-      <div className="modal-box max-w-sm" ref={containerRef} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-blue-900">Upload Trial Balance</h2>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-        </div>
-        <p className="text-xs text-gray-500 mb-3 truncate">
-          File: <span className="font-medium text-gray-700">{filePath.split(/[\\/]/).pop()}</span>
-        </p>
-        <div className="mb-4">
-          <FinancialPeriodPicker entity={entity} value={periodPick} onChange={setPeriodPick} allowCustom={false} />
-        </div>
-        {hasBranches && (
-          <div className="mb-4">
-            <label className="block text-xs text-gray-500 mb-1">Branch Name <span className="text-gray-400">(e.g. Head Office, Delhi Branch)</span></label>
-            <input
-              type="text"
-              value={branchName}
-              onChange={e => setBranchName(e.target.value)}
-              placeholder="e.g. Head Office"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-        )}
-        <div className="flex gap-2">
-          <button onClick={onCancel} className="flex-1 py-2 border border-gray-300 text-gray-600 rounded text-sm hover:bg-gray-50 transition">
-            Cancel
-          </button>
-          <button
-            onClick={doConfirm}
-            disabled={!periodPick?.entityPeriodId || checking}
-            className="flex-1 py-2 text-white rounded text-sm font-medium hover:opacity-90 disabled:opacity-40 transition" style={{ background: 'var(--color-primary)' }}
-          >
-            {checking ? 'Checking…' : 'Upload'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Format chooser: ODBC vs Tally dual-file ──────────────────────────────
+// ── Format chooser ─────────────────────────────────────────────────────────
+// T-073: the simple Excel format (Trial Balance and Masters in one workbook)
+// comes first. T-074: the manual "ODBC Format" upload is withdrawn: Tally is
+// now read directly (Tally Auto-Import). Trial Balances uploaded in that
+// format earlier still open and work as before.
 function FormatChooserModal({ onChoose, onCancel }) {
   const containerRef = useModalKeys({ onClose: onCancel })
   return (
@@ -167,13 +119,14 @@ function FormatChooserModal({ onChoose, onCancel }) {
         <p className="text-xs text-gray-500 mb-4">Select the source format of your Trial Balance.</p>
         <div className="space-y-2">
           <button
-            onClick={() => onChoose('odbc')}
-            className="w-full text-left border border-gray-300 rounded p-3 hover:border-blue-500 hover:bg-blue-50 transition"
+            onClick={() => onChoose('simple')}
+            className="fsg-format-simple w-full text-left border border-blue-300 rounded p-3 hover:border-blue-500 hover:bg-blue-50 transition"
           >
-            <div className="text-sm font-semibold text-blue-900">ODBC Format</div>
+            <div className="text-sm font-semibold text-blue-900">Simple Excel Format (Trial Balance and Masters)</div>
             <div className="text-xs text-gray-500 mt-0.5">
-              Single Excel file with full ODBC schema (Period, Branch, Ledger Code, OpeningBalance,
-              Debit, Credit, ClosingBalance, IsDeemedPositive, Parent, Group.$Parent, …).
+              One Excel workbook with two sheets: the Trial Balance (Ledger · Under Group · Opening · Debit ·
+              Credit · Closing, in Dr and Cr columns) and the Groups master (Group · Under Group · Nature). Works
+              for any accounting software. Get the blank format with &quot;Download Template&quot;.
             </div>
           </button>
           <button
@@ -288,7 +241,7 @@ function TallyUploadModal({ entity, entityId, hasBranches, onUploaded, onCancel 
 
   const handleUpload = async () => {
     if (!canUpload) return
-    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, hasBranches)
+    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, branchName)
     if (!proceed) return
     setBusy(true); setError('')
     try {
@@ -379,6 +332,14 @@ function TallyUploadModal({ entity, entityId, hasBranches, onUploaded, onCancel 
 }
 
 // ── Tally Auto-Import modal ───────────────────────────────────────────────────
+// T-070: the From and To dates and the Financial Year are compulsory, and the
+// dates are SENT to Tally: the Trial Balance of that period is read from the
+// company open in Tally, whatever period is set on Tally's own screen (for
+// example 2024-25 while 2025-26 is open), provided the year's entries are in
+// the same company. The company being read is shown throughout.
+const showIso = (iso) => (iso ? String(iso).split('-').reverse().join('-') : '')
+const isIsoDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''))
+
 function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel }) {
   const [status, setStatus] = React.useState('checking') // checking | ready | error | importing | done
   const [message, setMessage] = React.useState('Connecting to Tally...')
@@ -388,6 +349,7 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
   const [toDate, setToDate] = React.useState('')
   const [periodPick, setPeriodPick] = React.useState(null)
   const [branchName, setBranchName] = React.useState('')
+  const [formError, setFormError] = React.useState('')
   const containerRef = useModalKeys({ onClose: onCancel })
 
   React.useEffect(() => {
@@ -411,10 +373,10 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
       setStatus('ready')
       setMessage(
         coms.length > 1
-          ? `Connected. ${coms.length} companies are open in Tally — choose which one to import below.`
+          ? `Connected to Tally. ${coms.length} companies are open — choose the one to import below.`
           : coms.length === 1
-            ? `Connected. Company: ${coms[0]}. Importing pulls whatever period is currently open in Tally.`
-            : 'Connected to Tally. Importing pulls whatever company/period is currently open in Tally.'
+            ? `Connected to Tally. Company: ${coms[0]}.`
+            : 'Connected to Tally, but the company name could not be read. The company open in Tally will be imported.'
       )
     }).catch(err => {
       setStatus('error')
@@ -422,32 +384,71 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
     })
   }, [])
 
+  // Choosing the Financial Year fills the dates with that year (they can still
+  // be changed, within the year).
+  const pickYear = (pick) => {
+    setPeriodPick(pick)
+    setFormError('')
+    if (isIsoDate(pick?.dateFrom)) setFromDate(pick.dateFrom)
+    if (isIsoDate(pick?.dateTill)) setToDate(pick.dateTill)
+  }
+
+  // What is still missing, in plain words; '' when the import can go ahead.
+  const missing = () => {
+    if (!entityId) return 'Select an entity first.'
+    if (!periodPick?.entityPeriodId) return 'Select the Financial Year (required).'
+    if (!isIsoDate(fromDate) || !isIsoDate(toDate)) return 'Enter both the From date and the To date (required).'
+    if (fromDate > toDate) return `The From date (${showIso(fromDate)}) is after the To date (${showIso(toDate)}).`
+    const fyFrom = periodPick.dateFrom, fyTill = periodPick.dateTill
+    if (isIsoDate(fyFrom) && isIsoDate(fyTill) && (fromDate < fyFrom || toDate > fyTill)) {
+      return `The dates must fall within the Financial Year ${periodPick.yearLabel || ''} (${showIso(fyFrom)} to ${showIso(fyTill)}).`
+    }
+    return ''
+  }
+
   const handleImport = async () => {
-    if (!entityId) {
-      setMessage('Please select an entity first.'); return
+    const problem = missing()
+    if (problem) { setFormError(problem); return }
+    setFormError('')
+    const fyFrom = periodPick.dateFrom, fyTill = periodPick.dateTill
+    if (isIsoDate(fyFrom) && isIsoDate(fyTill) && (fromDate !== fyFrom || toDate !== fyTill)) {
+      if (!window.confirm(
+        `The period ${showIso(fromDate)} to ${showIso(toDate)} is not the whole Financial Year ${periodPick.yearLabel || ''} ` +
+        `(${showIso(fyFrom)} to ${showIso(fyTill)}). Import this part of the year anyway?`
+      )) return
     }
-    if (!periodPick?.entityPeriodId) {
-      setMessage('Please select a Financial Period first.'); return
-    }
-    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, hasBranches)
+    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, branchName.trim())
     if (!proceed) return
+    const companyText = selectedCompany ? `“${selectedCompany}”` : 'the company open in Tally'
     setStatus('importing')
-    setMessage('Fetching Trial Balance and Chart of Accounts from Tally (whatever company/period is currently open there)...')
+    setMessage(`Reading the Trial Balance of ${companyText} for ${showIso(fromDate)} to ${showIso(toDate)} from Tally...`)
     try {
-      // No company name or date range is sent to Tally — it exports
-      // whichever company + period is currently active in the Tally UI.
       // multipleCompanies tells the backend whether this company choice was
       // actually a disambiguation between several open in Tally, or just the
       // single company that happened to be loaded — see tb.js's tally:fetchTB
       // handler: the ODBC fallback cannot target a specific company at all,
       // so it must refuse rather than silently substitute whichever company
       // Tally's ODBC layer considers "current" when there was a real choice
-      // to honour.
-      const { tbRows, masterData, stockTotals, company } = await fsgApi?.fetchTallyTB({
+      // to honour. T-070: the period is sent too (compulsory).
+      const fetched = await fsgApi?.fetchTallyTB({
         company: selectedCompany || undefined,
         multipleCompanies: companies.length > 1,
+        period: { from: fromDate, to: toDate },
       })
+      const { tbRows, masterData, stockTotals, company, periodApplied, periodReport } = fetched || {}
       if (!tbRows?.length) throw new Error('No TB rows returned from Tally.')
+      // T-070: Tally's ODBC driver cannot be given dates; it answers for the
+      // period open on Tally's own screen. Use it only on the user's word.
+      if (periodApplied === false && !window.confirm(
+        'The direct connection to Tally failed, and the backup route (Tally ODBC) cannot be given dates: ' +
+        "it reads the period currently open on Tally's screen.\n\n" +
+        `Import it only if Tally's current period is ${showIso(fromDate)} to ${showIso(toDate)}.\n\n` +
+        'OK = Tally shows exactly this period, import     Cancel = stop'
+      )) {
+        setStatus('ready')
+        setMessage('Import stopped. Nothing was saved.')
+        return
+      }
       // Build rows using the same Tally parser (reuse buildTBRowsFromTally)
       const { buildTBRowsFromTally } = await import('../../utils/tallyParsers')
       const rows = buildTBRowsFromTally(tbRows, masterData.ledgerMap)
@@ -497,13 +498,12 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
         })
       }
 
-      const labelCompany = selectedCompany || 'Tally'
-      const labelPeriod = fromDate && toDate ? `${fromDate}_${toDate}` : new Date().toISOString().slice(0, 10)
+      const labelCompany = company || selectedCompany || 'Tally'
       const res = await fsgApi?.uploadTallyTB({
         entityId, period: periodPick.periodText || '',
-        fileName: `Tally_${labelCompany}_${labelPeriod}.auto`,
+        fileName: `Tally_${labelCompany}_${fromDate}_${toDate}.auto`,
         tbRows: rows,
-        branchName: branchName || '',
+        branchName: branchName.trim(),
         entityPeriodId: periodPick.entityPeriodId,
         // Closing Stock is deliberately NOT inserted as a ledger row (Tally
         // never has one for it, and giving it one risks the mapping engine
@@ -517,15 +517,19 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
         openingStockTotal: stock.opening > 1 ? stock.opening : null,
         // Recorded so a branch TB can be checked against the company it
         // really came from, rather than the one you meant to export.
-        tallyCompany: company || null,
+        tallyCompany: company || selectedCompany || null,
       })
       setStatus('done')
       const srcLabel = (stockTotals?.candidates || []).find(c => c.source === stock.source)?.label
+      const unmatched = periodReport?.unmatched || 0
       setMessage(`✓ Imported ${rows.length} ledgers`
-        + (company ? ` from Tally company “${company}”` : ' from Tally')
+        + ` from Tally company “${labelCompany}”`
+        + ` for ${showIso(fromDate)} to ${showIso(toDate)}`
+        + (res?.tb?.tb_version ? ` as version _v${res.tb.tb_version}` : '')
         + '.'
-        + (srcLabel ? ` Stock taken from: ${srcLabel}.` : ''))
-      setTimeout(() => onUploaded(res.tb), 1500)
+        + (srcLabel ? ` Stock taken from: ${srcLabel}.` : '')
+        + (unmatched ? ` Check ${unmatched} ledger${unmatched === 1 ? '' : 's'} against Tally's Trial Balance for the period: opening + debit − credit did not agree with the closing balance (${(periodReport.unmatchedNames || []).slice(0, 5).join(', ')}${unmatched > 5 ? ', …' : ''}).` : ''))
+      setTimeout(() => onUploaded(res.tb), unmatched ? 6000 : 1500)
     } catch (err) {
       setStatus('error')
       setMessage('Import failed: ' + err.message)
@@ -533,10 +537,11 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
   }
 
   const statusColor = { checking: 'text-gray-600', ready: 'text-green-700', error: 'text-red-600', importing: 'text-blue-600', done: 'text-green-700' }
+  const req = <span className="text-red-600"> *</span>
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
-      <div className="modal-box max-w-md" ref={containerRef} onClick={e => e.stopPropagation()}>
+      <div className="modal-box max-w-md fsg-tally-auto" ref={containerRef} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-bold text-green-800">⚡ Tally Auto-Import</h2>
           <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
@@ -549,69 +554,54 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
 
         {status === 'ready' && (
           <div className="space-y-3">
-            <div className="text-[11px] text-gray-500 bg-blue-50 border border-blue-200 rounded p-2">
-              Import pulls whatever company and period are currently open in Tally — no need to match names or dates here. The fields below only label how this import is saved in FSG Bharat.
+            <div className="fsg-tally-company border border-green-300 bg-green-50 rounded px-3 py-2">
+              <div className="text-[11px] text-green-800 mb-1">Data will be pulled from this Tally company{req}</div>
+              {companies.length > 1 ? (
+                <>
+                  <select value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}
+                    className="w-full border border-amber-400 bg-amber-50 rounded px-2 py-1.5 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                    {companies.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <p className="text-[10px] text-amber-700 mt-1">
+                    {companies.length} companies are open in Tally. With more than one open, Tally cannot be relied on
+                    to answer every request from the same one, so the import is locked to the company chosen here.
+                  </p>
+                </>
+              ) : (
+                <div className="text-sm font-semibold text-gray-900">
+                  {companies[0] || 'The company open in Tally (its name could not be read)'}
+                </div>
+              )}
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Company in Tally <span className="text-gray-400">(label only, optional)</span></label>
-              {companies.length > 1 ? (
-                <select value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none">
-                  {companies.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              ) : companies.length === 1 ? (
-                <div className="border border-gray-200 rounded px-2 py-1.5 text-sm bg-gray-50 font-medium text-gray-800">
-                  {companies[0]}
-                </div>
-              ) : (
-                <input type="text" value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}
-                  placeholder="(optional) name for your records"
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-              )}
+              <FinancialPeriodPicker entity={entity} value={periodPick} onChange={pickYear} allowCustom={false} required label="Financial Year" />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">From Date <span className="text-gray-400">(label only)</span></label>
-                <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                <label className="block text-xs text-gray-500 mb-1">From Date{req}</label>
+                <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setFormError('') }}
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">To Date <span className="text-gray-400">(label only)</span></label>
-                <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                <label className="block text-xs text-gray-500 mb-1">To Date{req}</label>
+                <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setFormError('') }}
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
               </div>
             </div>
-            {companies.length > 1 && (
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">
-                  Tally Company <span className="text-red-600 font-medium">({companies.length} are open — pick the one to import)</span>
-                </label>
-                <select
-                  value={selectedCompany}
-                  onChange={e => setSelectedCompany(e.target.value)}
-                  className="w-full border border-amber-400 bg-amber-50 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                >
-                  {companies.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <p className="text-[10px] text-amber-700 mt-1">
-                  With more than one company open, Tally cannot be relied on to answer every
-                  request from the same one — that is what made a branch import pick up another
-                  branch's stock. The import is locked to whichever you choose here.
-                </p>
-              </div>
-            )}
-            <div>
-              <FinancialPeriodPicker entity={entity} value={periodPick} onChange={setPeriodPick} allowCustom={false} />
-              <p className="text-[10px] text-gray-400 mt-1">Required — every import is tied to a real Financial Period, not a free-text label.</p>
-            </div>
+            <p className="text-[10px] text-gray-500 -mt-1">
+              The Trial Balance of these dates is read from Tally even when Tally&apos;s screen shows another year
+              (for example 2024-25 while 2025-26 is open), as long as that year&apos;s entries are in the same company.
+              If the year was split into a separate company in Tally, open that company instead.
+            </p>
             {hasBranches && (
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Branch Name <span className="text-gray-400">(e.g. Head Office)</span></label>
-                <input type="text" value={branchName} onChange={e => setBranchName(e.target.value)}
+                <input type="text" value={branchName} onChange={e => { setBranchName(e.target.value); setFormError('') }}
                   placeholder="e.g. Head Office"
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
               </div>
             )}
+            {formError && <div className="fsg-tally-form-error text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{formError}</div>}
             <div className="text-[10px] text-gray-400 bg-yellow-50 border border-yellow-200 rounded p-2">
               ℹ Tally must have HTTP Server enabled: Tally → F12 → Advanced Configuration → Enable HTTP Server = Yes (Port 9000)
             </div>
@@ -623,7 +613,8 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
             Cancel
           </button>
           {status === 'ready' && (
-            <button onClick={handleImport} disabled={!entityId || !periodPick?.entityPeriodId}
+            <button onClick={handleImport}
+              title={missing() || 'Import the Trial Balance of these dates from Tally'}
               className="flex-1 py-2 text-white rounded text-sm font-medium disabled:opacity-40"
               style={{ background: 'var(--color-primary)' }}>
               Import from Tally
@@ -689,7 +680,7 @@ function RealBooksUploadModal({ entity, entityId, hasBranches, onUploaded, onCan
 
   const handleUpload = async () => {
     if (!canUpload) return
-    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, hasBranches)
+    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, branchName)
     if (!proceed) return
     setBusy(true); setError('')
     try {
@@ -847,7 +838,7 @@ function ZohoUploadModal({ entity, entityId, hasBranches, onUploaded, onCancel, 
 
   const handleUpload = async () => {
     if (!canUpload) return
-    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, hasBranches)
+    const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, branchName)
     if (!proceed) return
     setBusy(true); setError('')
     try {
@@ -983,34 +974,54 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
   const [selectedTBId, setSelectedTBId] = useState(activeTB?.id || '')
   const [uploading, setUploading]   = useState(false)
   const [error, setError]           = useState('')
-  const [pendingFile, setPendingFile] = useState(null)   // file path waiting for period input
   const [showFormatChooser, setShowFormatChooser] = useState(false)
   const [showTallyModal, setShowTallyModal] = useState(false)
   const [showRealBooksModal, setShowRealBooksModal] = useState(false)
   const [showZohoModal, setShowZohoModal] = useState(false)
   const [showBusyModal, setShowBusyModal] = useState(false)
   const [showTallyAutoModal, setShowTallyAutoModal] = useState(false)
+  const [showSimpleModal, setShowSimpleModal] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [balanceWarning, setBalanceWarning] = useState(null)
   const [stockMode, setStockMode] = useState(null) // 'prompt' | null
   const [deleting, setDeleting]     = useState(false)
   // T-044: { mode: 'carry' | 'import', fromTb?, toTb, areas, source?, bytes?, warning? } while the workings dialog is open
   const [workingsPrompt, setWorkingsPrompt] = useState(null)
+  // T-072: { newTb, prior } while the "bring your work to the new version" questions are open
+  const [versionPrompt, setVersionPrompt] = useState(null)
 
-  // After a new Trial Balance is uploaded and mapped: if another Trial Balance of the same year and branch holds workings,
-  // offer to carry them over. Returns true when the dialog was opened (the Stock prompt then waits for it).
-  const offerCarryOver = async (newTB) => {
-    if (!newTB?.id || !newTB.entity_period_id) return false
+  // T-072: the earlier versions of the new Trial Balance's year and branch, latest first.
+  const priorVersionsOf = async (newTB) => {
+    if (!newTB?.id || !newTB.entity_period_id) return []
     try {
-      const siblings = ((await fsgApi?.getTBsForEntityPeriod(newTB.entity_period_id)) || [])
+      return ((await fsgApi?.getTBsForEntityPeriod(newTB.entity_period_id)) || [])
         .filter(t => t.id !== newTB.id && (t.branch_name || '') === (newTB.branch_name || ''))
-        .sort((a, b) => b.id - a.id)
-      for (const from of siblings) {
-        const areas = ((await fsgApi?.workingsSummary(from.id))?.areas || [])
-        if (areas.some(a => a.count > 0)) { setWorkingsPrompt({ mode: 'carry', fromTb: from, toTb: newTB, areas }); return true }
-      }
-    } catch { /* best-effort: the upload itself already succeeded */ }
-    return false
+        .sort((x, y) => y.id - x.id)
+    } catch { return [] }   // best-effort: the upload itself already succeeded
+  }
+  // After every upload. With no earlier version: map and ask about Stock, as
+  // before. With one: ask first whether to copy the manual work and carry the
+  // Learned Ledger Rules, because the answer decides how the version is mapped.
+  const afterUpload = async (newTB) => {
+    const prior = await priorVersionsOf(newTB)
+    if (prior.length) { setVersionPrompt({ newTb: newTB, prior }); return }
+    await runAutoMapping(newTB.id)
+    await checkBalance(newTB.id)
+    setStockMode('prompt')
+  }
+  const confirmVersionCarry = async ({ fromTbId, include, carryRules }) => {
+    const p = versionPrompt
+    const mapped = await runAutoMapping(p.newTb.id, { carryRules })
+    let result = { carried: [], skipped: [] }
+    if (include.length) result = await fsgApi.carryOverWorkings({ fromTbId, toTbId: p.newTb.id, include })
+    setVersionPrompt(null)
+    const rulesLine = carryRules
+      ? `Learned Ledger Rules carried forward${mapped?.carriedForward ? `: ${mapped.carriedForward} ledger${mapped.carriedForward === 1 ? '' : 's'} categorised as before` : ''}.`
+      : 'Learned Ledger Rules not carried: this version is mapped on the default rules.'
+    window.alert((include.length ? workingsResultText(result) : 'No manually entered details were copied.') + '\n\n' + rulesLine)
+    await checkBalance(p.newTb.id)
+    onTBLoaded({ ...p.newTb })   // every screen re-reads the Trial Balance
+    if (!result.carried.some(c => c.key === 'stock')) setStockMode('prompt')
   }
   const closeWorkingsPrompt = (stockCarried = false) => {
     const wasCarry = workingsPrompt?.mode === 'carry'
@@ -1100,17 +1111,8 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
       setShowTallyAutoModal(true)
       return
     }
-    // ODBC format — existing flow
-    try {
-      const result = await fsgApi?.openFileDialog({
-        filters: [{ name: 'Excel Files', extensions: ['xlsx', 'xls'] }],
-        properties: ['openFile'],
-        title: 'Select Trial Balance Excel (ODBC Format)'
-      })
-      if (result?.canceled || !result?.filePaths?.length) return
-      setPendingFile(result.filePaths[0])
-    } catch (err) {
-      setError(err.message || 'Failed to open file.')
+    if (format === 'simple') {
+      setShowSimpleModal(true)
     }
   }
 
@@ -1129,16 +1131,16 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
   // rule set's data). Re-fetching the entity's actual default rule set
   // right here, at the moment of upload, closes that race regardless of
   // whatever state App.jsx currently holds.
-  const runAutoMapping = async (tbId) => {
-    if (!tbId || !entity?.id) return
+  const runAutoMapping = async (tbId, extra = {}) => {
+    if (!tbId || !entity?.id) return null
     try {
       const ruleSets = await fsgApi?.getRuleSets(entity.id)
       const rsId = ruleSets?.find(r => r.is_default)?.id || ruleSets?.[0]?.id || activeRsId
-      if (!rsId) return
+      if (!rsId) return null
       // Zero-in-both-years ledgers excluded by default (see MappedTB's Run
       // Auto-Mapping) — "Include Zero Balance" there is the opt-in path.
-      await fsgApi?.runMapping(tbId, rsId, { excludeZero: true })
-    } catch { /* non-fatal — user can re-run manually from Mapped TB */ }
+      return await fsgApi?.runMapping(tbId, rsId, { excludeZero: true, ...extra })
+    } catch { return null /* non-fatal — user can re-run manually from Mapped TB */ }
   }
 
   const checkBalance = async (tbId) => {
@@ -1167,9 +1169,7 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
       setTbList(newTBList)
       onTBLoaded(newTB)
       setSelectedTBId(newTB.id)
-      await runAutoMapping(newTB.id)
-      await checkBalance(newTB.id)
-      if (!(await offerCarryOver(newTB))) setStockMode('prompt')
+      await afterUpload(newTB)
     } catch (err) {
       setError(err.message || 'Post-upload load failed.')
     }
@@ -1183,35 +1183,9 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
       setTbList(newTBList)
       onTBLoaded(newTB)
       setSelectedTBId(newTB.id)
-      await runAutoMapping(newTB.id)
-      await checkBalance(newTB.id)
-      // Stock prompt — same as ODBC (after the T-044 carry-over offer, if any)
-      if (!(await offerCarryOver(newTB))) setStockMode('prompt')
+      await afterUpload(newTB)
     } catch (err) {
       setError(err.message || 'Post-upload load failed.')
-    }
-  }
-
-  const handleUploadConfirm = async (period, branchName, entityPeriodId) => {
-    if (!pendingFile) return
-    const filePath = pendingFile
-    setPendingFile(null)
-    setUploading(true)
-    setError('')
-    try {
-      const res = await fsgApi?.uploadTB({ entityId: entity.id, filePath, period: period || '', branchName: branchName || '', entityPeriodId })
-      const newTBList = await fsgApi?.getTBList(entity.id)
-      setTbList(newTBList)
-      onTBLoaded(res.tb)
-      setSelectedTBId(res.tb.id)
-      await runAutoMapping(res.tb.id)
-      await checkBalance(res.tb.id)
-      // Prompt for stock entry (after the T-044 carry-over offer, if any)
-      if (!(await offerCarryOver(res.tb))) setStockMode('prompt')
-    } catch (err) {
-      setError(err.message || 'Upload failed.')
-    } finally {
-      setUploading(false)
     }
   }
 
@@ -1249,19 +1223,9 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
     }
   }
 
+  // T-073: the blank simple format (Trial Balance and Groups sheets).
   const handleDownloadTemplate = async () => {
-    try {
-      const buf = await fsgApi?.downloadTBTemplate()
-      const result = await fsgApi?.saveFileDialog({
-        defaultPath: 'TrialBalance_Template.xlsx',
-        filters: [{ name: 'Excel', extensions: ['xlsx'] }]
-      })
-      if (result?.canceled || !result?.filePath) return
-      // T-047: VERA style (How to Fill, yellow cells, Yes/No dropdowns) — utils/tbExcelSpecs.js.
-      await fsgApi?.writeFile(result.filePath, Array.from(await finishWorkbook(new Uint8Array(buf), tbTemplateExcelSpec())))
-    } catch (err) {
-      setError(err.message)
-    }
+    try { await downloadSimpleTbTemplate() } catch (err) { setError(err.message) }
   }
 
   return (
@@ -1278,7 +1242,7 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
             <option value="">— Select Trial Balance —</option>
             {tbList.map(t => (
               <option key={t.id} value={t.id}>
-                {t.period || 'No period'}{t.branch_name ? ` [${t.branch_name}]` : ''} — {t.filename} ({t.row_count} rows)
+                {tbDisplayName(t)} — {t.filename} ({t.row_count} rows)
               </option>
             ))}
           </select>
@@ -1345,8 +1309,18 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
 
       {activeTB && (
         <div className="text-sm text-blue-800 bg-blue-50 border border-blue-100 rounded px-3 py-2">
-          Active Trial Balance: <span className="font-semibold">{activeTB.period || activeTB.filename}</span>{activeTB.branch_name ? ` [${activeTB.branch_name}]` : ''} — see it in the <span className="font-semibold">Actual TB</span> tab.
+          Active Trial Balance: <span className="font-semibold">{tbDisplayName(activeTB)}</span> — see it in the <span className="font-semibold">Actual TB</span> tab.
         </div>
+      )}
+
+      {/* T-072: bring the work of an earlier version to the new one */}
+      {versionPrompt && (
+        <VersionCarryModal
+          newTb={versionPrompt.newTb}
+          priorVersions={versionPrompt.prior}
+          loadAreas={async (tbId) => ((await fsgApi?.workingsSummary(tbId))?.areas || [])}
+          onConfirm={confirmVersionCarry}
+        />
       )}
 
       {/* T-044: carry workings over to the new Trial Balance / bring them back from a file */}
@@ -1428,14 +1402,15 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
         />
       )}
 
-      {/* Period input modal */}
-      {pendingFile && (
-        <UploadModal
+      {/* T-073: simple Excel format (Trial Balance and Masters in one workbook) */}
+      {showSimpleModal && (
+        <SimpleTbUploadModal
           entity={entity}
-          filePath={pendingFile}
+          entityId={entity?.id}
           hasBranches={!!entity?.has_branches}
-          onConfirm={handleUploadConfirm}
-          onCancel={() => setPendingFile(null)}
+          confirmVersion={confirmIfPeriodAlreadyHasTB}
+          onUploaded={(tb) => { setShowSimpleModal(false); handleTallyUploaded(tb) }}
+          onCancel={() => setShowSimpleModal(false)}
         />
       )}
 
@@ -1448,7 +1423,7 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
               This will permanently delete:
             </p>
             <ul className="text-sm text-gray-700 list-disc list-inside mb-4 space-y-0.5">
-              <li>Trial Balance: <span className="font-semibold">{activeTB?.period || activeTB?.filename}</span></li>
+              <li>Trial Balance: <span className="font-semibold">{tbDisplayName(activeTB)}</span></li>
               <li>All {activeTB?.row_count || ''} ledger rows</li>
               <li>All mapping results for this TB</li>
               {deleteAdjCount > 0 && (

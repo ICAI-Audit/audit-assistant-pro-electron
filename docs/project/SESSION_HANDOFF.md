@@ -135,6 +135,74 @@ Environment: Windows 11, two cores; PowerShell at the upper-case path `C:\Users\
 
 Tell the owner that the rupee rule by a font's name stays the lead's call, open to his change (he was asked twice on 20 November 2026 and gave no ruling; the page drawn turned is decided), tell him too that on a scan the Word page leaves out whatever recognition did not read (header bands, logos, stamps, ruling lines, shading), because the scan picture is left out (the lead's ruling, open to his change); the independent final pass of 20 November 2026 is done and the fault it found in scans is fixed; ask for his hand check (PDF_TOOLS.md section 9, "For phase 3": the workbooks in Excel, the documents in Word each beside its PDF, Document check on a signed file with the signature verified in Adobe Acrobat Reader, Compare on a draft and a signed set, Make searchable on a real scan and a phone photo, the toolbar and an office row at 1280 × 720). Then, on his word, check that the branch still sits on current `origin/main` and that T-064, D-013 and GAP-23 are still free, and commit and push `feat/pdf-tools-phase-3`; a pull request needs its own go-ahead (the draft is in the workspace, documentation pass 5). Done since (record made true by T-068): committed as `67d11eb` on 20 November 2026 on the owner's word and merged in pull request #121 (merge commit `05e35db`, 21 November 2026); the owner's hand checks happened during the work; no UAT is recorded. The first step now is in the T-068 and T-066 section above.
 
+## T-075 to T-079 Owner points: Dr / Cr, shareholding %, partners' profit, Deferred tax note, Dep (Books) (23 November 2026)
+
+- Agent: Claude Code. Owner's second list of 23 November 2026 (points 1 to 5); no commit or push without the owner's word. Workflow files used: `AGENTS.md`, this file, `CURRENT_STATUS.md`, `NEXT_TASKS.md`, `FEATURE_REGISTER.md`. Feature F-009.
+- T-075 (`components/Exceptions/index.jsx`): new column `drcr` (48 px, frozen after the amount; Save moves to 472 px); `drCrOf` reads the stored sign (Cr positive, Dr negative); All / Dr / Cr filter. The amount itself is unchanged.
+- T-076 (`Notes/shareCapitalDetailsWorkbook.js` classifyShareholders, shareTotals, classClosingShares, shareCount; `ShareCapitalForm.jsx`; `Notes/index.jsx`): found wrong: both uploads divided by the first share class only (a second Equity class inflated every %), a blank total fell back to 1 in the form (every holder far above 5% and listed), text "1,00,000" read as 1, promoters' % change always blank. Now: one calculation for both routes over every Equity class; the form refuses the import until Share Classes has a total; the Fill Details route still falls back to the shares listed in the file; promoters' % change = this year's % less last year's (percentage points), also by "Recalculate %"; a pop-up gives the counts, the totals used and a warning when the file lists more shares than the company has. shareTotals / classClosingShares moved from the form (re-exported there).
+- T-077 (`Notes/OwnersCapitalAccountForm.jsx` splitProfitByShare, profitSplitSummary, partnerSharePct): firms with partners and LLPs; profit = the P&L net profit already passed to the form; rows without a % are left as saved; a typed share sets profitManual (↺ clears it). Previous Year row unchanged (typed). The split is written when the form is opened and saved.
+- T-078 (new `utils/deferredTaxNote.js`; `PL/index.jsx`, `buildHTML.js`, `buildExcel.js`, `plStructureNonCorp.js`): taxLineNote / deferredTaxBsNoteNum; the BS note with a figure (this year's first); Excel adds the note link but no formula (ref / noteRef), so the amount stays the P&L charge.
+- T-079 (`DepreciationComp/index.jsx` plDepreciation): second strip and a footer line: Depreciation For Year (table), Depreciation as per P&L, Difference (CY); says so when the P&L has no depreciation head.
+- Tests: new `scripts/fsg-owner-points-checks.mjs` (28 checks), called by `test-fsg-integration.mjs` after the T-071 checks.
+
+### Exact checks and outcomes
+
+| Check | Result |
+| --- | --- |
+| `npm run test:fsg` (23 November 2026, after T-075 to T-079) | 390 of 390 passed; 4 PDF text checks skipped (PDF text reader unavailable on win32-arm64) |
+| `npm run test:fsg-ui` | 139 of 139 |
+| `node scripts/fsg-excel-theme-checks.mjs` | 61 of 61 |
+| `scripts/fsg-owner-points-checks.mjs` run on its own (23 November 2026) | 28 of 28 |
+| T-053 shareholding checks (`checkShareholding`) run on their own after the move of shareTotals | 6 of 6 |
+| esbuild of every changed file; bundle of `src/modules/fsg/App.jsx`; ESLint on the changed `.js` files | passed |
+
+- After owner review of the screen: the depreciation comparison is shown once (top strip only; the line under the table removed). At the owner's word the Net Block vs Trial Balance line under the table (CY and PY) is removed too; its PY figures (Net Block Opening, Trial Balance, Difference) now sit in the top strip. T-080 figures on screen: `.fsg-root .font-mono` and the print-view amounts use Inter with tabular, lining digits instead of JetBrains Mono / Consolas (dotted zero read as 8); PDF and Excel fonts unchanged.
+- Not run: owner UAT.
+
+### First executable next step
+
+Owner: open Rectification / Recategorisation (Dr / Cr column); a Company's Share Capital > 5% Shareholders > Import Excel with two Equity classes; a Partnership's Owners' Capital Fill Details, type the share %; a P&L with Deferred tax (note number against the line); Dep (Books) depreciation line. Then run `npm run test:fsg` and `npm run test:fsg-ui` before commit.
+
+## T-070 to T-074 Trial Balance upload: Tally by period, versions, carry-over, simple format (23 November 2026)
+
+- Agent: Claude Code. Owner instructions of 23 November 2026 (points 1 to 5) and rulings: three versions per Trial Balance per branch; journal entries need nothing (the feature will be removed); no upload into a locked year unless unlocked; build as the agent judges; no commit or push without the owner's word. Workflow files used: `AGENTS.md`, this file, `CURRENT_STATUS.md`, `NEXT_TASKS.md`, `FEATURE_REGISTER.md`. Feature F-009.
+- Branch `FSG-AM` at `3378148` (`origin/main` after PR #122; fast-forwarded on 23 November 2026, the T-069 work kept). Committed and pushed with T-069 to T-080 on 23 November 2026.
+- T-070 Tally Auto-Import (`UploadTB.jsx` TallyAutoModal; `electron/fsg/ipc/tb.js` tally:fetchTB; `electron/fsg/services/tally-odbc.js`): From date, To date and Financial Year compulsory (picking the year fills the dates; dates must fall within it; a part year asks first); the Tally company is shown in a box above the fields. SVFROMDATE / SVTODATE are sent with the Trial Balance, stock and P&L requests. The company's BooksFrom is read: a period starting before it is refused ("If that year was split into a separate company in Tally, open that company"). When the period starts after the books begin, a second request reads the balances to the day before; `periodiseTallyRows` takes, ledger by ledger, the reading that satisfies opening + debit - credit = closing (period totals or totals from the books' start, decided across all ledgers), starts income and expense ledgers at nil, and lists any ledger no reading fits on the result line. Opening stock for such a period is the closing stock of the day before. The ODBC fallback cannot take dates: it imports only after the user confirms Tally shows exactly that period. The unused `TallyTBUpload` screen now passes its dates in the same form.
+- T-071 versions (`tb.js` tbVersionStatus / claimTbVersion / tb:versionStatus, authorised in `authorization.js`; `src/modules/fsg/utils/tbVersions.js`): every upload route takes the lowest free number 1 to 3 for its year and branch inside the upload transaction; a fourth is refused by the main process and, before any file is read, by a pop-up naming the versions and the way out; a locked year is refused with "unlock it first". Names show _v1 to _v3 (Upload TB list and banner, delete confirmation, the year's TB chooser in `App.jsx`, Previous Year selector, branch bar); the upload date and time are no longer shown. Schema: `trial_balances.tb_version` and `carry_rules` in `10_fsg_tables.sql`; `schema.js` ensureTbVersionColumns adds them to an installed database and numbers existing Trial Balances in upload order (idempotent; adding a column keeps every row).
+- T-072 carry-over (`VersionCarryModal.jsx`, `UploadTB.jsx` afterUpload; `mapped-tb.js`): when the year and branch already hold a version, the new one is not mapped until the pop-up is answered: copy from which version, (1) copy the manually entered details (the T-044 areas, adjustments and journal entries unticked), (2) carry the Learned Ledger Rules forward. "No" to (2) is stored as carry_rules = 0: mapping then keeps only decisions made on that version, and the learned-rules apply and the push from later years skip it.
+- T-073 simple format (`utils/simpleTbFormat.js`, `SimpleTbUploadModal.jsx`): first in the chooser; "Download Template" gives it (How to Fill, Nature dropdown, Tally's 15 primary and 13 standard sub-groups listed). T-074: the ODBC-format card, its period modal and file flow are removed; `tb:upload` stays in the main process.
+- Tests: new `scripts/fsg-tb-version-checks.mjs` (31 checks), called last by `test-fsg-integration.mjs`; the harness now deletes the oldest earlier check's Trial Balance before an upload that would be a fourth version (`staffWithRoom`), as a user would.
+
+### Exact checks and outcomes
+
+| Check | Result |
+| --- | --- |
+| `npm run test:fsg` (23 November 2026) | 362 of 362 passed |
+| `node scripts/fsg-excel-theme-checks.mjs` | 61 of 61 |
+| esbuild compile of every changed renderer file; esbuild bundle of `src/modules/fsg/App.jsx`; `node --check` of the changed main-process files; ESLint on the changed `.js` files | passed; no errors |
+| Styled simple template built through `finishWorkbook` and read back | sheets How to Fill, Trial Balance, Groups; Nature dropdown; 28 groups; reading the blank file reports only "no ledgers" |
+
+- At commit (23 November 2026): `npm run test:fsg` 390/390, `npm run test:fsg-ui` 139/139. Not run: a live Tally import (no Tally on this machine), opening the template in Excel, owner UAT.
+
+### What the next person must not do
+
+- Do not assume how Tally answers for a period other than the one open on its screen: `periodiseTallyRows` checks each ledger; keep that check. Do not let the ODBC fallback import a dated request without the user's confirmation.
+- Do not count Trial Balances without a version as free slots, and do not bypass claimTbVersion in a new upload route.
+
+### First executable next step
+
+Owner, with Tally open on 2025-26: TB > Upload TB > Tally Auto-Import, pick Financial Year 2024-25 (dates fill), import, and compare the Trial Balance with Tally's own Trial Balance for 1-4-2024 to 31-3-2025 (opening, debit, credit, closing of a few ledgers, an income ledger, and stock). Then upload a second version of the same year, answer the pop-up, and check the copied Stock, depreciation and Fill Details; try a fourth version to see the refusal. Then run `npm run test:fsg-ui` before commit.
+
+## T-069 Trade Receivables ageing in the owner's layout (18 November 2026)
+
+- Task ID: first recorded as T-064; renumbered T-069 on 23 November 2026 when `main` was brought in, because `main` already uses T-064 for PDF Tools phase 3 (pull request #121).
+
+- Branch `FSG-AM` at `1df122c` (main after PR #120, fast-forwarded the same day); Financial Statement Review only (F-009); committed and pushed on 23 November 2026 with T-070 to T-080.
+- T-069: Trade Receivables (Company) Fill Details ageing table in the owner's layout (screenshot of 18 November 2026): columns Unbilled, Not Due, then the five periods from the due date, then Total; heading "Trade Receivables ageing schedule (As at ...) - Outstanding for following periods from due date of payment". Grey cells take no entry, per the owner's choice "Strict": rows (i) to (iv) take Not Due and the periods (Unbilled grey, since unbilled dues have their own rows); the two Unbilled Dues rows take Unbilled only; Less: Provision is open. Total Due and Total Trade Receivable are worked out. Same layout in the Fill Details Excel (grey cells refuse entries; an old five-column file still reads by its headings), the Notes screen, PDF and Excel output. The form's Check and Check Control (TB vs Ageing Schedule) use the same total (`trScheduleTotal`). Older saved Unbilled Dues figures in the period columns move to Unbilled; totals unchanged. Shared helpers `trCellBlocked` / `trPeriodView` / `trScheduleTotal` in Notes/TradeReceivablesAgingForm.jsx.
+- Changed: `src/modules/fsg/components/Notes/TradeReceivablesAgingForm.jsx`, `Notes/index.jsx`, `ExceptionReport/index.jsx`, `GenerateFinancials/buildHTML.js`, `buildExcel.js`, `fillDetailsWorkbook.js`, `utils/fillDetailsRegistry.js`, `utils/blankFormat.js`, `scripts/fsg-excel-theme-checks.mjs`, NEXT_TASKS, CURRENT_STATUS, this handoff.
+- Checks: `node scripts/fsg-excel-theme-checks.mjs` 61/61 (16 new); esbuild compile of the changed renderer files passed. At commit (23 November 2026): `npm run test:fsg` 390/390, `npm run test:fsg-ui` 139/139. Not run: owner UAT.
+- First executable next step: owner opens Notes > Trade Receivables > Fill Details, enters Not Due and Unbilled figures, and checks the Check table and Check Control.
+
 ## T-053 CAAT Tools v0.10 merged to caat_tools (17 November 2026)
 
 - Task ID: recorded as T-030 in the two branch commits; renumbered T-053 when `main` was merged in, because `main` already uses T-030 for the login label task.

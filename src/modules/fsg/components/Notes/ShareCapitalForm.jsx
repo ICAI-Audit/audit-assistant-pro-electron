@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import { SC_DISCLOSURES, disclosureTexts, defaultDisclosureText } from '../../utils/shareCapitalDisclosures'
 import { fsgApi } from '../../api.js'
 import { finishWorkbook, firstDataSheet } from '../../utils/veraExcel'
-import { SHAREHOLDER_SHEET, shareholderTemplateExcelSpec } from './shareCapitalDetailsWorkbook'
+import { SHAREHOLDER_SHEET, shareholderTemplateExcelSpec, classClosingShares, shareTotals, classifyShareholders } from './shareCapitalDetailsWorkbook'
 
 const INP = 'w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
 const NUM = INP + ' text-right font-mono'
@@ -23,14 +23,8 @@ function num(v) { return parseFloat(v) || 0 }
 // the Balance Sheet tally uses; else Subscribed & Fully Paid-up; else Subscribed; else Issued. Before T-053 only the
 // first class counted, Preference holders were divided by the Equity total, and the % only changed on Import or
 // "Recalculate %", so a typed or edited number of shares left a stale %.
-export function classClosingShares(cls, yr) {
-  const c = (cls && cls[yr]) || {}
-  return (num(c.openingShares) + num(c.issuedDuringYear) - num(c.deletedDuringYear)) || num(c.paidUp) || num(c.subscribed) || num(c.issued)
-}
-export function shareTotals(classes, kind) {
-  const list = (classes || []).filter(c => (c.type || 'Equity') === kind)
-  return { cy: list.reduce((s, c) => s + classClosingShares(c, 'cy'), 0), py: list.reduce((s, c) => s + classClosingShares(c, 'py'), 0) }
-}
+// classClosingShares / shareTotals live in shareCapitalDetailsWorkbook.js (shared with the Fill Details upload).
+export { classClosingShares, shareTotals }
 const pctOf = (shares, total) => (String(shares ?? '').trim() === '' || !total ? '' : (num(shares) / total * 100).toFixed(2))
 /** The form data with every % worked out again from the shares and the share classes. */
 export function withShareholdingPercent(data) {
@@ -330,40 +324,16 @@ async function downloadShareholderTemplate() {
 // ── Import shareholders from Excel ────────────────────────────────────────────
 // Rules per item 3: only include shareholders with ≥5% holding in EITHER CY or PY
 // Rules per item 5: promoters table only shows Category = "Promoter"
-function importShareholdersFromExcel(file, totalSharesCY, totalSharesPY, onImport) {
+function importShareholdersFromExcel(file, totals, onImport) {
   const reader = new FileReader()
   reader.onload = (e) => {
     const wb = XLSX.read(e.target.result, { type: 'array' })
     // T-047: never the How to Fill / Lists sheet of a VERA-styled file.
     const ws = wb.Sheets[SHAREHOLDER_SHEET] || firstDataSheet(wb)
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-    const totalCY = parseFloat(totalSharesCY) || 1
-    const totalPY = parseFloat(totalSharesPY) || 1
-
-    const all = rows.slice(1).filter(r => r[1]).map(r => {
-      const cyShares = parseFloat(r[4]) || 0
-      const pyShares = parseFloat(r[3]) || 0
-      const cyPct = totalCY ? (cyShares / totalCY) * 100 : 0
-      const pyPct = totalPY ? (pyShares / totalPY) * 100 : 0
-      return {
-        name: String(r[1] || '').trim(),
-        folioNo: String(r[2] || '').trim(),
-        cyShares,
-        cyPct: cyPct.toFixed(2),
-        pyShares,
-        pyPct: pyPct.toFixed(2),
-        category: String(r[5] || 'Non-Promoter').trim(),
-        _cyPct: cyPct,
-        _pyPct: pyPct,
-      }
-    })
-
-    // Item 3: 5% list = only ≥5% in CY OR PY
-    const fivePct = all.filter(r => r._cyPct >= 5 || r._pyPct >= 5)
-    // Item 5: promoters = only Category = "Promoter"
-    const promoters = all.filter(r => r.category.toLowerCase() === 'promoter')
-
-    onImport({ fivePct, promoters, all })
+    // % over the company's total Equity shares (every Equity class); the >=5% list (this year or last) and the
+    // promoters (Category = Promoter) follow from it - shareCapitalDetailsWorkbook.js classifyShareholders.
+    onImport(classifyShareholders(rows.slice(1), totals))
   }
   reader.readAsArrayBuffer(file)
 }
@@ -511,20 +481,26 @@ export default function ShareCapitalForm({ tbId, entityId, useEntityLevel, noteN
                   ⬆ Import Excel
                   <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => {
                     const file = e.target.files?.[0]; if (!file) return
-                    // Use paidUp shares as total; fallback to issued
-                    const cls0 = data.classes[0]
-                    const cyClosed = num(cls0?.cy.openingShares) + num(cls0?.cy.issuedDuringYear) - num(cls0?.cy.deletedDuringYear) || num(cls0?.cy.paidUp) || num(cls0?.cy.issued)
-                    const pyClosed = num(cls0?.py.openingShares) + num(cls0?.py.issuedDuringYear) - num(cls0?.py.deletedDuringYear) || num(cls0?.py.paidUp) || num(cls0?.py.issued)
-                    importShareholdersFromExcel(file, cyClosed, pyClosed, ({ fivePct, promoters }) => {
-                      // 5% equity holders (non-preference)
-                      update5pctEquity(fivePct.filter(r => !r.category?.toLowerCase().includes('prefer')))
-                      // Promoters list — only those marked "Promoter"
-                      updatePromoters(promoters.map(r => ({
-                        name: r.name, class: 'Equity', shares: r.cyShares,
-                        pctTotal: r.cyPct, pctChange: ''
-                      })))
-                    })
                     e.target.value = ''
+                    // The % is over the total Equity shares of the company, from the Share Classes tab (every Equity class).
+                    const eq = shareTotals(data.classes, 'Equity')
+                    if (!eq.cy) {
+                      window.alert('Fill the Share Classes tab first.\n\n% holding is worked out on the total number of Equity shares of the company at the end of the year (Share Classes: Opening + Issued - Bought back, or Paid-up). That total is blank, so the % cannot be worked out.')
+                      return
+                    }
+                    importShareholdersFromExcel(file, eq, ({ all, fivePct, promoters, basis }) => {
+                      update5pctEquity(fivePct.map(({ name, folioNo, cyShares, cyPct, pyShares, pyPct }) => ({ name, folioNo, cyShares, cyPct, pyShares, pyPct })))
+                      updatePromoters(promoters)
+                      const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+                      const lines = [
+                        `Imported ${all.length} shareholder${all.length !== 1 ? 's' : ''}: ${fivePct.length} hold${fivePct.length === 1 ? 's' : ''} 5% or more (this year or last), ${promoters.length} promoter${promoters.length !== 1 ? 's' : ''}.`,
+                        '',
+                        `% worked out on the total Equity shares: this year ${fmt(basis.totalCY)}${basis.pyFrom === 'classes' ? `, last year ${fmt(basis.totalPY)}` : ` (last year: Share Classes blank, so the ${fmt(basis.totalPY)} shares listed in the file)`}.`,
+                        `Shares listed in the file: this year ${fmt(basis.listedCY)}, last year ${fmt(basis.listedPY)}.`,
+                      ]
+                      if (basis.overCY || basis.overPY) lines.push('', `Check: the file lists more shares than the company's total (${basis.overCY ? 'this year' : 'last year'}). Correct the file or the Share Classes tab.`)
+                      window.alert(lines.join('\n'))
+                    })
                   }} />
                 </label>
                 <button onClick={() => {
@@ -536,22 +512,17 @@ export default function ShareCapitalForm({ tbId, entityId, useEntityLevel, noteN
                   // the CURRENT Classes total — same formula as Import Excel
                   // above — without needing to re-upload the file (so any
                   // manual name/folio edits already made here are kept).
-                  const cls0 = data.classes[0]
-                  const cyClosed = num(cls0?.cy.openingShares) + num(cls0?.cy.issuedDuringYear) - num(cls0?.cy.deletedDuringYear) || num(cls0?.cy.paidUp) || num(cls0?.cy.issued)
-                  const pyClosed = num(cls0?.py.openingShares) + num(cls0?.py.issuedDuringYear) - num(cls0?.py.deletedDuringYear) || num(cls0?.py.paidUp) || num(cls0?.py.issued)
-                  const totalCY = cyClosed || 1
-                  const totalPY = pyClosed || 1
-                  const recalcRows = (rows) => rows.map(r => ({
-                    ...r,
-                    cyPct: (num(r.cyShares) / totalCY * 100).toFixed(2),
-                    pyPct: (num(r.pyShares) / totalPY * 100).toFixed(2),
-                  }))
-                  update5pctEquity(recalcRows(data.shareholders5pctEquity))
-                  update5pctPref(recalcRows(data.shareholders5pctPreference))
-                  updatePromoters(data.promoters.map(r => ({
-                    ...r,
-                    pctTotal: (num(r.shares) / totalCY * 100).toFixed(2),
-                  })))
+                  // Every % already follows the shares and the Share Classes (withShareholdingPercent); this also works out a
+                  // promoter's % change again where last year's shares are known (rows from Import Excel).
+                  setData(d => {
+                    const next = withShareholdingPercent(d)
+                    const eq = shareTotals(d.classes, 'Equity'), pref = shareTotals(d.classes, 'Preference')
+                    return { ...next, promoters: next.promoters.map(r => {
+                      const t = r.class === 'Preference' ? pref : eq
+                      if (r.pyShares == null || String(r.pyShares).trim() === '' || !t.cy || !t.py) return r
+                      return { ...r, pctChange: (num(r.shares) / t.cy * 100 - num(r.pyShares) / t.py * 100).toFixed(2) }
+                    }) }
+                  })
                 }}
                   title="Re-derive every % below from each row's shares ÷ the current Classes total — use this after correcting Opening/Issued/Deleted on the Classes tab"
                   className="text-xs px-2 py-1 border border-amber-400 text-amber-700 rounded hover:bg-amber-50">

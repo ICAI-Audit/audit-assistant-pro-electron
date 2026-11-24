@@ -12,7 +12,7 @@
 // up here exactly as it would in a client's financials.
 import { processRows, attachNoteExtras } from '../hooks/useFinancials'
 import { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from '../components/Notes/TradePayablesDisclosureForm'
-import { TR_AGEING_ROWS } from '../components/Notes/TradeReceivablesAgingForm'
+import { TR_AGEING_ROWS, TR_AGEING_BUCKETS } from '../components/Notes/TradeReceivablesAgingForm'
 
 // Proprietorship and Partnership share one rule set (constitution 1); they
 // differ in wording only, via the entity's constitution_display.
@@ -59,7 +59,7 @@ const BLANK_LOAN = (nature, extra = {}) => ({
 const partyFields = () => ({ sharePct: '', opening: '', introduced: '', remuneration: '', interest: '', withdrawals: '', shareOfProfit: '' })
 const periodOf = (rows, buckets) => Object.fromEntries(rows.filter(r => !r.computed).map(r => [r.key, Object.fromEntries(buckets.map(b => [b, '']))]))
 const TP_BUCKETS = TP_AGEING_BUCKETS.map(b => b.key)   // T-063: Unbilled, Not Due and the four periods
-const TR_BUCKETS = ['less6m', '6m1y', '1y2y', '2y3y', 'more3y']
+const TR_BUCKETS = TR_AGEING_BUCKETS.map(b => b.key)   // T-069: Unbilled, Not Due and the five periods
 
 /**
  * The Fill Details of every note that has a form, empty: `noteDetailsMap`

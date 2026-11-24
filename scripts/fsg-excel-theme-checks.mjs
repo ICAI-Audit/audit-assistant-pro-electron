@@ -20,7 +20,8 @@ import { buildPolicyBlankWorkbook, buildPolicyFilledWorkbook, withoutLegacyPolic
 import JSZip from 'jszip'
 import { buildFillDetailsWorkbook, fillDetailsExcelSpec, parseFillDetailsWorkbook } from './src/modules/fsg/components/GenerateFinancials/fillDetailsWorkbook.js'
 import { tpPeriodView } from './src/modules/fsg/components/Notes/TradePayablesDisclosureForm.jsx'
-export { buildFillDetailsWorkbook, fillDetailsExcelSpec, parseFillDetailsWorkbook, tpPeriodView }
+import { trPeriodView, trScheduleTotal, trComputedCell } from './src/modules/fsg/components/Notes/TradeReceivablesAgingForm.jsx'
+export { buildFillDetailsWorkbook, fillDetailsExcelSpec, parseFillDetailsWorkbook, tpPeriodView, trPeriodView, trScheduleTotal, trComputedCell }
 export { XLSX, ExcelJS, JSZip, finishWorkbook, dataSheetNames, HOW_TO_SHEET, buildStockBlankTemplate, buildStockFilledWorkbook, parseStockWorkbook, stockExcelSpec }
 export { buildPolicyBlankWorkbook, buildPolicyFilledWorkbook, withoutLegacyPolicyGuide, policyExcelSpec }
 `
@@ -154,6 +155,47 @@ await xmlCheck('Inventory filled', filled)
   const owb = m.XLSX.utils.book_new(); m.XLSX.utils.book_append_sheet(owb, old, 'N7 Trade Payables')
   const ob = m.parseFillDetailsWorkbook(owb, { constitution: 3 }).results[0]?.data?.ageing?.cy
   check('T-063 an old four-column Trade Payables sheet still reads (Undue moves to Not Due)', ob?.others?.less1y === 10 && ob?.others?.more3y === 30 && ob?.others_undue?.notdue === 7 && ob?.total?.notdue === 7, ob)
+}
+
+// T-069: Trade Receivables ageing in the owner's layout: Unbilled and Not Due before the five periods; grey cells refuse
+// entries (rows (i) to (iv): Unbilled; Unbilled Dues rows: Not Due and the periods); provision row open.
+{
+  const trNotes = [{ num: 9, title: 'Trade Receivables', total: 31000 }]
+  const saved = { cy: { undis_good: { notdue: 30000, less6m: 1000, unbilled: 77 }, unbilled_good: { unbilled: 500 }, provision_doubtful: { less6m: 500 } }, py: {}, includeInOutput: true }
+  const v = m.trPeriodView(saved.cy)
+  check('T-069 (i) Unbilled is nil (grey); Not Due counts in Total Due and Total Trade Receivable',
+    v.undis_good.unbilled === '' && m.trComputedCell(v, 'due', 'notdue') === 30000 && m.trScheduleTotal(saved.cy) === 31000, [v, m.trScheduleTotal(saved.cy)])
+  const legacy = m.trPeriodView({ unbilled_doubtful: { less6m: 200, '1y2y': 50 }, dis_good: { more3y: 9 } })
+  check('T-069 older Unbilled Dues figures (period columns) move to Unbilled; totals unchanged',
+    legacy.unbilled_doubtful.unbilled === 250 && legacy.unbilled_doubtful.less6m === '' && legacy.dis_good.more3y === 9 && m.trScheduleTotal({ unbilled_doubtful: { less6m: 200, '1y2y': 50 }, dis_good: { more3y: 9 } }) === 259, legacy)
+  for (const blankFile of [true, false]) {
+    const label = blankFile ? 'Trade Receivables template' : 'Trade Receivables filled'
+    const wb = m.buildFillDetailsWorkbook(trNotes, new Map([[9, saved]]), null, { blank: blankFile, constitution: 3 })
+    const bytes = await m.finishWorkbook(wb, m.fillDetailsExcelSpec(wb))
+    await xmlCheck(label, bytes)
+    if (samplesAt) writeFileSync(path.join(samplesAt, `Sample - ${label}.xlsx`), bytes)
+    const x = await exceljs(bytes)
+    const ws = x.worksheets.find(w => /Trade Receivables/.test(w.name))
+    const hdr = ws.getRow(4).values.slice(1, 10).map(String)
+    check(`T-069 ${label}: columns Unbilled, Not Due, then the five periods`, hdr.slice(2).join('|') === 'Unbilled|Not Due|Less than 6 months|6 months - 1 year|1-2 yrs.|2-3 yrs.|More than 3 yrs.', hdr)
+    const rowOf = (lbl) => { let at = 0; ws.eachRow((r, n) => { if (!at && r.getCell(2).value === lbl) at = n }); return at }
+    const grey = (a) => ws.getCell(a).fill?.fgColor?.argb === 'FFBFBFBF'
+    const shut = (a) => ws.getCell(a).dataValidation?.type === 'custom' && ws.getCell(a).dataValidation?.formulae?.[0] === 'FALSE'
+    const i = rowOf('(i) Undisputed Trade receivables - considered good'), ub = rowOf('Unbilled Dues - considered good'), pr = rowOf('Less: Provision for doubtful debts')
+    check(`T-069 ${label}: (i) Unbilled grey and refuses entry; Not Due and periods open`, i && grey(`C${i}`) && shut(`C${i}`) && !grey(`D${i}`) && !shut(`D${i}`) && !shut(`I${i}`), [i, ws.getCell(`C${i}`).dataValidation])
+    check(`T-069 ${label}: Unbilled Dues takes Unbilled only (Not Due and periods grey, refuse entry)`, ub && ['D', 'E', 'F', 'G', 'H', 'I'].every(c => grey(`${c}${ub}`) && shut(`${c}${ub}`)) && !grey(`C${ub}`) && !shut(`C${ub}`), ub)
+    check(`T-069 ${label}: provision row fully open`, pr && ['C', 'D', 'E', 'I'].every(c => !grey(`${c}${pr}`) && !shut(`${c}${pr}`)), pr)
+    if (!blankFile) {
+      const back = m.parseFillDetailsWorkbook(m.XLSX.read(bytes, { type: 'array' }), { constitution: 3 }).results[0]?.data?.cy
+      check('T-069 filled Trade Receivables reads back: Not Due 30,000, Unbilled 500, total 31,000', back?.undis_good?.notdue === 30000 && back?.unbilled_good?.unbilled === 500 && !back?.undis_good?.unbilled && m.trScheduleTotal(back) === 31000, back)
+    }
+  }
+  // A file downloaded before T-069 (five period columns only) still reads into the right columns.
+  const old = m.XLSX.utils.aoa_to_sheet([['Note 9'], ['Trade Receivables Ageing'], [], ['Period', 'Particulars', 'Less than 6 months', '6 months - 1 year', '1-2 yrs.', '2-3 yrs.', 'More than 3 yrs.'],
+    ['CY', '(i) Undisputed Trade receivables - considered good', 10, 0, 0, 0, 30], ['CY', 'Unbilled Dues - considered good', 7, 0, 0, 0, 0]])
+  const owb = m.XLSX.utils.book_new(); m.XLSX.utils.book_append_sheet(owb, old, 'N9 Trade Receivables Ageing')
+  const ob = m.parseFillDetailsWorkbook(owb, { constitution: 3 }).results[0]?.data?.cy
+  check('T-069 an old five-column Trade Receivables sheet still reads (Unbilled Dues move to Unbilled)', ob?.undis_good?.less6m === 10 && ob?.undis_good?.more3y === 30 && ob?.unbilled_good?.unbilled === 7 && !ob?.unbilled_good?.less6m, ob)
 }
 
 if (samplesAt) {

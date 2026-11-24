@@ -34,24 +34,10 @@ import AdjustmentNotice from './components/shared/AdjustmentNotice'
 import LockBanner from './components/shared/LockBanner'
 import { undo as undoCategorisation, redo as redoCategorisation, canUndo as canUndoCat, canRedo as canRedoCat, subscribeUndo, peekUndoLabel, peekRedoLabel } from './utils/undoManager'
 import { fsgApi } from './api.js'
+import { tbDisplayName } from './utils/tbVersions'
 import { getPortalRoot } from './portalRoot.js'
 
 const THEME_KEY = 'vera-theme'
-
-// trial_balances.uploaded_at is a TIMESTAMPTZ column — pg parses it into a
-// native JS Date on the main-process side, and Electron's IPC structured
-// clone preserves it as a real Date instance all the way into the renderer
-// (unlike JSON, which would have stringified it). Rendering that object
-// directly as a React child throws "Objects are not valid as a React child",
-// crashing the whole app with no visible cause — format it explicitly.
-function fmtUploadedAt(v) {
-  if (!v) return ''
-  const d = v instanceof Date ? v : new Date(v)
-  if (isNaN(d.getTime())) return String(v)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  return `${dd}-${mm}-${d.getFullYear()}`
-}
 
 // Top-level menu bar (T-045): Master > TB > Inventory > Mapping > Dep > BS > PL > CFS > Notes > Policy > Annex > Features > Exception > Review Financials
 // 'Master', 'TB' and 'Mapping' are dropdown groups (hover/click,
@@ -911,8 +897,9 @@ export default function App({ context }) {
                   onClick={() => handleTBLoaded(tb)}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition"
                 >
-                  <div className="font-medium text-gray-800">{tb.filename || `Trial Balance #${tb.id}`}</div>
-                  <div className="text-xs text-gray-400">{tb.branch_name ? `${tb.branch_name} · ` : ''}Uploaded {fmtUploadedAt(tb.uploaded_at)} · {tb.row_count || 0} ledgers</div>
+                  {/* T-071: shown by version (_v1 to _v3); the upload date and time are not shown */}
+                  <div className="font-medium text-gray-800">{tbDisplayName(tb)}</div>
+                  <div className="text-xs text-gray-400">{tb.filename ? `${tb.filename} · ` : ''}{tb.row_count || 0} ledgers</div>
                 </button>
               ))}
             </div>

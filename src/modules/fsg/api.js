@@ -97,6 +97,7 @@ export const fsgApi = {
   getTBRows:         (tbId)   => call('tb:rows', tbId),
   downloadTBTemplate:()       => call('tb:template'),
   deleteTB:          (tbId)   => call('tb:delete', tbId),
+  tbVersionStatus:   (data)   => call('tb:versionStatus', data),
   saveStock:         (data)   => call('tb:saveStock', data),
   getStockRows:      (tbId)   => call('tb:getStockRows', tbId),
   getOtherExpenseHeads: (tbId) => call('tb:getOtherExpenseHeads', tbId),

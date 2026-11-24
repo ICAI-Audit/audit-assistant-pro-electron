@@ -15,7 +15,7 @@ import { buildCashFlow } from '../../utils/cashFlow'
 import { parseCfsSheet, applyCfsUpload } from '../CFS/cfsWorkbook'
 import { parseDepITWorkbook } from '../DepreciationIT/depITWorkbook'
 import { parseDepCompWorkbook } from '../DepreciationComp/depCompWorkbook'
-import { parseShareCapitalDetailsSheet } from './shareCapitalDetailsWorkbook'
+import { parseShareCapitalDetailsSheet, shareTotals } from './shareCapitalDetailsWorkbook'
 import { FILL_DETAILS_REGISTRY } from '../../utils/fillDetailsRegistry'
 import RemarkCell, { useRemarks } from '../shared/RemarkCell'
 import { AnalyseChangeButton, AnalyseChangeProvider, useAnalyseChangeToggle, ChangeCells, ChangeHeads, useChangeSpan } from '../shared/AnalyseChange'
@@ -27,7 +27,7 @@ import CashBankDetailsForm from './CashBankDetailsForm'
 import InvestmentsForm, { InvestmentDisclosure } from './InvestmentsForm'
 import { investmentKind } from '../../utils/investments'
 import { investmentScope } from '../../utils/investmentStore'
-import TradeReceivablesAgingForm, { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell } from './TradeReceivablesAgingForm'
+import TradeReceivablesAgingForm, { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell, trPeriodView } from './TradeReceivablesAgingForm'
 import TradeReceivablesAgeingNonCorpForm, { NcAgeingDisplayTable } from './TradeReceivablesAgeingNonCorpForm'
 import { isNonCorpTradeReceivables } from '../../utils/tradeReceivablesNonCorp'
 import { fixFilterWith, fixFilterWithIds } from '../../utils/fixTargets'
@@ -928,8 +928,8 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
         {note.trReceivablesAgingData && (note.trReceivablesAgingData.cy || note.trReceivablesAgingData.py) && (
           <div className="mt-6 pt-6 border-t-2 border-indigo-300 px-4 pb-4">
             <h3 className="text-sm font-bold text-indigo-900 mb-3">Trade Receivables ageing schedule</h3>
-            <AgeingDisplayTable heading={periodLabels.cy} periodData={note.trReceivablesAgingData.cy} rows={TR_AGEING_ROWS} buckets={TR_AGEING_BUCKETS} computeCell={trComputedCell} />
-            <AgeingDisplayTable heading={periodLabels.py} periodData={note.trReceivablesAgingData.py} rows={TR_AGEING_ROWS} buckets={TR_AGEING_BUCKETS} computeCell={trComputedCell} />
+            <AgeingDisplayTable heading={periodLabels.cy} periodData={note.trReceivablesAgingData.cy} rows={TR_AGEING_ROWS} buckets={TR_AGEING_BUCKETS} computeCell={trComputedCell} viewPeriod={trPeriodView} />
+            <AgeingDisplayTable heading={periodLabels.py} periodData={note.trReceivablesAgingData.py} rows={TR_AGEING_ROWS} buckets={TR_AGEING_BUCKETS} computeCell={trComputedCell} viewPeriod={trPeriodView} />
           </div>
         )}
 
@@ -1685,11 +1685,9 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
       const existingSc = scLiveNote ? await noteDetailsGet(scLiveNote.num, scLiveNote.title).catch(() => null) : null
       const resolvedNum = scLiveNote?.num
       if (resolvedNum) {
-        const cls0 = existingSc?.classes?.[0]
-        const num = v => parseFloat(v) || 0
-        const totalCY = num(cls0?.cy?.openingShares) + num(cls0?.cy?.issuedDuringYear) - num(cls0?.cy?.deletedDuringYear) || num(cls0?.cy?.paidUp) || num(cls0?.cy?.issued)
-        const totalPY = num(cls0?.py?.openingShares) + num(cls0?.py?.issuedDuringYear) - num(cls0?.py?.deletedDuringYear) || num(cls0?.py?.paidUp) || num(cls0?.py?.issued)
-        const shareCapParsed = parseShareCapitalDetailsSheet(wb, totalCY, totalPY)
+        // Total Equity shares across every Equity class (not the first class only), as the form's Import Excel uses.
+        const eq = shareTotals(existingSc?.classes, 'Equity')
+        const shareCapParsed = parseShareCapitalDetailsSheet(wb, eq.cy, eq.py)
         if (shareCapParsed) {
           await noteDetailsSave({
             noteNum: resolvedNum, noteTitle: scLiveNote.title,
@@ -2167,7 +2165,7 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
         }
         // Trade Receivables: Ageing Schedule — Company only (hasForm above already gates the button)
         if (title.includes('trade receivable') && parseInt(entity?.constitution) === 3) {
-          return <TradeReceivablesAgingForm {...commonProps} />
+          return <TradeReceivablesAgingForm {...commonProps} periodLabels={statementColumnLabels(activeTB, prevTB, 'bs')} />
         }
         // ...Proprietorship / Partnership / LLP: the simpler 6-month ageing table
         if (isNonCorpTradeReceivables(entity?.constitution, noteDetailsModal.noteTitle)) {

@@ -12,6 +12,7 @@ import { computeNonCorpPLLayout } from '../../utils/plStructureNonCorp'
 import { fixFilterWith } from '../../utils/fixTargets'
 import MissingAlieWarning from '../shared/MissingAlieWarning'
 import { EXPENSE_LINES, corpFaceTail, TAX_SECTION_RX } from '../../utils/plStructureCorp'
+import { taxLineNote } from '../../utils/deferredTaxNote'
 import { fsgApi } from '../../api.js'
 
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX']
@@ -573,7 +574,7 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                     sec.lines.map(line => (
                       <Row key={line.level2 || sec.level1}
                         label={line.level2 || sec.level1}
-                        noteNum={line.noteNum || sec.noteNum}
+                        noteNum={taxLineNote(line, sec, data?.notes).num}
                         amount={line.total} prevAmount={line.prevTotal}
                         indent onNoteClick={onNoteClick}
                         tbId={tbId} getRemark={getRemark} onRemarkSaved={onRemarkSaved} />

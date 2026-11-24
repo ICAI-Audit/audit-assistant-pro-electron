@@ -113,6 +113,7 @@ export const CHANNEL_POLICY = {
   'tb:uploadBusy': { access: 'auth', write: true, scopes: [R('entity', 0, { prop: 'entityId' }), R('entityPeriod', 0, { prop: 'entityPeriodId' })] },
   'tb:list': { access: 'auth', scopes: [R('entity')] },
   'tb:listByEntityPeriod': { access: 'auth', scopes: [R('entityPeriod')] },
+  'tb:versionStatus': { access: 'auth', scopes: [R('entityPeriod', 0, { prop: 'entityPeriodId' })] },
   'tb:rows': { access: 'auth', scopes: [R('tb')] },
   'tb:delete': { access: 'auth', write: true, scopes: [R('tb')] },
   // T-044: a Trial Balance's workings - summary, carry-over to a re-uploaded TB of the same year, one Excel file out and back in.

@@ -10,7 +10,7 @@
 // added" mechanism.
 
 import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../components/Notes/TradePayablesDisclosureForm'
-import { TR_AGEING_ROWS, TR_AGEING_BUCKETS } from '../components/Notes/TradeReceivablesAgingForm'
+import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trPeriodView } from '../components/Notes/TradeReceivablesAgingForm'
 import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolve } from './tradeReceivablesNonCorp'
 import { INVESTMENT_REGISTRY } from './investmentWorkbook'
 
@@ -243,15 +243,24 @@ export const FILL_DETAILS_REGISTRY = [
       const inputRows = TR_AGEING_ROWS.filter(r => !r.computed)
       const rows = []
       for (const period of ['cy', 'py']) {
+        // T-069: blocked cells empty; older Unbilled Dues figures shown under Unbilled.
+        const pd = trPeriodView(details?.[period] || {})
         for (const r of inputRows) {
-          rows.push([period.toUpperCase(), r.label, ...TR_AGEING_BUCKETS.map(b => num(details?.[period]?.[r.key]?.[b.key]) || '')])
+          rows.push([period.toUpperCase(), r.label, ...TR_AGEING_BUCKETS.map(b => num(pd?.[r.key]?.[b.key]) || '')])
         }
       }
-      rows.push(['', 'Include in Output (Yes/No)', yn(details?.includeInOutput), '', '', '', ''])
+      rows.push(['', 'Include in Output (Yes/No)', yn(details?.includeInOutput), ...TR_AGEING_BUCKETS.slice(1).map(() => '')])
       return rows
     },
-    fromRows(rows) {
+    fromRows(rows, header = []) {
       const inputRows = TR_AGEING_ROWS.filter(r => !r.computed)
+      // Columns found by their heading, so a sheet downloaded before T-069 (the five
+      // periods only, no Unbilled / Not Due) still reads into the right columns.
+      const hdr = (header || []).map(h => String(h ?? '').trim().toLowerCase())
+      const colOf = new Map(TR_AGEING_BUCKETS.map((b, i) => {
+        const at = hdr.indexOf(b.label.toLowerCase())
+        return [b.key, at >= 2 ? at : (hdr.length ? -1 : 2 + i)]
+      }))
       const labelToKey = new Map(inputRows.map(r => [r.label.trim().toLowerCase(), r.key]))
       const out = { cy: {}, py: {}, includeInOutput: false }
       for (const r of rows) {
@@ -260,8 +269,10 @@ export const FILL_DETAILS_REGISTRY = [
         if (label === 'include in output (yes/no)') { out.includeInOutput = isYes(r[2]); continue }
         const key = labelToKey.get(label)
         if (!key || (period !== 'cy' && period !== 'py')) continue
-        out[period][key] = Object.fromEntries(TR_AGEING_BUCKETS.map((b, i) => [b.key, num(r[2 + i])]))
+        out[period][key] = Object.fromEntries(TR_AGEING_BUCKETS.map(b => [b.key, colOf.get(b.key) >= 0 ? num(r[colOf.get(b.key)]) : 0]))
       }
+      out.cy = trPeriodView(out.cy)
+      out.py = trPeriodView(out.py)
       return out
     },
   },

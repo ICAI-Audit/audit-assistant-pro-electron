@@ -246,7 +246,7 @@
   padding: 3pt 4pt;
   border-bottom: 0.5pt solid #000;
 }
-.fsg-root .print-view .right { text-align: right; font-family: 'Consolas', monospace; }
+.fsg-root .print-view .right { text-align: right; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-variant-numeric: tabular-nums lining-nums; }
 .fsg-root .print-view .center { text-align: center; }
 .fsg-root .print-view .carryfwd {
   font-style: italic;
@@ -349,4 +349,13 @@
   .fsg-root .fsg-stmt-group-label { display: none; }
   .fsg-root .fsg-stmt-toolbar select { max-width: 8rem; }
   .fsg-root .fsg-stmt-toolbar button { padding: 0 8px; }
+}
+
+/* Figures on screen (owner, 23 November 2026): amounts used a typewriter font (JetBrains Mono, or Consolas when that web
+   font is not loaded) whose dotted zero reads like an 8. On screen only - the PDF and Excel keep their own fonts - every
+   figure set in font-mono now uses the same clean font as the words, with equal-width digits so columns still line up. */
+.fsg-root .font-mono {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1, 'zero' 0;
 }
