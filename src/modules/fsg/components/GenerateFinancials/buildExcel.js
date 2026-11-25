@@ -18,7 +18,8 @@ import { taxLineNote } from '../../utils/deferredTaxNote'
 // and the PDF exporter.
 import { computeNonCorpPLLayout } from '../../utils/plStructureNonCorp'
 import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolve } from '../../utils/tradeReceivablesNonCorp'
-import { getSubnoteGroups, UNCLASSIFIED_LABEL, plNoteLines, subnoteGroupFigures, bsNoteFallbackLines, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
+import { DIRECTOR_LOANS_TITLE, DIRECTOR_LOANS_ROWS, directorLoansResolve, isLoansAdvancesNoteTitle } from '../../utils/directorLoans'
+import { getSubnoteGroups, UNCLASSIFIED_LABEL, plNoteLines, plNoteTotalLabel, subnoteGroupFigures, bsNoteFallbackLines, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
 import { signatoryIdText, signedOnBehalfOf } from '../../utils/signatoryFormat'
 import { CASH_BANK_ITEMS } from '../Notes/CashBankDetailsForm'
 import { investmentKind, investmentTables } from '../../utils/investments'
@@ -1704,6 +1705,20 @@ function buildNoteDetailRows(noteTitle, details, noteNum, scale, cyTotal, period
   // until edited in Fill Details — see utils/tradeReceivablesNonCorp.js. Laid
   // out stacked (ageing heading, then its three categories) so the Amount
   // column lines up with the note's own Current Year column.
+  // T-086 Company: loans and advances due from directors, officers and entities in which directors are interested,
+  // beneath Long-term / Short-term loans and advances, in the note's own CY / PY columns (nil shows as "-").
+  if (isCompany && isLoansAdvancesNoteTitle(noteTitle)) {
+    const v = directorLoansResolve(details?.directorLoans)
+    rows.push([])
+    colHdrs.push(rows.length)
+    rows.push([DIRECTOR_LOANS_TITLE, '', 'Current Year', 'Previous Year'])
+    for (const r of DIRECTOR_LOANS_ROWS) rows.push([`   ${r.label}`, '', scale(v.cy[r.key]), scale(v.py[r.key])])
+    totals.push(rows.length)
+    rows.push(['Total', '', scale(v.totals.cy), scale(v.totals.py)])
+    rows.push([])
+    return { rows, sectionHdrs, colHdrs, classHdrs, totals, errorRows, integerCells, centerCells }
+  }
+
   if (t.includes('trade receivable') && isNonCorp) {
     const { values, total } = ncAgeingResolve(details?.ncAgeing, cyTotal)
     rows.push([])
@@ -1880,10 +1895,10 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
       // Annexures-linked sub-note (see annexureGrouping.js) and is NOT
       // added to noteLineRows, so the note's own Total doesn't double it.
       let sinceSubtotal = []
-      for (const { line, label } of plNoteLines(note)) {
+      for (const { line, label, display } of plNoteLines(note)) {
         if (/^less:\s*closing/i.test(label)) underlineRows.push(rows.length)
         const lineRow = rows.length
-        rows.push([`  ${label}`, '', scale(line.total), scale(line.prevTotal)])
+        rows.push([`  ${display}`, '', scale(line.total), scale(line.prevTotal)])
         if (line.isSubtotal) {
           if (sinceSubtotal.length > 0) {
             lineFormulaPatches.push({ r: lineRow, col: 2, formula: `SUM(${sinceSubtotal.map(r => `C${r + 1}`).join(',')})` })
@@ -2009,7 +2024,7 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
         cyCell = { t: 'n', v: scale(note.total), z: numFmt }
         pyCell = { t: 'n', v: scale(note.prevTotal), z: numFmt }
       }
-      rows.push(['Total', '', null, null])  // placeholders; real cells set below
+      rows.push([note.isPL ? plNoteTotalLabel(note) : 'Total', '', null, null])  // placeholders; real cells set below
       // Override the last two cells with formula cells
       const lastRowIdx = rows.length - 1
       // We'll patch these after aoa_to_sheet by using a post-processing step.
@@ -2022,7 +2037,8 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
       // Trade receivables of a Proprietorship / Partnership / LLP always carries
       // its ageing table (defaulting to Unsecured, considered good), saved or not.
       const isNcTradeReceivables = isNonCorp12 && /trade.*receivable/i.test(note.title || '')
-      if (savedDetails || isNcTradeReceivables) {
+      const isDirectorLoans = isCompany && isLoansAdvancesNoteTitle(note.title)
+      if (savedDetails || isNcTradeReceivables || isDirectorLoans) {
         const baseRow = rows.length
         const det = buildNoteDetailRows(note.title, savedDetails || {}, note.num, scale, note.total, periodStartStr, periodEndStr, isCompany, isNonCorp12)
         for (const r of [...det.sectionHdrs, ...det.colHdrs, ...det.classHdrs]) det.rows[r] = det.rows[r].map(v => typeof v === 'string' ? datedPeriodLabel(v, labels) : v)

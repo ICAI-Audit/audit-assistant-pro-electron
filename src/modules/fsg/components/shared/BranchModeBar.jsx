@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { ConsolidationContext, resolveConsolidationSelection, loadOverride, saveOverride } from '../../utils/consolidationSelection'
-import { tbVersionSuffix } from '../../utils/tbVersions'
+import { tbVersionSuffix, groupBranchVersions } from '../../utils/tbVersions'
 
 // Under "Consolidated": which Trial Balances are added together for the Current Year and for the Previous Year.
 function ConsolidationPicker() {
@@ -66,7 +66,13 @@ export default function BranchModeBar({ fsMode, onFsModeChange, branchTBList = [
     { key: 'columnar',     label: 'Branch-wise (Columnar)', icon: '📊' },
   ]
 
+  // T-087: one button per branch (of the year on screen, or of the Trial Balance picked), not one per Trial
+  // Balance; a branch with more than one version shows a version list on its button.
+  const ctx = useContext(ConsolidationContext)
   const activeBranch = branchTBList.find(t => t.id === selectedBranchTBId)
+  const yearId = activeBranch ? activeBranch.entity_period_id : ctx?.entityPeriodId
+  const ofYear = branchTBList.filter(t => yearId != null && t.entity_period_id === yearId)
+  const branchGroups = groupBranchVersions(ofYear.length ? ofYear : branchTBList)
   const activeBranchLabel = activeBranch
     ? (activeBranch.branch_name || activeBranch.period || `TB #${activeBranch.id}`)
     : null
@@ -104,23 +110,32 @@ export default function BranchModeBar({ fsMode, onFsModeChange, branchTBList = [
       {(hideModes || fsMode === 'single' || fsMode === 'columnar') && branchTBList.length > 0 && (
         <div className="flex items-center gap-1 px-3 pb-1.5 overflow-x-auto">
           <span className="text-[10px] text-gray-400 mr-1 shrink-0">Branch:</span>
-          {branchTBList.map(t => {
-            const label = `${t.branch_name || t.period || `TB #${t.id}`}${tbVersionSuffix(t)}`
-            const active = t.id === selectedBranchTBId
+          {branchGroups.map(g => {
+            const current = g.tbs.find(t => t.id === selectedBranchTBId)
+            const shown = current || g.latest
+            const label = g.branch || shown.period || `TB #${shown.id}`
+            const active = !!current
             return (
-              <button
-                key={t.id}
-                onClick={() => onBranchSelect(t.id)}
-                title={`${label} — ${t.period || ''}${t.filename ? ` (${t.filename})` : ''}`}
-                className={`shrink-0 px-3 py-0.5 rounded-full text-xs font-medium transition border ${
-                  active
-                    ? 'text-white border-transparent'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-700'
-                }`}
-                style={active ? { background: 'var(--color-primary)' } : {}}
-              >
-                {label}
-              </button>
+              <span key={g.key} className="shrink-0 inline-flex items-center gap-1" data-testid="branch-pill">
+                <button
+                  onClick={() => onBranchSelect(shown.id)}
+                  title={`${label}${tbVersionSuffix(shown)} — ${shown.period || ''}${shown.filename ? ` (${shown.filename})` : ''}`}
+                  className={`px-3 py-0.5 rounded-full text-xs font-medium transition border ${
+                    active
+                      ? 'text-white border-transparent'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-700'
+                  }`}
+                  style={active ? { background: 'var(--color-primary)' } : {}}
+                >
+                  {label}
+                </button>
+                {active && g.tbs.length > 1 && (
+                  <select value={shown.id} onChange={e => onBranchSelect(Number(e.target.value))} aria-label={`Version of ${label}`}
+                    className="text-[11px] border border-blue-300 rounded px-1 py-0.5 bg-white text-blue-800">
+                    {g.tbs.map(t => <option key={t.id} value={t.id}>{tbVersionSuffix(t) || `TB #${t.id}`}{t.id === g.latest.id ? ' (latest)' : ''}</option>)}
+                  </select>
+                )}
+              </span>
             )
           })}
           {allowConsolidated && (() => {

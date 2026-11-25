@@ -90,6 +90,28 @@
 ## T-053 CAAT Tools v0.10 (17 November 2026)
 
 On `caat_tools`, the embedded CAAT Tools was replaced by the owner-supplied v0.10 (new sidebar layout, data-type detection, Insights, export dialog, tests run on Apply mapping) and restyled with the VERA colours, type and components. The approved large-ledger loop fix and sampling wording fix were re-applied; SheetJS stays 0.20.3. Eight logic findings from the code review were fixed on the owner's instruction (see [CAAT_TOOLS.md](CAAT_TOOLS.md)). `npm run test:caat-ui` 38/38; owner UAT pending.
+## T-087 Branch Master and branch versions (24 November 2026)
+
+- Branch `FSG-AM`, uncommitted with T-081 to T-086. Branch picked from a Branch Master on every upload (with "+ Add new branch"); Master > Branch Master renames / deletes branches; a second upload of a branch is its next version; branch bar and Consolidated take one (latest) version per branch. Details in [the handoff](SESSION_HANDOFF.md).
+- Checks: `npm run test:fsg` 427/427 (4 PDF text checks skipped on win32-arm64), `npm run test:fsg-ui` 139/139. Not run: owner UAT.
+
+## T-086 Loans and advances due from directors (24 November 2026)
+
+- Branch `FSG-AM`, uncommitted with T-081 to T-085. Company Long-term / Short-term loans and advances get Fill Details and the directors / officers / firms / private companies table on screen, PDF and Excel. Details in [the handoff](SESSION_HANDOFF.md).
+- Checks: `npm run test:fsg` 409/409 (4 PDF text checks skipped on win32-arm64), Excel theme 61/61; `npm run test:fsg-ui` not re-run for T-086. Not run: owner UAT.
+
+## T-082 to T-085 Journal Entry removed, Recategorisation = Notes Fix, Investments and ALIE warning style (24 November 2026)
+
+- Branch `FSG-AM`, after commit b444631 (PR #123 open); uncommitted, with T-081. Financial Statement Review only (F-009).
+- T-082 Journal Entry removed. T-083 Recategorisation lists every ledger Notes / BS / P&L flag (one shared test), so an empty list means no screen asks again. T-084 Investments Fill Details: note and form show the same pending items, in the house style. T-085 ALIE not found warning in the house style. Details in [the handoff](SESSION_HANDOFF.md).
+- Checks: `npm run test:fsg` 399/399 (4 PDF text checks skipped on win32-arm64), `npm run test:fsg-ui` 139/139, Excel theme 61/61, `docs:check` passed. Test merge into origin/main (3378148) clean. Not run: owner UAT.
+
+## T-081 Cost of materials consumed as a working (23 November 2026)
+
+- Branch `FSG-AM`, after commit b444631 (PR #123 open); uncommitted. Financial Statement Review only (F-009).
+- T-081: Cost of materials consumed reads Opening Stock of Raw Materials / Add: Purchases / Less: Closing Stock of Raw Materials / Cost of materials consumed, on the Notes screen, PDF and Excel. Details in [the handoff](SESSION_HANDOFF.md).
+- Checks: `npm run test:fsg` 394/394 (4 new). Not run: `npm run test:fsg-ui` (before commit), owner UAT.
+
 ## T-075 to T-079 Owner points: Dr / Cr, shareholding %, partners' profit, Deferred tax note, Dep (Books) (23 November 2026)
 
 - Branch `FSG-AM`; Financial Statement Review only (F-009); committed together with T-069 to T-074.

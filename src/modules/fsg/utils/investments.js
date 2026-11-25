@@ -98,6 +98,15 @@ export function investmentIssues(details, rows, kind, note = null) {
   }
   return issues
 }
+// T-084 (owner, 24 November 2026): the Notes screen and the Fill Details form listed different things for the same note -
+// the note checked the saved details as they were (so an unsaved note read "investment details not entered"), the form
+// checked them with every ledger's row added (so it read "complete investee name, ..."). Both now use this one list.
+export const INVESTMENT_NOT_SAVED = 'Fill Details have not been saved yet for this note.'
+export function investmentPendingIssues(saved, rows, kind, note = null, live = null) {
+  const details = live || prepareInvestmentDetails(saved, rows)
+  const issues = investmentIssues(details, rows, kind, note)
+  return saved ? issues : [INVESTMENT_NOT_SAVED, ...issues]
+}
 export function validateInvestmentInput(data) {
   if (data?.version !== 1 || !Array.isArray(data.entries) || data.entries.length > 5000 || !Array.isArray(data.categories)) throw new Error('Invalid investment details format.')
   if (data.categories.some(c => typeof c !== 'string' || !c.trim()) || new Set(data.categories.map(c => c.toLowerCase())).size !== data.categories.length) throw new Error('Custom investment categories must be distinct non-empty names.')

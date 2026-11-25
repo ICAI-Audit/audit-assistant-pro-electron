@@ -16,6 +16,7 @@ import { pointLabel } from '../../utils/pointLabel'
 import { withStbCurrentMaturities } from '../../utils/stbCurrentMaturities'
 import { printNoteRows } from '../../utils/noteRowHeaders'
 import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolve } from '../../utils/tradeReceivablesNonCorp'
+import { DIRECTOR_LOANS_TITLE, DIRECTOR_LOANS_ROWS, directorLoansResolve } from '../../utils/directorLoans'
 // Single source of truth for Company/LLP PL expense-line bucketing and
 // presentation order — shared with the live PL screen and Excel exporter, so
 // PDF section/note order always matches (see plStructureCorp.js doc comment
@@ -24,7 +25,7 @@ import { EXPENSE_LINES, corpFaceTail, TAX_SECTION_RX } from '../../utils/plStruc
 import { taxLineNote } from '../../utils/deferredTaxNote'
 // Ledger → sub-note grouping — single source of truth shared with the live
 // Annexures UI and the Excel exporter.
-import { getSubnoteGroups, UNCLASSIFIED_LABEL, plNoteLines, bsNoteFallbackLines, subnoteGroupFigures, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
+import { getSubnoteGroups, UNCLASSIFIED_LABEL, plNoteLines, plNoteTotalLabel, bsNoteFallbackLines, subnoteGroupFigures, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
 import { CASH_BANK_ITEMS } from '../Notes/CashBankDetailsForm'
 import { investmentKind, investmentTables } from '../../utils/investments'
 import { missingAlieHTML, missingAlieLedgerHTML } from '../../utils/missingAlieExport'
@@ -1314,8 +1315,8 @@ function buildNoteRows(note) {
   const rows = []
   if (note.isPL) {
     // Same lines as the Notes screen and the Excel export (plNoteLines).
-    for (const { line, label } of plNoteLines(note)) {
-      rows.push({ type: 'l2', label, cy: line.total, py: line.prevTotal, isSubtotal: !!line.isSubtotal })
+    for (const { line, display } of plNoteLines(note)) {
+      rows.push({ type: 'l2', label: display, cy: line.total, py: line.prevTotal, isSubtotal: !!line.isSubtotal })
     }
     return rows
   }
@@ -1381,7 +1382,7 @@ function renderNoteTable(note, rows, { cyShort, pyShort }) {
     </tr>`
   })
   body += `<tr class="total-row">
-      <td>Total</td>
+      <td>${esc(note.isPL ? plNoteTotalLabel(note) : 'Total')}</td>
       <td></td>
       <td class="right">${fmtINR(note.total)}</td>
       <td class="right">${fmtINR(note.prevTotal)}</td>
@@ -2379,6 +2380,33 @@ function renderNcTradeReceivablesAgeing(saved, noteTotal) {
   </table>`
 }
 
+// ── T-086 Company: loans and advances due from directors, officers and entities in which directors are
+// interested, beneath Long-term / Short-term loans and advances. Nil lines print as "—".
+function renderDirectorLoans(saved, cyLabel, pyLabel) {
+  const v = directorLoansResolve(saved)
+  const amt = (x) => (x ? fmtINR(x) : '—')
+  const cell = 'border:0.5pt solid #444;padding:1mm 1.5mm;font-size:10pt;'
+  const head = cell + 'font-weight:bold;'
+  const body = DIRECTOR_LOANS_ROWS.map(r => `<tr>
+    <td style="${cell}text-align:left;">${esc(r.label)}</td>
+    <td style="${cell}text-align:right;white-space:nowrap;">${amt(v.cy[r.key])}</td>
+    <td style="${cell}text-align:right;white-space:nowrap;">${amt(v.py[r.key])}</td>
+  </tr>`).join('')
+  return `<div style="font-weight:bold;font-size:10pt;margin:3mm 0 1mm;">${esc(DIRECTOR_LOANS_TITLE)}</div>
+  <table style="width:100%;border-collapse:collapse;margin:0 0 4mm;">
+    <thead><tr>
+      <th style="${head}text-align:left;">Particulars</th>
+      <th style="${head}text-align:right;width:20%;">${esc(cyLabel)}</th>
+      <th style="${head}text-align:right;width:20%;">${esc(pyLabel)}</th>
+    </tr></thead>
+    <tbody>${body}<tr>
+      <td style="${head}text-align:left;">Total</td>
+      <td style="${head}text-align:right;white-space:nowrap;">${amt(v.totals.cy)}</td>
+      <td style="${head}text-align:right;white-space:nowrap;">${amt(v.totals.py)}</td>
+    </tr></tbody>
+  </table>`
+}
+
 // ── Note details dispatcher — picks the right renderer per note title ─────────
 // Ageing schedule (Trade Payables/Receivables) is a Company-only disclosure
 // requirement — see Notes/index.jsx's Fill Details gating; isCompany here
@@ -2498,6 +2526,9 @@ function buildNotesPages(entity, activeTB, auditor, signatories, signNotes = fal
         if (isNonCorp12 && /trade.*receivable/i.test(note.title || '')) {
           // contdTitle: starting a page, it says whose table it is ("Note 18: Trade receivables (contd.)").
           blocks.push(flowBlock('atomic', `<div class="fill-details">${renderNcTradeReceivablesAgeing(details?.ncAgeing, note.total)}</div>`, { contdTitle: `Note ${note.num}: ${note.displayTitle || note.title || ''}` }))
+        }
+        if (isCompany && note.directorLoans) {
+          blocks.push(flowBlock('atomic', `<div class="fill-details" data-testid="director-loans-pdf">${renderDirectorLoans(details?.directorLoans ?? note.directorLoans.saved, cyLabel, pyLabel)}</div>`, { contdTitle: `Note ${note.num}: ${note.displayTitle || note.title || ''}` }))
         }
         blocks.push(partsBlock(depScheduleHtml, 'fill-details'))
       }

@@ -30,6 +30,7 @@ import { joinDepITSchedules } from '../../utils/depJoin'
 import { buildDepITBlankTemplate, buildDepITFilledWorkbook, parseDepITWorkbook, depITExcelSpec } from './depITWorkbook'
 import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
+import { latestPerBranch } from '../../utils/tbVersions'
 
 // ── Style constants (matches Depreciation/index.jsx) ─────────────────────────
 const INP  = 'w-full border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
@@ -536,7 +537,8 @@ export default function DepreciationIT({ entity, activeTB }) {
     if (!window.confirm('This refreshes the branch-total rows below with each branch\'s current Dep (Income Tax) figures. Any other row you\'ve added yourself is left as it is. Continue?')) return
     setPulling(true)
     try {
-      const branches = await fsgApi?.getBranches(entity.id) || []
+      // T-087: the latest version of each branch only (A_v1 and A_v2 are the same branch)
+      const branches = latestPerBranch(await fsgApi?.getBranches(entity.id) || [])
       const branchSchedules = await Promise.all(branches.map(b => fsgApi?.depITGet(b.id).catch(() => null)))
       const { byBlock, pyAgg } = joinDepITSchedules(branchSchedules, Object.keys(EMPTY_PY_TOTALS))
       const newLedgers = []

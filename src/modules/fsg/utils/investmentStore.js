@@ -1,5 +1,5 @@
 import { fsgApi } from '../api.js'
-import { investmentKind, investmentIssues, investmentPeriodRows } from './investments.js'
+import { investmentKind, investmentPendingIssues, investmentPeriodRows } from './investments.js'
 export const investmentScope = tb => ({ entityPeriodId: tb?.entity_period_id, tbId: tb?.id === '__consolidated__' ? null : tb?.id })
 export async function attachInvestmentDetails(processed, tb) {
   if (!tb?.entity_period_id || !Object.values(processed.notes || {}).some(n => investmentKind(n.title))) return processed
@@ -12,7 +12,7 @@ export async function attachInvestmentDetails(processed, tb) {
     // The preparer allocates that comparative to detail rows; never silently substitute CY opening.
     note.investmentRows = investmentPeriodRows(note, processed.investmentPreviousRows)
     note.investmentPYTBIds = [...new Set((processed.investmentPreviousRows || []).map(r => r.tb_id).filter(Boolean))]
-    note.investmentIssues = investmentIssues(note.investmentDetails, note.investmentRows, kind, note)
+    note.investmentIssues = investmentPendingIssues(note.investmentDetails, note.investmentRows, kind, note)
   }
   return processed
 }

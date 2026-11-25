@@ -58,8 +58,25 @@ export async function ensureTbVersionColumns() {
   }
 }
 
+// T-087: Branch Master - the branches of an Auditee with branches, picked from a list when a Trial Balance is
+// uploaded, so a second upload of branch A is A's next version (_v2), never a new branch "A_v2". Seeded once
+// from the branch names already on Trial Balances; nothing existing is changed.
+export async function ensureBranchMaster() {
+  await query(`CREATE TABLE IF NOT EXISTS fsg_branches (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_id  INTEGER NOT NULL,
+    name       TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (entity_id, name COLLATE NOCASE)
+  )`)
+  await query(`INSERT OR IGNORE INTO fsg_branches (entity_id, name)
+    SELECT DISTINCT entity_id, TRIM(branch_name) FROM trial_balances
+     WHERE entity_id IS NOT NULL AND TRIM(COALESCE(branch_name, '')) <> ''`)
+}
+
 export async function ensureSchema() {
   await ensureTbVersionColumns()
+  await ensureBranchMaster()
 
   // ── Backfill ALIE for rows that are missing it ───────────────────────────────
   await query(`

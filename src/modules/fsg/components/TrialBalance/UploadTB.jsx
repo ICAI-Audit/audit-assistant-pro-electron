@@ -1,3 +1,4 @@
+import BranchSelect, { BRANCH_REQUIRED_MESSAGE } from '../shared/BranchSelect'
 import React, { useState, useEffect } from 'react'
 import { useModalKeys } from '../../hooks/useModalKeys'
 import { parseTallyTB, parseMasterJSON, buildTBRowsFromTally, parseRealBooksTB, parseRealBooksMaster, buildTBRowsFromRealBooks } from '../../utils/tallyParsers'
@@ -241,6 +242,7 @@ function TallyUploadModal({ entity, entityId, hasBranches, onUploaded, onCancel 
 
   const handleUpload = async () => {
     if (!canUpload) return
+    if (hasBranches && !branchName) { window.alert(BRANCH_REQUIRED_MESSAGE); return }
     const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, branchName)
     if (!proceed) return
     setBusy(true); setError('')
@@ -272,16 +274,7 @@ function TallyUploadModal({ entity, entityId, hasBranches, onUploaded, onCancel 
           <div>
             <FinancialPeriodPicker entity={entity} value={periodPick} onChange={setPeriodPick} allowCustom={false} />
           </div>
-          {hasBranches && (
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Branch Name <span className="text-gray-400">(e.g. Head Office, Delhi Branch)</span></label>
-              <input
-                type="text" value={branchName} onChange={e => setBranchName(e.target.value)}
-                placeholder="e.g. Head Office"
-                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
-              />
-            </div>
-          )}
+          {hasBranches && <BranchSelect entityId={entityId} value={branchName} onChange={setBranchName} />}
           <div className="border border-gray-200 rounded p-3 bg-gray-50">
             <label className="block text-xs font-semibold text-blue-900 mb-1">1. Tally Trial Balance (Excel)</label>
             <input type="file" accept=".xlsx,.xls" onChange={handleTB} className="text-xs" />
@@ -417,6 +410,7 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
         `(${showIso(fyFrom)} to ${showIso(fyTill)}). Import this part of the year anyway?`
       )) return
     }
+    if (hasBranches && !branchName.trim()) { window.alert(BRANCH_REQUIRED_MESSAGE); return }
     const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, branchName.trim())
     if (!proceed) return
     const companyText = selectedCompany ? `“${selectedCompany}”` : 'the company open in Tally'
@@ -593,14 +587,7 @@ function TallyAutoModal({ entity, entityId, hasBranches, onUploaded, onCancel })
               (for example 2024-25 while 2025-26 is open), as long as that year&apos;s entries are in the same company.
               If the year was split into a separate company in Tally, open that company instead.
             </p>
-            {hasBranches && (
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Branch Name <span className="text-gray-400">(e.g. Head Office)</span></label>
-                <input type="text" value={branchName} onChange={e => { setBranchName(e.target.value); setFormError('') }}
-                  placeholder="e.g. Head Office"
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-              </div>
-            )}
+            {hasBranches && <BranchSelect entityId={entityId} value={branchName} onChange={v => { setBranchName(v); setFormError('') }} />}
             {formError && <div className="fsg-tally-form-error text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{formError}</div>}
             <div className="text-[10px] text-gray-400 bg-yellow-50 border border-yellow-200 rounded p-2">
               ℹ Tally must have HTTP Server enabled: Tally → F12 → Advanced Configuration → Enable HTTP Server = Yes (Port 9000)
@@ -680,6 +667,7 @@ function RealBooksUploadModal({ entity, entityId, hasBranches, onUploaded, onCan
 
   const handleUpload = async () => {
     if (!canUpload) return
+    if (hasBranches && !branchName) { window.alert(BRANCH_REQUIRED_MESSAGE); return }
     const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, branchName)
     if (!proceed) return
     setBusy(true); setError('')
@@ -714,16 +702,7 @@ function RealBooksUploadModal({ entity, entityId, hasBranches, onUploaded, onCan
               <p className="text-[10px] text-gray-400 mt-1">File suggests period: <strong>{period}</strong> — still requires selecting a real Financial Period above.</p>
             )}
           </div>
-          {hasBranches && (
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Branch Name <span className="text-gray-400">(e.g. Head Office, Delhi Branch)</span></label>
-              <input
-                type="text" value={branchName} onChange={e => setBranchName(e.target.value)}
-                placeholder="e.g. Head Office"
-                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
-              />
-            </div>
-          )}
+          {hasBranches && <BranchSelect entityId={entityId} value={branchName} onChange={setBranchName} />}
           <div className="border border-gray-200 rounded p-3 bg-gray-50">
             <label className="block text-xs font-semibold text-blue-900 mb-1">
               1. Trial Balance Excel <span className="font-normal text-gray-400">(Ledger Group Details Pivot Structure)</span>
@@ -838,6 +817,7 @@ function ZohoUploadModal({ entity, entityId, hasBranches, onUploaded, onCancel, 
 
   const handleUpload = async () => {
     if (!canUpload) return
+    if (hasBranches && !branchName) { window.alert(BRANCH_REQUIRED_MESSAGE); return }
     const proceed = await confirmIfPeriodAlreadyHasTB(periodPick.entityPeriodId, branchName)
     if (!proceed) return
     setBusy(true); setError('')
@@ -868,16 +848,7 @@ function ZohoUploadModal({ entity, entityId, hasBranches, onUploaded, onCancel, 
         </div>
         <div className="space-y-3">
           <FinancialPeriodPicker entity={entity} value={periodPick} onChange={setPeriodPick} allowCustom={false} />
-          {hasBranches && (
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Branch Name <span className="text-gray-400">(e.g. Head Office, Delhi Branch)</span></label>
-              <input
-                type="text" value={branchName} onChange={e => setBranchName(e.target.value)}
-                placeholder="e.g. Head Office"
-                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
-              />
-            </div>
-          )}
+          {hasBranches && <BranchSelect entityId={entityId} value={branchName} onChange={setBranchName} />}
           <div className="border border-gray-200 rounded p-3 bg-gray-50">
             <label className="block text-xs font-semibold text-blue-900 mb-1">
               Trial Balance Excel <span className="font-normal text-gray-400">({FL.hint})</span>

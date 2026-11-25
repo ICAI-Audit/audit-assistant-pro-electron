@@ -33,6 +33,7 @@ import { withoutRatioIntro } from '../utils/ratioNoteIntro'
 import { refreshRatiosInNote } from '../utils/ratioTable'
 // Saved Fill Details are matched to notes by title, not number.
 import { indexSavedNoteRows, parsedNoteData } from '../utils/savedNoteData'
+import { isLoansAdvancesNoteTitle } from '../utils/directorLoans'
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -1165,12 +1166,12 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
         const openLine = {
           level2: 'Opening Stock of Raw Materials',
           total: split.rawMaterialOpening.cy, prevTotal: split.rawMaterialOpening.py,
-          rows: split.rawMaterialOpeningRows, minSortOrder: 9990,
+          rows: split.rawMaterialOpeningRows, minSortOrder: 9990, rawWorking: 'opening',
         }
         const closeLine = {
           level2: 'Less: Closing Stock of Raw Materials',
           total: -split.rawMaterialClosing.cy, prevTotal: -split.rawMaterialClosing.py,
-          rows: split.rawMaterialClosingRows, minSortOrder: 9991,
+          rows: split.rawMaterialClosingRows, minSortOrder: 9991, rawWorking: 'closing',
         }
         // notes[materialsSec.noteNum].lines sometimes ALIASES the same array
         // as materialsSec.lines (when no Purchases-of-Stock-in-Trade merge
@@ -1180,12 +1181,16 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
         // closeLine end up in the note exactly once either way.
         const noteLinesSnapshot = materialsSec.noteNum && notes[materialsSec.noteNum]
           ? [...notes[materialsSec.noteNum].lines] : null
-        materialsSec.lines.push(openLine, closeLine)
+        // Printed as the working (owner, 23 November 2026): Opening Stock of Raw Materials, Add: Purchases (and any other line
+        // of the head), Less: Closing Stock of Raw Materials, then the total captioned "Cost of materials consumed"
+        // (annexureGrouping.js plNoteLineDisplay / plNoteTotalLabel). Only the order changes; the figures do not.
+        const asWorking = (lines) => [openLine, ...lines.filter(l => l !== openLine && l !== closeLine), closeLine]
+        materialsSec.lines.splice(0, materialsSec.lines.length, ...asWorking(materialsSec.lines))
         if (noteLinesSnapshot) {
           const n = notes[materialsSec.noteNum]
           n.total += split.rawMaterialDelta.cy
           n.prevTotal += split.rawMaterialDelta.py
-          n.lines = [...noteLinesSnapshot, openLine, closeLine]
+          n.lines = asWorking(noteLinesSnapshot)
           n.rows = [...n.rows, ...split.rawMaterialOpeningRows, ...split.rawMaterialClosingRows]
         }
       }
@@ -1222,7 +1227,10 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
           // like the Opening - Closing result line, and when the Stock tab is filled such a ledger often repeats it.
           ...(split.otherStockNetRows.length ? [{
             level2: STOCK_OTHER_LEDGERS_LABEL, total: split.otherStockNet.cy, prevTotal: split.otherStockNet.py,
-            rows: split.otherStockNetRows, minSortOrder: 9989, needsReview: true,
+            rows: split.otherStockNetRows, minSortOrder: 9989,
+            // T-083: flagged until the CA confirms these ledgers on Rectification / Recategorisation (saved or
+            // approved there); after that the line is an ordinary line and no screen asks again.
+            needsReview: split.otherStockNetRows.some(r => !['user_override', 'user_approved'].includes(String(r?.status || ''))),
             reviewNote: split.otherStockOpeningRows.some(r => r.upload_nature === 'Stock Entry') || split.otherStockClosingRows.some(r => r.upload_nature === 'Stock Entry')
               ? 'Added to Opening less Closing. The Stock tab already gives the Opening and Closing values, so check that these ledgers do not repeat that movement; re-categorise them if they do.'
               : 'Added to Opening less Closing. Check that these ledgers belong under this head.',
@@ -2680,6 +2688,11 @@ export function attachNoteExtras(processed, ndList, lfRows, depData, constitutio
       // (the display then defaults everything to "Unsecured, considered good").
       if (isTradeReceivables && [1, 2].includes(parseInt(constitution))) {
         note.ncTradeReceivables = { saved: noteData?.ncAgeing || null }
+      }
+      // T-086: Company, Long-term / Short-term loans and advances - the directors / officers / firms / private
+      // companies table (utils/directorLoans.js). Always shown; nil until entered in Fill Details.
+      if (isCompany && isLoansAdvancesNoteTitle(note.title)) {
+        note.directorLoans = { saved: noteData?.directorLoans || null }
       }
       // Attach the IT Act Block-wise WDV summary to the PPE note — opt-in
       // only (checked on the Dep (IT) → Block Summary tab), so it shows in
