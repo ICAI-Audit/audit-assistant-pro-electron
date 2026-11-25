@@ -2,6 +2,8 @@
 
 Source baseline `cc5c04729604fba7d05240a07f24682e0644665c`. This catalogue documents code configuration only. AY 2025-26 is the configured statutory label; this documentation does not validate current law, complete legal subclause coverage, source notifications or portal schema.
 
+Form No. 26 (T-067, 23 November 2026) has its own catalogue at the end of this file: [Form No. 26](#form-no-26-t-067).
+
 ## Configured clauses
 
 The live array contains 49 configured clause definitions. Subclauses are separate configured keys. Missing historical numbers must not be interpreted without legal review.
@@ -853,3 +855,69 @@ The following 785 literal field/table-column objects were extracted where key, l
 ## Fields beyond standalone columns
 
 Tax setup, programme, compliance tracker, acknowledgement, prefill provenance and review state also use nested JSON and TypeScript contracts. Their business fields are described in M-14. Exact form visibility, summary fields and selection options must be read with the source definitions and tested for the target year. Empty, zero, not applicable, pending and unknown require distinct review treatment.
+
+## Form No. 26 (T-067)
+
+Added 23 November 2026. Everything above describes Form 3CD (AY 2025-26). Form No. 26 is used for tax years from 2026-27 ([module M-14](modules/M-14.md#form-no-26-t-067-23-november-2026)). Its content is the office's fillable Form 26 as it stands (D-014), extracted from that file and generated into [src/data/taxAuditForm26Definition.ts](../../src/data/taxAuditForm26Definition.ts) by `scripts/tax-audit-form26/generate-definition.mjs`; `node scripts/tax-audit-form26/generate-definition.mjs --check` shows whether the file still matches the extraction. The definition is the full catalogue (every answer's key, label, type, options and preset; every table's columns, calculated columns and totals; every schedule and what opens it); it is not repeated here. The clause units are in [src/data/taxAuditForm26Clauses.ts](../../src/data/taxAuditForm26Clauses.ts). This table was taken from that file on 23 November 2026.
+
+Totals: 57 clause units, 142 answers (67 of them Yes/No, 65 of which open a schedule or table), 65 tables (52 that take rows, 11 fixed, 2 depreciation tables), 368 columns, 55 schedules in 11 groups, 76 answers preset when a form is opened. Storage: one row per unit (the key below) and one per table (`f26_t_<table>`), 122 rows per audit; working-paper reference `TA-F26-<number>`. These keys are never renamed or reused. A prefix in the "Tables" column: `P` a table inside a question, `S` a table of a schedule, `A`/`B` a table of Part A or B, `Dpm`/`Dot` the depreciation tables.
+
+| Number | Storage key | List label | Answers | Tables (own, then of its schedules) |
+| --- | --- | --- | --- | --- |
+| Category | `f26_category` | Category of assessee | 1 | - |
+| Part A | `f26_part_a` | Audit report where the accounts have been audited under any other law | 17 | A3b, A5 |
+| Part B | `f26_part_b` | Audit report in the case of a person referred to in clause (b) of sub-rule (1) of rule 47 | 17 | B3b, B5 |
+| 1 | `f26_p1` | Name | 1 | - |
+| 2 | `f26_p2` | Address | 7 | - |
+| 3 | `f26_p3` | Permanent Account Number | 1 | - |
+| 4 | `f26_p4` | Status | 1 | - |
+| 5 | `f26_p5` | Residential status | 1 | - |
+| 6 | `f26_p6` | Email id | 1 | - |
+| 7 | `f26_p7` | Contact number | 2 | - |
+| 8 | `f26_p8` | Tax year | 1 | - |
+| 9 | `f26_c9` | Ground on which audit is conducted | 1 | - |
+| 10 | `f26_c10` | Option for concessional tax regime | 1 | - |
+| 11 | `f26_c11` | Partners/members, PAN, profit-sharing ratio and changes | 1 | P11a, S11b |
+| 12 | `f26_c12` | Nature of business and change in it; Cost audit carried out; Turnover, GP, NP, stock and yield ratios – current and preceding year | 2 | P12d, S12a, S12b, S12c |
+| 13 | `f26_c13` | Books maintained and address(es) where kept | 1 | - |
+| 14 | `f26_c14` | Books maintained and address(es) where kept; Accounting software; cloud storage with IP address and country; rule 46(8) compliance; backup server address in India | 4 | P14a |
+| 15 | `f26_c15` | Method of accounting and change in it | 2 | S15b |
+| 16 | `f26_c16` | Inventory valuation; adjustment needed to comply with section 277 | 3 | S16b |
+| 17 | `f26_c17` | ICDS adjustments and disclosures | 1 | S17 |
+| 18 | `f26_c18` | ICDS adjustments and disclosures | 1 | S18 |
+| 19 | `f26_c19` | Presumptive profits included in P&L | 1 | S19 |
+| 20 | `f26_c20` | Income under 92(2)(m) not credited to P&L | 1 | S20 |
+| 21 | `f26_c21` | Other income chargeable but not credited to P&L | 1 | S21 |
+| 22 | `f26_c22` | Capital asset converted into stock-in-trade | 1 | S22 |
+| 23 | `f26_c23` | Land/building transferred below stamp duty value | 1 | S23 |
+| 24 | `f26_c24` | Hundi borrowing and repayment deemed as income | 2 | - |
+| 25 | `f26_c25` | Hundi borrowing and repayment deemed as income | 2 | - |
+| 26 | `f26_c26` | Expenditure relating to exempt income | 2 | - |
+| 27 | `f26_c27` | Disallowance under 29, 31 and 32; Employees' contributions disallowable; Disallowance under section 34 (capital, personal, etc.); Disallowance under section 35 (other than TDS items) | 4 | S27a, S27b, S27c, S27d |
+| 28 | `f26_c28` | Penalty levied under any law in or outside India | 1 | S28 |
+| 29 | `f26_c29` | Payments to specified persons | 1 | S29 |
+| 30 | `f26_c30` | Cash payments disallowable and deemed income on later cash payment | 1 | S30 |
+| 31 | `f26_c31` | Cash payments disallowable and deemed income on later cash payment | 1 | S31 |
+| 32 | `f26_c32` | Sums allowable only on actual payment; later-year allowance | 2 | S32a, S32b |
+| 33 | `f26_c33` | Interest under section 23 of MSMED Act; Payments to micro and small enterprises; later-year allowance | 6 | - |
+| 34 | `f26_c34` | Amounts allowable as deduction under various sections | 1 | S34a, S34b |
+| 35 | `f26_c35` | Prior-period income and expenditure | 2 | S35a, S35b |
+| 36 | `f26_c36` | Depreciation allowable | 1 | Dpm, Dot |
+| 37 | `f26_c37` | Brought-forward loss; shareholding change; speculation loss; deemed speculation; specified business loss | 9 | S37a |
+| 38 | `f26_c38` | Chapter VIII deductions | 1 | S38 |
+| 39 | `f26_c39` | Utilisation of MAT/AMT credit | 1 | S39 |
+| 40 | `f26_c40` | Primary transfer-pricing adjustment | 1 | S40 |
+| 41 | `f26_c41` | Interest exceeding specified limit; Interest brought forward and carried forward | 3 | S41a, S41b, S41c |
+| 42 | `f26_c42` | Disallowance under section 60 | 2 | - |
+| 43 | `f26_c43` | Remittances reported in Part D of Form 145 | 1 | S43 |
+| 44 | `f26_c44` | Amounts not to be included as income under 92(2)(m) | 1 | S44 |
+| 45 | `f26_c45` | Loans/deposits taken, cash receipts, cash payments, repayments beyond limits | 4 | S45a, S45b, S45c, S45d |
+| 46 | `f26_c46` | Statements in Forms 98/165/166/167 | 1 | S46 |
+| 47 | `f26_c47` | Transactions in unquoted shares | 1 | S47 |
+| 48 | `f26_c48` | Loan or advance treated as deemed dividend | 1 | S48 |
+| 49 | `f26_c49` | All TANs held | 0 | P49 |
+| 50 | `f26_c50` | TDS/TCS particulars and statements; Interest on late deduction or payment | 3 | S50a, S50b, S50c |
+| 51 | `f26_c51` | Disallowance for TDS default – non-resident and resident payments; Same disallowances allowed in a later year | 4 | S51a, S51b, S51c, S51d |
+| 52 | `f26_c52` | Registration / identification numbers; Expenditure split: GST-registered, unregistered, exempt supplies | 1 | S52a, S52b |
+| 53 | `f26_c53` | Trading unit / manufacturing concern | 2 | S53a, S53bi, S53bii |
+| Signature | `f26_sign` | Signature and Notes | 8 | - |

@@ -1,0 +1,89 @@
+feat(fsg): enhance mapping, disclosures and dated statements; remove Cloudtail
+
+Review scope: T-023 through T-028 on RSF; pre-commit review T-029.
+
+T-023 ? signing place from VERA Firm profile
+Add optional Place in Settings/Admin Settings, the shared firm hook and nullable
+firm_settings schema. Upgrade existing databases transactionally after a backup,
+with retry, rollback and restore coverage. Use the firm place as the editable
+financial export default instead of Siliguri/global last-used place. Scope manual
+overrides to the current auditor/client/year; preserve finalised signing details
+and require manual entry when the profile place is blank.
+
+T-024 ? terminal known-ALIE Level 1 fallbacks
+Append the five requested Mapping_v2 LevelFormat rows for constitutions 1/3 while
+preserving all original workbook rows and Map1/2/3 data. Link known-ALIE/no-Map1
+fallbacks to the proper constitution master with auto_low/low confidence, without
+inventing Level 2/3 classifications. Standardise the Equity and Liabilities caption.
+Back up before additive master upgrades and recognise the exact workbook hash
+transition so existing master IDs, ledger mappings and user overrides survive.
+Source figures and signs remain unchanged; no automatic remap or balancing plug.
+
+T-025 ? investment Fill Details and Schedule III Division I tables
+Add mapped-subclass ledger dropdowns, printed investee names, extensible instrument
+categories, relationships, quotation/valuation, carrying/market/diminution values,
+security quantities/face values/paid status, partly-paid and redemption particulars.
+Separate non-current trade/other disclosures from current investments without that
+split. Record all partnership partners, capital/profit shares, company capital,
+firm totals, reporting dates/basis and adjustments; treat LLPs separately.
+Persist in existing note stores using reserved year/TB/consolidated keys. Enforce
+main-process permissions, ledger/subclass membership, comparative client/year,
+numeric validity and lock/final status, and block generic-save namespace bypass.
+Share disclosure tables and reconciliation warnings across Notes, financial PDF
+and Excel. Round-trip investments, partners and custom categories through Fill
+Details workbooks with validated saves and explicit partial-import failure notices.
+Preserve authoritative note totals; do not remeasure or double-deduct diminution.
+
+T-026 ? missing-ALIE diagnostics with provisional liability rolled back
+Inspect source rows including absent mapping records; show bold red top/end BS/PL
+warnings with counts, gross debit/credit/net rupees and visible correction lists.
+Carry diagnostics through Annexures and normal/columnar PDF/Excel; allow generation
+with explicit failure/incompleteness warnings. Ignore nil amounts by relevant period
+and exclude Stock Entry PY disclosure inputs by provenance, retaining genuine stock
+ledger checks and stock math. Restrict branch export queries to selected TB IDs.
+Retain the owner's FINAL rollback: no provisional ALIE MISSING liability section,
+no diagnostic changes to totals and no balancing plug. Unresolved amounts remain
+excluded until classified, with a clear incomplete/unbalanced statement warning.
+Replace prior screenshot-derived test figures with invented synthetic fixtures.
+
+T-027 ? dated faces, Notes and Annexures
+Use shared actual reporting/comparative dates: BS As at and PL For the year ended.
+Support FY shorthand, explicit/custom dates, selected comparative dates and leap-day
+fallback; retain generic columns when dates are unavailable. Extend headings to
+underlying notes, ledger annexures and applicable investment/ageing/cash-bank/
+reconciliation/ratio tables on screen and normal PDF/Excel. Repeat per-note Excel
+headers without breaking formula columns or note links. Preserve movement labels,
+ledger/narrative text and stable import keys. Wrap long headings using FSG-only CSS;
+retain branch-name axes for branch-wise columnar exports.
+
+T-028 ? remove Cloudtail MCA publishing
+Remove the Cloudtail banner/button/status, manual publishing/history state,
+automatic final-export publication, renderer APIs and backend handlers/policies.
+Delete the retired snapshot handler/serializer and obsolete serializer assertions.
+Preserve historical fs_snapshots storage; retain finalisation, signing and exports.
+
+Documentation and regression coverage
+Update feature/status/task/handoff, FSG module/data model/field catalogue, open gaps
+and generated inventory; add T023-T026 contracts and a complete RSF review record.
+Extend synthetic integration and desktop tests for upgrades/recovery, classifications,
+three constitutions, investment validation/isolation/locks, stock/ALIE diagnostics,
+actual PDF, reopened Excel, date layouts, Cloudtail absence and restart persistence.
+
+Validation (13 November 2026)
+- npm.cmd run test:fsg: 210/210 passed.
+- npm.cmd run test:fsg-ui: 81/81 passed, including production build.
+- Exact workbook ZIP/row comparison: original rows preserved; five additions only.
+- App typecheck: 76 existing diagnostics; HEAD-vs-working TS comparison adds none.
+- npm.cmd run docs:inventory and docs:check; git diff --check: passed.
+- Existing PDF-font, bundle/mixed-import and materiality-log warnings remain.
+
+Known limits retained explicitly
+Known-ALIE unmapped/conflict/discrepancy status exclusion remains T-026 work.
+GAP-18 non-corporate profit transfer without a classified capital target remains.
+No universal BS-balancing claim, professional approval, owner UAT, live Tally,
+real-client migration, packaged installer or release acceptance is implied.
+Older tracked TB/database/env artifacts predate this change and require privacy
+disposition before any push; no client upload/database/export is added here.
+
+Owner explicitly authorised this commit after reviewing the existing typecheck debt.
+Continue on RSF after committing; this commit does not authorise a push/release.

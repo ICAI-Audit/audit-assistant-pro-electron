@@ -34,6 +34,8 @@ import Feedback from "./pages/Feedback";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminSettings from "./pages/AdminSettings";
 import AuditTools from "./pages/AuditTools";
+import CaatTools from "./pages/CaatTools";
+import PermanentFile from "./pages/PermanentFile";
 import AuditReport from "./pages/AuditReport";
 import TaxAudit from "./pages/TaxAudit";
 import ComplianceApplicability from "./pages/ComplianceApplicability";
@@ -89,6 +91,16 @@ const App = () => (
                 />
 
                 {/* Protected routes that require engagement selection */}
+                <Route
+                  path="/permanent-file"
+                  element={
+                    <ProtectedEngagementRoute>
+                      <MainLayout>
+                        <PermanentFile />
+                      </MainLayout>
+                    </ProtectedEngagementRoute>
+                  }
+                />
                 <Route
                   path="/"
                   element={
@@ -258,6 +270,16 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/caat-tools"
+                  element={
+                    <ProtectedEngagementRoute>
+                      <MainLayout fullBleed>
+                        <CaatTools />
+                      </MainLayout>
+                    </ProtectedEngagementRoute>
+                  }
+                />
+                <Route
                   path="/tax-audit"
                   element={
                     <ProtectedEngagementRoute>
@@ -293,16 +315,6 @@ const App = () => (
                     <ProtectedRoute>
                       <MainLayout>
                         <Settings />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/feedback"
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <Feedback />
                       </MainLayout>
                     </ProtectedRoute>
                   }
@@ -376,7 +388,6 @@ const App = () => (
 );
 
 export default App;
-
 
 
 

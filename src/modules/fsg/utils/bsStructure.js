@@ -418,13 +418,13 @@ export function computeCompanyBSLayout(data) {
         prevTotal: matchedPrevTotal + (hasUncat ? uncat.prevTotal : 0),
         optional: !!grp.optional,
       }
-    }).filter(g => !g.optional || !(isZero(g.total) && isZero(g.prevTotal)))   // R7: optional groups print only with a figure
+    }).filter(g => !g.optional || !(isZero(g.total) && isZero(g.prevTotal)))
     const uncatTopRaw = uncatByGroup === elUncatByGroup ? elUncatTop : aUncatTop
     const hasUncatTop = !(isZero(uncatTopRaw.total) && isZero(uncatTopRaw.prevTotal))
     return {
       groups,
       uncatTop: hasUncatTop ? {
-        label: uncatByGroup === elUncatByGroup ? 'Uncategorised Liabilities' : 'Uncategorised Assets',
+        label: uncatByGroup === elUncatByGroup ? 'Uncategorised Equity and Liabilities' : 'Uncategorised Assets',
         noteNum: uncatTopRaw.lines[0]?.noteNum || null,
         total: uncatTopRaw.total, prevTotal: uncatTopRaw.prevTotal,
       } : null,

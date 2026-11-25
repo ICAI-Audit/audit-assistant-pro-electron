@@ -21,6 +21,7 @@ import {
   type EngagementLetterTemplatePayload,
 } from '@/services/engagementLetterTemplatePayload';
 import type { EngagementLetterMasterData } from '@/types/engagementLetter';
+import { formatGstinInput } from '@/lib/gstinValidation';
 
 interface LettersPageProps {
   engagementId: string;
@@ -189,7 +190,7 @@ export function LettersPage({ engagementId }: LettersPageProps) {
     setEntityType(d.entityType || 'Company');
     setRegistrationNumber(d.registrationNumber || '');
     setPanNumber(d.panNumber || '');
-    setGstinNumber(d.gstinNumber || '');
+    setGstinNumber(formatGstinInput(d.gstinNumber || ''));
     setAddress(d.address || '');
     setEmail(d.email || '');
     setPhone(d.phone || '');
@@ -672,7 +673,7 @@ export function LettersPage({ engagementId }: LettersPageProps) {
                   <Label>GSTIN</Label>
                   <Input
                     value={gstinNumber}
-                    onChange={(e) => setGstinNumber(e.target.value)}
+                    onChange={(e) => setGstinNumber(formatGstinInput(e.target.value))}
                     placeholder="e.g., 27AABCT1234H1Z0"
                   />
                 </div>

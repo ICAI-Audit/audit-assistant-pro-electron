@@ -1,4 +1,4 @@
-> Historical beta scope. Current code includes draft Form 3CD Word, Excel, PDF and HTML exports. Read [current feature status](project/FEATURE_REGISTER.md) and [validation limits](project/CURRENT_STATUS.md) before applying the older exclusions below. Professional review and portal acceptance remain separate.
+> Historical beta scope. Current code includes draft Form 3CD Word, Excel, PDF and HTML exports. Read [current feature status](project/FEATURE_REGISTER.md) and [validation limits](project/CURRENT_STATUS.md) before applying the older exclusions below. Professional review and portal acceptance remain separate. Since then several clauses are prefilled from the client master, and draft Forms 3CA and 3CB exist. The checks below are those of June 2026 and are not current verification. The current record is [module M-14](project/modules/M-14.md) and the [feature register](project/FEATURE_REGISTER.md).
 
 # Tax Audit Beta Pilot Checklist
 

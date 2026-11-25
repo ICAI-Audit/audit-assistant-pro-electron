@@ -5,7 +5,8 @@ import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
 import { buildCashFlow } from '../../utils/cashFlow'
 import * as XLSX from 'xlsx-js-style'
-import { buildCfsWorkbook, parseCfsSheet, applyCfsUpload } from './cfsWorkbook'
+import { buildCfsWorkbook, parseCfsSheet, applyCfsUpload, cfsExcelSpec } from './cfsWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
 
 // Cash Flow Statement as per AS 3 (indirect method). The Current Year column is drawn from the Balance Sheet and
@@ -105,7 +106,8 @@ export default function CFS({ entity, activeTB, prevTB, activeRsId, onPrevTBChan
   const flash = (msg) => { setStatus(msg); setTimeout(() => setStatus(''), 7000) }
   const downloadExcel = async () => {
     if (!cf) return
-    const buf = XLSX.write(buildCfsWorkbook(cf.rows, { cc: cf.cc }), { type: 'buffer', bookType: 'xlsx' })
+    // T-047: finished in the VERA style (How to Fill sheet, blue header, yellow input cells) — utils/veraExcel.js.
+    const buf = await finishWorkbook(buildCfsWorkbook(cf.rows, { cc: cf.cc }), cfsExcelSpec('filled', cf.rows, { cc: cf.cc }))
     const eName = (entity?.name || 'FS').replace(/[^A-Za-z0-9]+/g, '_')
     const result = await fsgApi?.saveFileDialog({ defaultPath: `${eName}_CFS_Filled.xlsx`, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }] })
     if (result?.filePath && buf) { await fsgApi?.writeFile(result.filePath, Array.from(new Uint8Array(buf))); flash(`Saved: ${result.filePath}`) }
@@ -141,25 +143,30 @@ export default function CFS({ entity, activeTB, prevTB, activeRsId, onPrevTBChan
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center gap-4 px-5 py-2 border-b border-blue-100 bg-gray-50 shrink-0">
-        <span className="text-xs text-gray-500 font-medium">Cash Flow Statement (AS 3 - indirect method)</span>
+      {/* T-054: one-line toolbar, same layout as the Balance Sheet and Profit & Loss (T-060: no repeated title). */}
+      <div className="fsg-stmt-toolbar px-5 py-1.5 border-b border-blue-100 bg-gray-50 shrink-0">
         <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer" title="Print the Cash Flow Statement after the Profit & Loss in the PDF and add it to the Excel">
           <input type="checkbox" checked={!!saved.include} onChange={e => persist({ ...saved, include: e.target.checked })} />
           Include in PDF / Excel
         </label>
-        <button onClick={() => { setAlsoRows(false); setAskRecompute(v => !v) }} disabled={!cf || (!overrideCount && !customCount && !hiddenCount)} className="text-xs border border-gray-300 rounded px-2 py-1 hover:bg-white disabled:opacity-40" title="Discard the Current Year figures you typed over and draw them again from the Balance Sheet and Profit & Loss">↺ Recompute</button>
-        <button onClick={downloadExcel} disabled={!cf} className="text-xs border border-gray-300 rounded px-2 py-1 hover:bg-white disabled:opacity-40" title="Download the statement as Excel (the same CFS sheet as the Notes tab's Filled Template), fill it in and upload it again">⬇ Filled Excel</button>
-        <button onClick={uploadExcel} disabled={!cf || !periodId} className="text-xs border border-gray-300 rounded px-2 py-1 hover:bg-white disabled:opacity-40" title="Upload a filled CFS sheet: Current Year overwrites, Previous Year figures and added rows are saved">⬆ Upload Excel</button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => { setAlsoRows(false); setAskRecompute(v => !v) }} disabled={!cf || (!overrideCount && !customCount && !hiddenCount)} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40" title="Discard the Current Year figures you typed over and draw them again from the Balance Sheet and Profit & Loss">↺ Recompute</button>
+          <button onClick={downloadExcel} disabled={!cf} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40" title="Download the statement as Excel (the same CFS sheet as the Notes tab's Filled Template), fill it in and upload it again">⬇ Filled Excel</button>
+          <button onClick={uploadExcel} disabled={!cf || !periodId} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40" title="Upload a filled CFS sheet: Current Year overwrites, Previous Year figures and added rows are saved">⬆ Upload Excel</button>
+        </div>
         {status && <span className="text-xs text-green-700">{status}</span>}
         <div className="ml-auto flex items-center gap-2">
-          <PYModeSelect activeTB={activeTB} onChanged={refresh} />
-          <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
-            onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
-            disabled={(isBranchEntity && !!prevTB?.id) || pyOff}
-            disabledTitle="Previous Year balances for the Balance Sheet movements" />
-          <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-            disabled={(isBranchEntity && manualPyOn) || pyOff}
-            disabledTitle="Previous Year figures are switched off for this Financial Year." />
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Previous Year</span>
+            <PYModeSelect activeTB={activeTB} onChanged={refresh} label="" />
+            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange} label="TB:"
+              disabled={(isBranchEntity && manualPyOn) || pyOff}
+              disabledTitle="Previous Year figures are switched off for this Financial Year." />
+            <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
+              onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
+              disabled={(isBranchEntity && !!prevTB?.id) || pyOff}
+              disabledTitle="Previous Year balances for the Balance Sheet movements" />
+          </div>
         </div>
       </div>
 

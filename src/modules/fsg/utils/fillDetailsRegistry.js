@@ -9,9 +9,11 @@
 // This is the "dynamically change the template as Fill Details forms are
 // added" mechanism.
 
-import { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from '../components/Notes/TradePayablesDisclosureForm'
-import { TR_AGEING_ROWS, TR_AGEING_BUCKETS } from '../components/Notes/TradeReceivablesAgingForm'
+import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../components/Notes/TradePayablesDisclosureForm'
+import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trPeriodView } from '../components/Notes/TradeReceivablesAgingForm'
 import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolve } from './tradeReceivablesNonCorp'
+import { INVESTMENT_REGISTRY } from './investmentWorkbook'
+import { DIRECTOR_LOANS_ROWS, directorLoansResolve, hasDirectorLoans } from './directorLoans'
 
 const num = (v) => parseFloat(v) || 0
 // An entry's match(title, constitution) may also depend on the Auditee's constitution
@@ -41,6 +43,7 @@ function excelSerialToISODate(v) {
 }
 
 export const FILL_DETAILS_REGISTRY = [
+  ...INVESTMENT_REGISTRY,
   // "Cost of Materials Consumed" and "Changes in Inventories" are
   // deliberately NOT here — they're auto-computed from the Stock tab's
   // category entries (see utils/inventorySplit.js), not independently
@@ -241,15 +244,24 @@ export const FILL_DETAILS_REGISTRY = [
       const inputRows = TR_AGEING_ROWS.filter(r => !r.computed)
       const rows = []
       for (const period of ['cy', 'py']) {
+        // T-069: blocked cells empty; older Unbilled Dues figures shown under Unbilled.
+        const pd = trPeriodView(details?.[period] || {})
         for (const r of inputRows) {
-          rows.push([period.toUpperCase(), r.label, ...TR_AGEING_BUCKETS.map(b => num(details?.[period]?.[r.key]?.[b.key]) || '')])
+          rows.push([period.toUpperCase(), r.label, ...TR_AGEING_BUCKETS.map(b => num(pd?.[r.key]?.[b.key]) || '')])
         }
       }
-      rows.push(['', 'Include in Output (Yes/No)', yn(details?.includeInOutput), '', '', '', ''])
+      rows.push(['', 'Include in Output (Yes/No)', yn(details?.includeInOutput), ...TR_AGEING_BUCKETS.slice(1).map(() => '')])
       return rows
     },
-    fromRows(rows) {
+    fromRows(rows, header = []) {
       const inputRows = TR_AGEING_ROWS.filter(r => !r.computed)
+      // Columns found by their heading, so a sheet downloaded before T-069 (the five
+      // periods only, no Unbilled / Not Due) still reads into the right columns.
+      const hdr = (header || []).map(h => String(h ?? '').trim().toLowerCase())
+      const colOf = new Map(TR_AGEING_BUCKETS.map((b, i) => {
+        const at = hdr.indexOf(b.label.toLowerCase())
+        return [b.key, at >= 2 ? at : (hdr.length ? -1 : 2 + i)]
+      }))
       const labelToKey = new Map(inputRows.map(r => [r.label.trim().toLowerCase(), r.key]))
       const out = { cy: {}, py: {}, includeInOutput: false }
       for (const r of rows) {
@@ -258,8 +270,10 @@ export const FILL_DETAILS_REGISTRY = [
         if (label === 'include in output (yes/no)') { out.includeInOutput = isYes(r[2]); continue }
         const key = labelToKey.get(label)
         if (!key || (period !== 'cy' && period !== 'py')) continue
-        out[period][key] = Object.fromEntries(TR_AGEING_BUCKETS.map((b, i) => [b.key, num(r[2 + i])]))
+        out[period][key] = Object.fromEntries(TR_AGEING_BUCKETS.map(b => [b.key, colOf.get(b.key) >= 0 ? num(r[colOf.get(b.key)]) : 0]))
       }
+      out.cy = trPeriodView(out.cy)
+      out.py = trPeriodView(out.py)
       return out
     },
   },
@@ -307,6 +321,34 @@ export const FILL_DETAILS_REGISTRY = [
     },
   },
 
+  // ── T-086 Long-term / Short-term loans and advances (Company): due from directors, officers, firms and
+  // private companies. One sheet per note (the sheet name carries Long / Short), rows matched back by label.
+  ...['Long', 'Short'].map(lt => ({
+    key: `director-loans-${lt.toLowerCase()}`,
+    match: (t, c) => hasDirectorLoans(c, t) && String(t).trim().toLowerCase().startsWith(lt.toLowerCase()),
+    sheetName: `${lt}-term Loans Directors`,
+    headerRow: ['Particulars', 'Current Year', 'Previous Year'],
+    toRows(details) {
+      const v = details?.directorLoans ? directorLoansResolve(details.directorLoans) : null
+      return DIRECTOR_LOANS_ROWS.map(r => [r.label, v ? (v.cy[r.key] || '') : '', v ? (v.py[r.key] || '') : ''])
+    },
+    fromRows(rows) {
+      const byLabel = new Map(DIRECTOR_LOANS_ROWS.map(r => [r.label.trim().toLowerCase(), r.key]))
+      const out = { cy: {}, py: {} }
+      let any = false
+      for (const r of rows) {
+        const key = byLabel.get((r[0] || '').toString().trim().toLowerCase())
+        if (!key) continue
+        out.cy[key] = num((r[1] ?? '').toString().replace(/,/g, ''))
+        out.py[key] = num((r[2] ?? '').toString().replace(/,/g, ''))
+        any = true
+      }
+      if (!any) return {}
+      const v = directorLoansResolve(out)
+      return { directorLoans: { cy: v.cy, py: v.py } }
+    },
+  })),
+
   // ── Trade Payables — Ageing Schedule + MSME Disclosure combined ─────────
   // Mirrors the live form's combined { ageing, msme } shape (both saved via
   // dedicated IPC there, but both persist to the same note_details row, so
@@ -321,8 +363,10 @@ export const FILL_DETAILS_REGISTRY = [
       const msme = details?.msme || {}
       const rows = []
       for (const period of ['cy', 'py']) {
+        // T-063: blocked cells empty, Total Due / Total worked out (read back as such, never typed).
+        const pd = tpPeriodView(ag?.[period] || {})
         for (const r of TP_AGEING_ROWS) {
-          rows.push(['AGEING', period.toUpperCase(), r.label, ...TP_AGEING_BUCKETS.map(b => num(ag?.[period]?.[r.key]?.[b.key]) || '')])
+          rows.push(['AGEING', period.toUpperCase(), r.label, ...TP_AGEING_BUCKETS.map(b => num(pd?.[r.key]?.[b.key]) || '')])
         }
       }
       rows.push(['RECON', 'CY', 'MSME (as per TB)', num(ag?.tbCY?.msme) || ''])
@@ -340,8 +384,15 @@ export const FILL_DETAILS_REGISTRY = [
       rows.push(['FLAGS', '', 'Include MSME in Output (Yes/No)', yn(msme?.includeInOutput)])
       return rows
     },
-    fromRows(rows) {
+    fromRows(rows, header = []) {
       const labelToKey = new Map(TP_AGEING_ROWS.map(r => [r.label.trim().toLowerCase(), r.key]))
+      // Columns found by their heading, so a sheet downloaded before T-063 (the four
+      // periods only, no Unbilled / Not Due) still reads into the right columns.
+      const hdr = (header || []).map(h => String(h ?? '').trim().toLowerCase())
+      const colOf = new Map(TP_AGEING_BUCKETS.map((b, i) => {
+        const at = hdr.indexOf(b.label.toLowerCase())
+        return [b.key, at >= 3 ? at : (hdr.length ? -1 : 3 + i)]
+      }))
       const ageing = { cy: {}, py: {}, tbCY: { msme: '', others: '' }, tbPY: { msme: '', others: '' }, includeInOutput: false }
       const msme = { cy: { a: { principal: '', interest: '' }, b: '', c: '', d: '', e: '' },
                      py: { a: { principal: '', interest: '' }, b: '', c: '', d: '', e: '' },
@@ -354,7 +405,7 @@ export const FILL_DETAILS_REGISTRY = [
         if (section === 'AGEING') {
           const key = labelToKey.get(labelLower)
           if (!key || (period !== 'cy' && period !== 'py')) continue
-          ageing[period][key] = Object.fromEntries(TP_AGEING_BUCKETS.map((b, i) => [b.key, num(r[3 + i])]))
+          ageing[period][key] = Object.fromEntries(TP_AGEING_BUCKETS.map(b => [b.key, colOf.get(b.key) >= 0 ? num(r[colOf.get(b.key)]) : 0]))
         } else if (section === 'RECON') {
           if (period !== 'cy' && period !== 'py') continue
           const target = period === 'cy' ? ageing.tbCY : ageing.tbPY
@@ -371,6 +422,8 @@ export const FILL_DETAILS_REGISTRY = [
           else if (labelLower.startsWith('include msme')) msme.includeInOutput = isYes(r[3])
         }
       }
+      ageing.cy = tpPeriodView(ageing.cy)
+      ageing.py = tpPeriodView(ageing.py)
       return { ageing, msme }
     },
   },

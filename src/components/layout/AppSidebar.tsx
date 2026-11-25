@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Wrench,
+  ScanSearch,
   Briefcase,
   Shield,
   FileText,
@@ -39,6 +40,7 @@ type SidebarItem = {
 const navItems: SidebarItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Assignments', href: '/engagements', icon: Briefcase },
+  { name: 'Permanent File', href: '/permanent-file', icon: Building2, requiresEngagement: true },
   { name: 'Appointment & Engagement', href: '/appointment', icon: FileSignature, requiresEngagement: true },
   { name: 'Compliance Applicability', href: '/compliance-applicability', icon: Shield },
   {
@@ -54,6 +56,7 @@ const navItems: SidebarItem[] = [
   { name: 'Review Notes', href: '/review-notes', icon: MessageSquare, requiresEngagement: true },
   { name: 'Evidence Vault', href: '/evidence', icon: FileCheck, requiresEngagement: true },
   { name: 'VERA Tools', href: '/audit-tools', icon: Wrench, requiresEngagement: true },
+  { name: 'CAAT Tools', href: '/caat-tools', icon: ScanSearch, requiresEngagement: true },
   { name: 'Feedback', href: '/feedback', icon: MessageSquare, requiresEngagement: true },
 ];
 

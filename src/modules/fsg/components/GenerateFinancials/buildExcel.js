@@ -1,9 +1,10 @@
+import { statementDates, statementColumnLabels, noteColumnLabels, datedPeriodLabel } from '../../utils/statementDates'
 import { auditorForDenomination } from '../../utils/signingRules'
 import * as XLSX from 'xlsx-js-style'  // fork of xlsx that preserves cell styles
 import { netCreditPurchasesWorking } from '../../utils/ratios'
 import { DENOMINATIONS, displayAmt, processRows } from '../../hooks/useFinancials'
-import { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from '../Notes/TradePayablesDisclosureForm'
-import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell } from '../Notes/TradeReceivablesAgingForm'
+import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../Notes/TradePayablesDisclosureForm'
+import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell, trPeriodView } from '../Notes/TradeReceivablesAgingForm'
 // Single source of truth for the Schedule III BS layout — shared with the
 // live BS screen so Excel always matches the UI exactly (numbering,
 // zero-value uncategorised suppression, everything).
@@ -11,14 +12,19 @@ import { computeCompanyBSLayout, computeDynamicBSLayout } from '../../utils/bsSt
 // Single source of truth for the Company/LLP PL expense-line bucketing —
 // shared with the live PL screen so Excel always matches the UI exactly.
 import { EXPENSE_LINES, corpFaceTail, TAX_SECTION_RX } from '../../utils/plStructureCorp'
+import { taxLineNote } from '../../utils/deferredTaxNote'
 // Single source of truth for the non-corporate (constitution=1: Individual/
 // Proprietorship/Partnership) PL sequence — shared with the live PL screen
 // and the PDF exporter.
 import { computeNonCorpPLLayout } from '../../utils/plStructureNonCorp'
 import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolve } from '../../utils/tradeReceivablesNonCorp'
-import { getSubnoteGroups, UNCLASSIFIED_LABEL, plNoteLines, subnoteGroupFigures, bsNoteFallbackLines, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
+import { DIRECTOR_LOANS_TITLE, DIRECTOR_LOANS_ROWS, directorLoansResolve, isLoansAdvancesNoteTitle } from '../../utils/directorLoans'
+import { getSubnoteGroups, UNCLASSIFIED_LABEL, plNoteLines, plNoteTotalLabel, subnoteGroupFigures, bsNoteFallbackLines, pyOnlySubnoteLines, annexureDisplayLabels } from '../../utils/annexureGrouping'
 import { signatoryIdText, signedOnBehalfOf } from '../../utils/signatoryFormat'
 import { CASH_BANK_ITEMS } from '../Notes/CashBankDetailsForm'
+import { investmentKind, investmentTables } from '../../utils/investments'
+import { pushMissingAlieRows, styleMissingAlieRows, appendMissingAlieSheet } from '../../utils/missingAlieExport'
+import { buildMissingAlieReport } from '../../utils/missingAlie'
 import { printedDisclosures, disclosureParagraphs } from '../../utils/shareCapitalDisclosures'
 import { scaleRatioAmounts } from '../../utils/ratioTable'
 import { buildCashFlow } from '../../utils/cashFlow'
@@ -546,9 +552,8 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   const scale = scaleFn(denomination)
   const numFmt = numFormatString(denomination)
   const d = DENOMINATIONS[denomination] || DENOMINATIONS['as_is']
-  const cyDate = yearEnd(activeTB?.period || '')
-  const cyLabel = cyDate || 'Current Year'
-  const pyLabel = (prevTB?.period ? yearEnd(prevTB.period) : yearBefore(cyDate)) || 'Previous Year'
+  const cyDate = statementDates(activeTB).cy
+  const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB, 'bs')
   const rows = []
   const noteLinks = []
   const formulaCells = []        // { rowIdx, noteNum } — patch with Notes formula after aoa_to_sheet
@@ -557,6 +562,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   const grandTotalRows = []      // TOTAL EQUITY AND LIABILITIES / TOTAL ASSETS
 
   const titleRows = pushTitleRows(rows, entity, `Balance Sheet as at ${cyDate}`, d.unit)
+  const alieWarningRows = pushMissingAlieRows(rows, data.missingAlie)
   rows.push([])
   const headerRow = rows.length
   rows.push(['Particulars', 'Note No.', cyLabel, pyLabel])
@@ -610,7 +616,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
     elLastLineRow = rows.length - 1
     grandTotalRows.push(rows.length)
     elTotalRow = rows.length
-    rows.push(['TOTAL EQUITY AND LIABILITIES', '', scale(totalEL), scale(prevEL)])
+    rows.push(['TOTAL', '', scale(totalEL), scale(prevEL)])   // T-056: Schedule III caption
     rows.push([])
     rows.push([])
 
@@ -636,7 +642,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
     asLastLineRow = rows.length - 1
     grandTotalRows.push(rows.length)
     asTotalRow = rows.length
-    rows.push(['TOTAL ASSETS', '', scale(totalAsset), scale(prevAsset)])
+    rows.push(['TOTAL', '', scale(totalAsset), scale(prevAsset)])
   } else {
     // ── Non-corporate: dynamic sections, zero-value uncategorised suppressed
     // (computeDynamicBSLayout mirrors DynamicBS in the live BS screen).
@@ -658,7 +664,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
     elLastLineRow = rows.length - 1
     grandTotalRows.push(rows.length)
     elTotalRow = rows.length
-    rows.push(['TOTAL EQUITY AND LIABILITIES', '', scale(totalEL), scale(prevEL)])
+    rows.push(['TOTAL', '', scale(totalEL), scale(prevEL)])   // T-056: Schedule III caption
     rows.push([])
     rows.push([])
 
@@ -676,9 +682,10 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
     asLastLineRow = rows.length - 1
     grandTotalRows.push(rows.length)
     asTotalRow = rows.length
-    rows.push(['TOTAL ASSETS', '', scale(totalAsset), scale(prevAsset)])
+    rows.push(['TOTAL', '', scale(totalAsset), scale(prevAsset)])
   }
 
+  pushMissingAlieRows(rows, data.missingAlie, alieWarningRows)
   addSignatureBlock(rows, rows, entity, auditor, signatories, signPlace, signDate)
 
   const ws = XLSX.utils.aoa_to_sheet(rows)
@@ -693,6 +700,9 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   }
   // Entity name / constitution / statement title / unit — merged + centered
   styleTitleRows(ws, titleRows, 4)
+  styleMissingAlieRows(ws, alieWarningRows)
+  ws['!rows'] = ws['!rows'] || []
+  ws['!rows'][headerRow] = { ...(ws['!rows'][headerRow] || {}), hpt: 36 }
   // Column header — "Note No." centered, amounts right-aligned
   for (let c = 0; c <= 3; c++) {
     setCellStyle(ws, ensureCell(ws, c, headerRow), {
@@ -702,7 +712,7 @@ function buildBSSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
         top: { style: 'thin', color: { rgb: '000000' } },
         bottom: { style: 'thin', color: { rgb: '000000' } },
       },
-      alignment: { vertical: 'center', horizontal: c === 1 ? 'center' : (c >= 2 ? 'right' : 'left') },
+      alignment: { vertical: 'center', horizontal: c === 1 ? 'center' : (c >= 2 ? 'right' : 'left'), wrapText: c >= 2 },
     })
   }
   // Note No. data column — centered for every line item
@@ -766,9 +776,8 @@ function buildNonCorpPLSheet(entity, activeTB, prevTB, data, { denomination, aud
   const scale = scaleFn(denomination)
   const numFmt = numFormatString(denomination)
   const d = DENOMINATIONS[denomination] || DENOMINATIONS['as_is']
-  const cyDate = yearEnd(activeTB?.period || '')
-  const cyLabel = cyDate || 'Current Year'
-  const pyLabel = (prevTB?.period ? yearEnd(prevTB.period) : yearBefore(cyDate)) || 'Previous Year'
+  const cyDate = statementDates(activeTB).cy
+  const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB, 'pl')
   const title = 'Profit and Loss Account'
   const rows = []
   const noteLinks = []
@@ -777,7 +786,8 @@ function buildNonCorpPLSheet(entity, activeTB, prevTB, data, { denomination, aud
   const subtotalRows = []
   const netProfitRow = { row: -1 }
 
-  const titleRows = pushTitleRows(rows, entity, `${title} for year ended ${cyDate}`, d.unit)
+  const titleRows = pushTitleRows(rows, entity, `${title} for the year ended ${cyDate}`, d.unit)
+  const alieWarningRows = pushMissingAlieRows(rows, data.missingAlie)
   rows.push([])
   const headerRow = rows.length
   rows.push(['Particulars', 'Note No.', cyLabel, pyLabel])
@@ -802,7 +812,7 @@ function buildNonCorpPLSheet(entity, activeTB, prevTB, data, { denomination, aud
         break
       case 'sub': {
         rows.push([`   (${item.alpha}) ${item.label}`, item.noteNum || '', scale(item.cy), scale(item.py)])
-        if (item.noteNum) { noteLinks.push({ row: rowIdx, col: 1, noteNum: item.noteNum }); formulaCells.push({ rowIdx, noteNum: item.noteNum }) }
+        if (item.noteNum) { noteLinks.push({ row: rowIdx, col: 1, noteNum: item.noteNum }); if (!item.noteRef) formulaCells.push({ rowIdx, noteNum: item.noteNum }) }
         break
       }
       case 'subtotal':
@@ -827,6 +837,7 @@ function buildNonCorpPLSheet(entity, activeTB, prevTB, data, { denomination, aud
   }
   const lastRow = rows.length - 1
 
+  pushMissingAlieRows(rows, data.missingAlie, alieWarningRows)
   addSignatureBlock(rows, rows, entity, auditor, signatories, signPlace, signDate)
 
   const ws = XLSX.utils.aoa_to_sheet(rows)
@@ -839,11 +850,14 @@ function buildNonCorpPLSheet(entity, activeTB, prevTB, data, { denomination, aud
     if (addr.match(/^[CD]\d+$/) && typeof cell.v === 'number') cell.z = numFmt
   }
   styleTitleRows(ws, titleRows, 4)
+  styleMissingAlieRows(ws, alieWarningRows)
+  ws['!rows'] = ws['!rows'] || []
+  ws['!rows'][headerRow] = { ...(ws['!rows'][headerRow] || {}), hpt: 36 }
   for (let c = 0; c <= 3; c++) {
     setCellStyle(ws, ensureCell(ws, c, headerRow), {
       font: { bold: true, sz: 11 }, fill: FILL_HDR,
       border: { top: { style: 'thin', color: { rgb: '000000' } }, bottom: { style: 'thin', color: { rgb: '000000' } } },
-      alignment: { vertical: 'center', horizontal: c === 1 ? 'center' : (c >= 2 ? 'right' : 'left') },
+      alignment: { vertical: 'center', horizontal: c === 1 ? 'center' : (c >= 2 ? 'right' : 'left'), wrapText: c >= 2 },
     })
   }
   centerColumn(ws, 1, headerRow + 1, lastRow)
@@ -894,9 +908,8 @@ function buildPLSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   const scale = scaleFn(denomination)
   const numFmt = numFormatString(denomination)
   const d = DENOMINATIONS[denomination] || DENOMINATIONS['as_is']
-  const cyDate = yearEnd(activeTB?.period || '')
-  const cyLabel = cyDate || 'Current Year'
-  const pyLabel = (prevTB?.period ? yearEnd(prevTB.period) : yearBefore(cyDate)) || 'Previous Year'
+  const cyDate = statementDates(activeTB).cy
+  const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB, 'pl')
   const title = constitution === 1 ? 'Profit and Loss Account' : 'Statement of Profit and Loss'
   const rows = []
   const noteLinks = []
@@ -907,7 +920,8 @@ function buildPLSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   const epsRedCells = []   // {r, c} — a Basic/Diluted EPS cell with no override and missing Share Capital shares
   const epsWarnRows = []   // row index of the "Fill in Share Capital" caution line, if shown
 
-  const titleRows = pushTitleRows(rows, entity, `${title} for year ended ${cyDate}`, d.unit)
+  const titleRows = pushTitleRows(rows, entity, `${title} for the year ended ${cyDate}`, d.unit)
+  const alieWarningRows = pushMissingAlieRows(rows, data.missingAlie)
   rows.push([])
   const headerRow = rows.length
   rows.push(['Particulars', 'Note No.', cyLabel, pyLabel])
@@ -1080,9 +1094,11 @@ function buildPLSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   if (taxSecs.length > 0) {
     taxSecs.forEach(sec => sec.lines.forEach(line => {
       rowIdx = rows.length
-      rows.push([`   ${line.level2 || sec.level1}`, line.noteNum || sec.noteNum || '', scale(line.total), scale(line.prevTotal)])
-      const nn = line.noteNum || sec.noteNum
-      if (nn) { noteLinks.push({ row: rowIdx, col: 1, noteNum: nn }); formulaCells.push({ rowIdx, noteNum: nn }) }
+      // The Deferred tax line points to the Balance Sheet's Deferred tax note (a link only: its amount is the charge of
+      // the year, not that note's balance, so no formula to the note) - utils/deferredTaxNote.js.
+      const { num: nn, ref } = taxLineNote(line, sec, data.notes)
+      rows.push([`   ${line.level2 || sec.level1}`, nn || '', scale(line.total), scale(line.prevTotal)])
+      if (nn) { noteLinks.push({ row: rowIdx, col: 1, noteNum: nn }); if (!ref) formulaCells.push({ rowIdx, noteNum: nn }) }
     }))
   } else {
     rows.push([`   (1) Current tax`, '', scale(0), scale(0)])
@@ -1154,6 +1170,7 @@ function buildPLSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   }
   pos.epsEnd = rows.length - 1
 
+  pushMissingAlieRows(rows, data.missingAlie, alieWarningRows)
   addSignatureBlock(rows, rows, entity, auditor, signatories, signPlace, signDate)
 
   const ws = XLSX.utils.aoa_to_sheet(rows)
@@ -1168,12 +1185,15 @@ function buildPLSheet(entity, activeTB, prevTB, data, { denomination, auditor, s
   }
   // Titles
   styleTitleRows(ws, titleRows, 4)
+  styleMissingAlieRows(ws, alieWarningRows)
+  ws['!rows'] = ws['!rows'] || []
+  ws['!rows'][headerRow] = { ...(ws['!rows'][headerRow] || {}), hpt: 36 }
   // Column header
   for (let c = 0; c <= 3; c++) {
     setCellStyle(ws, ensureCell(ws, c, headerRow), {
       font: { bold: true, sz: 11 }, fill: FILL_HDR,
       border: { top: { style: 'thin', color: { rgb: '000000' } }, bottom: { style: 'thin', color: { rgb: '000000' } } },
-      alignment: { vertical: 'center', horizontal: c === 1 ? 'center' : (c >= 2 ? 'right' : 'left') },
+      alignment: { vertical: 'center', horizontal: c === 1 ? 'center' : (c >= 2 ? 'right' : 'left'), wrapText: c >= 2 },
     })
   }
   centerColumn(ws, 1, headerRow + 1, pos.epsEnd)
@@ -1685,6 +1705,20 @@ function buildNoteDetailRows(noteTitle, details, noteNum, scale, cyTotal, period
   // until edited in Fill Details — see utils/tradeReceivablesNonCorp.js. Laid
   // out stacked (ageing heading, then its three categories) so the Amount
   // column lines up with the note's own Current Year column.
+  // T-086 Company: loans and advances due from directors, officers and entities in which directors are interested,
+  // beneath Long-term / Short-term loans and advances, in the note's own CY / PY columns (nil shows as "-").
+  if (isCompany && isLoansAdvancesNoteTitle(noteTitle)) {
+    const v = directorLoansResolve(details?.directorLoans)
+    rows.push([])
+    colHdrs.push(rows.length)
+    rows.push([DIRECTOR_LOANS_TITLE, '', 'Current Year', 'Previous Year'])
+    for (const r of DIRECTOR_LOANS_ROWS) rows.push([`   ${r.label}`, '', scale(v.cy[r.key]), scale(v.py[r.key])])
+    totals.push(rows.length)
+    rows.push(['Total', '', scale(v.totals.cy), scale(v.totals.py)])
+    rows.push([])
+    return { rows, sectionHdrs, colHdrs, classHdrs, totals, errorRows, integerCells, centerCells }
+  }
+
   if (t.includes('trade receivable') && isNonCorp) {
     const { values, total } = ncAgeingResolve(details?.ncAgeing, cyTotal)
     rows.push([])
@@ -1718,8 +1752,10 @@ function buildNoteDetailRows(noteTitle, details, noteNum, scale, cyTotal, period
       const AG_BUCKETS = isTP ? TP_AGEING_BUCKETS : TR_AGEING_BUCKETS
       const cellVal = (pd, row, bKey) =>
         row.computed ? trComputedCell(pd, row.computed, bKey) : num(pd?.[row.key]?.[bKey])
-      const buildPeriod = (pd, heading) => {
-        if (!pd) return
+      const buildPeriod = (rawPd, heading) => {
+        if (!rawPd) return
+        // T-063 / T-069: blocked cells are nil and Total Due / Total are worked out.
+        const pd = isTP ? tpPeriodView(rawPd) : trPeriodView(rawPd)
         const any = AG_ROWS.some(r => AG_BUCKETS.some(b => Math.abs(cellVal(pd, r, b.key)) > 0.005))
         if (!any && !ag.includeInOutput && !details.includeInOutput) return
         rows.push([])
@@ -1769,6 +1805,7 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
   const rows = []
   const titleLinks = []   // { row, col, noteNum }  — title linked to annexure
   const totalLinks = []   // same — total amount cell linked to annexure
+  const perNoteHeaderRows = []
   const noteTitleRows = [] // for bold styling
   const totalRows = []     // for bold+border styling
   const subtotalRows = []  // L3 rows in BS notes
@@ -1777,14 +1814,14 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
   const lineFormulaPatches = []  // { r, col, formula } — sub-note lines linked to Annexures subtotal cells
   const notesCyTotalMap = new Map()  // noteNum → { cyRow, pyRow } in this Notes sheet
 
-  const cyDate = yearEnd(activeTB?.period || '')
+  const cyDate = statementDates(activeTB).cy
   const titleRows = pushTitleRows(rows, entity, `Notes to Financial Statements for the year ended ${cyDate}`, d.unit)
   rows.push([])
 
   // Single column header for the whole sheet
   const mainHeaderRow = rows.length
   const cyColLabel = cyDate || 'Current Year'
-  const pyColLabel = (prevTB?.period ? yearEnd(prevTB.period) : yearBefore(cyDate)) || 'Previous Year'
+  const pyColLabel = statementDates(activeTB, prevTB).py || 'Previous Year'
   rows.push(['Particulars', '', cyColLabel, pyColLabel])
   rows.push([])
 
@@ -1815,12 +1852,16 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
   const notes = data.activeNotes || Object.values(data.notes)
   const noteBlocks = []  // { start, end, lastCol } — for outline box borders per note
   for (const note of notes) {
+    const labels = noteColumnLabels(activeTB, prevTB, note)
+    const { cy: cyColLabel, py: pyColLabel } = labels
     trimToOneBlankRow(rows)
     const noteTitleRow = rows.length
     noteStartRows.set(note.num, noteTitleRow)
     rows.push([`Note ${note.num}: ${note.displayTitle || note.title}`])
     noteTitleRows.push(noteTitleRow)
     titleLinks.push({ row: noteTitleRow, col: 0, noteNum: note.num })
+    perNoteHeaderRows.push(rows.length)
+    rows.push(['Particulars', '', cyColLabel, pyColLabel])
 
     // For notes with filled form details, skip auto-derived sub-rows (details appear below Total)
     const _noteTitle = (note.title || '').toLowerCase()
@@ -1854,10 +1895,10 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
       // Annexures-linked sub-note (see annexureGrouping.js) and is NOT
       // added to noteLineRows, so the note's own Total doesn't double it.
       let sinceSubtotal = []
-      for (const { line, label } of plNoteLines(note)) {
+      for (const { line, label, display } of plNoteLines(note)) {
         if (/^less:\s*closing/i.test(label)) underlineRows.push(rows.length)
         const lineRow = rows.length
-        rows.push([`  ${label}`, '', scale(line.total), scale(line.prevTotal)])
+        rows.push([`  ${display}`, '', scale(line.total), scale(line.prevTotal)])
         if (line.isSubtotal) {
           if (sinceSubtotal.length > 0) {
             lineFormulaPatches.push({ r: lineRow, col: 2, formula: `SUM(${sinceSubtotal.map(r => `C${r + 1}`).join(',')})` })
@@ -1949,6 +1990,7 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
       const savedDetails = withStbCurrentMaturities(noteDetailsMap[note.num], note)
       const baseRow = rows.length
       const det = buildNoteDetailRows(note.title, savedDetails, note.num, scale, note.total, periodStartStr, periodEndStr, isCompany, isNonCorp12)
+      for (const r of [...det.sectionHdrs, ...det.colHdrs, ...det.classHdrs]) det.rows[r] = det.rows[r].map(v => typeof v === 'string' ? datedPeriodLabel(v, labels) : v)
       if (det.rows.length > 0) {
         for (const dr of det.rows) rows.push(dr)
         for (const r of det.sectionHdrs) detailSectionHdrRows.push(baseRow + r)
@@ -1982,7 +2024,7 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
         cyCell = { t: 'n', v: scale(note.total), z: numFmt }
         pyCell = { t: 'n', v: scale(note.prevTotal), z: numFmt }
       }
-      rows.push(['Total', '', null, null])  // placeholders; real cells set below
+      rows.push([note.isPL ? plNoteTotalLabel(note) : 'Total', '', null, null])  // placeholders; real cells set below
       // Override the last two cells with formula cells
       const lastRowIdx = rows.length - 1
       // We'll patch these after aoa_to_sheet by using a post-processing step.
@@ -1995,9 +2037,11 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
       // Trade receivables of a Proprietorship / Partnership / LLP always carries
       // its ageing table (defaulting to Unsecured, considered good), saved or not.
       const isNcTradeReceivables = isNonCorp12 && /trade.*receivable/i.test(note.title || '')
-      if (savedDetails || isNcTradeReceivables) {
+      const isDirectorLoans = isCompany && isLoansAdvancesNoteTitle(note.title)
+      if (savedDetails || isNcTradeReceivables || isDirectorLoans) {
         const baseRow = rows.length
         const det = buildNoteDetailRows(note.title, savedDetails || {}, note.num, scale, note.total, periodStartStr, periodEndStr, isCompany, isNonCorp12)
+        for (const r of [...det.sectionHdrs, ...det.colHdrs, ...det.classHdrs]) det.rows[r] = det.rows[r].map(v => typeof v === 'string' ? datedPeriodLabel(v, labels) : v)
         if (det.rows.length > 0) {
           for (const dr of det.rows) rows.push(dr)
           for (const r of det.sectionHdrs) detailSectionHdrRows.push(baseRow + r)
@@ -2058,11 +2102,11 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
           itBlockSummaryTotalRows.push(rows.length)
           rows.push(['Total (Work in Progress)', '', '', '', '', '', scale(wipCapital + wipIntangible)])
           itBlockSummaryPyRows.push(rows.length)
-          rows.push(['Previous Year (Work in Progress)', '', '', '', '', '', scale(wipPY)])
+          rows.push([`${pyColLabel} (Work in Progress)`, '', '', '', '', '', scale(wipPY)])
           itBlockSummaryTotalRows.push(rows.length)
           rows.push(['Total PPE & Intangible Assets including work in progress', '', '', '', '', '', scale(itTotals.closingWDV + wipCapital + wipIntangible)])
           itBlockSummaryPyRows.push(rows.length)
-          rows.push(['Previous Year', '', '', '', '', '', scale((py ? num(py.closingWDV) : 0) + wipPY)])
+          rows.push([pyColLabel, '', '', '', '', '', scale((py ? num(py.closingWDV) : 0) + wipPY)])
         }
       }
 
@@ -2118,6 +2162,26 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
     }
 
     // Optional disclosure note — plain text row, included only when filled in
+    const invKind = investmentKind(note.title)
+    if (invKind) {
+      if (note.investmentIssues?.length) {
+        rows.push(['Investment disclosures need review'])
+        for (const issue of note.investmentIssues) { disclosureRows.push(rows.length); rows.push([issue]) }
+      }
+      for (const table of investmentTables(note.investmentDetails, invKind, scale)) {
+        rows.push([])
+        detailSectionHdrRows.push(rows.length); rows.push([table.title])
+        detailColHdrRows.push(rows.length); rows.push(table.headers.map(h => datedPeriodLabel(h, labels)))
+        for (const r of table.rows) {
+          const ri = rows.length
+          rows.push(r)
+          // Counts, percentages and per-unit rupees must not use denomination formatting.
+          table.headers.forEach((h, c) => {
+            if (/^Number/.test(h) && typeof r[c] === 'number') detailIntegerCells.push({ row: ri, col: c })
+          })
+        }
+      }
+    }
     const disclosureText = noteDisclosureMap[note.num]
     if (disclosureText && disclosureText.trim()) {
       disclosureRows.push(rows.length)
@@ -2168,6 +2232,11 @@ function buildNotesSheet(entity, activeTB, prevTB, data, { denomination, auditor
     const cell = ws[addr]
     if (!cell) continue
     cell.s = { ...(cell.s || {}), alignment: { ...((cell.s || {}).alignment || {}), horizontal: 'center' } }
+  }
+  for (const r of perNoteHeaderRows) {
+    ws['!rows'] = ws['!rows'] || []
+    ws['!rows'][r] = { hpt: 42 }
+    for (let c = 0; c <= 3; c++) setCellStyle(ws, ensureCell(ws, c, r), { font: { bold: true }, fill: FILL_HDR, alignment: { wrapText: true, vertical: 'center', horizontal: c >= 2 ? 'right' : 'left' } })
   }
   // Single main header row — bold + coloured
   for (let c = 0; c <= 3; c++) {
@@ -2432,13 +2501,14 @@ function buildAnnexuresSheet(entity, activeTB, prevTB, data, { denomination, aud
   const numFmt = numFormatString(denomination)
   const d = DENOMINATIONS[denomination] || DENOMINATIONS['as_is']
   const rows = []
+  const perNoteHeaderRows = []
   const noteTitleRows = []
   const subtotalRows = []  // last-ledger-row per sub-note group — underlined, SUM formula
   const totalRows = []
   const annexTotalMap = new Map()         // noteNum → { cyRow, pyRow } (note Total row)
   const annexSubnoteTotalMap = new Map()  // noteNum → Map(subnoteLabel → { cyRow, pyRow })
 
-  const titleRows = pushTitleRows(rows, entity, `Annexures — Ledger-Level Details for the year ended ${yearEnd(activeTB?.period || '')}`, d.unit)
+  const titleRows = pushTitleRows(rows, entity, `Annexures — Ledger-Level Details for the year ended ${statementDates(activeTB).cy}`, d.unit)
   rows.push([])
 
   const mainHeaderRow = rows.length
@@ -2448,7 +2518,7 @@ function buildAnnexuresSheet(entity, activeTB, prevTB, data, { denomination, aud
   // buildNotesSheet's cross-sheet links via annexTotalMap/
   // annexSubnoteTotalMap) stays valid unchanged. Populated only on PPE note
   // rows — blank for every other note.
-  rows.push(['Ledger Name', 'Sub-note', 'Code', 'CY Ledger', 'CY Sub-note Total', 'PY Ledger', 'PY Sub-note Total', 'IT Block'])
+  rows.push(['Ledger Name', 'Sub-note', 'Code', `${statementDates(activeTB).cy || 'Current Year'} - Ledger`, `${statementDates(activeTB).cy || 'Current Year'} - Sub-note Total`, `${statementDates(activeTB, prevTB).py || 'Previous Year'} - Ledger`, `${statementDates(activeTB, prevTB).py || 'Previous Year'} - Sub-note Total`, 'IT Block'])
   rows.push([])
 
   const isZeroRow = r => Math.abs(rowAmt(r, 'closing_balance')) < 0.005 && Math.abs(rowAmt(r, 'opening_balance')) < 0.005
@@ -2463,6 +2533,9 @@ function buildAnnexuresSheet(entity, activeTB, prevTB, data, { denomination, aud
     annexStartRows.set(note.num, startRow)
     noteTitleRows.push(startRow)
     rows.push([`Note ${note.num}: ${note.displayTitle || note.title}`])
+    const labels = noteColumnLabels(activeTB, prevTB, note)
+    perNoteHeaderRows.push(rows.length)
+    rows.push(['Ledger Name', 'Sub-note', 'Code', `${labels.cy} - Ledger`, `${labels.cy} - Sub-note Total`, `${labels.py} - Ledger`, `${labels.py} - Sub-note Total`, 'IT Block'])
 
     const subnoteMap = new Map()
     const shown = annexureDisplayLabels(note)   // print text only - subnoteMap and the links keep the real labels
@@ -2586,12 +2659,17 @@ function buildAnnexuresSheet(entity, activeTB, prevTB, data, { denomination, aud
   }
   // Title rows
   styleTitleRows(ws, titleRows, 7)
+  for (const r of [mainHeaderRow, ...perNoteHeaderRows]) {
+    ws['!rows'] = ws['!rows'] || []
+    ws['!rows'][r] = { hpt: 66 }
+    for (let c = 0; c <= 7; c++) setCellStyle(ws, ensureCell(ws, c, r), { font: { bold: true }, fill: FILL_HDR, alignment: { wrapText: true, vertical: 'center', horizontal: c >= 3 ? 'right' : 'left' } })
+  }
   // Main header
   for (let c = 0; c <= 6; c++) {
     setCellStyle(ws, ensureCell(ws, c, mainHeaderRow), {
       font: { bold: true, sz: 11 }, fill: FILL_HDR,
       border: { top: { style: 'thin', color: { rgb: '000000' } }, bottom: { style: 'thin', color: { rgb: '000000' } } },
-      alignment: { vertical: 'center', horizontal: c >= 3 ? 'right' : 'left' },
+      alignment: { vertical: 'center', horizontal: c >= 3 ? 'right' : 'left', wrapText: true },
     })
   }
   // Note title rows — bold, blue, full-width band
@@ -2699,7 +2777,7 @@ export function buildGeneralNotesSheet(data, { entity, auditor, signatories, sig
     addSignatureBlock(rows, rows, entity, auditor, signatories, signPlace, signDate)
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(rows.length ? rows : [['No General Notes added yet.']])
+  const ws = XLSX.utils.aoa_to_sheet(rows.length ? rows : [['No Policy added yet.']])
   ws['!cols'] = [{ wch: 100 }, { wch: 30 }, { wch: 30 }, { wch: 30 }]
   for (const rowIdx of boldRowIdxs) {
     const addr = XLSX.utils.encode_cell({ r: rowIdx, c: 0 })
@@ -2827,12 +2905,13 @@ export function buildFinancialsWorkbook({ entity, activeTB, prevTB, data, levelF
     ? buildGeneralNotesSheet(data, { entity, auditor, signatories, signPlace, signDate })
     : null
   if (generalNotesSheet && !generalNotesLast) {
-    XLSX.utils.book_append_sheet(wb, generalNotesSheet, 'General Notes')
+    XLSX.utils.book_append_sheet(wb, generalNotesSheet, 'Policy')
   }
   XLSX.utils.book_append_sheet(wb, notesWs,  'Notes')
   XLSX.utils.book_append_sheet(wb, annexWs,  'Annexures')
+  appendMissingAlieSheet(wb, data.missingAlie)
   if (generalNotesSheet && generalNotesLast) {
-    XLSX.utils.book_append_sheet(wb, generalNotesSheet, 'General Notes')
+    XLSX.utils.book_append_sheet(wb, generalNotesSheet, 'Policy')
   }
   // Previous Year not required, column left out: hidden (not deleted) on the sheets whose Previous Year sits in
   // columns of its own - so every formula and link keeps working. The Notes sheet stacks tables of different
@@ -2895,6 +2974,7 @@ export function buildColumnarWorkbook({ entity, branchTBsData, denomination = 'a
     rows: b.rows || [],
   }))
   const N = branches.length
+  const alieReport = buildMissingAlieReport(branchTBsData.flatMap(b => b.missingAlieRows || []))
 
   // ── Style helpers ────────────────────────────────────────────────────────
   const HDR_STYLE = { font: { bold: true, sz: 10 }, fill: { patternType: 'solid', fgColor: { rgb: 'DBEAFE' } }, border: BORDER_HEADER }
@@ -2915,7 +2995,9 @@ export function buildColumnarWorkbook({ entity, branchTBsData, denomination = 'a
     // Column headers: Particulars | Branch1 | Branch2 | ... | Total
     const hdr = ['Particulars', ...branches.map(b => b.name), 'Total']
     rows.push(hdr)
+    const alieWarningRows = /Balance Sheet|Profit & Loss/.test(title) ? pushMissingAlieRows(rows, alieReport) : []
     buildRows(rows)
+    if (/Balance Sheet|Profit & Loss/.test(title)) pushMissingAlieRows(rows, alieReport, alieWarningRows)
 
     const ws = XLSX.utils.aoa_to_sheet(rows)
     const range = XLSX.utils.decode_range(ws['!ref'])
@@ -2965,6 +3047,7 @@ export function buildColumnarWorkbook({ entity, branchTBsData, denomination = 'a
       }
     }
 
+    styleMissingAlieRows(ws, alieWarningRows, N + 1)
     applyPrintSetup(ws)
     ws['!pageSetup'] = { ...ws['!pageSetup'], orientation: N > 3 ? 'landscape' : 'portrait' }
     return ws
@@ -3247,8 +3330,9 @@ export function buildColumnarWorkbook({ entity, branchTBsData, denomination = 'a
 
   // General Notes (Significant Accounting Policies ...) of the Auditee as a whole - not a branch's, so one sheet
   if (generalData?.generalNotes?.points?.length) {
-    XLSX.utils.book_append_sheet(wb, buildGeneralNotesSheet(generalData, { entity, auditor, signatories, signPlace, signDate }), 'General Notes')
+    XLSX.utils.book_append_sheet(wb, buildGeneralNotesSheet(generalData, { entity, auditor, signatories, signPlace, signDate }), 'Policy')
   }
 
+  appendMissingAlieSheet(wb, alieReport)
   return wb
 }

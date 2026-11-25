@@ -246,7 +246,7 @@
   padding: 3pt 4pt;
   border-bottom: 0.5pt solid #000;
 }
-.fsg-root .print-view .right { text-align: right; font-family: 'Consolas', monospace; }
+.fsg-root .print-view .right { text-align: right; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-variant-numeric: tabular-nums lining-nums; }
 .fsg-root .print-view .center { text-align: center; }
 .fsg-root .print-view .carryfwd {
   font-style: italic;
@@ -270,3 +270,92 @@
 
 /* "Previous Year figures: Not required - column left out" (PYModeSelect): every Previous Year cell, header and <col> of a statement screen carries .py-col */
 .fsg-root .hide-py .py-col { display: none; }
+
+/* Reporting-date headings wrap locally despite VERA global table nowrap. */
+.fsg-root th.fsg-dated-heading {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  vertical-align: bottom;
+}
+
+/* T-048 Variance Analysis headings and T-049 Analytical Ratios text wrap despite VERA global table nowrap. */
+.fsg-root th.fsg-change-col,
+.fsg-root .fsg-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.fsg-root th.fsg-change-col { vertical-align: bottom; }
+
+/* T-050 Balance Sheet / Profit & Loss toolbar: one line, one button style, Previous Year controls grouped. */
+.fsg-root .fsg-stmt-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;            /* a narrow window wraps to a second tidy line; nothing is hidden */
+  column-gap: 0.5rem;
+  row-gap: 6px;
+  white-space: nowrap;
+}
+.fsg-root .fsg-stmt-toolbar > .ml-auto { flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
+.fsg-root .fsg-stmt-toolbar .fsg-stmt-title { font-size: 13px; font-weight: 600; color: #1e3a8a; }
+.fsg-root .fsg-stmt-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.fsg-root .fsg-stmt-toolbar select {
+  height: 28px;
+  max-width: 9.5rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+.fsg-root .fsg-stmt-toolbar label { font-size: 12px; white-space: nowrap; }
+.fsg-root .fsg-stmt-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+/* T-060 joined buttons (Expand / Collapse, Download / Upload): one bordered strip, square inner corners. */
+.fsg-root .fsg-seg { display: inline-flex; align-items: stretch; border: 1px solid #d1d5db; border-radius: 6px; overflow: hidden; background: #fff; }
+.fsg-root .fsg-seg > button { border-radius: 0 !important; border: 0; background: transparent; }
+.fsg-root .fsg-seg > button + button { border-left: 1px solid #d1d5db; }
+.fsg-root .fsg-stmt-toolbar .fsg-seg > button { height: 26px; }
+.fsg-root .fsg-stmt-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+/* T-050 every heading of a statement row with the variance columns sits on the same bottom line. */
+.fsg-root tr:has(> th.fsg-change-col) > th { vertical-align: bottom; }
+
+/* T-054 narrower windows: the statement toolbars keep to one line longer. */
+@media (max-width: 1360px) {
+  .fsg-root .fsg-stmt-group-label { display: none; }
+  .fsg-root .fsg-stmt-toolbar select { max-width: 8rem; }
+  .fsg-root .fsg-stmt-toolbar button { padding: 0 8px; }
+}
+
+/* Figures on screen (owner, 23 November 2026): amounts used a typewriter font (JetBrains Mono, or Consolas when that web
+   font is not loaded) whose dotted zero reads like an 8. On screen only - the PDF and Excel keep their own fonts - every
+   figure set in font-mono now uses the same clean font as the words, with equal-width digits so columns still line up. */
+.fsg-root .font-mono {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1, 'zero' 0;
+}

@@ -288,6 +288,37 @@ function deriveAlieFromType(trialBalanceType) {
   return null
 }
 
+/**
+ * T-037: Tally's own nature flags of the ledger's group decide ALIE when the
+ * TrialBalance column is absent (Tally ODBC exports and the live Tally fetch):
+ *   IsRevenue No  + IsDeemedPositive Yes (Dr) → ASSETS
+ *   IsRevenue No  + IsDeemedPositive No  (Cr) → EQUITY AND LIABILITIES
+ *   IsRevenue Yes + IsDeemedPositive Yes (Dr) → Expenses
+ *   IsRevenue Yes + IsDeemedPositive No  (Cr) → Income
+ * Both flags must be known; nothing is guessed from the balance side.
+ */
+function flagValue(v) {
+  if (v === true || v === 1 || v === '1') return true
+  if (v === false || v === 0 || v === '0') return false
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase()
+    if (s === 'yes' || s === 'true') return true
+    if (s === 'no' || s === 'false') return false
+  }
+  return null
+}
+
+function deriveAlieFromFlags(isRevenue, isDeemedPositive) {
+  const revenue = flagValue(isRevenue), debit = flagValue(isDeemedPositive)
+  if (revenue === null || debit === null) return null
+  if (!revenue) return debit ? 'ASSETS' : 'EQUITY AND LIABILITIES'
+  return debit ? 'Expenses' : 'Income'
+}
+
+function deriveAlieForRow(row) {
+  return deriveAlieFromType(row.trial_balance_type) ?? deriveAlieFromFlags(row.is_revenue, row.is_deemed_positive)
+}
+
 // ── Main engine ───────────────────────────────────────────────────────────────
 
 /**
@@ -390,7 +421,7 @@ export async function runMappingEngine(tbId, rsId, constitution, { excludeZero =
       tb_id:                  tbId,
       tb_row_id:              row.id,
       rule_set_id:            rsId,
-      alie:                   deriveAlieFromType(row.trial_balance_type),
+      alie:                   deriveAlieForRow(row),
       mapping1_resultant:     null,
       mapping2_resultant:     null,
       mapping3_resultant:     null,
@@ -556,11 +587,15 @@ export async function runMappingEngine(tbId, rsId, constitution, { excludeZero =
     }
 
     if (!m1Hit) {
-      // Fallback: use "Uncategorised {ALIE}" as Level 1
+      // Known ALIE with no Map1 match: a terminal Level 1 fallback. Use the
+      // constitution's master caption/id, without inventing Level 2/3 heads.
       if (result.alie) {
-        result.mapping1_resultant = `Uncategorised ${result.alie}`
-        result.mapping2_resultant = `Uncategorised ${result.alie}`
-        result.mapping3_resultant = `Uncategorised ${result.alie}`
+        const caption = result.alie === 'EQUITY AND LIABILITIES' ? 'Uncategorised Equity and Liabilities'
+          : result.alie === 'ASSETS' ? 'Uncategorised Assets' : `Uncategorised ${result.alie}`
+        const fallback = lf.find(r => r.alie === result.alie && (r.level1 || '').trim().toLowerCase() === caption.toLowerCase()
+          && !r.level2 && !r.level3 && !r.level4 && !r.level5 && !r.level6 && !r.level7)
+        result.mapping1_resultant = fallback?.level1 || caption
+        result.level_format_id = fallback?.id || null
         result.status = 'auto_low'; result.confidence = 'low'
       } else {
         result.status = 'unmapped'; result.confidence = 'none'
@@ -586,7 +621,10 @@ export async function runMappingEngine(tbId, rsId, constitution, { excludeZero =
     // rather than being swallowed by the broad "Indirect Expenses" group match.
     const m2GroupHitsAll = m2InScope.filter(m => anyWordBoundaryMatch(allHierarchy, m.keywords))
     const m2GroupHitsPri1 = m2GroupHitsAll.filter(m => (m.priority || 1) <= 1)
-    const m2GroupHits = m2GroupHitsPri1.length > 0 ? m2GroupHitsAll : []
+    // T-062: when a specific (priority-1) group rule matches, the broad priority-2 fallbacks are dropped. They were kept
+    // alongside it, so a ledger under e.g. "Donation" inside "Indirect Expenses" hit both Donations and the
+    // "Indirect Expenses -> Miscellaneous expenses" fallback, and became a Conflict whenever its name broke no tie.
+    const m2GroupHits = m2GroupHitsPri1.length > 0 ? m2GroupHitsPri1 : []
 
     // Step B: NAME-BASED (FALLBACK — only if no priority-1 group matching)
     const m2NameHits  = m2GroupHits.length > 0
@@ -683,6 +721,13 @@ export async function runMappingEngine(tbId, rsId, constitution, { excludeZero =
       result.status        = 'conflict'
       result.confidence    = 'none'
       result.conflict_stage = 2
+      // T-062: Level 1 is known, only Level 2 is in doubt - file the ledger as "Uncategorised {Level 1}" (as when no
+      // Level 2 rule matches) so the statements and Notes show it under its head with a Fix button, instead of a line
+      // with no caption. The status stays Conflict and the candidates below remain the options to resolve it.
+      if (l1HasL2Children[result.mapping1_resultant]) {
+        result.mapping2_resultant = `Uncategorised ${result.mapping1_resultant}`
+        result.mapping3_resultant = null
+      }
       result.conflict_candidates = resolvedM2Hits.map(m => ({
         stage:              2,
         mapping1_resultant: m.mapping1_resultant,

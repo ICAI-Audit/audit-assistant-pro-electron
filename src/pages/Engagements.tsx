@@ -172,8 +172,8 @@ export default function Engagements() {
     refetchClients();
   };
 
-  const handleSelectEngagement = (engagement: Engagement) => {
-    setCurrentEngagement(engagement);
+  const handleSelectEngagement = async (engagement: Engagement) => {
+    if (!(await setCurrentEngagement(engagement))) return;
     toast.success(`Switched to ${engagement.client_name} - ${engagement.financial_year}`);
   };
 

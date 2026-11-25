@@ -2,16 +2,44 @@ import React, { useState, useEffect, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { SC_DISCLOSURES, disclosureTexts, defaultDisclosureText } from '../../utils/shareCapitalDisclosures'
 import { fsgApi } from '../../api.js'
+import { finishWorkbook, firstDataSheet } from '../../utils/veraExcel'
+import { SHAREHOLDER_SHEET, shareholderTemplateExcelSpec, classClosingShares, shareTotals, classifyShareholders } from './shareCapitalDetailsWorkbook'
 
 const INP = 'w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
 const NUM = INP + ' text-right font-mono'
 const LABEL = 'block text-[10px] text-gray-500 mb-0.5 font-medium'
+const PCT_CELL = 'px-2 py-1 border border-gray-200 text-right font-mono text-gray-700 bg-gray-50'
+const PCT_TITLE = 'Calculated: the holder\'s shares / total shares of this type at the end of the year (Share Classes tab)'
 
 // Money: always 2 decimals ("34.00", not "34"). Shares: a count, never
 // fractional — no decimals, ever ("1,00,000", not "1,00,000.00").
 function fmtN(n) { return n != null && n !== '' && !isNaN(n) ? Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' }
 function fmtShares(n) { return n != null && n !== '' && !isNaN(n) ? Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '' }
 function num(v) { return parseFloat(v) || 0 }
+
+// ── T-053 shareholding % ──────────────────────────────────────────────────────
+// A holder's % = their shares / the total shares of the same type (Equity or Preference) at the end of that year,
+// across EVERY class of that type. A class's closing shares: the Reconciliation (Opening + Issued - Bought back), as
+// the Balance Sheet tally uses; else Subscribed & Fully Paid-up; else Subscribed; else Issued. Before T-053 only the
+// first class counted, Preference holders were divided by the Equity total, and the % only changed on Import or
+// "Recalculate %", so a typed or edited number of shares left a stale %.
+// classClosingShares / shareTotals live in shareCapitalDetailsWorkbook.js (shared with the Fill Details upload).
+export { classClosingShares, shareTotals }
+const pctOf = (shares, total) => (String(shares ?? '').trim() === '' || !total ? '' : (num(shares) / total * 100).toFixed(2))
+/** The form data with every % worked out again from the shares and the share classes. */
+export function withShareholdingPercent(data) {
+  const eq = shareTotals(data.classes, 'Equity'), pref = shareTotals(data.classes, 'Preference')
+  const rows = (list, t) => (list || []).map(r => ({ ...r, cyPct: pctOf(r.cyShares, t.cy), pyPct: pctOf(r.pyShares, t.py) }))
+  return {
+    ...data,
+    shareholders5pctEquity: rows(data.shareholders5pctEquity, eq),
+    shareholders5pctPreference: rows(data.shareholders5pctPreference, pref),
+    promoters: (data.promoters || []).map(r => ({ ...r, pctTotal: pctOf(r.shares, (r.class === 'Preference' ? pref : eq).cy) })),
+  }
+}
+const pctKey = (d) => JSON.stringify([
+  (d.shareholders5pctEquity || []).map(r => [r.cyPct, r.pyPct]), (d.shareholders5pctPreference || []).map(r => [r.cyPct, r.pyPct]),
+  (d.promoters || []).map(r => r.pctTotal)])
 
 // ── Empty share class template ────────────────────────────────────────────────
 function emptyClass(name = '', type = 'Equity') {
@@ -212,9 +240,9 @@ function ShareholderTable({ title, rows, onChange }) {
             <tr key={i}>
               <td className="px-1 py-0.5 border border-gray-200"><input className={INP} value={r.name} onChange={e => setRow(i, 'name', e.target.value)} placeholder="Name" /></td>
               <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.cyShares} onChange={e => setRow(i, 'cyShares', e.target.value)} /></td>
-              <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.cyPct} onChange={e => setRow(i, 'cyPct', e.target.value)} placeholder="%" /></td>
+              <td className={PCT_CELL} title={PCT_TITLE}>{r.cyPct !== '' && r.cyPct != null ? `${r.cyPct}%` : ''}</td>
               <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.pyShares} onChange={e => setRow(i, 'pyShares', e.target.value)} /></td>
-              <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.pyPct} onChange={e => setRow(i, 'pyPct', e.target.value)} placeholder="%" /></td>
+              <td className={PCT_CELL} title={PCT_TITLE}>{r.pyPct !== '' && r.pyPct != null ? `${r.pyPct}%` : ''}</td>
               <td className="px-1 py-0.5 border border-gray-200 text-center">
                 <button onClick={() => removeRow(i)} className="text-red-400 hover:text-red-600 text-[10px]">✕</button>
               </td>
@@ -257,7 +285,7 @@ function PromoterTable({ rows, onChange }) {
                 </select>
               </td>
               <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.shares} onChange={e => setRow(i, 'shares', e.target.value)} /></td>
-              <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.pctTotal} onChange={e => setRow(i, 'pctTotal', e.target.value)} placeholder="%" /></td>
+              <td className={PCT_CELL} title={PCT_TITLE}>{r.pctTotal !== '' && r.pctTotal != null ? `${r.pctTotal}%` : ''}</td>
               <td className="px-1 py-0.5 border border-gray-200"><input className={NUM} type="number" value={r.pctChange} onChange={e => setRow(i, 'pctChange', e.target.value)} placeholder="%" /></td>
               <td className="px-1 py-0.5 border border-gray-200 text-center">
                 <button onClick={() => removeRow(i)} className="text-red-400 hover:text-red-600 text-[10px]">✕</button>
@@ -272,7 +300,10 @@ function PromoterTable({ rows, onChange }) {
 }
 
 // ── Shareholder Excel template download (with dropdown validation) ────────────
-function downloadShareholderTemplate() {
+// T-047: finished in the VERA style (How to Fill sheet, blue header, yellow cells and a
+// real Category dropdown) — utils/veraExcel.js. The old ws['!dataValidation'] was never
+// written by SheetJS; the dropdown now comes from finishWorkbook.
+async function downloadShareholderTemplate() {
   const wb = XLSX.utils.book_new()
   // Data sheet
   const ws = XLSX.utils.aoa_to_sheet([
@@ -284,18 +315,8 @@ function downloadShareholderTemplate() {
     [5, '', '', '', '', 'Non-Promoter'],
   ])
   ws['!cols'] = [{ wch: 6 }, { wch: 40 }, { wch: 18 }, { wch: 30 }, { wch: 28 }, { wch: 18 }]
-  // Add data validation for Category dropdown (rows 2-500, column F = col 6)
-  ws['!dataValidation'] = [{
-    sqref: 'F2:F500',
-    type: 'list',
-    formula1: '"Promoter,Non-Promoter"',
-    showDropDown: false,
-    showErrorMessage: true,
-    errorTitle: 'Invalid',
-    error: 'Please select Promoter or Non-Promoter',
-  }]
-  XLSX.utils.book_append_sheet(wb, ws, 'Shareholders')
-  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+  XLSX.utils.book_append_sheet(wb, ws, SHAREHOLDER_SHEET)
+  const buf = await finishWorkbook(wb, shareholderTemplateExcelSpec())
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Shareholder_Template.xlsx'; a.click()
 }
@@ -303,39 +324,16 @@ function downloadShareholderTemplate() {
 // ── Import shareholders from Excel ────────────────────────────────────────────
 // Rules per item 3: only include shareholders with ≥5% holding in EITHER CY or PY
 // Rules per item 5: promoters table only shows Category = "Promoter"
-function importShareholdersFromExcel(file, totalSharesCY, totalSharesPY, onImport) {
+function importShareholdersFromExcel(file, totals, onImport) {
   const reader = new FileReader()
   reader.onload = (e) => {
     const wb = XLSX.read(e.target.result, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
+    // T-047: never the How to Fill / Lists sheet of a VERA-styled file.
+    const ws = wb.Sheets[SHAREHOLDER_SHEET] || firstDataSheet(wb)
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-    const totalCY = parseFloat(totalSharesCY) || 1
-    const totalPY = parseFloat(totalSharesPY) || 1
-
-    const all = rows.slice(1).filter(r => r[1]).map(r => {
-      const cyShares = parseFloat(r[4]) || 0
-      const pyShares = parseFloat(r[3]) || 0
-      const cyPct = totalCY ? (cyShares / totalCY) * 100 : 0
-      const pyPct = totalPY ? (pyShares / totalPY) * 100 : 0
-      return {
-        name: String(r[1] || '').trim(),
-        folioNo: String(r[2] || '').trim(),
-        cyShares,
-        cyPct: cyPct.toFixed(2),
-        pyShares,
-        pyPct: pyPct.toFixed(2),
-        category: String(r[5] || 'Non-Promoter').trim(),
-        _cyPct: cyPct,
-        _pyPct: pyPct,
-      }
-    })
-
-    // Item 3: 5% list = only ≥5% in CY OR PY
-    const fivePct = all.filter(r => r._cyPct >= 5 || r._pyPct >= 5)
-    // Item 5: promoters = only Category = "Promoter"
-    const promoters = all.filter(r => r.category.toLowerCase() === 'promoter')
-
-    onImport({ fivePct, promoters, all })
+    // % over the company's total Equity shares (every Equity class); the >=5% list (this year or last) and the
+    // promoters (Category = Promoter) follow from it - shareCapitalDetailsWorkbook.js classifyShareholders.
+    onImport(classifyShareholders(rows.slice(1), totals))
   }
   reader.readAsArrayBuffer(file)
 }
@@ -367,6 +365,12 @@ export default function ShareCapitalForm({ tbId, entityId, useEntityLevel, noteN
       const closing = num(cls.cy.openingShares) + num(cls.cy.issuedDuringYear) - num(cls.cy.deletedDuringYear)
       return s + closing * num(cls.faceValue)
     }, 0), [data.classes])
+
+  // T-053: the % follows the shares and the Share Classes, whatever changed them (typing, Import, a class edit, a saved file).
+  useEffect(() => {
+    const next = withShareholdingPercent(data)
+    if (pctKey(next) !== pctKey(data)) setData(next)
+  }, [data])
 
   const bsAmt = bsShareCapital != null ? Math.abs(bsShareCapital) : null
   const tallies = bsAmt != null && Math.abs(totalCYAmount - bsAmt) < 1
@@ -477,20 +481,26 @@ export default function ShareCapitalForm({ tbId, entityId, useEntityLevel, noteN
                   ⬆ Import Excel
                   <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => {
                     const file = e.target.files?.[0]; if (!file) return
-                    // Use paidUp shares as total; fallback to issued
-                    const cls0 = data.classes[0]
-                    const cyClosed = num(cls0?.cy.openingShares) + num(cls0?.cy.issuedDuringYear) - num(cls0?.cy.deletedDuringYear) || num(cls0?.cy.paidUp) || num(cls0?.cy.issued)
-                    const pyClosed = num(cls0?.py.openingShares) + num(cls0?.py.issuedDuringYear) - num(cls0?.py.deletedDuringYear) || num(cls0?.py.paidUp) || num(cls0?.py.issued)
-                    importShareholdersFromExcel(file, cyClosed, pyClosed, ({ fivePct, promoters }) => {
-                      // 5% equity holders (non-preference)
-                      update5pctEquity(fivePct.filter(r => !r.category?.toLowerCase().includes('prefer')))
-                      // Promoters list — only those marked "Promoter"
-                      updatePromoters(promoters.map(r => ({
-                        name: r.name, class: 'Equity', shares: r.cyShares,
-                        pctTotal: r.cyPct, pctChange: ''
-                      })))
-                    })
                     e.target.value = ''
+                    // The % is over the total Equity shares of the company, from the Share Classes tab (every Equity class).
+                    const eq = shareTotals(data.classes, 'Equity')
+                    if (!eq.cy) {
+                      window.alert('Fill the Share Classes tab first.\n\n% holding is worked out on the total number of Equity shares of the company at the end of the year (Share Classes: Opening + Issued - Bought back, or Paid-up). That total is blank, so the % cannot be worked out.')
+                      return
+                    }
+                    importShareholdersFromExcel(file, eq, ({ all, fivePct, promoters, basis }) => {
+                      update5pctEquity(fivePct.map(({ name, folioNo, cyShares, cyPct, pyShares, pyPct }) => ({ name, folioNo, cyShares, cyPct, pyShares, pyPct })))
+                      updatePromoters(promoters)
+                      const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+                      const lines = [
+                        `Imported ${all.length} shareholder${all.length !== 1 ? 's' : ''}: ${fivePct.length} hold${fivePct.length === 1 ? 's' : ''} 5% or more (this year or last), ${promoters.length} promoter${promoters.length !== 1 ? 's' : ''}.`,
+                        '',
+                        `% worked out on the total Equity shares: this year ${fmt(basis.totalCY)}${basis.pyFrom === 'classes' ? `, last year ${fmt(basis.totalPY)}` : ` (last year: Share Classes blank, so the ${fmt(basis.totalPY)} shares listed in the file)`}.`,
+                        `Shares listed in the file: this year ${fmt(basis.listedCY)}, last year ${fmt(basis.listedPY)}.`,
+                      ]
+                      if (basis.overCY || basis.overPY) lines.push('', `Check: the file lists more shares than the company's total (${basis.overCY ? 'this year' : 'last year'}). Correct the file or the Share Classes tab.`)
+                      window.alert(lines.join('\n'))
+                    })
                   }} />
                 </label>
                 <button onClick={() => {
@@ -502,22 +512,17 @@ export default function ShareCapitalForm({ tbId, entityId, useEntityLevel, noteN
                   // the CURRENT Classes total — same formula as Import Excel
                   // above — without needing to re-upload the file (so any
                   // manual name/folio edits already made here are kept).
-                  const cls0 = data.classes[0]
-                  const cyClosed = num(cls0?.cy.openingShares) + num(cls0?.cy.issuedDuringYear) - num(cls0?.cy.deletedDuringYear) || num(cls0?.cy.paidUp) || num(cls0?.cy.issued)
-                  const pyClosed = num(cls0?.py.openingShares) + num(cls0?.py.issuedDuringYear) - num(cls0?.py.deletedDuringYear) || num(cls0?.py.paidUp) || num(cls0?.py.issued)
-                  const totalCY = cyClosed || 1
-                  const totalPY = pyClosed || 1
-                  const recalcRows = (rows) => rows.map(r => ({
-                    ...r,
-                    cyPct: (num(r.cyShares) / totalCY * 100).toFixed(2),
-                    pyPct: (num(r.pyShares) / totalPY * 100).toFixed(2),
-                  }))
-                  update5pctEquity(recalcRows(data.shareholders5pctEquity))
-                  update5pctPref(recalcRows(data.shareholders5pctPreference))
-                  updatePromoters(data.promoters.map(r => ({
-                    ...r,
-                    pctTotal: (num(r.shares) / totalCY * 100).toFixed(2),
-                  })))
+                  // Every % already follows the shares and the Share Classes (withShareholdingPercent); this also works out a
+                  // promoter's % change again where last year's shares are known (rows from Import Excel).
+                  setData(d => {
+                    const next = withShareholdingPercent(d)
+                    const eq = shareTotals(d.classes, 'Equity'), pref = shareTotals(d.classes, 'Preference')
+                    return { ...next, promoters: next.promoters.map(r => {
+                      const t = r.class === 'Preference' ? pref : eq
+                      if (r.pyShares == null || String(r.pyShares).trim() === '' || !t.cy || !t.py) return r
+                      return { ...r, pctChange: (num(r.shares) / t.cy * 100 - num(r.pyShares) / t.py * 100).toFixed(2) }
+                    }) }
+                  })
                 }}
                   title="Re-derive every % below from each row's shares ÷ the current Classes total — use this after correcting Opening/Issued/Deleted on the Classes tab"
                   className="text-xs px-2 py-1 border border-amber-400 text-amber-700 rounded hover:bg-amber-50">

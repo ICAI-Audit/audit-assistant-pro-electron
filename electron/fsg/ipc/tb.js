@@ -4,7 +4,19 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { query, runInTransaction } from '../db/client.js'
 import { parseTBExcel, generateTBTemplate } from '../services/excel.js'
-import { checkTallyRunning, getTallyCompanies, listTallyCompanies, getTallyTrialBalance, getTallyLedgerMasters, parseTallyTBXml, parseTallyMasterXml, tcpPing, getTallyDataViaOdbc, getTallyStockTotals, resolveStockFigures } from '../services/tally-odbc.js'
+import { checkTallyRunning, getTallyCompanies, listTallyCompanies, getTallyTrialBalance, getTallyLedgerMasters, parseTallyTBXml, parseTallyMasterXml, tcpPing, getTallyDataViaOdbc, getTallyStockTotals, resolveStockFigures, getTallyCompanyBooks, getTallyLedgerBalancesAsOf, periodiseTallyRows, dayBefore } from '../services/tally-odbc.js'
+
+// T-070: the period an import reads from Tally. Both dates are required (the
+// import screen asks for them); YYYY-MM-DD, From not after To.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const showDate = (iso) => iso ? iso.split('-').reverse().join('-') : ''
+export function checkImportPeriod(period) {
+  const from = period?.from, to = period?.to
+  if (!from || !to) throw new Error('Enter both the From date and the To date of the period to import from Tally.')
+  if (!ISO_DATE.test(from) || !ISO_DATE.test(to)) throw new Error('The From and To dates must be real dates.')
+  if (from > to) throw new Error(`The From date (${showDate(from)}) is after the To date (${showDate(to)}).`)
+  return { from, to }
+}
 
 // A locked entity_period (Auditee ↔ FY) also blocks new TB uploads against
 // it — locking fully freezes the period, not just existing categorisation.
@@ -12,6 +24,101 @@ async function assertEntityPeriodUnlocked(entityPeriodId) {
   if (!entityPeriodId) return
   const { rows: [row] } = await query(`SELECT locked FROM entity_periods WHERE id=$1`, [entityPeriodId])
   if (row?.locked) throw new Error('This Financial Period is locked. Unlock it from the Master tab to upload a new Trial Balance.')
+}
+
+// ── T-071: at most three versions of a Trial Balance per year and branch ────
+// Each upload for the same financial year (and branch, for a client with
+// branches) is a new version, _v1 to _v3. A fourth is refused until one of the
+// three is deleted; the freed number is then reused (lowest first).
+export const TB_VERSION_LIMIT = 3
+
+// T-087 Branch Master. A branch is one name per Auditee, whatever its case or spacing ("Delhi", " delhi ").
+export const cleanBranchName = (name) => String(name ?? '').replace(/\s+/g, ' ').trim()
+// Each branch with the Trial Balances that use it (tb_count) and how many of them sit in a locked or
+// finalised year (locked_count) - the Branch Master screen allows rename / delete from these.
+const SAME_BRANCH = `LOWER(TRIM(COALESCE(t.branch_name, ''))) = LOWER(b.name)`
+export async function listBranchMaster(entityId) {
+  const { rows } = await query(`SELECT b.id, b.name,
+      (SELECT COUNT(*) FROM trial_balances t WHERE t.entity_id = b.entity_id AND ${SAME_BRANCH}) AS tb_count,
+      (SELECT COUNT(*) FROM trial_balances t JOIN entity_periods ep ON ep.id = t.entity_period_id
+         WHERE t.entity_id = b.entity_id AND ${SAME_BRANCH} AND (COALESCE(ep.locked, 0) <> 0 OR COALESCE(ep.is_final, 0) <> 0)) AS locked_count
+    FROM fsg_branches b WHERE b.entity_id = $1 ORDER BY b.name COLLATE NOCASE`, [entityId])
+  return rows.map(r => ({ ...r, tb_count: Number(r.tb_count) || 0, locked_count: Number(r.locked_count) || 0 }))
+}
+async function branchOf(entityId, id) {
+  const hit = (await listBranchMaster(entityId)).find(b => Number(b.id) === Number(id))
+  if (!hit) throw new Error('That branch is not on this Auditee\'s Branch Master.')
+  return hit
+}
+// T-087: rename a branch - its Trial Balances take the new name, so their versions stay together.
+export async function renameBranch(entityId, id, newName) {
+  const name = cleanBranchName(newName)
+  if (!name) throw new Error('Enter the new branch name.')
+  const branch = await branchOf(entityId, id)
+  if (branch.name === name) return { name }
+  const clash = (await listBranchMaster(entityId)).find(b => Number(b.id) !== Number(id) && b.name.toLowerCase() === name.toLowerCase())
+  if (clash) throw new Error(`A branch named "${clash.name}" already exists. Choose another name.`)
+  if (branch.locked_count) throw new Error(`"${branch.name}" has ${branch.locked_count} Trial Balance${branch.locked_count > 1 ? 's' : ''} in a locked or finalised year, so it cannot be renamed. Unlock the year on the Master tab first.`)
+  return runInTransaction(async () => {
+    await query(`UPDATE trial_balances SET branch_name = $1 WHERE entity_id = $2 AND LOWER(TRIM(COALESCE(branch_name, ''))) = LOWER($3)`, [name, entityId, branch.name])
+    await query(`UPDATE fsg_branches SET name = $1 WHERE id = $2 AND entity_id = $3`, [name, id, entityId])
+    return { name }
+  })
+}
+// Only a branch no Trial Balance uses can be deleted (its Trial Balances are deleted on TB > Upload TB first).
+export async function deleteBranch(entityId, id) {
+  const branch = await branchOf(entityId, id)
+  if (branch.tb_count) throw new Error(`"${branch.name}" is used by ${branch.tb_count} Trial Balance${branch.tb_count > 1 ? 's' : ''}, so it cannot be deleted. Delete those Trial Balances on TB > Upload TB first, or rename the branch instead.`)
+  await query(`DELETE FROM fsg_branches WHERE id = $1 AND entity_id = $2`, [id, entityId])
+  return { ok: true }
+}
+// The master's spelling of this branch, adding it when new - used by every upload, so the version count
+// (same year and branch) finds the earlier Trial Balances of the branch.
+export async function canonicalBranch(entityId, name) {
+  const clean = cleanBranchName(name)
+  if (!clean || entityId == null) return clean
+  const { rows: [hit] } = await query(`SELECT name FROM fsg_branches WHERE entity_id = $1 AND name = $2 COLLATE NOCASE`, [entityId, clean])
+  if (hit) return hit.name
+  await query(`INSERT OR IGNORE INTO fsg_branches (entity_id, name) VALUES ($1, $2)`, [entityId, clean])
+  return clean
+}
+
+export async function tbVersionStatus(entityPeriodId, branchName = '') {
+  if (!entityPeriodId) return { versions: [], next: 1, full: false, limit: TB_VERSION_LIMIT, yearLabel: '', locked: false }
+  const branch = branchName || ''
+  const { rows: versions } = await query(
+    `SELECT id, tb_version, filename, period, row_count, branch_name
+       FROM trial_balances WHERE entity_period_id = $1 AND COALESCE(branch_name, '') = $2
+      ORDER BY tb_version, id`,
+    [entityPeriodId, branch]
+  )
+  const { rows: [ep] } = await query(
+    `SELECT ep.locked, fp.year_label FROM entity_periods ep
+       LEFT JOIN financial_periods fp ON fp.id = ep.financial_period_id WHERE ep.id = $1`, [entityPeriodId])
+  const used = new Set(versions.map(v => Number(v.tb_version)).filter(Boolean))
+  let next = null
+  for (let v = 1; v <= TB_VERSION_LIMIT; v++) if (!used.has(v)) { next = v; break }
+  const full = versions.length >= TB_VERSION_LIMIT || next === null
+  return { versions, next: full ? null : next, full, limit: TB_VERSION_LIMIT, yearLabel: ep?.year_label || '', locked: !!ep?.locked }
+}
+
+export function tbVersionLimitMessage({ versions = [], yearLabel = '' }, branchName = '') {
+  const where = `${yearLabel || 'This financial year'}${branchName ? ` (branch ${branchName})` : ''}`
+  const list = versions.map(v => v.tb_version
+    ? `_v${v.tb_version}${v.filename ? ` (${v.filename})` : ''}`
+    : (v.filename || `Trial Balance #${v.id}`)).join(', ')
+  return `${where} already has ${TB_VERSION_LIMIT} Trial Balances: ${list}. ` +
+    `Only ${TB_VERSION_LIMIT} versions are kept for a financial year. ` +
+    'To upload another: on TB > Upload TB, select the version you no longer need, click "Delete TB", then upload again.'
+}
+
+// The version the next upload takes, or a refusal. Runs inside the upload's
+// transaction, so two uploads cannot take the same number.
+async function claimTbVersion(entityPeriodId, branchName) {
+  if (!entityPeriodId) return null
+  const status = await tbVersionStatus(entityPeriodId, branchName)
+  if (status.full) throw new Error(tbVersionLimitMessage(status, branchName))
+  return status.next
 }
 
 export function registerTBHandlers() {
@@ -51,13 +158,24 @@ export function registerTBHandlers() {
   })
 
   // ── List distinct branches for an entity ──────────────────────────────────
+  // (each Trial Balance of a branch entity; tb_version lets the screens show the branch once with its versions)
   ipcMain.handle('tb:getBranches', async (_, entityId) => {
     const { rows } = await query(
-      `SELECT id, branch_name, period, filename, row_count, entity_period_id FROM trial_balances
+      `SELECT id, branch_name, period, filename, row_count, entity_period_id, tb_version FROM trial_balances
        WHERE entity_id=$1 ORDER BY branch_name, id`,
       [entityId]
     )
     return rows
+  })
+
+  // ── T-087 Branch Master ─────────────────────────────────────────────────────
+  ipcMain.handle('tb:listBranchMaster', async (_, entityId) => listBranchMaster(entityId))
+  ipcMain.handle('tb:renameBranch', async (_, { entityId, id, name } = {}) => ({ ...(await renameBranch(entityId, id, name)), branches: await listBranchMaster(entityId) }))
+  ipcMain.handle('tb:deleteBranch', async (_, { entityId, id } = {}) => { await deleteBranch(entityId, id); return { branches: await listBranchMaster(entityId) } })
+  ipcMain.handle('tb:addBranch', async (_, { entityId, name } = {}) => {
+    const clean = cleanBranchName(name)
+    if (!clean) throw new Error('Enter the branch name.')
+    return { name: await canonicalBranch(entityId, clean), branches: await listBranchMaster(entityId) }
   })
 
   // ── Trial Balance upload ───────────────────────────────────────────────────
@@ -71,10 +189,12 @@ export function registerTBHandlers() {
     // SQLite port: the header + row inserts run as one transaction (file was
     // read and parsed above; only query() is awaited inside).
     return runInTransaction(async () => {
+    branchName = await canonicalBranch(entityId, branchName)
+    const tbVersion = await claimTbVersion(entityPeriodId, branchName)
     const { rows: [tb] } = await query(
-      `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [entityId, period || '', filePath.split(/[\\/]/).pop(), tbRows.length, branchName || '', entityPeriodId || null]
+      `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id, tb_version)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [entityId, period || '', filePath.split(/[\\/]/).pop(), tbRows.length, branchName || '', entityPeriodId || null, tbVersion]
     )
 
     // Batch insert TB rows (chunked for performance)
@@ -84,20 +204,20 @@ export function registerTBHandlers() {
       const values = []
       const params = []
       chunk.forEach((r, idx) => {
-        const base = idx * 21
-        values.push(
-          `($${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9},$${base+10},$${base+11},$${base+12},$${base+13},$${base+14},$${base+15},$${base+16},$${base+17},$${base+18},$${base+19},$${base+20},$${base+21})`
-        )
+        // T-037: also keeps Group.$Parent.8 (ninth group level) and the TrialBalance (ALIE) column.
+        const base = idx * 23
+        values.push(`(${Array.from({ length: 23 }, (_, k) => `$${base + k + 1}`).join(',')})`)
         params.push(
           tb.id, r.period, r.branch, r.ledger_code, r.name,
           r.opening_balance, r.debit, r.credit, r.closing_balance,
           r.is_revenue, r.is_deemed_positive, r.trail_balance, r.parent,
           r.group_parent, r.group_parent_1, r.group_parent_2, r.group_parent_3,
-          r.group_parent_4, r.group_parent_5, r.group_parent_6, r.group_parent_7
+          r.group_parent_4, r.group_parent_5, r.group_parent_6, r.group_parent_7,
+          r.group_parent_8 ?? null, r.trial_balance_type ?? null
         )
       })
       await query(
-        `INSERT INTO tb_rows (tb_id,period,branch,ledger_code,name,opening_balance,debit,credit,closing_balance,is_revenue,is_deemed_positive,trail_balance,parent,group_parent,group_parent_1,group_parent_2,group_parent_3,group_parent_4,group_parent_5,group_parent_6,group_parent_7)
+        `INSERT INTO tb_rows (tb_id,period,branch,ledger_code,name,opening_balance,debit,credit,closing_balance,is_revenue,is_deemed_positive,trail_balance,parent,group_parent,group_parent_1,group_parent_2,group_parent_3,group_parent_4,group_parent_5,group_parent_6,group_parent_7,group_parent_8,trial_balance_type)
          VALUES ${values.join(',')}`,
         params
       )
@@ -151,10 +271,12 @@ export function registerTBHandlers() {
     // SQLite port: all inserts below run as one transaction (only query() is
     // awaited inside).
     return runInTransaction(async () => {
+    branchName = await canonicalBranch(entityId, branchName)
+    const tbVersion = await claimTbVersion(entityPeriodId, branchName)
     const { rows: [tb] } = await query(
-      `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id, tally_closing_stock_total, tally_opening_stock_total, tally_company, pl_closed_to_capital)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [entityId, period || '', fileName || 'Tally_TB.xlsx', tbRows.length, branchName || '', entityPeriodId || null, closingStockTotal || null, openingStockTotal || null, tallyCompany || null, plClosedToCapital ? 1 : 0]
+      `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id, tally_closing_stock_total, tally_opening_stock_total, tally_company, pl_closed_to_capital, tb_version)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [entityId, period || '', fileName || 'Tally_TB.xlsx', tbRows.length, branchName || '', entityPeriodId || null, closingStockTotal || null, openingStockTotal || null, tallyCompany || null, plClosedToCapital ? 1 : 0, tbVersion]
     )
 
     // Insert tb_rows and remember which row IDs are Opening Stock so we can
@@ -172,8 +294,8 @@ export function registerTBHandlers() {
             (tb_id,period,branch,ledger_code,name,opening_balance,debit,credit,closing_balance,
              is_revenue,is_deemed_positive,trail_balance,parent,group_parent,group_parent_1,
              group_parent_2,group_parent_3,group_parent_4,group_parent_5,group_parent_6,group_parent_7,
-             upload_nature)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+             group_parent_8,trial_balance_type,upload_nature)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
            RETURNING id, name`,
           [
             tb.id, r.period || '', r.branch || '', r.ledger_code || '', r.name,
@@ -182,6 +304,7 @@ export function registerTBHandlers() {
             r.group_parent || '', r.group_parent_1 || '', r.group_parent_2 || '',
             r.group_parent_3 || '', r.group_parent_4 || '', r.group_parent_5 || '',
             r.group_parent_6 || '', r.group_parent_7 || '',
+            r.group_parent_8 || '', r.trial_balance_type || null,
             uploadNature,
           ]
         )
@@ -245,6 +368,14 @@ export function registerTBHandlers() {
       [entityPeriodId]
     )
     return rows
+  })
+
+  // ── T-071: which versions a year (and branch) already holds ───────────────
+  // Read before an upload so the screen can explain a refusal before any file
+  // is read; the upload itself enforces the same rule (claimTbVersion).
+  ipcMain.handle('tb:versionStatus', async (_, { entityPeriodId, branchName } = {}) => {
+    const status = await tbVersionStatus(entityPeriodId, branchName || '')
+    return { ...status, message: status.full ? tbVersionLimitMessage(status, branchName || '') : '' }
   })
 
   // ── Get rows for a TB ──────────────────────────────────────────────────────
@@ -523,10 +654,12 @@ export function registerTBHandlers() {
     // SQLite port: all inserts below run as one transaction (only query() is
     // awaited inside).
     return runInTransaction(async () => {
+    branchName = await canonicalBranch(entityId, branchName)
+    const tbVersion = await claimTbVersion(entityPeriodId, branchName)
     const { rows: [tb] } = await query(
-      `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [entityId, period || '', fileName || defaultFileName, tbRows.length, branchName || '', entityPeriodId || null]
+      `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id, tb_version)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [entityId, period || '', fileName || defaultFileName, tbRows.length, branchName || '', entityPeriodId || null, tbVersion]
     )
 
     const CHUNK = 200
@@ -538,8 +671,8 @@ export function registerTBHandlers() {
             (tb_id,period,branch,ledger_code,name,opening_balance,debit,credit,closing_balance,
              is_revenue,is_deemed_positive,trail_balance,parent,group_parent,group_parent_1,
              group_parent_2,group_parent_3,group_parent_4,group_parent_5,group_parent_6,group_parent_7,
-             trial_balance_type,upload_nature)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+             group_parent_8,trial_balance_type,upload_nature)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
           [
             tb.id, r.period || '', r.branch || '', r.ledger_code || '', r.name,
             r.opening_balance || 0, r.debit || 0, r.credit || 0, r.closing_balance || 0,
@@ -547,7 +680,7 @@ export function registerTBHandlers() {
             r.parent || '', r.group_parent || '', r.group_parent_1 || '',
             r.group_parent_2 || '', r.group_parent_3 || '', r.group_parent_4 || '',
             r.group_parent_5 || '', r.group_parent_6 || '', r.group_parent_7 || '',
-            r.trial_balance_type || null, uploadNature,
+            r.group_parent_8 || '', r.trial_balance_type || null, uploadNature,
           ]
         )
       }
@@ -756,116 +889,9 @@ export function registerTBHandlers() {
     return rows
   })
 
-  // ── Save Journal Entry (multiple Dr/Cr rows, must balance) ────────────────
-  ipcMain.handle('tb:saveJournalEntry', async (_, { tbId, date, entries }) => {
-    // Validate balance
-    const totalDr = entries.filter(e => e.type === 'Dr').reduce((s, e) => s + parseFloat(e.amount), 0)
-    const totalCr = entries.filter(e => e.type === 'Cr').reduce((s, e) => s + parseFloat(e.amount), 0)
-    if (Math.abs(totalDr - totalCr) > 0.01) {
-      throw new Error(`Journal entry not balanced: Dr ${totalDr} vs Cr ${totalCr}`)
-    }
-
-    // Get TB / entity / rule_set info for mapping inserts
-    const { rows: [tbInfo] } = await query(
-      `SELECT tb.id, e.constitution,
-              (SELECT id FROM mapping_rule_sets WHERE is_default=TRUE LIMIT 1) AS rule_set_id
-       FROM trial_balances tb JOIN entities e ON e.id = tb.entity_id WHERE tb.id = $1`,
-      [tbId]
-    )
-    const rsId = tbInfo?.rule_set_id
-    const constitution = tbInfo?.constitution
-
-    for (const e of entries) {
-      const amt = parseFloat(e.amount)
-      // Dr → negative closing_balance, is_deemed_positive=true
-      // Cr → positive closing_balance, is_deemed_positive=false
-      const closingBalance = e.type === 'Dr' ? amt * -1 : amt
-      const isDeemedPositive = e.type === 'Dr'
-
-      // Insert tb_rows entry
-      const { rows: [tbRow] } = await query(
-        `INSERT INTO tb_rows (tb_id, period, name, opening_balance, closing_balance,
-                              is_deemed_positive, upload_nature)
-         VALUES ($1, $2, $3, 0, $4, $5, 'Journal Passed Manually')
-         RETURNING id`,
-        [tbId, date || '', e.ledgerName, closingBalance, isDeemedPositive]
-      )
-
-      // Determine mapping: existing ledger or provided new mapping
-      let m1 = e.mapping1
-      let m2 = e.mapping2
-      let m3 = e.mapping3
-      let alie = null
-
-      if (!e.isNew) {
-        // Try to find existing mapping for a ledger with same name in this TB
-        const { rows: [existing] } = await query(
-          `SELECT mt.mapping1_resultant, mt.mapping2_resultant, mt.mapping3_resultant,
-                  mt.alie, mt.level_format_id
-           FROM mapped_tb mt
-           JOIN tb_rows tr ON tr.id = mt.tb_row_id
-           WHERE tr.tb_id = $1 AND tr.name = $2 AND mt.mapping1_resultant IS NOT NULL
-           ORDER BY mt.id DESC LIMIT 1`,
-          [tbId, e.ledgerName]
-        )
-        if (existing) {
-          m1 = m1 || existing.mapping1_resultant
-          m2 = m2 || existing.mapping2_resultant
-          m3 = m3 || existing.mapping3_resultant
-          alie = existing.alie
-        }
-      }
-
-      // Derive ALIE from LevelFormat if not set
-      if (!alie && m1 && rsId) {
-        const { rows: [lfRow] } = await query(
-          `SELECT alie FROM level_format
-           WHERE rule_set_id = $1 AND level1 = $2 AND alie IS NOT NULL LIMIT 1`,
-          [rsId, m1]
-        )
-        if (lfRow) alie = lfRow.alie
-      }
-
-      // Find level_format_id
-      let lfId = null
-      if (rsId && m1 && m2) {
-        const { rows: [lfRow] } = await query(
-          `SELECT id FROM level_format
-           WHERE rule_set_id = $1 AND level1 = $2 AND level2 = $3
-             ${m3 ? `AND (level3 = $4 OR $4 IN (
-               WITH RECURSIVE split(part, rest) AS (
-                 SELECT NULL, NULLIF(level3, '') || '/'
-                 UNION ALL
-                 SELECT substr(rest, 1, instr(rest, '/') - 1), substr(rest, instr(rest, '/') + 1)
-                 FROM split WHERE rest <> ''
-               )
-               SELECT btrim(part) FROM split WHERE part IS NOT NULL))` : ''}
-           LIMIT 1`,
-          m3 ? [rsId, m1, m2, m3] : [rsId, m1, m2]
-        )
-        if (lfRow) lfId = lfRow.id
-      }
-
-      // Insert mapped_tb entry
-      if (rsId && m1) {
-        await query(
-          `INSERT INTO mapped_tb
-             (tb_id, tb_row_id, rule_set_id, alie,
-              mapping1_resultant, mapping2_resultant, mapping3_resultant,
-              level_format_id, status, confidence, mapped_at, override_note)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'user_approved', 'high', NOW(), $9)
-           ON CONFLICT (tb_id, tb_row_id) DO NOTHING`,
-          [tbId, tbRow.id, rsId, alie, m1, m2, m3, lfId, `Journal Entry dated ${date || 'N/A'}`]
-        )
-      }
-    }
-
-    // Update row_count
-    const { rows: [countRow] } = await query(`SELECT COUNT(*) as cnt FROM tb_rows WHERE tb_id = $1`, [tbId])
-    await query(`UPDATE trial_balances SET row_count = $1 WHERE id = $2`, [parseInt(countRow.cnt), tbId])
-
-    return { inserted: entries.length }
-  })
+  // T-082: the Journal Entry screen and its tb:saveJournalEntry route are removed (owner, 24 November 2026) - adjustments
+  // are made on the Mapped TB. Ledgers an earlier version posted this way ('Journal Passed Manually') stay in their Trial
+  // Balance and keep working (Mapped TB, statements, workings carry-over).
 
   // ── Tally Auto-Import (HTTP XML) ───────────────────────────────────────────
   function loadTallyConfig() {
@@ -899,10 +925,12 @@ export function registerTBHandlers() {
     return listTallyCompanies(host, port)
   })
 
-  ipcMain.handle('tally:fetchTB', async (_, { host, port, keepPLLedger, company: chosenCompany, multipleCompanies = false } = {}) => {
+  ipcMain.handle('tally:fetchTB', async (_, { host, port, keepPLLedger, company: chosenCompany, multipleCompanies = false, period: askedPeriod } = {}) => {
     const cfg = loadTallyConfig()
     const h = host || cfg.host
     const p = port || cfg.port
+    // T-070: the dates are compulsory; every request below is made for them.
+    const period = checkImportPeriod(askedPeriod)
     let httpErr = null
     try {
       // Resolve WHICH company we are importing, ONCE, and pin every subsequent
@@ -926,8 +954,22 @@ export function registerTBHandlers() {
         try { company = (await getTallyCompanies(h, p))[0] || null } catch (_) {}
       }
 
+      // T-070: the period must lie within the company's books. Before the date
+      // the books begin, Tally holds no entries for this company.
+      const books = await getTallyCompanyBooks(h, p, company)
+      if (books.booksFrom && period.from < books.booksFrom) {
+        throw new Error(
+          `The books of "${company || 'the company open in Tally'}" begin on ${showDate(books.booksFrom)}, ` +
+          `so Tally has no entries in this company for ${showDate(period.from)} to ${showDate(period.to)}. ` +
+          'If that year was split into a separate company in Tally, open that company in Tally and import from it.'
+        )
+      }
+      // A period starting after the books begin needs its opening balances
+      // worked out (Tally's own opening field is the books' opening).
+      const needsOpening = !books.booksFrom || period.from > books.booksFrom
+
       const [tbXml, masterXml] = await Promise.all([
-        getTallyTrialBalance(h, p, company),
+        getTallyTrialBalance(h, p, company, period),
         getTallyLedgerMasters(h, p, company),
       ])
 
@@ -942,8 +984,17 @@ export function registerTBHandlers() {
         writeFileSync(join(dir, `master-raw-${stamp}.xml`), masterXml, 'utf8')
       } catch { /* best-effort debug dump */ }
 
-      const tbRows = parseTallyTBXml(tbXml, keepPLLedger)
+      let tbRows = parseTallyTBXml(tbXml, keepPLLedger)
       const masterData = parseTallyMasterXml(masterXml)
+      let periodReport = null
+      if (tbRows.length > 0 && needsOpening) {
+        const asOf = dayBefore(period.from)
+        const openingXml = await getTallyLedgerBalancesAsOf(h, p, company, asOf, books.booksFrom)
+        try { writeFileSync(join(userDataPath('tally-debug'), `opening-raw-${Date.now()}.xml`), openingXml, 'utf8') } catch { /* best-effort debug dump */ }
+        const done = periodiseTallyRows(tbRows, parseTallyTBXml(openingXml, keepPLLedger), masterData.ledgerMap)
+        tbRows = done.rows
+        periodReport = { ...done.report, openingAsOf: asOf }
+      }
       // HTTP call can resolve with a response that superficially looks right
       // (e.g. an empty <LEDGER> collection) but parses to zero rows — that's
       // not a thrown error, so fall through to the ODBC path below instead
@@ -956,11 +1007,17 @@ export function registerTBHandlers() {
         // the wrong figure for every client who sets F11 "Integrate Accounts
         // and Inventory" to No and types the stock value in by hand.
         // Best-effort throughout; never blocks the import.
-        const stockTotals = await resolveStockFigures(h, p, company)
-        return { tbRows, masterData, rawTBXml: tbXml.substring(0, 500), source: 'http_xml', stockTotals, company }
+        const stockTotals = await resolveStockFigures(h, p, company, {
+          ...period, booksFrom: books.booksFrom, openingAsOf: needsOpening ? dayBefore(period.from) : null,
+        })
+        return { tbRows, masterData, rawTBXml: tbXml.substring(0, 500), source: 'http_xml', stockTotals, company,
+          period, periodApplied: true, booksFrom: books.booksFrom, periodReport }
       }
       httpErr = new Error(`HTTP XML export returned 0 ledger rows (${tbXml.substring(0, 180)})`)
     } catch (err) {
+      // T-070: a period outside the company's books is the answer, not a
+      // connection failure: the ODBC fallback must not run after it.
+      if (/^The books of /.test(err?.message || '')) throw err
       httpErr = err
     }
     // The ODBC fallback below reads Tally's ODBC driver directly and has NO
@@ -983,7 +1040,9 @@ export function registerTBHandlers() {
     }
     try {
       const odbcData = await getTallyDataViaOdbc(h, p, keepPLLedger)
-      return { ...odbcData, source: 'odbc', httpError: httpErr.message }
+      // T-070: Tally's ODBC driver cannot be given dates: it answers for the
+      // period open on Tally's screen. The screen must ask before using it.
+      return { ...odbcData, source: 'odbc', httpError: httpErr.message, period, periodApplied: false }
     } catch (odbcErr) {
       throw new Error(`${httpErr.message} ODBC fallback also failed: ${odbcErr.message}`)
     }

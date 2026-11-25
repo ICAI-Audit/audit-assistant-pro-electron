@@ -1,3 +1,5 @@
+> Historical Supabase-era guide. The `scripts/run-*migration*`, `setup-migration-helper.sql` and `apply-migration.cjs` helpers it names were removed in T-020 (they targeted the removed `tb_new_*` tables, read `supabase/migrations/` files that now live only under `_archive/`, and are not part of the SQLite application). See [current status](project/CURRENT_STATUS.md).
+
 # Running Trial Balance New Migration
 
 This guide explains how to run the database migration to create all tables for the Trial Balance New module.

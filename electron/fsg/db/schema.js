@@ -25,7 +25,59 @@ export async function tryClaimMigration(key) {
   return rows.length > 0
 }
 
+// T-071 / T-072: two columns on trial_balances, added to an installed database
+// in place (new databases get them from 10_fsg_tables.sql):
+//   tb_version   1, 2 or 3: the version of the Trial Balance within its
+//                financial year and branch, shown as _v1, _v2, _v3.
+//   carry_rules  1 = mapping reuses earlier decisions (the learned ledger
+//                rules and other Trial Balances' categorisation), as before;
+//                0 = the owner chose not to carry them to this version.
+// Existing Trial Balances are numbered once, in upload order within their year
+// and branch. Adding a column with a default keeps every existing row and value.
+export async function ensureTbVersionColumns() {
+  const { rows: cols } = await query(`PRAGMA table_info(trial_balances)`)
+  const has = (name) => cols.some(c => c.name === name)
+  if (!has('tb_version')) await query(`ALTER TABLE trial_balances ADD COLUMN tb_version INTEGER`)
+  if (!has('carry_rules')) await query(`ALTER TABLE trial_balances ADD COLUMN carry_rules INTEGER NOT NULL DEFAULT 1 CHECK (carry_rules IN (0, 1))`)
+  // Number only Trial Balances that have none yet, after the highest number
+  // already used in the same year and branch.
+  const { rows: tbs } = await query(
+    `SELECT id, entity_period_id, COALESCE(branch_name, '') AS branch, tb_version
+       FROM trial_balances WHERE entity_period_id IS NOT NULL ORDER BY id`)
+  const highest = new Map()
+  for (const t of tbs) {
+    const key = `${t.entity_period_id}|${t.branch}`
+    if (t.tb_version != null) highest.set(key, Math.max(highest.get(key) || 0, Number(t.tb_version)))
+  }
+  for (const t of tbs) {
+    if (t.tb_version != null) continue
+    const key = `${t.entity_period_id}|${t.branch}`
+    const v = (highest.get(key) || 0) + 1
+    highest.set(key, v)
+    await query(`UPDATE trial_balances SET tb_version = $1 WHERE id = $2`, [v, t.id])
+  }
+}
+
+// T-087: Branch Master - the branches of an Auditee with branches, picked from a list when a Trial Balance is
+// uploaded, so a second upload of branch A is A's next version (_v2), never a new branch "A_v2". Seeded once
+// from the branch names already on Trial Balances; nothing existing is changed.
+export async function ensureBranchMaster() {
+  await query(`CREATE TABLE IF NOT EXISTS fsg_branches (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_id  INTEGER NOT NULL,
+    name       TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (entity_id, name COLLATE NOCASE)
+  )`)
+  await query(`INSERT OR IGNORE INTO fsg_branches (entity_id, name)
+    SELECT DISTINCT entity_id, TRIM(branch_name) FROM trial_balances
+     WHERE entity_id IS NOT NULL AND TRIM(COALESCE(branch_name, '')) <> ''`)
+}
+
 export async function ensureSchema() {
+  await ensureTbVersionColumns()
+  await ensureBranchMaster()
+
   // ── Backfill ALIE for rows that are missing it ───────────────────────────────
   await query(`
     UPDATE mapped_tb SET alie = (

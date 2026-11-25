@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { fmtINR, parseSlashOptions } from '../../hooks/useFinancials'
+import { fmtINR, parseSlashOptions, fetchFinancialsData } from '../../hooks/useFinancials'
+import { notesFixTargets } from '../../utils/notesFixQueue'
 import { pushAction, snapshotMapping } from '../../utils/undoManager'
 import { resolveFixScope, fixOpensPreviousYear, natureLevelsFor, ledgerNeeds, isComplete, bulkNaturePlan } from '../../utils/fixTargets'
 import HierarchyPopup from '../shared/HierarchyPopup'
@@ -28,6 +29,7 @@ const COLUMNS = [
   { key: 'select', label: '', width: 44 },
   { key: 'name', label: 'Ledger in Books', width: 260 },
   { key: 'closing_balance', label: 'CY', width: 120 },
+  { key: 'drcr', label: 'Dr/Cr', width: 48 },
   { key: 'save', label: 'Save', width: 80 },
   { key: 'needs', label: 'To fix', width: 230 },
   { key: 'mapping1_resultant', label: 'Mapping 1', width: 210 },
@@ -47,10 +49,10 @@ const CUSTOM_VALUE = '__custom__'
 // Level 4-7 classifications a ledger can need beyond Mapping 1/2/3 (utils/fixTargets.js). Their columns
 // appear, right after Mapping 3, only where a ledger on screen needs them (Level 5 always).
 const NATURE_COLUMNS = {
-  4: { key: 'level4_value', label: 'Level 4 (sub-head)', width: 200, level: 4 },
-  5: { key: 'level5_value', label: 'Level 5 (nature)', width: 190, level: 5 },
-  6: { key: 'level6_value', label: 'Level 6 (Secured / Unsecured)', width: 170, level: 6 },
-  7: { key: 'level7_value', label: 'Level 7 (specify nature)', width: 200, level: 7 },
+  4: { key: 'level4_value', label: 'Mapping 4 (sub-head)', width: 200, level: 4 },
+  5: { key: 'level5_value', label: 'Mapping 5 (nature)', width: 190, level: 5 },
+  6: { key: 'level6_value', label: 'Mapping 6 (Secured / Unsecured)', width: 170, level: 6 },
+  7: { key: 'level7_value', label: 'Mapping 7 (specify nature)', width: 200, level: 7 },
 }
 const columnsWith = (levels) => {
   const out = []
@@ -75,6 +77,13 @@ function textValue(row, key) {
 function shownAmount(row) {
   const bal = parseFloat(row.closing_balance || 0)
   return (row.alie === 'ASSETS' || row.alie === 'Expenses') ? -bal : bal
+}
+
+// Dr or Cr of the balance as the Trial Balance carries it (stored Cr positive, Dr negative). The amount column shows a
+// Dr-side head positive, so without this a debit and a credit balance look alike.
+export function drCrOf(row, field = 'closing_balance') {
+  const bal = parseFloat(row?.[field] || 0)
+  return bal < -0.005 ? 'Dr' : bal > 0.005 ? 'Cr' : ''
 }
 
 // "To fix" filter: anything still to fix, complete, or one particular need.
@@ -106,7 +115,6 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   const [search, setSearch] = useState('')
   const [columnFilters, setColumnFilters] = useState({})
   const [refreshTick, setRefreshTick] = useState(0)
-  const [diagnostics, setDiagnostics] = useState(null)
   const [showAll, setShowAll] = useState(false)
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
   const [page, setPage] = useState(0)
@@ -166,6 +174,40 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   const activeFilter = scopeFilter
     ? (fixScope.idScoped ? { mappedIds: fixScope.ids } : fixScope.filter)
     : (showAll ? {} : { uncategorised: true })
+  const queueView = !scopeFilter && !showAll
+
+  // T-083: everything Notes, the Balance Sheet and the P&L show Fix / Bifurcate / Review for is on this list too
+  // (utils/notesFixQueue.js - the very tests those screens draw the buttons by). Without it this screen could say
+  // "no exceptions" while Notes still showed Fix. Worked out from the same statements Notes builds; kept apart from
+  // the list's own load so a save is not slowed down by it.
+  const [notesFix, setNotesFix] = useState(null)   // { cy: Map(id -> reason), py: Map, orphan: [] } | null while loading
+  useEffect(() => {
+    if (!queueView || !activeTB?.id || activeTB.id === '__consolidated__') { setNotesFix(null); return }
+    let live = true
+    Promise.resolve(fetchFinancialsData(activeTB, prevTB, entity, activeRsId))
+      .then(data => {
+        if (!live) return
+        const t = notesFixTargets(data)
+        const toMap = (key) => {
+          const m = new Map()
+          for (const it of t.items) for (const id of it[key]) if (!m.has(id)) m.set(id, { what: it.what, where: it.where })
+          return m
+        }
+        setNotesFix({ cy: toMap('ids'), py: toMap('pyIds'), orphan: t.items.filter(i => !i.ids.length && !i.pyIds.length) })
+      })
+      .catch(() => { if (live) setNotesFix({ cy: new Map(), py: new Map(), orphan: [], failed: true }) })
+    return () => { live = false }
+  }, [queueView, activeTB?.id, prevTB?.id, refreshTick, entity?.id, activeRsId])
+  const notesWhyMap = notesFix ? (categorisePY ? notesFix.py : notesFix.cy) : null
+  const notesWhy = (id) => (queueView && notesWhyMap ? notesWhyMap.get(id) || null : null)
+  // What a ledger still needs: its own Level Format test, plus the Notes / BS / P&L flag when that is all there is.
+  const rowNeeds = (r) => {
+    const needs = ledgerNeeds(levelFormat, r)
+    const why = notesWhy(r.id)
+    if (why && !needs.length) needs.push({ what: why.what === 'Review' ? 'Review' : why.what === 'Bifurcate' ? 'Mapping 3' : 'Recategorise',
+      hint: why.what === 'Review' ? `${why.where}: check it belongs under this head, then Save to confirm` : `flagged on ${why.where}` })
+    return needs
+  }
 
   useEffect(() => {
     if (!tbId) return
@@ -207,6 +249,42 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   }, [tbId, refreshTick, showAll, entity?.id, entity?.constitution, activeRsId, scopeFilter])
 
   const refresh = () => setRefreshTick(t => t + 1)
+
+  // T-083: add the flagged ledgers the database query did not list.
+  useEffect(() => {
+    if (!queueView || loading || !tbId || !notesWhyMap?.size) return
+    const have = new Set(ledgers.map(r => r.id))
+    const missing = [...notesWhyMap.keys()].filter(id => !have.has(id))
+    if (!missing.length) return
+    let live = true
+    Promise.resolve(fsgApi?.findMappedByFilter(tbId, { mappedIds: missing }))
+      .then(rows => {
+        if (!live || !rows?.length) return
+        setLedgers(prev => { const ids = new Set(prev.map(r => r.id)); return [...prev, ...rows.filter(r => !ids.has(r.id))] })
+        setOriginalById(prev => { const next = { ...prev }; for (const r of rows) if (!next[r.id]) next[r.id] = snapshotMapping(r); return next })
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [queueView, loading, tbId, notesWhyMap, ledgers.length])
+
+  // T-040: Notes also shows Fix for Previous Year ledgers, so "every ledger is
+  // fully categorised" may only be said when the Previous Year Trial Balance
+  // has nothing left either.
+  const [pyQueue, setPyQueue] = useState([])
+  const pyCheckApplies = !scopeFilter && !showAll && !categorisePY && !!prevTB?.id
+  useEffect(() => {
+    if (!pyCheckApplies) { setPyQueue([]); return }
+    let live = true
+    Promise.resolve(fsgApi?.findMappedByFilter(prevTB.id, { uncategorised: true }))
+      .then(rows => { if (live) setPyQueue(rows || []) })
+      .catch(() => { if (live) setPyQueue([]) })
+    return () => { live = false }
+  }, [pyCheckApplies, prevTB?.id, refreshTick])
+  const pyPendingCount = useMemo(() => {
+    const pending = new Set((levelFormat.length ? pyQueue.filter(r => !isComplete(levelFormat, r)) : pyQueue).map(r => r.id))
+    for (const id of (notesFix?.py?.keys() || [])) pending.add(id)
+    return pending.size
+  }, [pyQueue, levelFormat, notesFix])
 
   // Bulk auto-map a TB — for Previous Year this is what actually carries
   // Current Year's classification across: runMapping's engine (see
@@ -362,7 +440,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   const visibleLedgers = useMemo(() => {
     const q = search.trim().toLowerCase()
     return ledgers.filter(r => {
-      if (!showHidden && hiddenComplete.has(r.id)) return false
+      if (!showHidden && hiddenComplete.has(r.id) && !notesWhy(r.id)) return false
       if (!showZero) {
         const cb = Math.abs(parseFloat(r.closing_balance) || 0)
         const ob = Math.abs(parseFloat(r.opening_balance) || 0)
@@ -384,21 +462,22 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
       }
       // Amount: >100000, <500, 1000-5000 … (utils/amountFilter.js)
       if (columnFilters.closing_balance && !amountPasses(columnFilters.closing_balance, shownAmount(r))) return false
+      if (columnFilters.drcr && drCrOf(r) !== columnFilters.drcr) return false
       const nf = columnFilters.needs
       if (nf) {
-        const needs = ledgerNeeds(levelFormat, r)
+        const needs = rowNeeds(r)
         if (nf === NEEDS_ANY ? !needs.length : nf === NEEDS_NONE ? needs.length > 0 : !needs.some(n => n.what === nf)) return false
       }
       return true
     })
-  }, [ledgers, search, columnFilters, showZero, hiddenComplete, showHidden, levelFormat])
+  }, [ledgers, search, columnFilters, showZero, hiddenComplete, showHidden, levelFormat, notesWhyMap])
 
   // The kinds of fix the ledgers on screen still need, for the "To fix" filter.
   const needKinds = useMemo(() => {
     const kinds = new Set()
-    for (const r of ledgers) for (const n of ledgerNeeds(levelFormat, r)) kinds.add(n.what)
+    for (const r of ledgers) for (const n of rowNeeds(r)) kinds.add(n.what)
     return [...kinds].sort()
-  }, [ledgers, levelFormat])
+  }, [ledgers, levelFormat, notesWhyMap])
 
   // Which of Level 4-7 the ledgers on screen call for (Level 5 always; the level a Fix was about too).
   const natureLevels = useMemo(() => {
@@ -409,7 +488,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
     return [4, 5, 6, 7].filter(l => used.has(l))
   }, [ledgers, levelFormat, scopeFilter?.focusLevel])
   const columns = useMemo(() => columnsWith(natureLevels), [natureLevels])
-  const needFixCount = useMemo(() => visibleLedgers.filter(r => ledgerNeeds(levelFormat, r).length > 0).length, [visibleLedgers, levelFormat])
+  const needFixCount = useMemo(() => visibleLedgers.filter(r => rowNeeds(r).length > 0).length, [visibleLedgers, levelFormat, notesWhyMap])
 
   // The page being drawn. Back to the first page whenever the list itself changes (another search, filter, tick box or
   // Trial Balance) - never on an edit, so saving a row on page 3 leaves you on page 3.
@@ -423,7 +502,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   const allChecked = visibleLedgers.length > 0 && selectedVisibleCount === visibleLedgers.length
   const someChecked = selectedVisibleCount > 0 && !allChecked
   const totalWidth = columns.reduce((s, c) => s + c.width, 0)
-  const stickyLeft = { select: 0, name: 44, closing_balance: 304, save: 424 }
+  const stickyLeft = { select: 0, name: 44, closing_balance: 304, drcr: 424, save: 472 }
 
   // Auto-populate bulk pickers from selected rows (common values)
   useEffect(() => {
@@ -620,7 +699,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
         return n
       })
       pushAction({
-        label: `Bulk Level ${p.level} (${impacted.length} rows)`,
+        label: `Bulk Mapping ${p.level} (${impacted.length} rows)`,
         changes: impacted.map(r => ({
           id: r.id,
           before: originalById[r.id] || snapshotMapping(r),
@@ -712,6 +791,20 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
           title={AMOUNT_FILTER_HELP}
           className={`w-full h-7 border rounded px-1.5 text-[11px] text-right bg-white focus:outline-none focus:ring-1 ${f?.invalid ? 'border-red-400 focus:ring-red-400' : 'border-blue-100 focus:ring-blue-400'}`}
         />
+      )
+    }
+    if (key === 'drcr') {
+      return (
+        <select
+          value={columnFilters.drcr || ''}
+          onChange={e => setFilter('drcr', e.target.value)}
+          title="Show only debit or only credit balances"
+          className="w-full h-7 border border-blue-100 rounded px-0.5 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+        >
+          <option value="">All</option>
+          <option value="Dr">Dr</option>
+          <option value="Cr">Cr</option>
+        </select>
       )
     }
     if (key === 'needs') {
@@ -872,7 +965,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
           ) : null}
           {scopeFilter.focusLevel ? (
             <span className="ml-3 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 text-xs">
-              Fix is about Level {scopeFilter.focusLevel} — that column is highlighted
+              Fix is about Mapping {scopeFilter.focusLevel} — that column is highlighted
             </span>
           ) : null}
           <button onClick={() => setScopeFilter(null)}
@@ -931,15 +1024,6 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
             className="px-3 py-1.5 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition">
             Refresh
           </button>
-          <button
-            onClick={async () => {
-              if (!tbId) return
-              const d = await fsgApi?.exceptionsDiagnostics(tbId)
-              setDiagnostics(d)
-            }}
-            className="px-3 py-1.5 text-xs border border-amber-400 text-amber-700 rounded hover:bg-amber-50 transition">
-            Diagnose
-          </button>
           <input type="text" placeholder="Search all visible fields..."
             value={search} onChange={e => setSearch(e.target.value)}
             className="border border-gray-300 rounded px-3 py-1.5 text-xs w-56 focus:ring-2 focus:ring-blue-400 focus:outline-none" />
@@ -950,19 +1034,6 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
-        {diagnostics && (
-          <div className="mb-3 bg-amber-50 border border-amber-200 rounded p-3 text-xs font-mono">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold text-amber-900">Diagnostic snapshot</span>
-              <button onClick={() => setDiagnostics(null)} className="text-amber-700 hover:text-amber-900">close</button>
-            </div>
-            <div className="grid grid-cols-3 gap-3 mb-2">
-              <pre className="bg-white border border-amber-100 rounded p-2 text-[11px] whitespace-pre">{JSON.stringify(diagnostics.counts, null, 2)}</pre>
-              <pre className="bg-white border border-amber-100 rounded p-2 text-[11px] whitespace-pre">{JSON.stringify(diagnostics.byStatus, null, 2)}</pre>
-              <pre className="bg-white border border-amber-100 rounded p-2 text-[11px] whitespace-pre overflow-auto" style={{ maxHeight: '220px' }}>{JSON.stringify(diagnostics.sample, null, 2)}</pre>
-            </div>
-          </div>
-        )}
         {loading && <LoadingNote className="py-4" />}
         {error && <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{error}</div>}
 
@@ -986,9 +1057,31 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
               </button>
             </div>
           </div>
+        ) : pyPendingCount > 0 ? (
+          <div className="fsg-py-pending text-amber-800 bg-amber-50 border border-amber-200 rounded px-4 py-5 text-sm">
+            <p className="font-semibold mb-1">This year’s Trial Balance has no exceptions, but the Previous Year Trial Balance still has {pyPendingCount} ledger{pyPendingCount !== 1 ? 's' : ''} to categorise.</p>
+            <p className="text-xs mb-3">Notes, the Balance Sheet and the P&amp;L show Fix for them until they are categorised.</p>
+            <button onClick={() => setCategorisePY(true)} className="px-2 py-1 text-xs rounded border border-amber-400 bg-white hover:bg-amber-100">
+              Open the Previous Year ledgers
+            </button>
+          </div>
+        ) : queueView && !notesFix ? (
+          <div className="text-gray-600 bg-gray-50 border border-gray-200 rounded px-4 py-5 text-sm" data-testid="recat-notes-checking">
+            Checking Notes, the Balance Sheet and the P&amp;L for anything still flagged…
+          </div>
+        ) : queueView && (notesFix.failed || notesFix.orphan.length > 0) ? (
+          <div className="text-amber-800 bg-amber-50 border border-amber-200 rounded px-4 py-5 text-sm" data-testid="recat-notes-orphan">
+            {notesFix.failed ? (
+              <p className="font-semibold">No ledger is left to categorise here, but Notes could not be checked just now. Open Notes to confirm, or refresh this screen.</p>
+            ) : (<>
+              <p className="font-semibold mb-1">No ledger is left to categorise here, but these lines are still flagged and have no Trial Balance ledger behind them:</p>
+              <ul className="list-disc pl-5 text-xs">{notesFix.orphan.map((o, i) => <li key={i}>{o.where} ({o.what})</li>)}</ul>
+              <p className="text-xs mt-2">They come from a schedule or a manual entry (for example the Dep tab or the Stock tab); fix them there.</p>
+            </>)}
+          </div>
         ) : (
-          <div className="text-center text-green-700 bg-green-50 border border-green-200 rounded px-4 py-6 text-sm">
-            No exceptions - every ledger is fully categorised.
+          <div className="text-center text-green-700 bg-green-50 border border-green-200 rounded px-4 py-6 text-sm" data-testid="recat-all-done">
+            No exceptions - every ledger is fully categorised{prevTB?.id ? ', in this year’s and the Previous Year Trial Balance' : ''}. Notes, the Balance Sheet and the P&amp;L will not ask for re-categorisation.
           </div>
         ))}
 
@@ -1084,7 +1177,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                 {bulkNatures.map(n => (
                   <div key={n.level}>
                     <label className="block text-[10px] text-gray-500 mb-0.5">
-                      Level {n.level} {n.level === 4 ? '(Sub-head)' : n.level === 7 ? '(Specify nature)' : '(Nature)'}
+                      Mapping {n.level} {n.level === 4 ? '(Sub-head)' : n.level === 7 ? '(Specify nature)' : '(Nature)'}
                     </label>
                     {n.freeText ? (
                       <input type="text" value={bulkNatureValue[n.level]} onChange={e => setBulkNature(n.level, e.target.value)}
@@ -1101,10 +1194,11 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                     )}
                   </div>
                 ))}
-                {/* a custom note line has no Level Format row — Level 5 stays a free-text field for it, as before */}
-                {!bulkNatures.some(n => n.level === 5) && (
+                {/* a custom note line has no Level Format row — Mapping 5 stays a free-text field for it, as before.
+                    Shown only once such a line is chosen: before Mapping 3 it sat alone after Mapping 3 and looked as if Mapping 4 were missing. */}
+                {bulkM3 && !bulkLfRow && !bulkNatures.some(n => n.level === 5) && (
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-0.5">Level 5 (Nature)</label>
+                    <label className="block text-[10px] text-gray-500 mb-0.5">Mapping 5 (Nature)</label>
                     <input type="text" value={bulkL5} onChange={e => setBulkL5(e.target.value)}
                       disabled={!bulkM3}
                       className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs bg-white disabled:bg-gray-100" />
@@ -1121,14 +1215,14 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
               {levelOnlyPlan.length > 0 && (
                 <div className="mt-3 pt-2 border-t border-blue-200">
                   <div className="text-[10px] text-blue-700 mb-1.5">
-                    <span className="font-semibold">Level 4–7 only</span> — sets just that level on the ticked ledgers that need it.
-                    Their Mapping 1 / 2 / 3 and other levels stay as they are, so ledgers under different lines can be fixed together.
+                    <span className="font-semibold">Mapping 4–7 only</span> — sets just that mapping on the ticked ledgers that need it.
+                    Their Mapping 1 / 2 / 3 and other mappings stay as they are, so ledgers under different lines can be fixed together.
                   </div>
                   <div className="grid gap-2 text-xs" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                     {levelOnlyPlan.map(p => (
                       <div key={p.level} className="bg-white border border-blue-100 rounded p-2">
                         <label className="block text-[10px] text-gray-500 mb-0.5">
-                          Level {p.level} {p.level === 4 ? '(Sub-head)' : p.level === 7 ? '(Specify nature)' : '(Nature)'} — {p.ids.length} ledger{p.ids.length !== 1 ? 's' : ''}
+                          Mapping {p.level} {p.level === 4 ? '(Sub-head)' : p.level === 7 ? '(Specify nature)' : '(Nature)'} — {p.ids.length} ledger{p.ids.length !== 1 ? 's' : ''}
                           {p.missing > 0 && <span className="text-red-600"> ({p.missing} not set)</span>}
                         </label>
                         <div className="flex gap-1">
@@ -1217,7 +1311,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                       <th
                         key={col.key}
                         style={stickyStyle(col.key, true)}
-                        className={`px-2 py-1.5 font-semibold text-blue-900 border-r border-blue-100 bg-blue-50 ${col.key === 'closing_balance' ? 'text-right' : col.key === 'select' || col.key === 'save' ? 'text-center' : 'text-left'} ${col.level && Number(scopeFilter?.focusLevel) === col.level ? 'ring-2 ring-inset ring-amber-400 !bg-amber-100' : ''} ${col.key === 'needs' ? 'text-red-800' : ''}`}
+                        className={`px-2 py-1.5 font-semibold text-blue-900 border-r border-blue-100 bg-blue-50 ${col.key === 'closing_balance' ? 'text-right' : col.key === 'select' || col.key === 'save' || col.key === 'drcr' ? 'text-center' : 'text-left'} ${col.level && Number(scopeFilter?.focusLevel) === col.level ? 'ring-2 ring-inset ring-amber-400 !bg-amber-100' : ''} ${col.key === 'needs' ? 'text-red-800' : ''}`}
                       >
                         {col.key === 'select' ? (
                           <input type="checkbox" checked={allChecked} ref={el => { if (el) el.indeterminate = someChecked }}
@@ -1243,7 +1337,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                     // What this ledger still lacks, from its own Level Format row(s) — found by captions, or,
                     // when those lead nowhere (old wording, blank Level 3), by its own level_format_id:
                     // Mapping 2 / 3 and every Level 4-7 classification it must be given (utils/fixTargets.js).
-                    const needs = ledgerNeeds(levelFormat, row)
+                    const needs = rowNeeds(row)
                     const natureOf = Object.fromEntries(natureLevelsFor(levelFormat, row).map(n => [n.level, n]))
                     const isChecked = selected.has(row.id)
                     const isFocused = focusedRow?.id === row.id
@@ -1272,6 +1366,13 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                           className={`px-2 py-1 text-right font-mono text-gray-700 border-r border-gray-100 ${stickyBg('closing_balance', isChecked)}`}
                         >
                           {fmtINR(rowAmt(row, 'closing_balance'))}
+                        </td>
+                        <td
+                          style={stickyStyle('drcr')}
+                          title={drCrOf(row) === 'Dr' ? 'Debit balance in the Trial Balance' : drCrOf(row) === 'Cr' ? 'Credit balance in the Trial Balance' : 'Nil balance'}
+                          className={`px-1 py-1 text-center text-[10px] font-semibold border-r border-gray-100 ${drCrOf(row) === 'Dr' ? 'text-blue-700' : 'text-amber-700'} ${stickyBg('drcr', isChecked)}`}
+                        >
+                          {drCrOf(row)}
                         </td>
                         <td
                           style={stickyStyle('save')}

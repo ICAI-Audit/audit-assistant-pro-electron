@@ -1,0 +1,2172 @@
+{
+ "rules": [
+  {
+   "key": "A.q3a",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "A",
+     "dsec": null,
+     "text": "(b) If yes, effect of such observations/qualifications/adverse remark/disclaimer/emphasis of matter in income or loss or book profit, which has not been considered in particulars filed in Part D of Form No. 26Sl. No.Nature of observation/qualifications/adverse remark/disclaimer/emphasis of matterIncrease in profit/decrease in lossDecrease in profit/increase in lossNet impactRemarks(A)(B)(C)(D)(E)(F)1 ×2 ×Total+ Add row",
+     "fields": [],
+     "tables": [
+      "A3b"
+     ]
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "B.q3b",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "B",
+     "dsec": null,
+     "text": "(b) If yes, effect of such observations/qualifications/adverse remark/disclaimer/emphasis of matter in income or loss or book profit, which has not been considered in particulars filed in Part D of Form No. 26Sl. No.Nature of observation/qualifications/adverse remark/disclaimer/emphasis of matterIncrease in profit/decrease in lossDecrease in profit/increase in lossNet impactRemarks(A)(B)(C)(D)(E)(F)1 ×2 ×Total+ Add row",
+     "fields": [],
+     "tables": [
+      "B3b"
+     ]
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c11b",
+   "schedules": [
+    "s11b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "A",
+     "text": "If yes, refer Schedule – General Information",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c12b",
+   "schedules": [
+    "s12b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "A",
+     "text": "If yes, refer Schedule – General Information",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c12c",
+   "schedules": [
+    "s12c"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "A",
+     "text": "(i) attach copy of such audit report(ii) Impact, if any, of disqualification/disagreement on any matter/item/value/quantity: Refer Schedule – General Information",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c15b",
+   "schedules": [
+    "s15b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "B",
+     "text": "If yes, refer Schedule – Accounting Information",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c16b",
+   "schedules": [
+    "s16b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "B",
+     "text": "If yes, refer Schedule – Accounting Information",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c17",
+   "schedules": [
+    "s17"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "B",
+     "text": "If yes, refer Schedule – Accounting Information",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c18",
+   "schedules": [
+    "s18"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "B",
+     "text": "If yes, refer Schedule – Accounting Information",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c19",
+   "schedules": [
+    "s19"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "B",
+     "text": "If yes, refer Schedule – Accounting Information",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c20",
+   "schedules": [
+    "s20"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "C",
+     "text": "If yes, refer Schedule – Computation of receipt/income",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c21",
+   "schedules": [
+    "s21"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "C",
+     "text": "If yes, refer Schedule – Computation of receipt/income",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c22",
+   "schedules": [
+    "s22"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "C",
+     "text": "If yes, refer Schedule – Computation of receipt/income",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c23",
+   "schedules": [
+    "s23"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "C",
+     "text": "If yes, refer Schedule – Computation of receipt/income",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c24",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "C",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c24_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c25",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "C",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c25_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c26",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c26_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c27a",
+   "schedules": [
+    "s27a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c27b",
+   "schedules": [
+    "s27b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c27c",
+   "schedules": [
+    "s27c"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c27d",
+   "schedules": [
+    "s27d"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c28",
+   "schedules": [
+    "s28"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c29",
+   "schedules": [
+    "s29"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c30",
+   "schedules": [
+    "s30"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c31",
+   "schedules": [
+    "s31"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c32a",
+   "schedules": [
+    "s32a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c32b",
+   "schedules": [
+    "s32b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c33a",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c33a_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c33b",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c33b_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c33c",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c33c_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c34",
+   "schedules": [
+    "s34"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "D",
+     "text": "If yes, refer Schedule – Computation of Expenses",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c35a",
+   "schedules": [
+    "s35a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "E",
+     "text": "If yes, refer Schedule – Prior Period",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c35b",
+   "schedules": [
+    "s35b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "E",
+     "text": "If yes, refer Schedule – Prior Period",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c36",
+   "schedules": [
+    "s36"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "F",
+     "text": "If yes, refer Schedule – Losses, Depreciation and Deductions",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c37a",
+   "schedules": [
+    "s37a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "F",
+     "text": "If yes, refer Schedule – Losses, Depreciation and Deductions",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c37b",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "F",
+     "text": "(ii) Amount of brought forward loss that can not be allowed to be carried forward (₹):",
+     "fields": [
+      "c37b_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c37c",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "F",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c37c_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c37d",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "F",
+     "text": "If yes, amount of speculation loss incurred during tax year, if any (₹):",
+     "fields": [
+      "c37d_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c37e",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "F",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c37e_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c38",
+   "schedules": [
+    "s38"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "F",
+     "text": "If yes, refer Schedule – Losses, Depreciation and Deductions",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c39",
+   "schedules": [
+    "s39"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "F",
+     "text": "If yes, refer Schedule – Losses, Depreciation and Deductions",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c40",
+   "schedules": [
+    "s40"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "G",
+     "text": "If yes, refer Schedule – International Taxation",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c41a",
+   "schedules": [
+    "s41a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "G",
+     "text": "If yes, refer Schedule – International Taxation",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c41b",
+   "schedules": [
+    "s41b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "G",
+     "text": "If yes, refer Schedule – International Taxation",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c41c",
+   "schedules": [
+    "s41c"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "G",
+     "text": "If yes, refer Schedule – International Taxation",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c42",
+   "schedules": [],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "G",
+     "text": "If yes, amount (₹):",
+     "fields": [
+      "c42_amt"
+     ],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c43",
+   "schedules": [
+    "s43"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "G",
+     "text": "If yes, refer Schedule – International Taxation",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c44",
+   "schedules": [
+    "s44"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "H",
+     "text": "If yes, refer Schedule – Other Key Parameters",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c45a",
+   "schedules": [
+    "s45a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "H",
+     "text": "If yes, refer Schedule – Other Key Parameters",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c45b",
+   "schedules": [
+    "s45b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "H",
+     "text": "If yes, refer Schedule – Other Key Parameters",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c45c",
+   "schedules": [
+    "s45c"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "H",
+     "text": "If yes, refer Schedule – Other Key Parameters",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c45d",
+   "schedules": [
+    "s45d"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "H",
+     "text": "If yes, refer Schedule – Other Key Parameters",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c46",
+   "schedules": [
+    "s46"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "H",
+     "text": "If yes, refer Schedule – Other Key Parameters",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c47",
+   "schedules": [
+    "s47"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "H",
+     "text": "If yes, refer Schedule – Other Key Parameters",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c48",
+   "schedules": [
+    "s48"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "H",
+     "text": "If yes, refer Schedule – Other Key Parameters",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c50a",
+   "schedules": [
+    "s50a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "I",
+     "text": "If yes, refer Schedule – TDS/TCS",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c50b",
+   "schedules": [
+    "s50b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "I",
+     "text": "If yes, refer Schedule – TDS/TCS",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c50c",
+   "schedules": [
+    "s50c"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "I",
+     "text": "If yes, refer Schedule – TDS/TCS",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c51a",
+   "schedules": [
+    "s51a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "I",
+     "text": "If yes, refer Schedule – TDS/TCS",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c51b",
+   "schedules": [
+    "s51b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "I",
+     "text": "If yes, refer Schedule – TDS/TCS",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c51c",
+   "schedules": [
+    "s51c"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "I",
+     "text": "If yes, refer Schedule – TDS/TCS",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c51d",
+   "schedules": [
+    "s51d"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "I",
+     "text": "If yes, refer Schedule – TDS/TCS",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c52",
+   "schedules": [
+    "s52a",
+    "s52b"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "J",
+     "text": "(a) If yes, refer Schedule - GST(b) Furnish break-up of expenditure incurred during the year as under (refer Schedule - GST)",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c53a",
+   "schedules": [
+    "s53a"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "K",
+     "text": "If yes, refer Schedule – Quantitative Details",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  },
+  {
+   "key": "c53b",
+   "schedules": [
+    "s53bi",
+    "s53bii"
+   ],
+   "inline": [
+    {
+     "panel": "D",
+     "dsec": "K",
+     "text": "If yes, refer Schedule – Quantitative Details(i) for raw materials(ii) for finished products, by-products, and scrap",
+     "fields": [],
+     "tables": []
+    }
+   ],
+   "verifiedByToggle": true
+  }
+ ],
+ "byKey": {
+  "A.q3a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    0
+   ],
+   "expectedFromAttribute": [
+    0
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "B.q3b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    1
+   ],
+   "expectedFromAttribute": [
+    1
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c11b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    2,
+    65
+   ],
+   "expectedFromAttribute": [
+    2,
+    65
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s11b"
+   ],
+   "revealedOther": 1
+  },
+  "c12b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    3,
+    66
+   ],
+   "expectedFromAttribute": [
+    3,
+    66
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s12b"
+   ],
+   "revealedOther": 1
+  },
+  "c12c": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    4,
+    67
+   ],
+   "expectedFromAttribute": [
+    4,
+    67
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s12c"
+   ],
+   "revealedOther": 1
+  },
+  "c15b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    5,
+    68
+   ],
+   "expectedFromAttribute": [
+    5,
+    68
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s15b"
+   ],
+   "revealedOther": 1
+  },
+  "c16b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    6,
+    69
+   ],
+   "expectedFromAttribute": [
+    6,
+    69
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s16b"
+   ],
+   "revealedOther": 1
+  },
+  "c17": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    7,
+    70
+   ],
+   "expectedFromAttribute": [
+    7,
+    70
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s17"
+   ],
+   "revealedOther": 1
+  },
+  "c18": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    8,
+    71
+   ],
+   "expectedFromAttribute": [
+    8,
+    71
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s18"
+   ],
+   "revealedOther": 1
+  },
+  "c19": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    9,
+    72
+   ],
+   "expectedFromAttribute": [
+    9,
+    72
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s19"
+   ],
+   "revealedOther": 1
+  },
+  "c20": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    10,
+    73
+   ],
+   "expectedFromAttribute": [
+    10,
+    73
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s20"
+   ],
+   "revealedOther": 1
+  },
+  "c21": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    11,
+    74
+   ],
+   "expectedFromAttribute": [
+    11,
+    74
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s21"
+   ],
+   "revealedOther": 1
+  },
+  "c22": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    12,
+    75
+   ],
+   "expectedFromAttribute": [
+    12,
+    75
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s22"
+   ],
+   "revealedOther": 1
+  },
+  "c23": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    13,
+    76
+   ],
+   "expectedFromAttribute": [
+    13,
+    76
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s23"
+   ],
+   "revealedOther": 1
+  },
+  "c24": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    14
+   ],
+   "expectedFromAttribute": [
+    14
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c25": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    15
+   ],
+   "expectedFromAttribute": [
+    15
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c26": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    16
+   ],
+   "expectedFromAttribute": [
+    16
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c27a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    17,
+    77
+   ],
+   "expectedFromAttribute": [
+    17,
+    77
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s27a"
+   ],
+   "revealedOther": 1
+  },
+  "c27b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    18,
+    78
+   ],
+   "expectedFromAttribute": [
+    18,
+    78
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s27b"
+   ],
+   "revealedOther": 1
+  },
+  "c27c": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    19,
+    79
+   ],
+   "expectedFromAttribute": [
+    19,
+    79
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s27c"
+   ],
+   "revealedOther": 1
+  },
+  "c27d": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    20,
+    80
+   ],
+   "expectedFromAttribute": [
+    20,
+    80
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s27d"
+   ],
+   "revealedOther": 1
+  },
+  "c28": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    21,
+    81
+   ],
+   "expectedFromAttribute": [
+    21,
+    81
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s28"
+   ],
+   "revealedOther": 1
+  },
+  "c29": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    22,
+    82
+   ],
+   "expectedFromAttribute": [
+    22,
+    82
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s29"
+   ],
+   "revealedOther": 1
+  },
+  "c30": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    23,
+    83
+   ],
+   "expectedFromAttribute": [
+    23,
+    83
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s30"
+   ],
+   "revealedOther": 1
+  },
+  "c31": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    24,
+    84
+   ],
+   "expectedFromAttribute": [
+    24,
+    84
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s31"
+   ],
+   "revealedOther": 1
+  },
+  "c32a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    25,
+    85
+   ],
+   "expectedFromAttribute": [
+    25,
+    85
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s32a"
+   ],
+   "revealedOther": 1
+  },
+  "c32b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    26,
+    86
+   ],
+   "expectedFromAttribute": [
+    26,
+    86
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s32b"
+   ],
+   "revealedOther": 1
+  },
+  "c33a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    27
+   ],
+   "expectedFromAttribute": [
+    27
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c33b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    28
+   ],
+   "expectedFromAttribute": [
+    28
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c33c": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    29
+   ],
+   "expectedFromAttribute": [
+    29
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c34": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    30,
+    87
+   ],
+   "expectedFromAttribute": [
+    30,
+    87
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s34"
+   ],
+   "revealedOther": 1
+  },
+  "c35a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    31,
+    88
+   ],
+   "expectedFromAttribute": [
+    31,
+    88
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s35a"
+   ],
+   "revealedOther": 1
+  },
+  "c35b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    32,
+    89
+   ],
+   "expectedFromAttribute": [
+    32,
+    89
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s35b"
+   ],
+   "revealedOther": 1
+  },
+  "c36": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    33,
+    90
+   ],
+   "expectedFromAttribute": [
+    33,
+    90
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s36"
+   ],
+   "revealedOther": 1
+  },
+  "c37a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    34,
+    91
+   ],
+   "expectedFromAttribute": [
+    34,
+    91
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s37a"
+   ],
+   "revealedOther": 1
+  },
+  "c37b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    35
+   ],
+   "expectedFromAttribute": [
+    35
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c37c": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    36
+   ],
+   "expectedFromAttribute": [
+    36
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c37d": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    37
+   ],
+   "expectedFromAttribute": [
+    37
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c37e": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    38
+   ],
+   "expectedFromAttribute": [
+    38
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c38": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    39,
+    92
+   ],
+   "expectedFromAttribute": [
+    39,
+    92
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s38"
+   ],
+   "revealedOther": 1
+  },
+  "c39": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    40,
+    93
+   ],
+   "expectedFromAttribute": [
+    40,
+    93
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s39"
+   ],
+   "revealedOther": 1
+  },
+  "c40": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    41,
+    94
+   ],
+   "expectedFromAttribute": [
+    41,
+    94
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s40"
+   ],
+   "revealedOther": 1
+  },
+  "c41a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    42,
+    95
+   ],
+   "expectedFromAttribute": [
+    42,
+    95
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s41a"
+   ],
+   "revealedOther": 1
+  },
+  "c41b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    43,
+    96
+   ],
+   "expectedFromAttribute": [
+    43,
+    96
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s41b"
+   ],
+   "revealedOther": 1
+  },
+  "c41c": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    44,
+    97
+   ],
+   "expectedFromAttribute": [
+    44,
+    97
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s41c"
+   ],
+   "revealedOther": 1
+  },
+  "c42": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    45
+   ],
+   "expectedFromAttribute": [
+    45
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [],
+   "revealedOther": 1
+  },
+  "c43": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    46,
+    98
+   ],
+   "expectedFromAttribute": [
+    46,
+    98
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s43"
+   ],
+   "revealedOther": 1
+  },
+  "c44": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    47,
+    99
+   ],
+   "expectedFromAttribute": [
+    47,
+    99
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s44"
+   ],
+   "revealedOther": 1
+  },
+  "c45a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    48,
+    100
+   ],
+   "expectedFromAttribute": [
+    48,
+    100
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s45a"
+   ],
+   "revealedOther": 1
+  },
+  "c45b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    49,
+    101
+   ],
+   "expectedFromAttribute": [
+    49,
+    101
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s45b"
+   ],
+   "revealedOther": 1
+  },
+  "c45c": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    50,
+    102
+   ],
+   "expectedFromAttribute": [
+    50,
+    102
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s45c"
+   ],
+   "revealedOther": 1
+  },
+  "c45d": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    51,
+    103
+   ],
+   "expectedFromAttribute": [
+    51,
+    103
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s45d"
+   ],
+   "revealedOther": 1
+  },
+  "c46": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    52,
+    104
+   ],
+   "expectedFromAttribute": [
+    52,
+    104
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s46"
+   ],
+   "revealedOther": 1
+  },
+  "c47": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    53,
+    105
+   ],
+   "expectedFromAttribute": [
+    53,
+    105
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s47"
+   ],
+   "revealedOther": 1
+  },
+  "c48": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    54,
+    106
+   ],
+   "expectedFromAttribute": [
+    54,
+    106
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s48"
+   ],
+   "revealedOther": 1
+  },
+  "c50a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    55,
+    107
+   ],
+   "expectedFromAttribute": [
+    55,
+    107
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s50a"
+   ],
+   "revealedOther": 1
+  },
+  "c50b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    56,
+    108
+   ],
+   "expectedFromAttribute": [
+    56,
+    108
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s50b"
+   ],
+   "revealedOther": 1
+  },
+  "c50c": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    57,
+    109
+   ],
+   "expectedFromAttribute": [
+    57,
+    109
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s50c"
+   ],
+   "revealedOther": 1
+  },
+  "c51a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    58,
+    110
+   ],
+   "expectedFromAttribute": [
+    58,
+    110
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s51a"
+   ],
+   "revealedOther": 1
+  },
+  "c51b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    59,
+    111
+   ],
+   "expectedFromAttribute": [
+    59,
+    111
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s51b"
+   ],
+   "revealedOther": 1
+  },
+  "c51c": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    60,
+    112
+   ],
+   "expectedFromAttribute": [
+    60,
+    112
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s51c"
+   ],
+   "revealedOther": 1
+  },
+  "c51d": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    61,
+    113
+   ],
+   "expectedFromAttribute": [
+    61,
+    113
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s51d"
+   ],
+   "revealedOther": 1
+  },
+  "c52": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    62,
+    114,
+    115
+   ],
+   "expectedFromAttribute": [
+    62,
+    114,
+    115
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s52a",
+    "s52b"
+   ],
+   "revealedOther": 1
+  },
+  "c53a": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    63,
+    116
+   ],
+   "expectedFromAttribute": [
+    63,
+    116
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s53a"
+   ],
+   "revealedOther": 1
+  },
+  "c53b": {
+   "anyVisibleBefore": false,
+   "visibleOnYes": [
+    64,
+    117,
+    118
+   ],
+   "expectedFromAttribute": [
+    64,
+    117,
+    118
+   ],
+   "match": true,
+   "visibleOnBlank": 0,
+   "visibleOnNo": 0,
+   "revealedScheds": [
+    "s53bi",
+    "s53bii"
+   ],
+   "revealedOther": 1
+  }
+ }
+}

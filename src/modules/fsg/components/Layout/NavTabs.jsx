@@ -23,28 +23,29 @@ import { getPortalRoot } from '../../portalRoot.js'
 // Top-level tab -> its key (Ctrl+Shift+key). Unique across the bar.
 export const TOP_SHORTCUTS = {
   'Master': 'M',
-  'Trial Balance': 'T',
-  'Stock': 'S',
+  'TB': 'T',
+  'Inventory': 'I',
   'Mapping': 'P',
   'Dep': 'D',
   'BS': 'B',
   'PL': 'L',
   'CFS': 'C',
   'Notes': 'N',
-  'General Notes': 'G',
-  'Annex & Reco': 'X',
+  'A/c Policy': 'O',   // T-057: formerly Policy
+  'Annex': 'X',
   'Features': 'U',
-  'Exception': 'E',
-  'Generate Financials': 'F',
+  'Check Control': 'E',   // T-055: formerly Exception
+  'Review Financials': 'F',
 }
 
 // Item -> its key, per dropdown (unique within the dropdown it is in)
 const ITEM_SHORTCUTS = {
-  'Master': { 'Auditee Details': 'A', 'Financial Period': 'F', 'Auditor': 'U', 'Signatory': 'S', 'Mapping Rules': 'M' },
-  'Trial Balance': { 'Upload TB': 'U', 'Actual TB': 'A', 'Mapped TB': 'M', 'Mapped TB (Remarks)': 'R', 'Journal Entry': 'J' },
+  'Master': { 'Auditee Details': 'A', 'Financial Period': 'F', 'Auditor': 'U', 'Signatory': 'S', 'Branch Master': 'B', 'Mapping Rules': 'M' },
+  'TB': { 'Upload TB': 'U', 'Actual TB': 'A', 'Mapped TB': 'M', 'Mapped TB (Remarks)': 'R' },
   'Mapping': { 'Rectification / Recategorisation': 'R', 'Mapped TB': 'M', 'Mapping Rules': 'U' },
-  'Dep': { 'Dep (Comp)': 'C', 'Dep (IT)': 'I', 'Dep (Old)': 'O' },
-  'Features': { 'ITR': 'I', 'Tax Computation': 'T', 'Deferred Tax': 'D', 'PPE': 'P', 'Ratio': 'R', 'Format': 'F' },
+  'Dep': { 'Dep (Books)': 'B', 'Dep (Income Tax)': 'I' },
+  'Features': { 'ITR': 'I', 'Tax Computation': 'T', 'Deferred Tax': 'D', 'Ratio': 'R', 'Reco': 'C', 'Format': 'F' },
+  'Ratio': { 'Ratio: Form 26 (Old Name - 3CD)': 'F', 'Ratio: Company Additional Disclosure Ratio': 'C', 'Ratio: Analytical Ratios': 'A' },
   'ITR': { 'ITR: BS': 'B', 'ITR: PL': 'P', 'ITR: BS Details': 'D', 'ITR: PL Details': 'L' },
   'Format': { 'Format: Proprietorship': 'R', 'Format: Partnership': 'A', 'Format: LLP': 'L', 'Format: Company': 'C' },
 }
@@ -201,6 +202,8 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
   }
 
   const openChildren = openGroup ? groups?.[openGroup] : null
+  // The dropdown is 240 px wide (w-60) and a second-level list 288 px (w-72).
+  const subOpensLeft = !!dropdownPos && typeof window !== 'undefined' && dropdownPos.left + 240 + 288 > window.innerWidth - 8
   const itemCls = (isActive, isHi) =>
     `w-full text-left px-4 py-2 text-sm transition flex items-center justify-between ${
       isHi ? 'bg-blue-100 text-blue-900' : isActive ? 'bg-blue-50 text-blue-800 font-semibold' : 'hover:bg-blue-50 text-gray-800'
@@ -231,7 +234,7 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
             onMouseEnter={() => children && openGroupAt(tab, idx)}
             onMouseLeave={() => children && scheduleClose()}
             onKeyDown={(e) => handleKeyDown(e, idx)}
-            className={`px-4 py-2.5 text-sm whitespace-nowrap transition-all duration-150 flex items-center gap-1
+            className={`px-2 py-2.5 text-[13px] whitespace-nowrap transition-all duration-150 flex items-center gap-1
               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset
               ${topActive ? 'tab-active' : 'tab-inactive'}`}
           >
@@ -269,7 +272,10 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
                     <KeyLabel text={child} k={ck} /><span className="text-[9px] opacity-70">▸</span>
                   </button>
                   {openSub === child && (
-                    <div role="menu" className="absolute left-full top-0 -mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-56 py-1">
+                    // T-054: a second-level list opens to the LEFT of the dropdown when the right side has no room
+                    // (Features is near the right edge of the bar), so no item is cut off the screen.
+                    <div role="menu" data-flip={subOpensLeft ? 'left' : 'right'}
+                      className={`absolute ${subOpensLeft ? 'right-full mr-1' : 'left-full'} top-0 -mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-72 py-1`}>
                       {leaves.map((leaf, li) => (
                         <button
                           key={leaf}

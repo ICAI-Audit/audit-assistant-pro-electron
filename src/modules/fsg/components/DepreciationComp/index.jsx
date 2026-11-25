@@ -21,8 +21,10 @@ import { fmtINR, displayAmt, fetchFinancialsData } from '../../hooks/useFinancia
 import { depStoreFor } from '../../utils/depStore'
 import { joinDepCompSchedules } from '../../utils/depJoin'
 import { withNet, isDerivedField } from '../../utils/depCompNet'
-import { buildDepCompBlankTemplate, buildDepCompFilledWorkbook, parseDepCompWorkbook } from './depCompWorkbook'
+import { buildDepCompBlankTemplate, buildDepCompFilledWorkbook, parseDepCompWorkbook, depCompExcelSpec } from './depCompWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
+import { latestPerBranch } from '../../utils/tbVersions'
 
 const INP  = 'w-full border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
 const NINP = INP + ' text-right font-mono'
@@ -30,6 +32,13 @@ const TDI  = 'border border-gray-200 px-1 py-0.5'
 
 const num = v => parseFloat(String(v ?? '').replace(/,/g, '')) || 0
 const PPE_NOTE_RX = /property.*plant.*equipment|PPE|fixed assets/i
+// The P&L's depreciation head ("Depreciation and amortization expense") - its figure is compared with the schedule's
+// Depreciation For Year, as the Net Block is compared with the PPE note (owner, 23 November 2026).
+const PL_DEP_RX = /depreciation|amorti[sz]ation/i
+export function plDepreciation(data) {
+  const secs = (data?.expenseSections || []).filter(s => PL_DEP_RX.test(s.level1 || '') && !/uncategorised/i.test(s.level1 || ''))
+  return { cy: secs.reduce((t, s) => t + (parseFloat(s.total) || 0), 0), py: secs.reduce((t, s) => t + (parseFloat(s.prevTotal) || 0), 0), found: secs.length > 0 }
+}
 const ADD_NEW = '__add_new__'
 
 // Every field here is a plain typed number — no computation, no formula.
@@ -118,6 +127,7 @@ export default function DepreciationComp({ entity, activeTB }) {
   const [includeInPPENote, setIncludeInPPENote] = useState(false)
   const [pyTotals, setPyTotals] = useState({ ...EMPTY_PY_TOTALS })
   const [tbTotals, setTbTotals] = useState({ cy: 0, py: 0, loaded: false })
+  const [plDep, setPlDep] = useState({ cy: 0, py: 0, found: false, loaded: false })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [pulling, setPulling] = useState(false)
@@ -174,7 +184,7 @@ export default function DepreciationComp({ entity, activeTB }) {
   // attachNoteExtras() in useFinancials.js, which sources note.compScheduleTbCY/PY
   // the same way).
   useEffect(() => {
-    if (!activeTB?.id) { setTbTotals({ cy: 0, py: 0, loaded: false }); return }
+    if (!activeTB?.id) { setTbTotals({ cy: 0, py: 0, loaded: false }); setPlDep({ cy: 0, py: 0, found: false, loaded: false }); return }
     let cancelled = false
     fetchFinancialsData(activeTB, null, entity, null).then(data => {
       if (cancelled || !data) return
@@ -182,7 +192,8 @@ export default function DepreciationComp({ entity, activeTB }) {
       const cy = ppeNote?.rows?.reduce((s, r) => s + displayAmt(r, 'closing_balance'), 0) || 0
       const py = ppeNote?.rows?.reduce((s, r) => s + displayAmt(r, 'opening_balance'), 0) || 0
       setTbTotals({ cy, py, loaded: true })
-    }).catch(() => setTbTotals({ cy: 0, py: 0, loaded: false }))
+      setPlDep({ ...plDepreciation(data), loaded: true })
+    }).catch(() => { setTbTotals({ cy: 0, py: 0, loaded: false }); setPlDep({ cy: 0, py: 0, found: false, loaded: false }) })
     return () => { cancelled = true }
   }, [activeTB?.id, entity?.id])
 
@@ -205,7 +216,8 @@ export default function DepreciationComp({ entity, activeTB }) {
     if (!window.confirm('This refreshes any category below that matches a branch\'s own category with its current branch total. A category that only exists here (not in any branch) is left as it is. Continue?')) return
     setPulling(true)
     try {
-      const branches = await fsgApi?.getBranches(entity.id) || []
+      // T-087: the latest version of each branch only (A_v1 and A_v2 are the same branch)
+      const branches = latestPerBranch(await fsgApi?.getBranches(entity.id) || [])
       const branchSchedules = await Promise.all(branches.map(b => fsgApi?.depCompGet(b.id).catch(() => null)))
       const { byCategory, pyAgg } = joinDepCompSchedules(branchSchedules, CATEGORY_ROW_FIELDS, CATEGORY_ROW_FIELDS)
       const pulledRows = [...byCategory.values()].map(r => ({
@@ -241,6 +253,8 @@ export default function DepreciationComp({ entity, activeTB }) {
 
   const diffCY = totals.netBlockClose - tbTotals.cy
   const diffPY = totals.netBlockOpen - tbTotals.py
+  // Depreciation for the year: the schedule (Fill Details) less the P&L.
+  const depDiffCY = num(totals.depForYear) - plDep.cy
 
   const save = async (opts = {}) => {
     if (!tbId) return showToast('Load a Trial Balance first.')
@@ -279,14 +293,15 @@ export default function DepreciationComp({ entity, activeTB }) {
         const itSaved = await itStore.get()
         if (itSaved?.includeInPPENote) {
           await itStore.save({ ...itSaved, includeInPPENote: false })
-          showToast('Included in PPE Note. Dep (IT)\'s inclusion was turned off — only one schedule can show in the note.')
+          showToast('Included in PPE Note. Dep (Income Tax)\'s inclusion was turned off — only one schedule can show in the note.')
         }
       } catch (_) {}
     }
   }
 
-  const saveWorkbook = async (wb, defaultPath) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells, dropdowns) — utils/veraExcel.js.
+  const saveWorkbook = async (wb, defaultPath, mode) => {
+    const buf = await finishWorkbook(wb, depCompExcelSpec(mode, scheduleII))
     const result = await fsgApi?.saveFileDialog({
       defaultPath, filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
     })
@@ -299,7 +314,7 @@ export default function DepreciationComp({ entity, activeTB }) {
 
   const downloadBlankTemplate = async () => {
     try {
-      const path = await saveWorkbook(buildDepCompBlankTemplate(scheduleII), 'Dep_Comp_Template.xlsx')
+      const path = await saveWorkbook(buildDepCompBlankTemplate(scheduleII), 'Dep_Comp_Template.xlsx', 'template')
       if (path) showToast('Blank template saved.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
@@ -307,7 +322,7 @@ export default function DepreciationComp({ entity, activeTB }) {
   const downloadFilled = async () => {
     try {
       const eName = (entity?.name || 'Entity').replace(/[^A-Za-z0-9]+/g, '_')
-      const path = await saveWorkbook(buildDepCompFilledWorkbook(categoryRows, scheduleII), `${eName}_Dep_Comp_Filled.xlsx`)
+      const path = await saveWorkbook(buildDepCompFilledWorkbook(categoryRows, scheduleII), `${eName}_Dep_Comp_Filled.xlsx`, 'filled')
       if (path) showToast('Filled schedule saved — keep this safe before re-uploading a Trial Balance.')
     } catch (e) { showToast('Download failed: ' + (e?.message || '')) }
   }
@@ -385,6 +400,16 @@ export default function DepreciationComp({ entity, activeTB }) {
         <span>Net Block Closing (Table): <span className="font-bold text-orange-700 font-mono">{fmtINR(totals.netBlockClose)}</span></span>
         <span>Total as per Trial Balance (PPE Note): <span className="font-bold text-gray-800 font-mono">{tbTotals.loaded ? fmtINR(tbTotals.cy) : '…'}</span></span>
         <span>Difference: <span className={`font-bold font-mono ${Math.abs(diffCY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{tbTotals.loaded ? fmtINR(diffCY) : '…'}</span></span>
+        <span className="text-gray-400">|</span>
+        <span title="Previous Year: Net Block Opening of the table against the PPE note's opening balances">PY — Net Block Opening (Table): <span className="font-bold text-orange-700 font-mono">{fmtINR(totals.netBlockOpen)}</span></span>
+        <span>Trial Balance: <span className="font-bold text-gray-800 font-mono">{tbTotals.loaded ? fmtINR(tbTotals.py) : '…'}</span></span>
+        <span>Difference: <span className={`font-bold font-mono ${Math.abs(diffPY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{tbTotals.loaded ? fmtINR(diffPY) : '…'}</span></span>
+      </div>
+      <div className="flex items-center gap-6 px-5 py-1.5 bg-white border-b border-gray-100 shrink-0 text-xs text-gray-500">
+        <span>Depreciation For Year (Table): <span className="font-bold text-orange-700 font-mono">{fmtINR(totals.depForYear)}</span></span>
+        <span title="Depreciation and amortization expense of the Profit & Loss account">Depreciation as per P&L: <span className="font-bold text-gray-800 font-mono">{plDep.loaded ? fmtINR(plDep.cy) : '…'}</span></span>
+        <span>Difference: <span className={`font-bold font-mono ${Math.abs(depDiffCY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{plDep.loaded ? fmtINR(depDiffCY) : '…'}</span></span>
+        {plDep.loaded && !plDep.found && <span className="text-amber-700">No depreciation head in the P&L</span>}
       </div>
 
       <div className="flex-1 overflow-auto bg-white">
@@ -455,16 +480,6 @@ export default function DepreciationComp({ entity, activeTB }) {
                       })}
                       <td className="border border-gray-300 px-1.5 py-1"></td>
                     </tr>
-                    <tr className="bg-gray-100 text-xs">
-                      <td colSpan={12} className="border border-gray-300 px-2 py-1.5">
-                        <div className="flex flex-wrap gap-x-6 gap-y-1">
-                          <span className="text-gray-600">Total as per Trial Balance — CY: <span className="font-mono font-semibold text-gray-800">{tbTotals.loaded ? fmtINR(tbTotals.cy) : '…'}</span></span>
-                          <span className="text-gray-600">PY: <span className="font-mono font-semibold text-gray-800">{tbTotals.loaded ? fmtINR(tbTotals.py) : '…'}</span></span>
-                          <span className="text-gray-600">Difference — CY: <span className={`font-mono font-semibold ${Math.abs(diffCY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{tbTotals.loaded ? fmtINR(diffCY) : '…'}</span></span>
-                          <span className="text-gray-600">PY: <span className={`font-mono font-semibold ${Math.abs(diffPY) < 1 ? 'text-green-700' : 'text-red-700'}`}>{tbTotals.loaded ? fmtINR(diffPY) : '…'}</span></span>
-                        </div>
-                      </td>
-                    </tr>
                   </tfoot>
                 </table>
               </div>
@@ -479,7 +494,7 @@ export default function DepreciationComp({ entity, activeTB }) {
               <span>
                 <strong>Include this Fixed Assets Schedule in the PPE Note disclosure.</strong> When checked and saved, this
                 table appears inside the "Property, Plant & Equipment" note — in the Notes tab, the Excel export, and the
-                PDF export. Only one of Dep (Comp) or Dep (IT) can be included at a time — checking this turns off Dep (IT)'s
+                PDF export. Only one of Dep (Books) or Dep (Income Tax) can be included at a time — checking this turns off Dep (Income Tax)'s
                 inclusion if it was on. Uncheck and save to remove it again.
               </span>
             </label>

@@ -1,3 +1,4 @@
+import { noteColumnLabels, statementColumnLabels } from '../../utils/statementDates'
 import React, { useState, useEffect, useRef } from 'react'
 import { useFinancials, fmtINR, displayAmt as rowAmt } from '../../hooks/useFinancials'
 import { mapSavedRowsToLiveNotes } from '../../utils/savedNoteData'
@@ -6,31 +7,38 @@ import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
 import * as XLSX from 'xlsx-js-style'
-import { buildManualPyFilledWorkbook, parseManualPyWorkbook } from './manualPyWorkbook'
-import { buildFillDetailsWorkbook, parseFillDetailsWorkbook, parseFillDetailsStockSheet } from '../GenerateFinancials/fillDetailsWorkbook'
+import { buildManualPyFilledWorkbook, parseManualPyWorkbook, manualPyExcelSpec } from './manualPyWorkbook'
+import { buildFillDetailsWorkbook, parseFillDetailsWorkbook, parseFillDetailsStockSheet, fillDetailsExcelSpec } from '../GenerateFinancials/fillDetailsWorkbook'
+import { finishWorkbook } from '../../utils/veraExcel'
 import { loadStockMaps } from '../Stock/StockPage'
 import { buildCashFlow } from '../../utils/cashFlow'
 import { parseCfsSheet, applyCfsUpload } from '../CFS/cfsWorkbook'
 import { parseDepITWorkbook } from '../DepreciationIT/depITWorkbook'
 import { parseDepCompWorkbook } from '../DepreciationComp/depCompWorkbook'
-import { parseShareCapitalDetailsSheet } from './shareCapitalDetailsWorkbook'
+import { parseShareCapitalDetailsSheet, shareTotals } from './shareCapitalDetailsWorkbook'
 import { FILL_DETAILS_REGISTRY } from '../../utils/fillDetailsRegistry'
 import RemarkCell, { useRemarks } from '../shared/RemarkCell'
+import { AnalyseChangeButton, AnalyseChangeProvider, useAnalyseChangeToggle, ChangeCells, ChangeHeads, useChangeSpan } from '../shared/AnalyseChange'
 import ShareCapitalForm from './ShareCapitalForm'
 import LongTermBorrowingsForm from './LongTermBorrowingsForm'
 import ShortTermBorrowingsForm from './ShortTermBorrowingsForm'
-import TradePayablesDisclosureForm, { TP_AGEING_ROWS, TP_AGEING_BUCKETS } from './TradePayablesDisclosureForm'
+import TradePayablesDisclosureForm, { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from './TradePayablesDisclosureForm'
 import CashBankDetailsForm from './CashBankDetailsForm'
-import TradeReceivablesAgingForm, { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell } from './TradeReceivablesAgingForm'
+import InvestmentsForm, { InvestmentDisclosure } from './InvestmentsForm'
+import { investmentKind } from '../../utils/investments'
+import { investmentScope } from '../../utils/investmentStore'
+import TradeReceivablesAgingForm, { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell, trPeriodView } from './TradeReceivablesAgingForm'
 import TradeReceivablesAgeingNonCorpForm, { NcAgeingDisplayTable } from './TradeReceivablesAgeingNonCorpForm'
 import { isNonCorpTradeReceivables } from '../../utils/tradeReceivablesNonCorp'
+import DirectorLoansForm, { DirectorLoansDisplayTable } from './DirectorLoansForm'
+import { hasDirectorLoans } from '../../utils/directorLoans'
 import { fixFilterWith, fixFilterWithIds } from '../../utils/fixTargets'
 import OwnersCapitalAccountForm from './OwnersCapitalAccountForm'
 import { NoteFormatRefButton } from '../shared/FormatReference'
 import { depStoreFor, isConsolidatedTB } from '../../utils/depStore'
 import { withNet } from '../../utils/depCompNet'
-import { plNoteShowsLines, plNoteLineLabel, isPrintedPlNoteLine, bsNoteFallbackLines } from '../../utils/annexureGrouping'
-import { unsplitSaleLine } from '../../utils/revenueLines'
+import { plNoteShowsLines, plNoteLineLabel, plNoteLineDisplay, plNoteTotalLabel, isPrintedPlNoteLine, bsNoteFallbackLines } from '../../utils/annexureGrouping'
+import { plLineFix, bsRowFix } from '../../utils/notesFixQueue'
 import { fsgApi } from '../../api.js'
 
 function Guard({ activeTB, loading, hasData, error, children }) {
@@ -196,7 +204,8 @@ function capPyExPL(saved) {
  * `rows`/`buckets` come from the form modules so labels always match the fill form.
  * `computeCell(periodData, computedType, bucketKey)` derives computed rows (e.g. Total Due).
  */
-function AgeingDisplayTable({ heading, periodData, rows, buckets, computeCell }) {
+function AgeingDisplayTable({ heading, periodData: rawPeriod, rows, buckets, computeCell, viewPeriod }) {
+  const periodData = viewPeriod ? viewPeriod(rawPeriod) : rawPeriod
   if (!periodData || Object.keys(periodData).length === 0) return null
   const cell = (row, bKey) => {
     if (row.computed && computeCell) return computeCell(periodData, row.computed, bKey)
@@ -214,11 +223,15 @@ function AgeingDisplayTable({ heading, periodData, rows, buckets, computeCell })
           <thead>
             <tr className="bg-indigo-50">
               <th rowSpan={2} className="border border-indigo-200 px-2 py-1 text-left font-semibold text-indigo-900 align-bottom w-[26%]">Particulars</th>
-              <th colSpan={buckets.length} className="border border-indigo-200 px-2 py-1 text-center font-semibold text-indigo-900">Outstanding for following periods from due date of payment</th>
+              {/* T-063: Unbilled / Not Due stand outside the "from due date" heading */}
+              {buckets.filter(b => b.notAged).map(b => (
+                <th key={b.key} rowSpan={2} className="border border-indigo-200 px-2 py-1 text-right font-semibold text-indigo-900 align-bottom">{b.label}</th>
+              ))}
+              <th colSpan={buckets.filter(b => !b.notAged).length} className="border border-indigo-200 px-2 py-1 text-center font-semibold text-indigo-900">Outstanding for following periods from due date of payment</th>
               <th rowSpan={2} className="border border-indigo-200 px-2 py-1 text-right font-semibold text-indigo-900 align-bottom">Total</th>
             </tr>
             <tr className="bg-indigo-50">
-              {buckets.map(b => (
+              {buckets.filter(b => !b.notAged).map(b => (
                 <th key={b.key} className="border border-indigo-200 px-2 py-1 text-right font-semibold text-indigo-900">{b.label}</th>
               ))}
             </tr>
@@ -296,6 +309,7 @@ function AddManualPyRow({ tbId, entityId, noteNum, noteTitle, onSaved }) {
   const [label, setLabel] = useState('')
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const extra = useChangeSpan()
 
   const save = async () => {
     if (!label.trim()) return
@@ -314,7 +328,7 @@ function AddManualPyRow({ tbId, entityId, noteNum, noteTitle, onSaved }) {
   if (!open) {
     return (
       <tr>
-        <td colSpan={3} className="py-1 px-4">
+        <td colSpan={3 + extra} className="py-1 px-4">
           <button onClick={() => setOpen(true)} className="text-[11px] text-amber-700 hover:underline">+ Add Row (Previous Year sub-head)</button>
         </td>
       </tr>
@@ -336,11 +350,13 @@ function AddManualPyRow({ tbId, entityId, noteNum, noteTitle, onSaved }) {
           <button onClick={() => { setOpen(false); setLabel(''); setAmount('') }} className="text-[11px] text-gray-400 hover:text-gray-600 shrink-0">✕</button>
         </div>
       </td>
+      <ChangeCells blank />
     </tr>
   )
 }
 
-function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved, showZeroRows = false, onFix, onFillDetails, expandSignal, manualPyEnabled, onManualPySaved, onGoToAnnexure, onGoToStock }) {
+function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRemark, onRemarkSaved, showZeroRows = false, onFix, onFillDetails, expandSignal, manualPyEnabled, onManualPySaved, onGoToAnnexure, onGoToStock }) {
+  const periodLabels = noteColumnLabels(activeTB, prevTB, note)
   // Manual PY is turned on specifically to type figures into lines that are
   // CURRENTLY zero (e.g. "Statutory dues payable" and its GST/TDS/etc. sub-
   // options, nil this year but not last year) — without this, such a line
@@ -443,6 +459,10 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
   }
 
   const hasL2Lines = plNoteShowsLines(note)
+  // T-048: with Variance Analysis on, Particulars and the year columns make room for the three change columns.
+  const changeWide = useChangeSpan() > 0
+  const wP = changeWide ? 'w-[35%]' : 'w-[55%]', wY = changeWide ? 'w-[14%]' : 'w-[22%]'
+  const CHANGE_W = ['13%', '8%', '16%']
   // PPE note: when the IT Act Block-wise WDV Summary or the Dep (Comp)
   // category-level schedule is present (opt-in, mutually exclusive), it
   // supersedes the plain "Property, Plant & Equipment / Total" one-row
@@ -524,9 +544,10 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-blue-50 border-b border-blue-200">
-              <th className="text-left py-1.5 px-4 font-semibold text-blue-900 w-[55%]">Particulars</th>
-              <th className="text-right py-1.5 px-3 font-semibold text-blue-900 w-[22%]">Current Year</th>
-              <th className="text-right py-1.5 px-3 font-semibold text-blue-900 w-[22%]">Previous Year</th>
+              <th className={`text-left py-1.5 px-4 font-semibold text-blue-900 ${wP}`}>Particulars</th>
+              <th className={`fsg-dated-heading text-right py-1.5 px-3 font-semibold text-blue-900 ${wY}`}>{periodLabels.cy}</th>
+              <th className={`fsg-dated-heading text-right py-1.5 px-3 font-semibold text-blue-900 ${wY}`}>{periodLabels.py}</th>
+              <ChangeHeads className="py-1.5 font-semibold text-blue-900" widths={CHANGE_W} />
             </tr>
           </thead>
           <tbody>
@@ -553,6 +574,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                 <td className="py-1 text-right font-mono pr-3 text-gray-400">
                   {oi === 0 ? fmtINR(capPyExPL(ownerDetails)) : ''}
                 </td>
+                <ChangeCells cy={capRowExPL(r, ownerDetails.variant)} py={oi === 0 ? capPyExPL(ownerDetails) : undefined} rowKey={`${note.title}::${r.name}`} />
               </tr>
             ) : null)}
             {/* PL note: Level 2 breakdown only (no ledger rows) */}
@@ -560,8 +582,10 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
               // Revenue's sales ledgers not yet split into Sale of Goods / Sale
               // of Services (utils/revenueLines.js) are flagged like an
               // uncategorised line, and Fix asks for the split (their Level 3).
-              const toSplit = unsplitSaleLine(note) === line
-              const l2Uncat = (line.level2 || '').toLowerCase().includes('uncategorised') || toSplit
+              // T-083: the same test Recategorisation lists its ledgers by (utils/notesFixQueue.js).
+              const lineFix = plLineFix(note, line)
+              const toSplit = lineFix === 'Bifurcate'
+              const l2Uncat = !!lineFix
               // A ledger mapped straight to this note's Level 1 with no Level
               // 2 at all (e.g. Purchase Accounts under "Cost of materials
               // consumed" — see mapping-engine.js's applyPurchaseAccountsOverride)
@@ -600,18 +624,23 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                         className="text-blue-500 hover:text-blue-700 mr-1 text-[10px] align-middle"
                       >{lineExpanded ? '▾' : '▸'}</button>
                     )}
-                    {l2Label}
+                    {plNoteLineDisplay(note, line)}
                     {toSplit && (
-                      <span className="ml-1 text-[10px] font-normal text-red-600">— bifurcate into Sale of Goods / Sale of Services (Level 3)</span>
+                      <span className="ml-1 text-[10px] font-normal text-red-600">— bifurcate into Sale of Goods / Sale of Services (Mapping 3)</span>
                     )}
                     {l2Uncat && onFix && (
                       <button
                         onClick={() => onFix(
-                          fixFilterWith({ alie: note.alie, mapping1_resultant: note.title, mapping2_resultant: toSplit ? 'Sale' : line.level2 }, line.rows),
-                          toSplit ? 'Bifurcate: Sale of Goods / Sale of Services' : `Fix: ${line.level2}`
+                          lineFix === 'Review'
+                            ? fixFilterWith({ alie: note.alie, mapping1_resultant: note.title }, line.rows)
+                            : fixFilterWith({ alie: note.alie, mapping1_resultant: note.title, mapping2_resultant: toSplit ? 'Sale' : line.level2 }, line.rows),
+                          toSplit ? 'Bifurcate: Sale of Goods / Sale of Services' : lineFix === 'Review' ? `Review: ledgers mapped to ${note.title}` : `Fix: ${line.level2}`
                         )}
                         className="ml-2 px-1.5 py-0.5 text-[10px] rounded border border-red-400 text-red-700 bg-white hover:bg-red-100 transition font-normal"
-                      >{toSplit ? 'Bifurcate' : 'Fix'}</button>
+                      >{lineFix}</button>
+                    )}
+                    {lineFix === 'Review' && line.reviewNote && (
+                      <div className="text-[10px] font-normal text-red-600 mt-0.5" data-testid="stock-other-ledgers-note">{line.reviewNote}</div>
                     )}
                     {tbId && (
                       <span className="ml-1 align-middle">
@@ -636,12 +665,14 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                       <div className={`text-right font-mono text-gray-400 ${isClosingLine ? 'underline' : ''}`}>{fmtINR(line.prevTotal)}</div>
                     )}
                   </td>
+                  <ChangeCells cy={line.total} py={line.prevTotal} rowKey={`${note.title}::${l2Label}`} />
                 </tr>
                 {hasBreakdown && lineExpanded && visibleBreakdownRows.map((row, ri) => (
                   <tr key={`${lineKey}-row-${ri}`} className="border-b border-gray-50 bg-blue-50/40">
                     <td className="py-0.5 pl-10 pr-2 text-gray-500 italic">{row.name || '(unnamed ledger)'}</td>
                     <td className="py-0.5 text-right font-mono pr-3 text-gray-500">{fmtINR(rowAmt(row, 'closing_balance'))}</td>
                     <td className="py-0.5 text-right font-mono pr-3 text-gray-500">{fmtINR(rowAmt(row, 'opening_balance'))}</td>
+                    <ChangeCells cy={rowAmt(row, 'closing_balance')} py={rowAmt(row, 'opening_balance')} rowKey={`${note.title}::${l2Label}::ledger::${row.ledger_code || row.name || ri}`} />
                   </tr>
                 ))}
                 </React.Fragment>
@@ -654,7 +685,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
             {/* BS note: LevelFormat template rows (L3 → options from L5/L6 "/" ) */}
             {!note.isPL && noteRows.map((r, ri) => {
               if (r.type === 'l3') {
-                const l3Uncat = (r.label || '').toLowerCase().includes('uncategorised')
+                const l3Uncat = bsRowFix(note, r) === 'Fix'
                 const isHighlight = r.isHighlight
                 return (
                   <tr key={ri} className={`border-b border-gray-200 ${
@@ -704,6 +735,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                         <div className={`text-right font-mono ${isHighlight ? 'font-bold text-red-600' : r.isSubtotal ? 'font-bold text-gray-600' : 'text-gray-400'}`}>{fmtINR(r.py)}</div>
                       )}
                     </td>
+                    <ChangeCells cy={r.cy} py={r.py} rowKey={`${note.title}::${r.label}`} bold={r.isSubtotal} />
                   </tr>
                 )
               }
@@ -722,6 +754,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                     </td>
                     <td className="py-1 text-right font-mono pr-3">{fmtINR(r.cy)}</td>
                     <td className="py-1 text-right font-mono pr-3 text-gray-400">{fmtINR(r.py)}</td>
+                    <ChangeCells cy={r.cy} py={r.py} rowKey={`${note.title}::${r.label}`} />
                   </tr>
                 )
               }
@@ -729,7 +762,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
               return (
                 <tr key={ri} className={`border-b border-gray-50 ${r.unclassified ? 'bg-red-50' : ''}`}>
                   <td className={`py-0.5 pl-10 pr-2 italic ${r.unclassified ? 'text-red-600' : 'text-gray-600'}`}>
-                    {r.unclassified ? `Unclassified${r.natureLevel ? ` — Level ${r.natureLevel}` : ''}` : r.label}
+                    {r.unclassified ? `Unclassified${r.natureLevel ? ` — Mapping ${r.natureLevel}` : ''}` : r.label}
                     {r.unclassified && onFix && (
                       <button
                         onClick={() => onFix(
@@ -747,7 +780,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                                 mapping3_resultant: r.parentL3,
                                 level5_unclassified: true,
                               }, r.ledgerIds, r.pyLedgerIds, r.natureLevel),
-                          `Fix Unclassified (Level ${r.natureLevel || 5}) — ${r.parentL3 || note.title}`
+                          `Fix Unclassified (Mapping ${r.natureLevel || 5}) — ${r.parentL3 || note.title}`
                         )}
                         className="ml-2 px-1.5 py-0.5 text-[10px] rounded border border-red-400 text-red-700 bg-white hover:bg-red-100 transition not-italic"
                       >
@@ -770,6 +803,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                       <div className="text-right font-mono text-gray-400">{fmtINR(r.py)}</div>
                     )}
                   </td>
+                  <ChangeCells cy={r.cy} py={r.py} rowKey={r.unclassified ? `${note.title}::${r.parentL3 || note.title}::Unclassified` : `${note.title}::${r.parentL3 || note.title}::${r.label}`} />
                 </tr>
               )
             })}
@@ -789,6 +823,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                 </td>
                 <td className={`py-1 text-right font-mono pr-3 ${l.isSubtotal ? 'font-bold' : 'font-semibold'}`}>{fmtINR(l.cy)}</td>
                 <td className={`py-1 text-right font-mono pr-3 ${l.isSubtotal ? 'font-bold text-gray-600' : 'text-gray-400'}`}>{fmtINR(l.py)}</td>
+                <ChangeCells cy={l.cy} py={l.py} rowKey={`${note.title}::${l.label}`} bold={l.isSubtotal} />
               </tr>
             ))}
             {!note.isPL && manualPyEnabled && (
@@ -797,7 +832,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
           </tbody>
           <tfoot>
             <tr className="bg-blue-50 border-t-2 border-blue-300">
-              <td className="py-1.5 px-4 font-bold text-blue-800 text-xs">Total</td>
+              <td className="py-1.5 px-4 font-bold text-blue-800 text-xs">{note.isPL ? plNoteTotalLabel(note) : 'Total'}</td>
               <td className="py-1.5 text-right font-mono font-bold text-blue-800 pr-3">{fmtINR(note.total)}</td>
               <td className="py-1.5 pr-3">
                 {manualPyEnabled && 'manualPyFlatEntry' in note ? (
@@ -806,6 +841,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                   <div className="text-right font-mono font-bold text-blue-800">{fmtINR(note.prevTotal)}</div>
                 )}
               </td>
+              <ChangeCells cy={note.total} py={note.prevTotal} rowKey={`${note.title}::Total`} bold />
             </tr>
           </tfoot>
         </table>
@@ -818,9 +854,10 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-amber-50 border-b border-amber-200">
-                  <th className="text-left py-1.5 px-4 font-semibold text-amber-900 w-[55%]">Particulars</th>
-                  <th className="text-right py-1.5 px-3 font-semibold text-amber-900 w-[22%]">Current Year</th>
-                  <th className="text-right py-1.5 px-3 font-semibold text-amber-900 w-[22%]">Previous Year</th>
+                  <th className={`text-left py-1.5 px-4 font-semibold text-amber-900 ${wP}`}>Particulars</th>
+                  <th className={`fsg-dated-heading text-right py-1.5 px-3 font-semibold text-amber-900 ${wY}`}>{periodLabels.cy}</th>
+                  <th className={`fsg-dated-heading text-right py-1.5 px-3 font-semibold text-amber-900 ${wY}`}>{periodLabels.py}</th>
+                  <ChangeHeads className="py-1.5 font-semibold text-amber-900" widths={CHANGE_W} />
                 </tr>
               </thead>
               <tbody>
@@ -835,6 +872,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                         <div className="text-right font-mono text-gray-500 font-medium">{fmtINR(r.py)}</div>
                       )}
                     </td>
+                    <ChangeCells cy={r.cy} py={r.py} rowKey={`${note.title}::MSME::${r.label}`} />
                   </tr>
                 ))}
               </tbody>
@@ -853,8 +891,8 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
               <thead>
                 <tr className="bg-green-50 border-b border-green-200">
                   <th className="text-left py-1.5 px-4 font-semibold text-green-900 w-[55%]">Particulars</th>
-                  <th className="text-right py-1.5 px-3 font-semibold text-green-900 w-[22%]">{cashBankRows.some(r => Number(r.py)) ? 'Amount — CY (₹)' : 'Amount (₹)'}</th>
-                  {cashBankRows.some(r => Number(r.py)) && <th className="text-right py-1.5 px-3 font-semibold text-green-900 w-[18%]">Amount — PY (₹)</th>}
+                  <th className="fsg-dated-heading text-right py-1.5 px-3 font-semibold text-green-900 w-[22%]">{periodLabels.cy}</th>
+                  {cashBankRows.some(r => Number(r.py)) && <th className="fsg-dated-heading text-right py-1.5 px-3 font-semibold text-green-900 w-[18%]">{periodLabels.py}</th>}
                   <th className="text-left py-1.5 px-3 font-semibold text-green-900 w-[23%]">Remarks</th>
                 </tr>
               </thead>
@@ -885,8 +923,8 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
         {note.trPayablesAgingData && (note.trPayablesAgingData.cy || note.trPayablesAgingData.py) && (
           <div className="mt-6 pt-6 border-t-2 border-indigo-300 px-4 pb-4">
             <h3 className="text-sm font-bold text-indigo-900 mb-3">Trade Payables ageing schedule</h3>
-            <AgeingDisplayTable heading="Current Year" periodData={note.trPayablesAgingData.cy} rows={TP_AGEING_ROWS} buckets={TP_AGEING_BUCKETS} />
-            <AgeingDisplayTable heading="Previous Year" periodData={note.trPayablesAgingData.py} rows={TP_AGEING_ROWS} buckets={TP_AGEING_BUCKETS} />
+            <AgeingDisplayTable heading={periodLabels.cy} periodData={note.trPayablesAgingData.cy} rows={TP_AGEING_ROWS} buckets={TP_AGEING_BUCKETS} viewPeriod={tpPeriodView} />
+            <AgeingDisplayTable heading={periodLabels.py} periodData={note.trPayablesAgingData.py} rows={TP_AGEING_ROWS} buckets={TP_AGEING_BUCKETS} viewPeriod={tpPeriodView} />
           </div>
         )}
 
@@ -894,15 +932,22 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
         {note.trReceivablesAgingData && (note.trReceivablesAgingData.cy || note.trReceivablesAgingData.py) && (
           <div className="mt-6 pt-6 border-t-2 border-indigo-300 px-4 pb-4">
             <h3 className="text-sm font-bold text-indigo-900 mb-3">Trade Receivables ageing schedule</h3>
-            <AgeingDisplayTable heading="Current Year" periodData={note.trReceivablesAgingData.cy} rows={TR_AGEING_ROWS} buckets={TR_AGEING_BUCKETS} computeCell={trComputedCell} />
-            <AgeingDisplayTable heading="Previous Year" periodData={note.trReceivablesAgingData.py} rows={TR_AGEING_ROWS} buckets={TR_AGEING_BUCKETS} computeCell={trComputedCell} />
+            <AgeingDisplayTable heading={periodLabels.cy} periodData={note.trReceivablesAgingData.cy} rows={TR_AGEING_ROWS} buckets={TR_AGEING_BUCKETS} computeCell={trComputedCell} viewPeriod={trPeriodView} />
+            <AgeingDisplayTable heading={periodLabels.py} periodData={note.trReceivablesAgingData.py} rows={TR_AGEING_ROWS} buckets={TR_AGEING_BUCKETS} computeCell={trComputedCell} viewPeriod={trPeriodView} />
           </div>
         )}
 
         {/* Trade Receivables ageing table — Proprietorship / Partnership / LLP (Company has its own schedule above). Always shown; defaults to Unsecured, considered good. */}
+        {investmentKind(note.title) && <InvestmentDisclosure periodLabels={periodLabels} details={note.investmentDetails} kind={investmentKind(note.title)} issues={note.investmentIssues || []} />}
         {note.ncTradeReceivables && (
           <div className="mt-6 pt-6 border-t-2 border-indigo-300 px-4 pb-4">
             <NcAgeingDisplayTable saved={note.ncTradeReceivables.saved} noteTotal={note.total} fmtAmount={fmtINR} />
+          </div>
+        )}
+        {/* T-086 Company: loans and advances due from directors, officers and entities in which directors are interested */}
+        {note.directorLoans && (
+          <div className="mt-6 pt-6 border-t-2 border-indigo-300 px-4 pb-4">
+            <DirectorLoansDisplayTable saved={note.directorLoans.saved} periodLabels={periodLabels} fmtAmount={fmtINR} />
           </div>
         )}
 
@@ -973,7 +1018,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                   </tr>
                   {note.itBlockSummaryPyTotals && (
                     <tr className="bg-gray-50">
-                      <td className="py-1 px-4 text-gray-500 text-[11px] italic">Previous Year</td>
+                      <td className="py-1 px-4 text-gray-500 text-[11px] italic">{periodLabels.py}</td>
                       <td className="py-1 text-right font-mono px-3"></td>
                       <td className="py-1 text-right font-mono px-3 text-gray-700">{fmtINR(note.itBlockSummaryPyTotals.openingWDV)}</td>
                       <td className="py-1 text-right font-mono px-3 text-gray-700">{fmtINR((note.itBlockSummaryPyTotals.addBefore180 || 0) + (note.itBlockSummaryPyTotals.addAfter180 || 0))}</td>
@@ -1016,7 +1061,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                         <td className="py-1.5 text-right font-mono px-3 text-blue-900">{fmtINR((parseFloat(note.itWip.capitalCY) || 0) + (parseFloat(note.itWip.intangibleCY) || 0))}</td>
                       </tr>
                       <tr className="bg-gray-50">
-                        <td className="py-1 px-4 text-gray-500 text-[11px] italic">Previous Year (Work in Progress)</td>
+                        <td className="py-1 px-4 text-gray-500 text-[11px] italic">{periodLabels.py} (Work in Progress)</td>
                         <td className="py-1 text-right font-mono px-3"></td>
                         <td className="py-1 text-right font-mono px-3"></td>
                         <td className="py-1 text-right font-mono px-3"></td>
@@ -1034,7 +1079,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                         <td className="py-1.5 text-right font-mono px-3 text-blue-900">{fmtINR(totals.closingWDV + (parseFloat(note.itWip.capitalCY) || 0) + (parseFloat(note.itWip.intangibleCY) || 0))}</td>
                       </tr>
                       <tr className="bg-gray-50">
-                        <td className="py-1 px-4 text-gray-500 text-[11px] italic">Previous Year</td>
+                        <td className="py-1 px-4 text-gray-500 text-[11px] italic">{periodLabels.py}</td>
                         <td className="py-1 text-right font-mono px-3"></td>
                         <td className="py-1 text-right font-mono px-3"></td>
                         <td className="py-1 text-right font-mono px-3"></td>
@@ -1122,7 +1167,7 @@ function NoteBlock({ note, entity, isHighlighted, tbId, getRemark, onRemarkSaved
                     </tr>
                     {note.compSchedulePyTotals && (
                       <tr className="bg-gray-50">
-                        <td className="py-1 px-3 text-gray-500 text-[11px] italic">Previous Year</td>
+                        <td className="py-1 px-3 text-gray-500 text-[11px] italic">{periodLabels.py}</td>
                         <td className="py-1 text-right font-mono px-3 text-gray-700 border-l border-gray-200">{fmtINR(note.compSchedulePyTotals.grossOpen)}</td>
                         <td className="py-1 text-right font-mono px-3 text-gray-700">{fmtINR(note.compSchedulePyTotals.additions)}</td>
                         <td className="py-1 text-right font-mono px-3 text-gray-700">{fmtINR(note.compSchedulePyTotals.deductions)}</td>
@@ -1199,22 +1244,28 @@ function DisclosureNote({ tbId, entityId, note }) {
   }
 
   if (!scopeId || loading) return null
+  // T-046: one line when empty; grows with its text (up to 240px, then scrolls).
+  const fit = (el) => { if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight + 2, 240) + 'px' }
   return (
-    <div className="mt-4 pt-4 border-t border-gray-200 px-4 pb-4">
-      <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
-        Disclosure Note <span className="normal-case font-normal text-gray-400">(optional — included in PDF/Excel when filled in)</span>
-      </label>
-      <textarea
-        value={text}
-        onChange={e => setText(e.target.value)}
-        onBlur={save}
-        rows={4}
-        placeholder="Add any additional disclosure for this note…"
-        className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-700 focus:ring-2 focus:ring-blue-400 focus:outline-none resize-y max-h-[240px] overflow-y-auto"
-      />
-      {saving && <span className="text-[10px] text-gray-400">Saving…</span>}
-      {!saving && !error && text && text === saved && <span className="text-[10px] text-green-600">Saved - printed below this note in the PDF and Excel</span>}
-      {error && <span className="text-[10px] text-red-600">{error}</span>}
+    <div className="mt-2 pt-2 border-t border-gray-200 px-4 pb-3">
+      <div className="flex items-start gap-3">
+        <label className="shrink-0 pt-1.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+          title="Optional. Printed below this note in the PDF and Excel when filled in.">
+          Disclosure Note
+        </label>
+        <textarea
+          ref={fit}
+          value={text}
+          onChange={e => { setText(e.target.value); fit(e.target) }}
+          onBlur={save}
+          rows={1}
+          placeholder="Optional — add any additional disclosure for this note (printed in the PDF/Excel when filled in)…"
+          className="fsg-disclosure flex-1 border border-gray-300 rounded px-2 py-1 text-xs leading-5 text-gray-700 focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none overflow-y-auto"
+        />
+      </div>
+      {saving && <span className="block text-right text-[10px] text-gray-400">Saving…</span>}
+      {!saving && !error && text && text === saved && <span className="block text-right text-[10px] text-green-600">Saved - printed below this note in the PDF and Excel</span>}
+      {error && <span className="block text-[10px] text-red-600">{error}</span>}
     </div>
   )
 }
@@ -1313,7 +1364,7 @@ export function AssumptionDisclosureModal({ items, onClose }) {
         </div>
         <p className="text-xs text-gray-600 mb-4 leading-relaxed">
           The following ledgers could not be conclusively classified from their name or books hierarchy, so a
-          default nature was assumed. Please review and correct via the Categorisation tab (Mapping 3 / Level 3)
+          default nature was assumed. Please review and correct via the Categorisation tab (Mapping 3)
           if any of these are wrong for this entity.
         </p>
         <div className="max-h-80 overflow-y-auto border border-gray-200 rounded mb-4">
@@ -1360,6 +1411,7 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
   const [search, setSearch] = useState('')
   const [showEmpty, setShowEmpty] = useState(false)
   const [showZeroRows, setShowZeroRows] = useState(false)
+  const [changeOn, setChangeOn] = useAnalyseChangeToggle('notes')
   // "Fix" jumps to the full Rectification / Recategorisation screen, scoped
   // to just the clicked category — same screen/features as the Mapping menu.
   const openFix = (filter, title) => onFixNavigate?.(filter, title)
@@ -1408,8 +1460,9 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
   ]
   const pickStock = (obj) => Object.fromEntries(STOCK_INVENTORY_TYPES.map(t => [t, obj[t] ?? '']).filter(([, v]) => v !== ''))
 
+  // T-047: finished in the VERA style (How to Fill sheet, blue headers, yellow input cells, fixed-list dropdowns).
   const saveFillDetailsWorkbook = async (wb, suffix) => {
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const buf = await finishWorkbook(wb, fillDetailsExcelSpec(wb))
     const eName = (entity?.name || 'FS').replace(/[^A-Za-z0-9]+/g, '_')
     const result = await fsgApi?.saveFileDialog({
       defaultPath: `${eName}_FillDetails_${suffix}.xlsx`,
@@ -1481,7 +1534,9 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
     if (!filePath) return
     const bytes = await fsgApi?.readFile(filePath)
     const wb = XLSX.read(new Uint8Array(bytes), { type: 'array' })
-    const { results: parsed, skippedBlank } = parseFillDetailsWorkbook(wb, { constitution: entity?.constitution })
+    let parsed, skippedBlank
+    try { ({ results: parsed, skippedBlank } = parseFillDetailsWorkbook(wb, { constitution: entity?.constitution })) }
+    catch (e) { setFillDetailsStatus(e.message); return }
     // Note numbers can shift between download and upload (renumbering runs
     // live — e.g. a note that was zero-value at download time, and so had no
     // number, can pick one up once other data changes). Trusting the stale
@@ -1504,6 +1559,11 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
       // bolted-on sheet — see below). Merge onto whatever's already saved so
       // uploading just the Classes sheet doesn't silently wipe those out.
       const liveTitle = liveNote?.title || noteTitle
+      if (investmentKind(liveTitle)) {
+        try { await fsgApi.saveInvestments({ ...investmentScope(activeTB), noteTitle: liveTitle, data: { ...noteData, pyTBIds: liveNote?.investmentPYTBIds || [] } }) }
+        catch (e) { setFillDetailsStatus(`Investment upload failed: ${e.message}. Earlier sheets may have been saved.`); refresh(); return }
+        continue
+      }
       const existing = await noteDetailsGet(resolvedNum, liveTitle).catch(() => null)
       await noteDetailsSave({ noteNum: resolvedNum, noteTitle: liveTitle, data: { ...(existing || {}), ...noteData } }).catch(() => {})
     }
@@ -1635,11 +1695,9 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
       const existingSc = scLiveNote ? await noteDetailsGet(scLiveNote.num, scLiveNote.title).catch(() => null) : null
       const resolvedNum = scLiveNote?.num
       if (resolvedNum) {
-        const cls0 = existingSc?.classes?.[0]
-        const num = v => parseFloat(v) || 0
-        const totalCY = num(cls0?.cy?.openingShares) + num(cls0?.cy?.issuedDuringYear) - num(cls0?.cy?.deletedDuringYear) || num(cls0?.cy?.paidUp) || num(cls0?.cy?.issued)
-        const totalPY = num(cls0?.py?.openingShares) + num(cls0?.py?.issuedDuringYear) - num(cls0?.py?.deletedDuringYear) || num(cls0?.py?.paidUp) || num(cls0?.py?.issued)
-        const shareCapParsed = parseShareCapitalDetailsSheet(wb, totalCY, totalPY)
+        // Total Equity shares across every Equity class (not the first class only), as the form's Import Excel uses.
+        const eq = shareTotals(existingSc?.classes, 'Equity')
+        const shareCapParsed = parseShareCapitalDetailsSheet(wb, eq.cy, eq.py)
         if (shareCapParsed) {
           await noteDetailsSave({
             noteNum: resolvedNum, noteTitle: scLiveNote.title,
@@ -1682,7 +1740,7 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
     const eName = (entity?.name || 'FS').replace(/[^A-Za-z0-9]+/g, '_')
     const scopeName = (isConsolidatedManualPy ? 'Consolidated' : (activeTB?.branch_name || activeTB?.period || 'TB')).replace(/[^A-Za-z0-9]+/g, '_')
     const wb = buildManualPyFilledWorkbook(entries || [], { sheetLabel: 'Manual PY' })
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const buf = await finishWorkbook(wb, manualPyExcelSpec((entries || []).length))
     const result = await fsgApi?.saveFileDialog({
       defaultPath: `${eName}_ManualPY_${scopeName}.xlsx`,
       filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }],
@@ -1908,90 +1966,80 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
 
   const period = activeTB?.period || ''
 
+  const changePyOff = !!data?.pyMode && data.pyMode !== 'required'
   return (
+    <AnalyseChangeProvider on={changeOn && !changePyOff} tbId={activeTB?.id} scope="notes" getRemark={getRemark} onRemarkSaved={onRemarkSaved}>
     <div className="flex flex-col h-full overflow-hidden">
       <Guard activeTB={activeTB} loading={loading} hasData={!!data} error={error}>
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-blue-100 shrink-0 bg-white flex-wrap">
-          <div>
+        {/* T-046 / T-060: a title line (count, search, expand / collapse), then one toolbar line in the Balance Sheet style:
+            Variance Analysis, then labelled groups - Previous Year, Fill Details Excel, Show - with one button style. */}
+        <div className="px-5 py-1.5 border-b border-blue-100 shrink-0 bg-white">
+          <div className="fsg-stmt-toolbar">
             <h2 className="font-bold text-blue-900 text-sm">Notes to Financial Statements</h2>
-            {entity && <p className="text-xs text-gray-500">{entity.name}{period ? ` | ${period}` : ''}</p>}
+            {period && <span className="text-[11px] text-gray-400">{period}</span>}
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">{noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)} note{(noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)) !== 1 ? 's' : ''}</span>
+            <div className="ml-auto flex items-center gap-2">
+              <div className="relative">
+                <input type="text" placeholder="Search notes..." value={search} onChange={e => setSearch(e.target.value)}
+                  className="h-7 border border-gray-300 rounded-md pl-2.5 pr-6 text-xs w-48 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
+                {search && <button onClick={() => setSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs" style={{ height: 'auto', padding: 0 }} title="Clear search">✕</button>}
+              </div>
+              <div className="fsg-seg">
+                <button onClick={() => setExpandSignal(s => ({ v: true, n: s.n + 1 }))} className="text-gray-700 hover:bg-blue-50" title="Expand all notes">⊞ Expand All</button>
+                <button onClick={() => setExpandSignal(s => ({ v: false, n: s.n + 1 }))} className="text-gray-700 hover:bg-blue-50" title="Collapse all notes">⊟ Collapse All</button>
+              </div>
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-3 flex-wrap">
-            <PYModeSelect activeTB={activeTB} onChanged={refresh} />
+        </div>
+        <div className="fsg-stmt-toolbar fsg-notes-toolbar px-5 py-1.5 border-b border-blue-100 bg-gray-50 shrink-0">
+          <AnalyseChangeButton on={changeOn && !changePyOff} onToggle={setChangeOn} disabled={changePyOff}
+            disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Previous Year</span>
+            <PYModeSelect activeTB={activeTB} onChanged={refresh} label="" />
+            {/* One selector (it was drawn twice for a branch): a branch on Manual PY cannot pick a Previous Year TB as well. */}
+            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange} label="TB:"
+              disabled={(isBranchEntity && manualPyOn) || changePyOff}
+              disabledTitle={changePyOff ? 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).' : 'Manual PY is ON for this branch — turn it off to select a Previous Year Trial Balance instead.'} />
             <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
               onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
-              disabled={(isBranchEntity && !!prevTB?.id) || (!!data?.pyMode && data.pyMode !== 'required')}
-              disabledTitle={(!!data?.pyMode && data.pyMode !== 'required') ? 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).' : 'A Previous Year Trial Balance is already selected for this branch — clear it below to use Manual PY instead.'} />
-            {isBranchEntity && (
-              <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-                disabled={manualPyOn || (!!data?.pyMode && data.pyMode !== 'required')}
-                disabledTitle={(!!data?.pyMode && data.pyMode !== 'required') ? 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).' : 'Manual PY is ON for this branch — turn it off to select a Previous Year Trial Balance instead.'} />
-            )}
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden">
-              <button onClick={downloadManualPyFilled}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-amber-50 border-r border-gray-300"
-                title="Download every Manual PY figure currently saved here — keep this safe before re-uploading a Trial Balance, since Manual PY figures do not carry over automatically">
-                ⬇ Manual PY
-              </button>
-              <button onClick={uploadManualPyFilled}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-amber-50"
-                title="Restore Manual PY figures from a previously-downloaded file — matched back by note title, rows with a blank amount are left untouched">
-                ⬆ Manual PY
-              </button>
+              disabled={(isBranchEntity && !!prevTB?.id) || changePyOff}
+              disabledTitle={changePyOff ? 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).' : 'A Previous Year Trial Balance is already selected for this branch — clear it to use Manual PY instead.'} />
+            <div className="fsg-seg">
+              <button onClick={downloadManualPyFilled} className="text-gray-700 hover:bg-amber-50"
+                title="Download every Manual PY figure currently saved here — keep this safe before re-uploading a Trial Balance, since Manual PY figures do not carry over automatically">⬇ Manual PY</button>
+              <button onClick={uploadManualPyFilled} className="text-gray-700 hover:bg-amber-50"
+                title="Restore Manual PY figures from a previously-downloaded file — matched back by note title, rows with a blank amount are left untouched">⬆ Manual PY</button>
             </div>
             {data?.manualPyEnabled && (
               <button onClick={() => setAddMajorHeadModal(true)}
-                className="px-2 py-1 text-xs border border-amber-300 rounded text-amber-700 hover:bg-amber-50"
+                className="border border-amber-300 bg-white text-amber-700 hover:bg-amber-50"
                 title="Add a Balance Sheet or P&L major head that has no balance this year, purely to record a Previous Year figure">
-                + Add PY-only Major Head
+                + PY-only Major Head
               </button>
             )}
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden">
-              <button onClick={downloadFillDetailsBlank}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Download a pristine consolidated Excel template — one sheet per Fill Details note plus Stock, ignoring anything already saved">
-                ⬇ Blank Template
-              </button>
-              <button onClick={downloadFillDetailsFilled}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Download everything currently saved (Fill Details forms + Stock) — a backup/reference of your progress so far">
-                ⬇ Filled Template
-              </button>
-              <button onClick={uploadFillDetails}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
-                title="Upload a filled-in template — every non-blank sheet is saved at once, blank sheets are left untouched">
-                ⬆ Upload Fill Details
-              </button>
+          </div>
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Fill Details Excel</span>
+            <div className="fsg-seg">
+              <button onClick={downloadFillDetailsBlank} className="text-gray-700 hover:bg-blue-50"
+                title="Download a pristine consolidated Excel template — one sheet per Fill Details note plus Inventory, ignoring anything already saved">⬇ Blank</button>
+              <button onClick={downloadFillDetailsFilled} className="text-gray-700 hover:bg-blue-50"
+                title="Download everything currently saved (Fill Details forms + Inventory) — a backup/reference of your progress so far">⬇ Filled</button>
+              <button onClick={uploadFillDetails} className="text-gray-700 hover:bg-blue-50"
+                title="Upload a filled-in template — every non-blank sheet is saved at once, blank sheets are left untouched">⬆ Upload</button>
             </div>
-            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-              disabled={!!data?.pyMode && data.pyMode !== 'required'}
-              disabledTitle="Previous Year figures are switched off for this Financial Year (Previous Year figures: Required)." />
-            <span className="text-xs text-gray-400">{noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)} note{(noteList.length + (data?.generalNotes?.points?.length ? 1 : 0)) !== 1 ? 's' : ''}</span>
-            <div className="flex items-center rounded border border-gray-300 overflow-hidden">
-              <button
-                onClick={() => setExpandSignal(s => ({ v: true, n: s.n + 1 }))}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50 border-r border-gray-300"
-                title="Expand all notes"
-              >Expand All</button>
-              <button
-                onClick={() => setExpandSignal(s => ({ v: false, n: s.n + 1 }))}
-                className="px-2 py-1 text-xs text-gray-700 hover:bg-blue-50"
-                title="Collapse all notes"
-              >Collapse All</button>
-            </div>
-            <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={showEmpty} onChange={e => setShowEmpty(e.target.checked)}
-                className="rounded border-gray-300" />
-              Show empty notes
+          </div>
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Show</span>
+            <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={showEmpty} onChange={e => setShowEmpty(e.target.checked)} className="rounded border-gray-300" />
+              Empty notes
             </label>
-            <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
-              <input type="checkbox" checked={showZeroRows} onChange={e => setShowZeroRows(e.target.checked)}
-                className="rounded border-gray-300" />
-              Show zero-balance rows
+            <label className="flex items-center gap-1.5 text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={showZeroRows} onChange={e => setShowZeroRows(e.target.checked)} className="rounded border-gray-300" />
+              Zero-balance rows
             </label>
-            <input type="text" placeholder="Search notes..." value={search} onChange={e => setSearch(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1.5 text-xs w-40 text-gray-900 bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-            {search && <button onClick={() => setSearch('')} className="text-gray-400 text-xs">X</button>}
           </div>
         </div>
 
@@ -2027,19 +2075,20 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
             // no longer independently Fill-Details-editable, to avoid the
             // two sources silently drifting apart. See the "Edit in Stock
             // Menu" button below instead.
-            const hasForm = t.includes('share capital') ||
+            const hasForm = !!investmentKind(t) || t.includes('share capital') ||
                             t.includes('long-term borrow') || t.includes('long term borrow') ||
                             t.includes('short-term borrow') || t.includes('short term borrow') ||
                             t.includes('trade payable') ||
                             (t.includes('cash') && t.includes('bank')) ||
                             (t.includes('trade receivable') && (isCompanyEntity || isNonCorpEntity)) ||
                             t.includes("owners' capital") || t.includes('owners capital') ||
-                            t.includes("partners' capital") || t.includes('partners capital')
+                            t.includes("partners' capital") || t.includes('partners capital') ||
+                            hasDirectorLoans(entity?.constitution, note.title)
             const isLTB = t.includes('long-term borrow') || t.includes('long term borrow')
             const ltbV = note.ltbValidation
             return (
               <React.Fragment key={note.num}>
-                <NoteBlock note={note} entity={entity} isHighlighted={isHl(note.num)}
+                <NoteBlock activeTB={activeTB} prevTB={prevTB} note={note} entity={entity} isHighlighted={isHl(note.num)}
                   tbId={activeTB?.id} getRemark={getRemark} onRemarkSaved={onRemarkSaved}
                   showZeroRows={showZeroRows} onFix={openFix} expandSignal={expandSignal}
                   manualPyEnabled={data?.manualPyEnabled} onManualPySaved={refresh}
@@ -2080,6 +2129,11 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
           saved at entity level (shared across all branches). */}
       {noteDetailsModal && (() => {
         const title = (noteDetailsModal.noteTitle || '').toLowerCase()
+        if (investmentKind(title)) {
+          const note = Object.values(data?.notes || {}).find(n => n.num === noteDetailsModal.noteNum)
+          return note ? <InvestmentsForm prevTB={prevTB} key={`${activeTB.id}:${activeTB.entity_period_id}:${title}`} activeTB={activeTB} note={note}
+            onClose={() => setNoteDetailsModal(null)} onSaved={() => { setNoteDetailsModal(null); refresh() }} /> : null
+        }
         const isBranchEntity = !!entity?.has_branches
         const commonProps = isBranchEntity
           ? {
@@ -2118,11 +2172,11 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
         }
         // Trade Payables: MSME disclosure (all constitutions) + Ageing Schedule (Company only)
         if (title.includes('trade payable')) {
-          return <TradePayablesDisclosureForm {...commonProps} constitution={entity?.constitution} />
+          return <TradePayablesDisclosureForm {...commonProps} constitution={entity?.constitution} periodLabels={statementColumnLabels(activeTB, prevTB, 'bs')} />
         }
         // Trade Receivables: Ageing Schedule — Company only (hasForm above already gates the button)
         if (title.includes('trade receivable') && parseInt(entity?.constitution) === 3) {
-          return <TradeReceivablesAgingForm {...commonProps} />
+          return <TradeReceivablesAgingForm {...commonProps} periodLabels={statementColumnLabels(activeTB, prevTB, 'bs')} />
         }
         // ...Proprietorship / Partnership / LLP: the simpler 6-month ageing table
         if (isNonCorpTradeReceivables(entity?.constitution, noteDetailsModal.noteTitle)) {
@@ -2140,6 +2194,9 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
             plNetProfit={data?.netProfit}
             plPrevNetProfit={data?.prevNetProfit}
           />
+        }
+        if (hasDirectorLoans(entity?.constitution, noteDetailsModal.noteTitle)) {
+          return <DirectorLoansForm {...commonProps} periodLabels={statementColumnLabels(activeTB, prevTB, 'bs')} />
         }
         return null  // no form registered for this note yet
       })()}
@@ -2168,5 +2225,6 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
         />
       )}
     </div>
+    </AnalyseChangeProvider>
   )
 }

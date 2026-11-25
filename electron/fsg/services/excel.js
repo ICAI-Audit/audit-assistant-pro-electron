@@ -6,6 +6,7 @@ import { createHash } from 'crypto'
 import { query, runInTransaction } from '../db/client.js'
 import { tryClaimMigration } from '../db/schema.js'
 import { assetPath } from '../paths.js'
+import { ensureLevel1Fallbacks, PRE_FALLBACK_WORKBOOK_HASH, FALLBACK_WORKBOOK_HASH } from '../db/level1-fallbacks.js'
 
 // Primary mapping file: Mapping_v2.xlsx, bundled with VERA in
 // electron/fsg/assets/ (see paths.js).
@@ -20,6 +21,13 @@ const TB_HEADERS = [
   'Group.$Parent','Group.$Parent.1','Group.$Parent.2','Group.$Parent.3',
   'Group.$Parent.4','Group.$Parent.5','Group.$Parent.6','Group.$Parent.7','Group.$Parent.8'
 ]
+
+// T-042: a Level Format row's caption n (1-7). Downloads now head these columns
+// "Mapping n"; the built-in Mapping_v2.xlsx and older files say "Level n".
+export function formatLevel(row, n) {
+  const v = row[`Mapping ${n}`]
+  return v !== undefined && v !== null && v !== '' ? v : row[`Level ${n}`]
+}
 
 // ── Read Mapping.xlsx and return parsed data ─────────────────────────────────
 export function readMappingFile(filePath = SOURCE_MAPPING) {
@@ -81,6 +89,17 @@ export async function seedDefaultMapping() {
 
   if (usingMaintainedMapping) {
     const fileHash = createHash('sha256').update(readFileBytes(SOURCE_MAPPING)).digest('hex')
+    // This exact workbook revision adds only the five T-024 terminal rows.
+    // Preserve existing master IDs and all ledger mappings on an old install.
+    if (fileHash === FALLBACK_WORKBOOK_HASH && existing.length) {
+      const { rows: oldSeed } = await query('SELECT key FROM schema_migrations WHERE key = $1', [`mapping_seed:${PRE_FALLBACK_WORKBOOK_HASH}`])
+      if (oldSeed.length) {
+        const { rows: newSeed } = await query('SELECT key FROM schema_migrations WHERE key = $1', [`mapping_seed:${fileHash}`])
+        const result = await ensureLevel1Fallbacks({ seedHash: newSeed.length ? null : fileHash })
+        if (result.backupPath) console.log('T-024 mapping backup:', result.backupPath)
+        return existing[0].id
+      }
+    }
     const claimed = await tryClaimMigration(`mapping_seed:${fileHash}`)
     if (!claimed) {
       // This exact file content has already been seeded (by this client on a
@@ -120,8 +139,8 @@ export async function seedDefaultMapping() {
         `INSERT INTO level_format
           (rule_set_id, constitution, alie, level1, level2, level3, level4, level5, level6, level7, sort_order)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [rsId, parseInt(r['Constitution']), r['ALIE'], r['Level 1'], r['Level 2'],
-         r['Level 3'], r['Level 4'], r['Level 5'], r['Level 6'], r['Level 7'], i]
+        [rsId, parseInt(r['Constitution']), r['ALIE'], formatLevel(r, 1), formatLevel(r, 2),
+         formatLevel(r, 3), formatLevel(r, 4), formatLevel(r, 5), formatLevel(r, 6), formatLevel(r, 7), i]
       )
     }
     for (const r of data.map1) {
@@ -290,7 +309,8 @@ export async function ensureStockCategories() {
 // ── Parse uploaded Trial Balance Excel ──────────────────────────────────────
 export function parseTBExcel(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
+  // T-047: skip the "How to Fill" guide and "Lists" sheets of a VERA-styled template.
+  const ws = wb.Sheets[wb.SheetNames.find(n => n !== 'How to Fill' && n !== 'Lists') ?? wb.SheetNames[0]]
   const rawRows = XLSX.utils.sheet_to_json(ws, { defval: null })
 
   // sheet_to_json keys each row off the header cell's FORMATTED display text
@@ -411,8 +431,8 @@ export async function exportMappingToExcel(rsId) {
 
   addSheet('LevelFormat', lf.map(r => ({
     Constitution: r.constitution, ALIE: r.alie,
-    'Level 1': r.level1, 'Level 2': r.level2, 'Level 3': r.level3,
-    'Level 4': r.level4, 'Level 5': r.level5, 'Level 6': r.level6, 'Level 7': r.level7
+    'Mapping 1': r.level1, 'Mapping 2': r.level2, 'Mapping 3': r.level3,
+    'Mapping 4': r.level4, 'Mapping 5': r.level5, 'Mapping 6': r.level6, 'Mapping 7': r.level7
   })))
   addSheet('Map1', m1)
   addSheet('Map2', m2)

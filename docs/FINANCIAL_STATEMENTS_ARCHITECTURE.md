@@ -1,3 +1,5 @@
+> Historical design document. None of the source files it names exists in the application today (checked on 21 November 2026); the current engine is Financial Statement Review. See [Financial Statement Review](project/FINANCIAL_STATEMENT_REVIEW.md) and [current status](project/CURRENT_STATUS.md).
+
 # Unified Financial Statements Report Engine - Architecture Documentation
 
 ## Executive Summary

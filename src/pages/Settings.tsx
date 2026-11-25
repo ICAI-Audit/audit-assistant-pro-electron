@@ -62,6 +62,7 @@ export default function Settings() {
     no_of_partners: 0,
     icai_unique_sl_no: '',
     address: '',
+    place: '',
   });
 
   // Load firm settings into form
@@ -74,6 +75,7 @@ export default function Settings() {
         no_of_partners: firmSettings.no_of_partners || 0,
         icai_unique_sl_no: firmSettings.icai_unique_sl_no || '',
         address: firmSettings.address || '',
+        place: firmSettings.place || '',
       });
     } else if (!firmLoading) {
       // Reset form if no settings exist and loading is complete
@@ -84,6 +86,7 @@ export default function Settings() {
         no_of_partners: 0,
         icai_unique_sl_no: '',
         address: '',
+        place: '',
       });
     }
   }, [firmSettings, firmLoading]);
@@ -287,6 +290,13 @@ export default function Settings() {
                       placeholder="0"
                     />
                   </div>
+                </div>
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="firm-place">Place</Label>
+                  <Input id="firm-place" value={firmForm.place}
+                    onChange={(e) => setFirmForm(prev => ({ ...prev, place: e.target.value }))}
+                    placeholder="City / town of the firm" />
+                  <p className="text-sm text-muted-foreground">Default signing place for financial statements; editable when generating financials.</p>
                 </div>
                 <p className="text-sm text-muted-foreground mt-4">
                   These details will appear on generated audit reports. Configure partners in the Admin Settings.

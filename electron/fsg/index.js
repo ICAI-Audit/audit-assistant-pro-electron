@@ -12,6 +12,7 @@
 //      its FSG entity (the client) and entity period (the financial year).
 
 import { attachDatabase, query, runInTransaction } from './db/client.js'
+import { ensureLevel1Fallbacks } from './db/level1-fallbacks.js'
 import { ensureSchema } from './db/schema.js'
 import { migrateMappingV3Captions, migrateMappingV3CaptionsPass2 } from './db/mapping-v3-migration.js'
 import { seedDefaultMapping, ensureStockCategories } from './services/excel.js'
@@ -30,7 +31,9 @@ import { registerPPEHandlers } from './ipc/ppe.js'
 import { registerRatioHandlers } from './ipc/ratio.js'
 import { registerGeneralNotesHandlers } from './ipc/general-notes.js'
 import { registerCfsHandlers } from './ipc/cfs.js'
-import { registerFsSnapshotHandlers } from './ipc/fs-snapshot.js'
+import { registerInvestmentHandlers } from './ipc/investments.js'
+import { registerWorkingsHandlers } from './ipc/workings.js'
+import { summarizeEngagement } from './engagement-summary.js'
 import { AuthorizationError, CHANNEL_POLICY, authorizeCall, createPathGuard, filterResult } from './authorization.js'
 
 export const CHANNEL_PREFIX = 'fsg:'
@@ -195,6 +198,8 @@ export async function initFsg({ db, ipcMain, getAuthorizedSession, isTrustedRend
   // FSG start-up data routines, in FSG_Bharat's order.
   await ensureSchema()
   await seedDefaultMapping()
+  const fallbackUpgrade = await ensureLevel1Fallbacks()
+  if (fallbackUpgrade.backupPath) log(`[FSG] T-024 mapping backup: ${fallbackUpgrade.backupPath}`)
   await ensureStockCategories()
   await migrateMappingV3Captions()
   await migrateMappingV3CaptionsPass2()
@@ -214,7 +219,8 @@ export async function initFsg({ db, ipcMain, getAuthorizedSession, isTrustedRend
   registerRatioHandlers()
   registerGeneralNotesHandlers()
   registerCfsHandlers()
-  registerFsSnapshotHandlers()
+  registerInvestmentHandlers()
+  registerWorkingsHandlers()
 
   const handlers = getRegisteredHandlers()
   const missingPolicy = [...handlers.keys()].filter((channel) => !CHANNEL_POLICY[channel])
@@ -264,6 +270,21 @@ export async function initFsg({ db, ipcMain, getAuthorizedSession, isTrustedRend
       return { ok: true, result: await openEngagementContext(db, engagementId) }
     } catch (err) {
       if (!(err instanceof AuthorizationError)) log(`[FSG] context:open failed: ${toErrorMessage(err)}`)
+      return { ok: false, error: toErrorMessage(err), denied: err instanceof AuthorizationError }
+    }
+  })
+
+  // Read-only; same engagement-access rule as context:open.
+  ipcMain.handle(`${CHANNEL_PREFIX}engagement:summary`, async (event, engagementId) => {
+    try {
+      const context = authorize(event)
+      if (typeof engagementId !== 'string' || !engagementId) throw new AuthorizationError('Select an engagement first.')
+      if (!hasEngagementAccess(db, context, engagementId)) {
+        throw new AuthorizationError('This engagement is outside your engagement access.')
+      }
+      return { ok: true, result: summarizeEngagement(db, engagementId) }
+    } catch (err) {
+      if (!(err instanceof AuthorizationError)) log(`[FSG] engagement:summary failed: ${toErrorMessage(err)}`)
       return { ok: false, error: toErrorMessage(err), denied: err instanceof AuthorizationError }
     }
   })

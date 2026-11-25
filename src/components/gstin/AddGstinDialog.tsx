@@ -21,6 +21,7 @@ import {
 import { Loader2, Plus, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { gstzenApi } from "@/services/gstzen-api";
 import { useToast } from "@/components/ui/use-toast";
+import { formatGstinInput, getGstinValidationError } from "@/lib/gstinValidation";
 
 interface AddGstinDialogProps {
     open: boolean;
@@ -36,19 +37,11 @@ interface ValidatedGstin {
     company_details?: any;
 }
 
-// Utility function to sanitize GSTIN input
-const sanitizeGstin = (gstin: string): string => {
-    return gstin
-        .trim()
-        .replace(/\s+/g, "")
-        .toUpperCase();
-};
-
 // Utility function to parse multiple GSTINs from text
 const parseGstinList = (input: string): string[] => {
     return input
         .split(/[\s,]+/)
-        .map((gstin) => sanitizeGstin(gstin))
+        .map((gstin) => formatGstinInput(gstin))
         .filter((gstin) => gstin.length > 0);
 };
 
@@ -74,6 +67,20 @@ export function AddGstinDialog({ open, onOpenChange, onSuccess }: AddGstinDialog
             toast({
                 title: "Invalid input",
                 description: "Please enter valid GSTINs separated by commas or spaces.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const invalidEntry = parsedGstins.find((gstin) => {
+            const validationError = getGstinValidationError(gstin);
+            return validationError !== null;
+        });
+        if (invalidEntry) {
+            const validationError = getGstinValidationError(invalidEntry);
+            toast({
+                title: "Invalid GSTIN",
+                description: `${invalidEntry}: ${validationError}`,
                 variant: "destructive",
             });
             return;

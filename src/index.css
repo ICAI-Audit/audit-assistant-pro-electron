@@ -45,6 +45,23 @@
     --info: 215 70% 45%;
     --info-foreground: 0 0% 100%;
 
+    /* Soft surfaces with AA-safe ink for badges, banners and chips */
+    --success-soft: 142 55% 93%;
+    --success-ink: 142 72% 20%;
+    --warning-soft: 38 95% 91%;
+    --warning-ink: 28 85% 25%;
+    --info-soft: 215 80% 95%;
+    --info-ink: 215 70% 32%;
+    --danger-soft: 0 86% 96%;
+    --danger-ink: 0 70% 35%;
+    --neutral-soft: 210 20% 94%;
+    --neutral-ink: 215 19% 28%;
+    --violet-soft: 262 80% 95%;
+    --violet-ink: 262 55% 35%;
+
+    /* Secondary text that stays AA on both the page and muted surfaces */
+    --subtle: 215 16% 38%;
+
     /* Risk level colors */
     --risk-high: 0 72% 51%;
     --risk-medium: 38 92% 50%;

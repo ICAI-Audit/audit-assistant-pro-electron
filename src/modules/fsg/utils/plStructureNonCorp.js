@@ -19,6 +19,8 @@ const isZero = (n) => Math.abs(n || 0) < ZERO_EPS
 // exact-anchored regex would silently fail to match and the ENTIRE section
 // would compute as zero with no error. Normalizing here means a labelling
 // hiccup degrades gracefully instead of making a whole PL section vanish.
+import { deferredTaxBsNoteNum, isDeferredTaxWithFigure } from './deferredTaxNote'
+
 const normalizeLabel = (s) => (s || '').trim().replace(/:\s*$/, '')
 const findSec = (sections, rx) => sections.find(s => rx.test(normalizeLabel(s.level1)))
 
@@ -251,7 +253,10 @@ export function computeNonCorpPLLayout(data, constitutionDisplay, manualTaxLines
   items.push({ kind: 'header', numbered: true, label: 'Tax expense:' })
   items.push({ kind: 'sub', alpha: 'a', label: 'Current tax', cy: currentTax.cy, py: currentTax.py })
   items.push({ kind: 'sub', alpha: 'b', label: 'Excess/ Short provision of tax relating to earlier years', cy: excessShortTax.cy, py: excessShortTax.py })
-  items.push({ kind: 'sub', alpha: 'c', label: 'Deferred tax charge/ (benefit)', cy: deferredTax.cy, py: deferredTax.py })
+  // With a figure, the line points to the Balance Sheet's Deferred tax assets / liabilities note (noteRef: a reference,
+  // not where the amount comes from) - utils/deferredTaxNote.js.
+  const dtNote = isDeferredTaxWithFigure('Deferred tax', deferredTax.cy, deferredTax.py) ? deferredTaxBsNoteNum(data.notes) : null
+  items.push({ kind: 'sub', alpha: 'c', label: 'Deferred tax charge/ (benefit)', cy: deferredTax.cy, py: deferredTax.py, ...(dtNote ? { noteNum: dtNote, noteRef: true } : {}) })
   let alphaCode = 'd'.charCodeAt(0)
   for (const l of otherTaxLines) {
     items.push({ kind: 'sub', alpha: String.fromCharCode(alphaCode++), label: l.level2 || 'Tax expense (unclassified)', cy: l.total || 0, py: l.prevTotal || 0 })

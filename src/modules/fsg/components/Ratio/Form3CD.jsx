@@ -20,7 +20,7 @@ const ROWS = [
 // double-counted.
 const OPENING_LINE_RX = /^opening (stock|value) of/i
 const CLOSING_LINE_RX = /^less:\s*closing (stock|value) of/i
-const DERIVED_LINE_RX = /^(change in inventory of|net change in inventory)/i
+const DERIVED_LINE_RX = /^(change in inventory of|net change in inventory|add \/ \(less\): other ledgers mapped to this head)/i
 const CHANGES_SECTION_RX = /changes in inventor/i
 const UNCAT_RX = /uncategorised/i
 
@@ -361,7 +361,7 @@ export default function Form3CD({ entity, activeTB, prevTB, onPrevTBChange }) {
     <div className="flex flex-col h-full overflow-hidden bg-white">
       <div className="flex-shrink-0 bg-white border-b border-gray-300 p-6">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-lg font-bold text-gray-900">Form 3CD : Details regarding turnover, gross profit, etc., for the previous year and preceding previous year:</h1>
+          <h1 className="text-lg font-bold text-gray-900">Form 26 (Old Name - 3CD) : Details regarding turnover, gross profit, etc., for the previous year and preceding previous year:</h1>
           <div className="flex items-center gap-3">
             {saveStatus && <span className={`text-sm font-medium ${saveStatus.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>{saveStatus}</span>}
             <button

@@ -1,8 +1,14 @@
 import { BrowserWindow } from 'electron'
 import { ipcMain } from '../ipc-registry.js'
 import { query } from '../db/client.js'
+import { missingAlieRows } from '../services/missing-alie.js'
 
 export function registerFinancialHandlers() {
+  ipcMain.handle('financials:getMissingAlie', async (_, tbId) => missingAlieRows(null, [tbId]))
+  ipcMain.handle('financials:getConsolidatedMissingAlie', async (_, entityId, tbIds) => {
+    if (!Array.isArray(tbIds)) throw new Error('Select the Trial Balances of the Financial Year.')
+    return missingAlieRows(entityId, tbIds)
+  })
   ipcMain.handle('financials:getData', async (_, tbId) => {
     const { rows } = await query(`
       SELECT
@@ -125,10 +131,11 @@ export function registerFinancialHandlers() {
   })
 
   // ── Per-branch data for columnar view ────────────────────────────────────
-  ipcMain.handle('financials:getBranchTBsData', async (_, entityId) => {
+  ipcMain.handle('financials:getBranchTBsData', async (_, entityId, tbIds = null) => {
     const { rows: tbs } = await query(
-      `SELECT id, branch_name, period FROM trial_balances WHERE entity_id=$1 ORDER BY branch_name`,
-      [entityId]
+      `SELECT id, branch_name, period FROM trial_balances WHERE entity_id=$1
+       AND ($2 IS NULL OR id IN (SELECT value FROM json_each($2))) ORDER BY branch_name`,
+      [entityId, tbIds]
     )
     const result = []
     for (const tb of tbs) {
@@ -163,7 +170,8 @@ export function registerFinancialHandlers() {
           COALESCE(lf.alie, mt.alie), COALESCE(lf.level1, mt.mapping1_resultant),
           COALESCE(lf.level2, mt.mapping2_resultant), COALESCE(lf.level3, mt.mapping3_resultant)
       `, [tb.id])
-      result.push({ tbId: tb.id, branchName: tb.branch_name || `Branch ${tb.id}`, period: tb.period, rows })
+      result.push({ tbId: tb.id, branchName: tb.branch_name || `Branch ${tb.id}`, period: tb.period, rows,
+        missingAlieRows: await missingAlieRows(entityId, [tb.id]) })
     }
     return result
   })

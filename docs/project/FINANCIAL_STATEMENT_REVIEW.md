@@ -1,5 +1,38 @@
 # Financial Statement Review (T-019)
 
+## Note from the Tax Audit work (21 November 2026)
+
+To whoever maintains Financial Statement Review. This is a request to consider, not a change: no file of this module was touched.
+
+- **What clashes.** The ratio screen under Features > Ratio has the menu label and heading "Form 26 (Old Name - 3CD)" (T-049; `src/modules/fsg/App.jsx`, `src/modules/fsg/components/Ratio/Form3CD.jsx`). It is a ratio sheet: turnover, gross profit and the like for two years.
+- **Why it matters.** Form No. 26 is also the name of the statutory tax audit report under section 63 of the Income-tax Act, 2025 (sources verified on 21 November 2026). The Tax Audit module adds that form (task T-067, feature F-032). Two different screens are then called "Form 26", and a user could take the ratio sheet for the statutory form.
+- **A suggestion.** A neutral label, for example "Ratios for tax audit (Form 3CD clause 40 / Form 26 clause 12(d))". The clause numbers are verified: Form No. 26 clause 12(d) corresponds to Form 3CD clause 40.
+- **Whose choice.** Yours: keep the label, change it, or choose other words.
+- **What the Tax Audit work will do.** Nothing in this module. It will not change any Financial Statement Review file.
+- **Update, 23 November 2026.** Form No. 26 is now in the Tax Audit module (T-067, F-032, uncommitted). The first wording of this note (21 November 2026) said that the section and the clause numbers were still being checked; both were verified on 21 November 2026, and the points above now state them. Still no Financial Statement Review file was changed.
+
+Written on the owner's instruction of 21 November 2026. The short form of this note is in [next tasks](NEXT_TASKS.md#notes-for-other-modules). Thank you.
+
+Owner additions, 13 November 2026:
+
+T-027 now covers BS/P&L-related Notes and ledger Annexures, including applicable supporting disclosure/ageing tables. BS headings use As at, P&L headings For the year ended, with the same selected CY/PY dates as the faces. Shared Excel sheets repeat the proper dated headings per note, preserving existing formula column positions. Opening/Closing movement meanings remain. This supersedes the earlier face-only scope below. T-028 removes Cloudtail MCA publication UI, automatic publication on final PDF/Excel generation, API/IPC policies and snapshot publishing/serialization code. Existing fs_snapshots table/records are retained for data preservation but have no current feature handlers; finalisation/signing/normal exports remain. No client data is sent to Git or any external service by this work.
+
+Owner rollback, 12 November 2026:
+
+T-026 no longer places missing-ALIE amounts on the BS liability side. They remain excluded pending classification and are shown in warnings/review lists only. Generation remains available and warnings disclose possible incomplete/unbalanced statements. This supersedes earlier provisional ALIE MISSING head descriptions below; PY stock-disclosure exclusion, nil filtering, dated headings and other FSG work remain in place.
+
+Owner addition, 12 November 2026: T-027 reporting-date headings
+
+The BS and P&L screens and normal PDF/Excel use actual year-end dates in titles and current/comparative column headers, derived by `statementDates.js`. BS uses **As at** and P&L **For the year ended**. FY short labels assume April-March; explicit reporting dates retain their actual month/day. Selected comparative dates take precedence; opening/manual PY uses the preceding year end. Missing or invalid dates fall back to generic headings. Branch columnar exports keep branch-name columns; Notes and cash-flow headings are outside this change. Financial figures and saved periods are unchanged.
+
+Owner follow-up, 12 November 2026:
+
+Missing-ALIE balances are now provisionally included on the BS Equity and Liabilities side under **ALIE MISSING**, signed credits less debits, while red bold warnings remain. Per-period nil filtering excludes fully nil items from statement notices. This supersedes the no-allocation/no-financial-total-change description below; source balances and classifications remain unchanged. [Current T-026 contract](T026_MISSING_ALIE_WARNINGS.md).
+
+Later addition, 12 November 2026: [T-026 missing-ALIE warnings](T026_MISSING_ALIE_WARNINGS.md) derives missing classifications directly from source TB ledgers, including missing mapping rows. It keeps generation available and prints red bold item counts/debit/credit/net notices at both ends of BS/P&L, with ledger-wise screen/annexure/export details and saved snapshot evidence. It neither guesses unknown financial-statement sides nor alters source/financial totals. The remaining known-ALIE conflict/discrepancy inclusion and profit-transfer issue are separately outstanding.
+
+Later addition, 11 November 2026: [T-025 investment disclosures](T025_INVESTMENT_DISCLOSURES.md) introduces current/non-current investment Fill Details, restricted mapped-ledger tables, Schedule III Division I disclosures, securities and partnership schedules, year/branch/consolidated persistence and aligned PDF/Excel/workbook output. Current investments omit trade/other grouping. Investment details never change source balances or supply a balancing entry. The task contract records exact inputs, statutory sources, draft warnings, automated evidence and pending professional review.
+
 Authoritative record of the replacement of the former Financial Review screen with the FSG_Bharat financial statement generator, ported from PostgreSQL to ICAI VERA's SQLite database. It supersedes the financial-statement parts of [M-06](modules/M-06.md) and [M-07](modules/M-07.md) for current behaviour; those specifications are kept as the historical record of the removed screen.
 
 ## Request and decisions
@@ -45,6 +78,10 @@ Start-up order: VERA schema files → existing migrations → legacy-table clean
 
 ## Data model
 
+### Known-ALIE Level 1 fallback update (T-024, 10 November 2026)
+
+The workbook LevelFormat sheet now has 684 data rows (679 original plus five requested terminal fallback categories). Map1/2/3 remain 273/239/313. A known ALIE without a Map1 match links to its constitution's terminal fallback master row, retaining low confidence and blank Levels 2-7. Existing mappings are not automatically remapped. The known old workbook receives additive master additions with a backup, preserving existing identifiers and overrides. Full [contract, upgrade behavior and validation limits](T024_LEVEL1_FALLBACKS.md). This prevents the tested category omissions; it does not guarantee a balanced or correctly classified statement. GAP-18 records the non-corporate all-fallback equity/profit-transfer limitation.
+
 ### VERA ↔ FSG mapping
 
 | FSG | VERA source | Rule |
@@ -53,6 +90,22 @@ Start-up order: VERA schema files → existing migrations → legacy-table clean
 | Constitution | `clients.constitution` | company → 3 Company; llp → 2 LLP; partnership → 1 Partnership; proprietorship → 1 Proprietorship. Trust, society, AOP, HUF and cooperative are refused with a message (no FSG format). |
 | `financial_periods` | `engagements.financial_year` (`2024-25`) | 1 April 2024 – 31 March 2025. |
 | `entity_periods` | the client's engagements for that year | One per client and year, shared by every engagement of that client and year (e.g. statutory and tax audit). `engagement_id` records the engagement that first opened it. The previous year is created for comparatives and linked to that year's engagement when one exists. |
+
+### Engagement summary for Dashboard, Audit Report setup and Data Integrity (T-021)
+
+The three screens that used to read `engagement_trial_balance_*` / `trial_balance_lines` now call the read-only channel `fsg:engagement:summary` (`electron/fsg/engagement-summary.js`, renderer client `src/lib/fsgEngagementSummary.ts`). Owner decision (2 November 2026): read Financial Statement Review data only; legacy rows are neither read, migrated nor deleted.
+
+| Aspect | Rule |
+| --- | --- |
+| Access | Same check as `fsg:context:open`: the main process requires an authenticated, trusted frame and `hasEngagementAccess` for the engagement. A user outside the engagement gets a refusal, so figures never cross clients or unassigned engagements. The channel writes nothing and does not open or create FSG records. |
+| Client | `engagements.client_id` → `entities.client_id`. No entity (screen never opened for the client) → "no trial balance". |
+| Engagement and year | `engagements.financial_year` (`2024-25`) → `financial_periods` (1 April – 31 March) → `entity_periods` of that entity. Statutory and tax-audit engagements of the same client and year read the same figures. CY is that year; PY is the year before it (the period created for comparatives). |
+| Trial balances | Every `trial_balances` row of the entity period is included, so branch trial balances of one year are added together. |
+| Classification | A `tb_rows` line counts as classified when its `mapped_tb` row has status `auto_high`, `auto_medium`, `auto_low`, `user_approved` or `user_override` (the statuses used by the Balance Sheet query in `electron/fsg/ipc/financials.js`). Unclassified = rows − classified. The Dashboard shows classification complete when rows exist and none is unclassified. |
+| Amount | `tb_rows.closing_balance` after adjustments (revised balance), taken as an absolute value per ledger line and summed, exactly as the former cross-check did with `Math.abs(closing_balance)`. The ledger sign stays in `tb_rows` unchanged; the absolute value is used only for the cross-check. |
+| Face lines | Level 2 caption of the mapped line, from `level_format.level2` (else `mapped_tb.mapping2_resultant`), compared case-insensitively: Paid-up capital = "Share capital"; Reserves and surplus = "Reserves and surplus"; Borrowings = "Long-term borrowings" + "Short-term borrowings" (Schedule III 2021 current maturities map into Short-term borrowings). Non-company constitutions use other captions ("Partners' capital" and similar) and therefore return 0 for Paid-up capital; the owner has not approved a mapping for them. |
+| Data Integrity | The delete-engagement guard counts the FSG trial balance rows of the engagement's client and year. Those rows belong to the client and year, not the engagement, and survive engagement deletion (`engagement_id` is set to NULL), so the guard is conservative. |
+| Legacy data | `trial_balance_lines` and `engagement_trial_balance_*` remain in the database untouched and are no longer read. Deleting an engagement still cascades to its legacy rows, as before. `useTrialBalance` is kept without a consumer. |
 
 ### Tables
 
@@ -103,9 +156,11 @@ FSG_Bharat had no users. In VERA every `fsg:*` call requires an authenticated, a
 - **Tests and scripts:** `test:classification` and `test:bulk-update`, and their tests. They tested only the removed classification code.
 - **IPC:** `app:getDownloadsPath` and `app:openPath`, used only by the removed export dialog.
 - **Database:** `schedule_iii_config`, `tb_new_entity_info`, `tb_new_ledgers`, `tb_new_stock_items`, `tb_new_classification_mappings` and `tb_new_sessions`. They had no reader or writer and were removed from `05_trial_balance_tables.sql` and the authorization lists. On an existing database they are dropped at start-up only if all are empty, after `VACUUM INTO <userData>/backups/audit_assistant-before-T019-legacy-tb-cleanup-<time>.db`; otherwise they are kept and a message is logged.
-- **Kept, because other modules use them:** `trial_balance_lines` and `useTrialBalance` (Audit Report setup, admin data integrity), `engagement_trial_balance_*` (dashboard, T-003 test), and the Tally ODBC handlers, `useTallyODBC` and `TallyContext` (VERA Tools). The tax-audit source chips keep their stored key `financial_review` and now open Financial Statement Review.
+- **Kept, because other modules use them:** `trial_balance_lines` and `useTrialBalance` (Audit Report setup, admin data integrity), `engagement_trial_balance_*` (dashboard, T-003 test), and the Tally ODBC handlers, `useTallyODBC` and `TallyContext` (VERA Tools). (T-033, 14 November 2026: the VERA Tools Tally Tools tab and `useTallyODBC` were since removed; Ledger Analysis replaces them. `TallyContext` and the ODBC handlers remain.) The tax-audit source chips keep their stored key `financial_review` and now open Financial Statement Review.
 
 ## Differences from FSG_Bharat
+
+T-023 (10 November 2026): signing place now defaults from `firm_settings.place`, entered in VERA Settings/Admin Settings → Firm, and remains editable in Generate Financials before finalisation. The former hard-coded Siliguri/global last-used default is superseded. See the [field, upgrade and acceptance contract](T023_FIRM_SIGNING_PLACE.md). Finalised years retain their stored signing place.
 
 - No PostgreSQL connection form, no cross-PC start-up lock, no multiple windows or pop-outs. The Settings button now opens Tools: the FSG data export and the format reference.
 - Fs snapshots are kept locally. FSG_Bharat's external reader (Cloudtail MCA) read them from the shared server and cannot do so here. `created_by` remains the operating-system user name.

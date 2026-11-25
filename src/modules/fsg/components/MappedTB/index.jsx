@@ -935,10 +935,10 @@ export default function MappedTB({ entity, activeTB, prevTB, onPrevTBChange, act
         )
       }
     },
-    { colId: 'level4', field: 'level4_value', headerName: 'Level 4', width: 180, cellRenderer: makeLevelRenderer('level4_value', 'lf_level4') },
-    { colId: 'level5', field: 'level5_value', headerName: 'Level 5', width: 180, cellRenderer: makeLevelRenderer('level5_value', 'lf_level5') },
-    { colId: 'level6', field: 'level6_value', headerName: 'Level 6', width: 180, cellRenderer: makeLevelRenderer('level6_value', 'lf_level6') },
-    { colId: 'level7', field: 'level7_value', headerName: 'Level 7', width: 180, cellRenderer: makeLevelRenderer('level7_value', 'lf_level7') },
+    { colId: 'level4', field: 'level4_value', headerName: 'Mapping 4', width: 180, cellRenderer: makeLevelRenderer('level4_value', 'lf_level4') },
+    { colId: 'level5', field: 'level5_value', headerName: 'Mapping 5', width: 180, cellRenderer: makeLevelRenderer('level5_value', 'lf_level5') },
+    { colId: 'level6', field: 'level6_value', headerName: 'Mapping 6', width: 180, cellRenderer: makeLevelRenderer('level6_value', 'lf_level6') },
+    { colId: 'level7', field: 'level7_value', headerName: 'Mapping 7', width: 180, cellRenderer: makeLevelRenderer('level7_value', 'lf_level7') },
     // TB Remark column
     {
       colId: 'tb_remark', headerName: 'Remark', width: 160,

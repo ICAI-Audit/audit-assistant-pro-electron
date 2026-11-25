@@ -13,6 +13,7 @@ export interface FirmSettings {
   no_of_partners: number | null;
   icai_unique_sl_no: string | null;
   address: string | null;
+  place: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -75,6 +76,7 @@ export function useFirmSettings() {
             no_of_partners: data.no_of_partners ?? firmSettings.no_of_partners,
             icai_unique_sl_no: data.icai_unique_sl_no ?? firmSettings.icai_unique_sl_no,
             address: data.address ?? firmSettings.address,
+            place: (data.place ?? firmSettings.place)?.trim() || null,
           })
           .eq('id', firmSettings.id)
           .execute();
@@ -106,6 +108,7 @@ export function useFirmSettings() {
             no_of_partners: data.no_of_partners || null,
             icai_unique_sl_no: data.icai_unique_sl_no || null,
             address: data.address || null,
+            place: data.place?.trim() || null,
             created_by: user.id,
           })
           .select()

@@ -15,10 +15,12 @@ export const requiredDocs = [
     .map(name => `docs/project/workflows/${name}.md`),
 ];
 const read = (root, name) => fs.readFileSync(path.join(root, name), 'utf8');
-const walk = (root, rel) => fs.readdirSync(path.join(root, rel), { withFileTypes: true })
-  .flatMap(entry => entry.isDirectory()
-    ? walk(root, `${rel}/${entry.name}`)
-    : [`${rel}/${entry.name}`]).sort();
+// A source directory may be absent (for example an unused tests/ directory in a fresh checkout).
+const walk = (root, rel) => !fs.existsSync(path.join(root, rel)) ? []
+  : fs.readdirSync(path.join(root, rel), { withFileTypes: true })
+    .flatMap(entry => entry.isDirectory()
+      ? walk(root, `${rel}/${entry.name}`)
+      : [`${rel}/${entry.name}`]).sort();
 
 export function buildInventory(root) {
   const pkg = JSON.parse(read(root, 'package.json'));
@@ -66,7 +68,7 @@ export function screenMap(inventory) {
   return '# Screen map\n\nGenerated from src/App.tsx by npm run docs:inventory. This maps route declarations and their guards, not verified end-to-end behaviour. See the [feature register](FEATURE_REGISTER.md) for implementation limits.\n\n'
     + '| Route | Component | Declared guard |\n| --- | --- | --- |\n'
     + inventory.routes.map(route => `| ${route.path} | ${route.component} | ${route.guard} |`).join('\n')
-    + '\n\n/financial-statement-review (Audit Execution → Financial Statement Review, T-019) replaced the former Financial Review screen; /trial-balance and /financial-review redirect to it. /programs-new aliases AuditExecution. /feedback is declared twice with different guards; resolve intent in a scoped route task rather than inferring permissions from its label. A public fallback is not an authentication guarantee for other screens.\n';
+    + '\n\n/financial-statement-review (Audit Execution → Financial Statement Review, T-019) replaced the former Financial Review screen; /trial-balance and /financial-review redirect to it. /programs-new aliases AuditExecution. /feedback is declared once, engagement-scoped (T-012, owner decision 2 November 2026). A public fallback is not an authentication guarantee for other screens.\n';
 }
 
 export function checkDocs(root = defaultRoot) {
@@ -101,7 +103,7 @@ export function checkDocs(root = defaultRoot) {
       errors.push('Source inventory is stale. Run npm run docs:inventory and review the diff.');
     }
     if (fs.existsSync(path.join(root, 'docs/project/SCREEN_MAP.md')) &&
-        read(root, 'docs/project/SCREEN_MAP.md') !== screenMap(actual)) {
+        read(root, 'docs/project/SCREEN_MAP.md').replace(/\r\n/g, '\n') !== screenMap(actual)) {
       errors.push('Screen map is stale. Run npm run docs:inventory and review the diff.');
     }
   } catch (error) {

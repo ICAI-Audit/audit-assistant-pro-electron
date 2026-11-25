@@ -10,10 +10,25 @@
 
 import { app } from 'electron'
 import { createRequire } from 'node:module'
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { checkLevel1Fallbacks } from './fsg-fallback-checks.mjs'
+import { checkInvestments } from './fsg-investment-checks.mjs'
+import { checkMissingAlie } from './fsg-missing-alie-checks.mjs'
+import { skippedPdfChecks } from './fsg-pdf-text.mjs'
+import { checkTbImport } from './fsg-tb-import-checks.mjs'
+import { checkQueue } from './fsg-queue-checks.mjs'
+import { checkNaming } from './fsg-naming-checks.mjs'
+import { checkPolicyFormat } from './fsg-policy-checks.mjs'
+import { checkWorkings } from './fsg-workings-checks.mjs'
+import { checkAnalyseChange } from './fsg-analyse-change-checks.mjs'
+import { checkInventoryNote, checkShareholding, checkOpeningSurplusLabel, checkConflictFallback } from './fsg-inventory-note-checks.mjs'
+import { checkTbVersions } from './fsg-tb-version-checks.mjs'
+import { checkOwnerPoints } from './fsg-owner-points-checks.mjs'
+import { checkDirectorLoans } from './fsg-director-loans-checks.mjs'
+import { checkBranchMaster } from './fsg-branch-master-checks.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
@@ -30,6 +45,54 @@ async function main() {
   await app.whenReady()
   const Database = require(join(root, 'node_modules', 'better-sqlite3'))
   const { getAuthorizationContext, hasEngagementAccess } = require(join(root, 'electron', 'sqlite-authorization.cjs'))
+  const { ensureFirmPlace } = require(join(root, 'electron', 'firm-place-migration.cjs'))
+
+  // T-023: installed databases must upgrade without replacing existing data.
+  {
+  const oldPath = join(userData, 'old-firm.db')
+  const old = new Database(oldPath)
+  old.exec(`CREATE TABLE firm_settings (id TEXT PRIMARY KEY, firm_name TEXT, address TEXT);
+    INSERT INTO firm_settings VALUES ('firm-1', 'Synthetic Firm', 'Existing address');
+    CREATE TABLE balances (id INTEGER PRIMARY KEY, amount NUMERIC);
+    INSERT INTO balances VALUES (1, -12345.67);`)
+  const before = old.prepare('SELECT * FROM firm_settings').get()
+  const badDir = join(userData, 'not-a-directory')
+  writeFileSync(badDir, 'blocked')
+  let backupFailed = false
+  try { ensureFirmPlace(old, badDir) } catch (_) { backupFailed = true }
+  check('firm Place backup failure leaves the old schema and data intact', backupFailed
+    && !old.prepare('PRAGMA table_info(firm_settings)').all().some(c => c.name === 'place')
+    && JSON.stringify(old.prepare('SELECT * FROM firm_settings').get()) === JSON.stringify(before))
+  // Failure during ALTER must roll back; the next startup can retry.
+  let alterFailed = false
+  try {
+    ensureFirmPlace({ name: old.name, prepare: sql => old.prepare(sql), transaction: () => old.transaction(() => {
+      old.exec('ALTER TABLE firm_settings ADD COLUMN place TEXT')
+      throw new Error('synthetic migration interruption')
+    }) }, join(userData, 'interrupted-backups'))
+  } catch (_) { alterFailed = true }
+  check('interrupted firm Place upgrade rolls back', alterFailed
+    && !old.prepare('PRAGMA table_info(firm_settings)').all().some(c => c.name === 'place'))
+  const backupPath = ensureFirmPlace(old, join(userData, 'backups'))
+  const upgraded = old.prepare('SELECT * FROM firm_settings').get()
+  check('firm Place upgrade preserves identifiers, details and signed balances', upgraded.place === null
+    && upgraded.id === before.id && upgraded.firm_name === before.firm_name && upgraded.address === before.address
+    && old.prepare('SELECT amount FROM balances').get().amount === -12345.67)
+  old.prepare('UPDATE firm_settings SET place = ?').run('Bengaluru')
+  check('firm Place upgrade is idempotent and preserves saved Place', ensureFirmPlace(old, join(userData, 'backups')) === null
+    && old.prepare('SELECT place FROM firm_settings').get().place === 'Bengaluru')
+  old.close()
+  const restoredPath = join(userData, 'restored.db')
+  copyFileSync(backupPath, restoredPath)
+  const restored = new Database(restoredPath)
+  check('pre-upgrade backup restores original firm details and balances',
+    JSON.stringify(restored.prepare('SELECT * FROM firm_settings').get()) === JSON.stringify(before)
+    && restored.prepare('SELECT amount FROM balances').get().amount === -12345.67
+    && restored.pragma('integrity_check', { simple: true }) === 'ok')
+  ensureFirmPlace(restored, join(userData, 'restored-backups'))
+  check('restored old database upgrades successfully', restored.prepare('SELECT place FROM firm_settings').get().place === null)
+  restored.close()
+  }
 
   const db = new Database(':memory:')
   db.pragma('foreign_keys = ON')
@@ -37,6 +100,9 @@ async function main() {
   for (const file of readdirSync(schemaDir).filter((f) => f.endsWith('.sql')).sort()) {
     db.exec(readFileSync(join(schemaDir, file), 'utf8'))
   }
+  check('fresh firm schema has Place and needs no upgrade backup',
+    db.prepare('PRAGMA table_info(firm_settings)').all().some(c => c.name === 'place')
+    && ensureFirmPlace(db, join(userData, 'fresh-backups')) === null)
 
   // Table names of the FSG module must not collide with other VERA tables.
   const fsgSql = readFileSync(join(schemaDir, '10_fsg_tables.sql'), 'utf8')
@@ -84,6 +150,8 @@ async function main() {
     log: () => {},
   })
   check('module registers its channels', started.channels.length > 150, started.channels.length)
+  check('Cloudtail MCA publishing and history IPC channels are not registered', !handlers.has('fsg:fsSnapshot:publish') && !handlers.has('fsg:fsSnapshot:list'))
+  check('Retired snapshot storage is preserved without exposing Cloudtail', !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='fs_snapshots'").get())
 
   const invoke = (userId, channel, ...args) => handlers.get(`fsg:${channel}`)({ userId, trusted: true }, ...args)
   const staff = (channel, ...args) => invoke('u-staff', channel, ...args)
@@ -202,10 +270,62 @@ async function main() {
   check('staff can lock their financial year', r.ok && r.result.locked === true, r)
   r = await staff('mappedTB:clearAll', tbId)
   check('locked year refuses changes', r.ok === false && /lock/i.test(r.error), r)
+  // T-035: every kind of year data is frozen while the year is locked, for
+  // every role, and reads still work.
+  const frozenTables = ['tb_rows', 'mapped_tb', 'note_details', 'note_disclosures', 'remarks', 'dep_schedules', 'dep_it_schedules',
+    'dep_comp_schedules', 'cash_flow_entries', 'general_notes', 'tax_computations', 'deferred_tax_computations', 'form_3cd',
+    'ppe_ledgers', 'manual_py_entries', 'manual_face_lines', 'ratio_gp_selection', 'trial_balances']
+  const snapshotFrozen = () => JSON.stringify(frozenTables.map((t) => db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all()))
+  const lockedWrites = [
+    ['noteDetails:save', { tbId, noteNum: 1, noteTitle: 'Share Capital', data: { x: 1 } }],
+    ['noteDisclosure:save', { tbId, noteNum: 1, noteTitle: 'Share Capital', text: 'x' }],
+    ['remarks:save', { tbId, scope: 'note', scope_key: '1', remark: 'x' }],
+    ['dep:save', { tbId, data: { rows: [] } }],
+    ['dep:saveComp', { tbId, data: { categoryRows: [] } }],
+    ['dep:saveIT', { tbId, data: { blockSummary: [] } }],
+    ['cfs:save', entityId, periodId, { cy: { a: 9 }, py: {}, include: true }],
+    ['generalNotes:save', entityId, periodId, { points: [] }],
+    ['taxComputation:save', entityId, periodId, {}],
+    ['deferredTax:save', entityId, periodId, {}],
+    ['saveForm3CD', entityId, periodId, {}],
+    ['ratio:saveGPSelection', entityId, periodId, []],
+    ['savePPELedgers', entityId, periodId, []],
+    ['tb:saveStock', { tbId, stockData: [] }],
+    ['tb:insertManualRow', { tbId, rowData: { name: 'Locked ledger', closing_balance: 1 } }],
+    ['tb:delete', tbId],
+    ['manualPY:set', tbId, true],
+    ['manualPyEntries:upsert', { tbId, noteNum: 1, particularLabel: 'x', pyAmount: 1 }],
+    ['manualFaceLines:add', { tbId, label: 'x' }],
+    ['plClosedToCapital:set', tbId, true],
+    ['eps:set', tbId, 'basic_cy', 1],
+    ['entityPeriod:setPrevTB', periodId, null],
+    ['mappedTB:override', mapped[0]?.id, {}],
+  ]
+  for (const [label, caller] of [['locked', staff], ['final', partner]]) {
+    if (label === 'final') {
+      r = await partner('entityPeriod:finalise', periodId, 'Synthetic Place', '2025-09-01')
+      check('partner can mark the year final', r.ok, r)
+    }
+    const before = snapshotFrozen()
+    const allowed = []
+    for (const [channel, ...args] of lockedWrites) {
+      const res = await caller(channel, ...args)
+      if (!(res.ok === false && res.denied && /locked or final/i.test(res.error))) allowed.push({ channel, res })
+    }
+    check(`T-035 ${label} year refuses note, depreciation, cash flow, stock, journal, tax, 3CD, PPE, PY and TB writes`, allowed.length === 0, allowed)
+    check(`T-035 ${label} year data is unchanged after the refused writes`, snapshotFrozen() === before)
+    r = await caller('financials:getData', tbId)
+    check(`T-035 ${label} year can still be read`, r.ok && Array.isArray(r.result), r)
+  }
+  r = await partner('entityPeriod:lock', periodId)
+  check('T-035 locking an already final year is still allowed', r.ok, r)
+
   r = await staff('entityPeriod:unlock', periodId)
   check('staff cannot unlock', r.ok === false && r.denied, r)
   r = await partner('entityPeriod:unlock', periodId)
   check('partner can unlock', r.ok && r.result.locked === false, r)
+  r = await staff('noteDetails:save', { tbId, noteNum: 1, noteTitle: 'Share Capital', data: { x: 1 } })
+  check('T-035 unlocked year accepts changes again', r.ok, r)
 
   // JSON documents (former JSONB columns) round-trip.
   r = await staff('cfs:save', entityId, periodId, { cy: { a: 1 }, py: {}, include: true })
@@ -236,6 +356,53 @@ async function main() {
   }
   check('failed transaction rolls back', rolledBack)
 
+  // ── T-021: read-only engagement summary for Dashboard / Audit Report / Data Integrity ──
+  r = await staff('engagement:summary', 'e1')
+  check('engagement summary counts the FSG trial balance of the engagement year', r.ok
+    && r.result.current.found && r.result.current.yearLabel === '2024-25'
+    && r.result.current.totalRows === 5 && r.result.current.tbCount === 1
+    && r.result.current.classifiedRows + r.result.current.unclassifiedRows === 5
+    && r.result.current.classifiedRows >= 3, r)
+  check('engagement summary reports no previous-year trial balance', r.ok
+    && r.result.previous.yearLabel === '2023-24' && r.result.previous.found === false && r.result.previous.totalRows === 0, r)
+  check('engagement summary returns the Share capital face-line amount', r.ok && r.result.amounts
+    && r.result.amounts.paidUpCapital === 100000 && r.result.amounts.reservesSurplus === 0
+    && r.result.amounts.borrowings === 0, r)
+  r = await partner('engagement:summary', 'e1b')
+  check('a second engagement of the same client and year reads the same data', r.ok && r.result.current.totalRows === 5
+    && r.result.amounts && r.result.amounts.paidUpCapital === 100000, r)
+  r = await staff('engagement:summary', 'e1b')
+  check('engagement summary refuses an engagement the user is not assigned to', r.ok === false && r.denied === true, r)
+  r = await staff('engagement:summary', 'e2')
+  check('engagement summary does not cross to another client', r.ok === false && r.denied === true, r)
+  r = await partner('engagement:summary', 'e2')
+  check('engagement of a client without a trial balance reports none and no amounts', r.ok
+    && r.result.current.found === false && r.result.current.totalRows === 0 && r.result.amounts === null, r)
+  r = await partner('engagement:summary', 'e3')
+  check('engagement of a client never opened in FSG reports none', r.ok && r.result.current.found === false && r.result.amounts === null, r)
+  r = await handlers.get('fsg:engagement:summary')({ trusted: true }, 'e1')
+  check('engagement summary needs authentication', r.ok === false && r.denied === true, r)
+  const before = db.prepare('SELECT (SELECT COUNT(*) FROM entities) AS e, (SELECT COUNT(*) FROM entity_periods) AS p, (SELECT COUNT(*) FROM trial_balances) AS t').get()
+  await partner('engagement:summary', 'e3')
+  const after = db.prepare('SELECT (SELECT COUNT(*) FROM entities) AS e, (SELECT COUNT(*) FROM entity_periods) AS p, (SELECT COUNT(*) FROM trial_balances) AS t').get()
+  check('engagement summary writes nothing', JSON.stringify(before) === JSON.stringify(after), { before, after })
+
+  const beforeBranch = db.prepare('SELECT COUNT(*) AS c FROM trial_balances').get().c
+  r = await staff('tb:uploadRealBooks', { entityId, entityPeriodId: periodId, fileName: 'branch.xlsx', tbRows: [
+    { ...ledger('Term Loan from Bank', 'Secured Loans', 'Loans (Liability)', 40000), branch: 'B2' },
+    { ...ledger('General Reserve', 'Reserves & Surplus', 'Reserves & Surplus', 25000), branch: 'B2' },
+  ] })
+  if (r.ok) {
+    await staff('mappedTB:run', r.result.tb.id, defaultRs, {})
+    const s = await staff('engagement:summary', 'e1')
+    check('branch trial balances of the same year are added together', s.ok && s.result.current.tbCount === 2
+      && s.result.current.totalRows === 7 && s.result.amounts.paidUpCapital === 100000
+      && s.result.amounts.reservesSurplus === 25000 && s.result.amounts.borrowings === 40000, s)
+  } else {
+    check('branch trial balance upload for summary test', false, r)
+  }
+  check('summary test inserted one extra trial balance', db.prepare('SELECT COUNT(*) AS c FROM trial_balances').get().c === beforeBranch + 1)
+
   // ── Engagement / client deletion behaviour ───────────────────────────────
   db.prepare(`DELETE FROM engagements WHERE id = 'e1b'`).run()
   check('deleting one engagement keeps the shared financial statements', db.prepare('SELECT COUNT(*) AS c FROM trial_balances WHERE id = ?').get(tbId).c === 1)
@@ -243,8 +410,47 @@ async function main() {
   try { db.prepare(`DELETE FROM clients WHERE id = 'c1'`).run() } catch (e) { restricted = /FOREIGN KEY/.test(e.message) }
   check('deleting a client with statement data is refused', restricted)
 
+  // T-071: at most three Trial Balances per financial year and branch. The checks
+  // below each upload their own; before an upload that would be a fourth, the
+  // oldest earlier check's Trial Balance is deleted (never the main one above),
+  // as a user would delete a version they no longer need.
+  const staffWithRoom = async (channel, ...args) => {
+    for (let i = 0; i < 5 && /^tb:upload/.test(channel) && args[0]?.entityPeriodId; i++) {
+      const st = await staff('tb:versionStatus', { entityPeriodId: args[0].entityPeriodId, branchName: args[0].branchName || '' })
+      const oldest = st.ok && st.result.full ? st.result.versions.filter(v => v.id !== tbId).sort((a, b) => a.id - b.id)[0] : null
+      if (!oldest) break
+      await staff('tb:delete', oldest.id)
+    }
+    return staff(channel, ...args)
+  }
+
+  await checkMissingAlie({ db, root, userData, check, staff, partner, entityId, periodId, defaultRs })
+  await checkInvestments({ db, root, userData, check, staff, partner, entityId, periodId, defaultRs,
+    renderPdf: html => partner('financials:renderPDF', html) })
+  await checkLevel1Fallbacks({ Database, root, userData, originalDb: db, check,
+    renderPdf: html => partner('financials:renderPDF',html) })
+  await checkTbImport({ db, root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkQueue({ db, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkNaming({ db, root, check, staff, entityId, defaultRs })
+  await checkPolicyFormat({ root, userData, check })
+  await checkWorkings({ db, check, staff: staffWithRoom, partner, entityId, periodId, defaultRs })
+  await checkAnalyseChange({ root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkInventoryNote({ db, root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkShareholding({ root, userData, check })
+  await checkDirectorLoans({ root, userData, check })
+  await checkBranchMaster({ db, root, check, staff: staffWithRoom, entityId, periodId })
+  await checkOpeningSurplusLabel({ db, root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkConflictFallback({ db, check, staff: staffWithRoom, entityId, periodId, defaultRs })
+  await checkTbVersions({ db, root, check, staff, partner, entityId, defaultRs })
+  await checkOwnerPoints({ root, userData, check })
+
   const failed = results.filter((x) => !x.pass)
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
+  const skipped = skippedPdfChecks()
+  if (skipped.length) {
+    console.log(`${skipped.length} PDF text check(s) skipped, not passed (${skipped[0].reason}):`)
+    for (const s of skipped) console.log(`  - ${s.name}`)
+  }
   db.close()
   try { rmSync(userData, { recursive: true, force: true }) } catch (_) { /* temp folder */ }
   app.exit(failed.length ? 1 : 0)

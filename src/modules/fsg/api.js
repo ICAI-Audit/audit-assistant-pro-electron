@@ -57,6 +57,10 @@ export const fsgApi = {
   saveEntity:        (e)      => call('entity:save', e),
   deleteEntity:      (id)     => call('entity:delete', id),
   getBranches:       (eid)    => call('tb:getBranches', eid),
+  listBranchMaster:  (eid)    => call('tb:listBranchMaster', eid),
+  addBranch:         (data)   => call('tb:addBranch', data),
+  renameBranch:      (data)   => call('tb:renameBranch', data),
+  deleteBranch:      (data)   => call('tb:deleteBranch', data),
 
   // Financial Periods (global master) + Entity Periods (per-Auditee attachment, with locking)
   listFinancialPeriods:  ()                    => call('financialPeriod:list'),
@@ -89,9 +93,15 @@ export const fsgApi = {
   tallyTcpPing:      (cfg)                    => call('tally:tcpPing', cfg),
   getTBList:         (eid)    => call('tb:list', eid),
   getTBsForEntityPeriod: (entityPeriodId) => call('tb:listByEntityPeriod', entityPeriodId),
+  // T-044: a Trial Balance's workings
+  workingsSummary:   (tbId)                   => call('workings:summary', tbId),
+  carryOverWorkings: (data)                   => call('workings:carryOver', data),
+  exportWorkings:    (tbId)                   => call('workings:export', tbId),
+  importWorkings:    (data)                   => call('workings:import', data),
   getTBRows:         (tbId)   => call('tb:rows', tbId),
   downloadTBTemplate:()       => call('tb:template'),
   deleteTB:          (tbId)   => call('tb:delete', tbId),
+  tbVersionStatus:   (data)   => call('tb:versionStatus', data),
   saveStock:         (data)   => call('tb:saveStock', data),
   getStockRows:      (tbId)   => call('tb:getStockRows', tbId),
   getOtherExpenseHeads: (tbId) => call('tb:getOtherExpenseHeads', tbId),
@@ -99,7 +109,6 @@ export const fsgApi = {
   insertManualRow:   (data)   => call('tb:insertManualRow', data),
   deleteTBRow:       (data)   => call('tb:deleteRow', data),
   getLedgersForTB:   (tbId)   => call('tb:getLedgersForTB', tbId),
-  saveJournalEntry:  (data)   => call('tb:saveJournalEntry', data),
 
   // Mapping Rules
   getDefaultMapping: (const_) => call('mapping:getDefault', const_),
@@ -117,7 +126,6 @@ export const fsgApi = {
   getMappedRows:     (tbId)          => call('mappedTB:rows', tbId),
   findMappedByFilter:(tbId, filter) => call('mappedTB:findByFilter', tbId, filter),
   listMappedCaptions:(tbId)         => call('mappedTB:captionTuples', tbId),
-  exceptionsDiagnostics:(tbId)     => call('mappedTB:diagnostics', tbId),
   setAdjustment:     (id, data)      => call('mappedTB:setAdjustment', id, data),
   getAdjustmentSummary: (arg)        => call('mappedTB:adjustmentSummary', arg),
   clearAdjustments:  (tbId)          => call('mappedTB:clearAdjustments', tbId),
@@ -142,8 +150,10 @@ export const fsgApi = {
 
   // Financial Statements
   getFinancialData:          (tbId)       => call('financials:getData', tbId),
+  getMissingAlie:            (tbId)       => call('financials:getMissingAlie', tbId),
+  getConsolidatedMissingAlie:(entityId, tbIds) => call('financials:getConsolidatedMissingAlie', entityId, tbIds),
   getConsolidatedData:       (entityId, tbIds) => call('financials:getConsolidatedData', entityId, tbIds),
-  getBranchTBsData:          (entityId)   => call('financials:getBranchTBsData', entityId),
+  getBranchTBsData:          (entityId, tbIds = null) => call('financials:getBranchTBsData', entityId, tbIds),
   renderPDF:                 (html)       => call('financials:renderPDF', html),
   getAppVersion:             ()           => call('app:getVersion'),
 
@@ -166,6 +176,8 @@ export const fsgApi = {
 
   // Note Details (supplementary data for each financial statement note)
   getNoteDetails:       (tbId, noteNum, noteTitle)   => call('noteDetails:get', tbId, noteNum, noteTitle),
+  listInvestments:      (scope) => call('investments:list', scope),
+  saveInvestments:      (scope) => call('investments:save', scope),
   saveNoteDetails:      (data)                       => call('noteDetails:save', data),
   listNoteDetails:      (tbId)                       => call('noteDetails:listByTB', tbId),
   getItrDetails:        (tbId)                       => call('itrDetails:get', tbId),
@@ -211,9 +223,6 @@ export const fsgApi = {
   getTaxComputation:     (entityId, entityPeriodId)  => call('taxComputation:get', entityId, entityPeriodId),
   saveTaxComputation:    (entityId, entityPeriodId, data) => call('taxComputation:save', entityId, entityPeriodId, data),
 
-  // Snapshots of the finalised statements for Cloudtail MCA (fs_snapshots)
-  publishFsSnapshot:     (entityId, entityPeriodId, payload) => call('fsSnapshot:publish', entityId, entityPeriodId, payload),
-  listFsSnapshots:       (entityPeriodId)      => call('fsSnapshot:list', entityPeriodId),
 
   // PPE (Property, Plant & Equipment)
   getPPELedgers:         (entityId, entityPeriodId)  => call('getPPELedgers', entityId, entityPeriodId),

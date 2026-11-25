@@ -62,9 +62,24 @@ export function isPrintedPlNoteLine(line) {
 export function plNoteLineLabel(note, line) {
   return (line && line.level2) || fallbackSubnoteLabel(note && note.title)
 }
+// Cost of materials consumed with Raw Materials stock prints as a working (owner, 23 November 2026):
+//   Opening Stock of Raw Materials / Add: Purchases / Less: Closing Stock of Raw Materials / Cost of materials consumed.
+// The "Add: " is display only: the line's own label (plNoteLineLabel) stays the key of its remarks, Manual PY entry and
+// Annexure sub-note.
+const hasRawWorking = (note) => !!(note && (note.lines || []).some(l => l && l.rawWorking === 'opening'))
+export function plNoteLineDisplay(note, line) {
+  const label = plNoteLineLabel(note, line)
+  if (!hasRawWorking(note) || !line || line.rawWorking || line.isSubtotal || /^(add|less)\s*:/i.test(label)) return label
+  const firstOther = note.lines.filter(isPrintedPlNoteLine).find(l => !l.rawWorking && !l.isSubtotal)
+  return firstOther === line ? `Add: ${label}` : label
+}
+/** The caption of a P&L note's total row: the head's name for the Cost of materials consumed working, else "Total". */
+export function plNoteTotalLabel(note) {
+  return hasRawWorking(note) ? (note.displayTitle || note.title || 'Total') : 'Total'
+}
 export function plNoteLines(note) {
   if (!plNoteShowsLines(note)) return []
-  return note.lines.filter(isPrintedPlNoteLine).map(line => ({ line, label: plNoteLineLabel(note, line) }))
+  return note.lines.filter(isPrintedPlNoteLine).map(line => ({ line, label: plNoteLineLabel(note, line), display: plNoteLineDisplay(note, line) }))
 }
 
 // ── A Balance Sheet note with no template lines ─────────────────────────────

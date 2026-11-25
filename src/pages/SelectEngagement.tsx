@@ -40,13 +40,13 @@ export default function SelectEngagement() {
     });
   }, [engagements, searchQuery, clientFilter, yearFilter]);
 
-  const handleSelectEngagement = (engagement: typeof engagements[0]) => {
-    setCurrentEngagement(engagement);
+  const handleSelectEngagement = async (engagement: typeof engagements[0]) => {
+    if (!(await setCurrentEngagement(engagement))) return;
     navigate('/');
   };
 
   const handleSignOut = async () => {
-    clearEngagement();
+    if (!(await clearEngagement('sign-out'))) return;
     await signOut();
     navigate('/auth', { replace: true });
   };

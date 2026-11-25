@@ -1,11 +1,14 @@
+import { statementDates, statementColumnLabels } from '../../utils/statementDates'
 import React, { useState } from 'react'
 import { useFinancials, fmtINR } from '../../hooks/useFinancials'
 import { fixFilterWith } from '../../utils/fixTargets'
+import MissingAlieWarning from '../shared/MissingAlieWarning'
 import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
 import PlClosedToCapitalButton from '../shared/PlClosedToCapitalButton'
 import RemarkCell, { useRemarks } from '../shared/RemarkCell'
+import { AnalyseChangeButton, AnalyseChangeProvider, useAnalyseChangeToggle, ChangeCells, ChangeCols, ChangeHeads, useChangeSpan } from '../shared/AnalyseChange'
 import { FormatRefButton, SCHEDULE3_SECTIONS } from '../shared/FormatReference'
 import {
   computeDynamicBSLayout, BS_STRUCTURE, matchToBuckets, buildUncatBuckets, elGroupOf, assetGroupOf, tradePayablesSplit } from '../../utils/bsStructure'
@@ -31,7 +34,7 @@ function Guard({ activeTB, loading, error, children }) {
 const ALPHA_SEQ = 'abcdefghijklmnopqrstuvwxyz'
 
 // ── A single BS line row ──────────────────────────────────────────────────────
-function BsRow({ num, alpha, label, noteNum, total, prevTotal, bold, dark, head, sub, red, indent, onNoteClick, tbId, getRemark, onRemarkSaved, onFix, fixFilter }) {
+function BsRow({ num, alpha, label, noteNum, total, prevTotal, bold, dark, head, sub, red, indent, onNoteClick, tbId, getRemark, onRemarkSaved, onFix, fixFilter, changeKey }) {
   const cls = dark ? 'bg-blue-800 text-white'
     : head ? 'bg-blue-50 border-b border-blue-200'
     : bold ? 'bg-white font-semibold border-b border-blue-100'
@@ -40,6 +43,9 @@ function BsRow({ num, alpha, label, noteNum, total, prevTotal, bold, dark, head,
     : 'border-b border-gray-100 hover:bg-gray-50'
 
   const indentPl = indent === 2 ? 'pl-12' : indent === 1 ? 'pl-8' : 'pl-4'
+  // T-050: a numbered sub-line ((i)-(iv) under (a) PPE and intangibles) carries its numeral inside Particulars,
+  // one step to the right of the parent's letter, so the hierarchy reads at a glance.
+  const nested = indent === 2 && !!alpha
   const textCls  = dark ? 'text-white font-bold'
     : head  ? 'text-blue-800 font-bold'
     : bold  ? 'text-blue-800 font-semibold'
@@ -49,8 +55,9 @@ function BsRow({ num, alpha, label, noteNum, total, prevTotal, bold, dark, head,
   return (
     <tr className={cls}>
       <td className={`py-1.5 text-xs w-10 text-center ${dark ? 'text-white' : 'text-gray-500'}`}>{num || ''}</td>
-      <td className={`py-1.5 text-xs w-8 text-center ${dark ? 'text-white' : red ? 'text-red-400' : 'text-gray-400'}`}>{alpha || ''}</td>
-      <td className={`py-1.5 text-xs ${indentPl} ${textCls}`}>
+      <td className={`py-1.5 text-xs w-8 text-center ${dark ? 'text-white' : red ? 'text-red-400' : 'text-gray-400'}`}>{nested ? '' : (alpha || '')}</td>
+      <td className={`py-1.5 text-xs ${nested ? '' : indentPl} ${textCls}`} style={nested ? { paddingLeft: '2rem' } : undefined}>
+        {nested && <span className="inline-block w-8 text-gray-400">{alpha}</span>}
         {label}
         {red && tbId && onFix && fixFilter && (
           <button onClick={() => onFix(fixFilter, `Fix: ${label}`)}
@@ -80,11 +87,27 @@ function BsRow({ num, alpha, label, noteNum, total, prevTotal, bold, dark, head,
       <td className={`py-col py-1.5 text-right font-mono text-xs pr-2 w-32 ${dark ? 'opacity-70 text-white' : bold ? 'text-gray-400 border-t-2 border-blue-400' : 'text-gray-400'}`}>
         {prevTotal !== undefined ? fmtINR(prevTotal) : ''}
       </td>
+      <ChangeCells cy={total} py={prevTotal} rowKey={changeKey || label} blank={head || (total === undefined && prevTotal === undefined)} dark={dark} bold={bold} />
     </tr>
   )
 }
 
-function Spacer() { return <tr><td colSpan={6} className="py-0.5" /></tr> }
+// Company BS column widths; with Variance Analysis on, Particulars gives up room for the three change columns (T-048).
+function BsColgroup({ wide }) {
+  return (
+    <colgroup>
+      <col style={{ width: wide ? '4%' : '5%' }} />
+      <col style={{ width: wide ? '3%' : '5%' }} />
+      <col style={{ width: wide ? '27%' : '50%' }} />
+      <col style={{ width: wide ? '6%' : '9%' }} />
+      <col style={{ width: wide ? '12.5%' : '15.5%' }} />
+      <col className="py-col" style={{ width: wide ? '12.5%' : '15.5%' }} />
+      <ChangeCols />
+    </colgroup>
+  )
+}
+
+function Spacer() { const extra = useChangeSpan(); return <tr><td colSpan={6 + extra} className="py-0.5" /></tr> }
 
 // ── Non-company (proprietor / partnership) BS — dynamic layout ────────────────
 function DynamicBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSaved, openFix, entity }) {
@@ -98,15 +121,17 @@ function DynamicBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
   const assetSections = layout.assets
   const grandPrevEL     = layout.prevEL
   const grandPrevAssets = layout.prevAsset
+  const changeWide = useChangeSpan() > 0
 
   function SectionBlock({ index, section }) {
     const l1 = section.level1 || ''
+    const extra = useChangeSpan()
     const isU = !l1 || (l1 || '').toLowerCase().includes('uncategorised')
     if (isU && Math.abs(section.total) < 0.005 && Math.abs(section.prevTotal) < 0.005) return null
     return (
       <>
         <tr className={isU ? 'bg-red-50' : 'bg-blue-50'}>
-          <td colSpan={6} className={`py-1.5 px-3 font-bold border-b border-blue-100 text-xs ${isU ? 'text-red-700' : 'text-blue-800'}`}>
+          <td colSpan={6 + extra} className={`py-1.5 px-3 font-bold border-b border-blue-100 text-xs ${isU ? 'text-red-700' : 'text-blue-800'}`}>
             ({index}) {l1 || <span className="italic">Uncategorised</span>}
             {isU && activeTB?.id && openFix && (
               <button onClick={() => openFix(fixFilterWith({ alie: 'EQUITY AND LIABILITIES', uncategorised: true }, section.lines.flatMap(l => l.rows || [])), `Fix: ${l1}`)}
@@ -154,6 +179,7 @@ function DynamicBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
               </td>
               <td className="py-1 text-right font-mono text-xs text-gray-900 pr-2">{fmtINR(line.total)}</td>
               <td className="py-col py-1 text-right font-mono text-xs text-gray-400 pr-2">{fmtINR(line.prevTotal)}</td>
+              <ChangeCells cy={line.total} py={line.prevTotal} rowKey={`${section.level1}::${l2 || section.level1}`} />
             </tr>
           )
         })}
@@ -162,6 +188,7 @@ function DynamicBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
           <td />
           <td className="py-1 text-right font-mono font-semibold text-blue-800 pr-2 text-xs border-t border-blue-200">{fmtINR(section.total)}</td>
           <td className="py-col py-1 text-right font-mono text-gray-400 pr-2 text-xs border-t border-blue-200">{fmtINR(section.prevTotal)}</td>
+          <ChangeCells cy={section.total} py={section.prevTotal} rowKey={`Sub-total: ${section.level1}`} bold />
         </tr>
       </>
     )
@@ -172,15 +199,16 @@ function DynamicBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
       <div className="mb-4">
         <div className="text-xs font-bold text-blue-800 uppercase tracking-wider border-b border-blue-300 pb-1 mb-1">EQUITY AND LIABILITIES</div>
         <table className="w-full text-xs table-fixed">
-          <colgroup><col style={{ width: '5%' }} /><col style={{ width: '4%' }} /><col style={{ width: '50%' }} /><col style={{ width: '9%' }} /><col style={{ width: '16%' }} /><col className="py-col" style={{ width: '16%' }} /></colgroup>
+          <colgroup>{changeWide ? <><col style={{ width: '4%' }} /><col style={{ width: '3%' }} /><col style={{ width: '27%' }} /><col style={{ width: '6%' }} /><col style={{ width: '12.5%' }} /><col className="py-col" style={{ width: '12.5%' }} /></> : <><col style={{ width: '5%' }} /><col style={{ width: '4%' }} /><col style={{ width: '50%' }} /><col style={{ width: '9%' }} /><col style={{ width: '16%' }} /><col className="py-col" style={{ width: '16%' }} /></>}<ChangeCols /></colgroup>
           <tbody>
             {elSections.map((sec, si) => <SectionBlock key={sec.level1 + si} index={si + 1} section={sec} />)}
           </tbody>
           <tfoot>
             <tr className="bg-blue-800 text-white">
-              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL EQUITY AND LIABILITIES</td>
+              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL</td>
               <td className="py-2 text-right font-mono font-bold pr-2 text-xs">{fmtINR(data.totalEL)}</td>
               <td className="py-col py-2 text-right font-mono opacity-70 pr-2 text-xs">{fmtINR(grandPrevEL)}</td>
+              <ChangeCells cy={data.totalEL} py={grandPrevEL} rowKey='TOTAL EQUITY AND LIABILITIES' dark />
             </tr>
           </tfoot>
         </table>
@@ -188,15 +216,16 @@ function DynamicBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
       <div className="mb-4">
         <div className="text-xs font-bold text-blue-800 uppercase tracking-wider border-b border-blue-300 pb-1 mb-1">ASSETS</div>
         <table className="w-full text-xs table-fixed">
-          <colgroup><col style={{ width: '5%' }} /><col style={{ width: '4%' }} /><col style={{ width: '50%' }} /><col style={{ width: '9%' }} /><col style={{ width: '16%' }} /><col className="py-col" style={{ width: '16%' }} /></colgroup>
+          <colgroup>{changeWide ? <><col style={{ width: '4%' }} /><col style={{ width: '3%' }} /><col style={{ width: '27%' }} /><col style={{ width: '6%' }} /><col style={{ width: '12.5%' }} /><col className="py-col" style={{ width: '12.5%' }} /></> : <><col style={{ width: '5%' }} /><col style={{ width: '4%' }} /><col style={{ width: '50%' }} /><col style={{ width: '9%' }} /><col style={{ width: '16%' }} /><col className="py-col" style={{ width: '16%' }} /></>}<ChangeCols /></colgroup>
           <tbody>
             {assetSections.map((sec, si) => <SectionBlock key={sec.level1 + si} index={si + 1} section={sec} />)}
           </tbody>
           <tfoot>
             <tr className="bg-blue-800 text-white">
-              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL ASSETS</td>
+              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL</td>
               <td className="py-2 text-right font-mono font-bold pr-2 text-xs">{fmtINR(data.totalAssets)}</td>
               <td className="py-col py-2 text-right font-mono opacity-70 pr-2 text-xs">{fmtINR(grandPrevAssets)}</td>
+              <ChangeCells cy={data.totalAssets} py={grandPrevAssets} rowKey='TOTAL ASSETS' dark />
             </tr>
           </tfoot>
         </table>
@@ -247,16 +276,8 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
   const totalAsset   = matchedACy + uncatACy
   const prevAsset    = matchedAPy + uncatAPy
 
-  const colgroup = (
-    <colgroup>
-      <col style={{ width: '5%' }} />
-      <col style={{ width: '5%' }} />
-      <col style={{ width: '50%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '15.5%' }} />
-      <col className="py-col" style={{ width: '15.5%' }} />
-    </colgroup>
-  )
+  const changeWide = useChangeSpan() > 0
+  const colgroup = <BsColgroup wide={changeWide} />
 
   // Renders one E&L or Asset group with its hardcoded sub-lines +
   // an optional extra "(x) Uncategorised <Group>" row for unmatched items
@@ -359,10 +380,10 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
             {/* Top-level uncategorised — ALIE = E&L but L1 unidentifiable */}
             {(Math.abs(elUncatTop.total) > 0.005 || Math.abs(elUncatTop.prevTotal) > 0.005) && (
               <>
-                <BsRow bold label="Uncategorised Liabilities"
+                <BsRow bold label="Uncategorised Equity and Liabilities"
                   total={elUncatTop.total} prevTotal={elUncatTop.prevTotal}
                   tbId={tbId} getRemark={getRemark} onRemarkSaved={onRemarkSaved} />
-                <BsRow alpha="—" label="Uncategorised Liabilities"
+                <BsRow alpha="—" label="Uncategorised Equity and Liabilities" changeKey="Uncategorised Equity and Liabilities::line"
                   noteNum={elUncatTop.lines[0]?.noteNum}
                   total={elUncatTop.total} prevTotal={elUncatTop.prevTotal}
                   sub indent={1} red
@@ -377,9 +398,10 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
           </tbody>
           <tfoot>
             <tr className="bg-blue-800 text-white">
-              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL EQUITY AND LIABILITIES</td>
+              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL</td>
               <td className="py-2 text-right font-mono font-bold pr-2 text-xs">{fmtINR(totalEL)}</td>
               <td className="py-col py-2 text-right font-mono opacity-70 pr-2 text-xs">{fmtINR(prevEL)}</td>
+              <ChangeCells cy={totalEL} py={prevEL} rowKey='TOTAL EQUITY AND LIABILITIES' dark />
             </tr>
           </tfoot>
         </table>
@@ -403,7 +425,7 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
                 <BsRow bold label="Uncategorised Assets"
                   total={aUncatTop.total} prevTotal={aUncatTop.prevTotal}
                   tbId={tbId} getRemark={getRemark} onRemarkSaved={onRemarkSaved} />
-                <BsRow alpha="—" label="Uncategorised Assets"
+                <BsRow alpha="—" label="Uncategorised Assets" changeKey="Uncategorised Assets::line"
                   noteNum={aUncatTop.lines[0]?.noteNum}
                   total={aUncatTop.total} prevTotal={aUncatTop.prevTotal}
                   sub indent={1} red
@@ -418,9 +440,10 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
           </tbody>
           <tfoot>
             <tr className="bg-blue-800 text-white">
-              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL ASSETS</td>
+              <td colSpan={4} className="py-2 px-3 font-bold text-xs uppercase tracking-wide">TOTAL</td>
               <td className="py-2 text-right font-mono font-bold pr-2 text-xs">{fmtINR(totalAsset)}</td>
               <td className="py-col py-2 text-right font-mono opacity-70 pr-2 text-xs">{fmtINR(prevAsset)}</td>
+              <ChangeCells cy={totalAsset} py={prevAsset} rowKey='TOTAL ASSETS' dark />
             </tr>
           </tfoot>
         </table>
@@ -453,32 +476,39 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
   const [manualPyOn, setManualPyOn] = useState(false)
 
   const isCompany = parseInt(entity?.constitution) === 3
-  const cyLabel   = 'Current Year'
-  const pyLabel   = 'Previous Year'
-  const subtitle  = activeTB?.period ? `Balance Sheet as at ${activeTB.period}` : 'Balance Sheet'
+  // T-051 (owner): the column headings read "As at 31 Mar 26"; the title above keeps the full date.
+  const { cy: cyLabel, py: pyLabel } = statementColumnLabels(activeTB, prevTB, 'bs', { short: true })
+  const subtitle  = statementDates(activeTB).cy ? `Balance Sheet as at ${statementDates(activeTB).cy}` : 'Balance Sheet'
   // Previous Year not required for this Financial Year (PYModeSelect): nothing to pick or type, and - when the CA
   // asked for it - no Previous Year column ('hide-py' hides every .py-col below).
   const pyOff = !!data?.pyMode && data.pyMode !== 'required'
   const pyOffTitle = 'Previous Year figures are switched off for this Financial Year (Previous Year figures: Required).'
+  const [changeOn, setChangeOn] = useAnalyseChangeToggle('bs')
 
   return (
+    <AnalyseChangeProvider on={changeOn && !pyOff} tbId={activeTB?.id} scope="bs" getRemark={getRemark} onRemarkSaved={onRemarkSaved}>
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center gap-4 px-5 py-2 border-b border-blue-100 bg-gray-50 shrink-0">
-        <span className="text-xs text-gray-500 font-medium">Balance Sheet</span>
+      {/* T-050: one-line toolbar - Format, then Variance Analysis, the Previous Year group and P&L closed to capital.
+          T-060: no "Balance Sheet" title here: the statement's own heading below already says it. */}
+      <div className="fsg-stmt-toolbar px-5 py-1.5 border-b border-blue-100 bg-gray-50 shrink-0">
         <FormatRefButton entity={entity} url={SCHEDULE3_SECTIONS.BS.url} label={SCHEDULE3_SECTIONS.BS.label} />
         <div className="ml-auto flex items-center gap-2">
-          <PYModeSelect activeTB={activeTB} onChanged={refresh} />
-          <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
-            onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
-            disabled={(isBranchEntity && !!prevTB?.id) || pyOff}
-            disabledTitle={pyOff ? pyOffTitle : 'A Previous Year Trial Balance is already selected for this branch — clear it below to use Manual PY instead.'} />
+          <AnalyseChangeButton on={changeOn && !pyOff} onToggle={setChangeOn} disabled={pyOff} disabledTitle={pyOffTitle} />
+          <div className="fsg-stmt-group">
+            <span className="fsg-stmt-group-label">Previous Year</span>
+            <PYModeSelect activeTB={activeTB} onChanged={refresh} label="" />
+            <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange} label="TB:"
+              disabled={(isBranchEntity && manualPyOn) || pyOff}
+              disabledTitle={pyOff ? pyOffTitle : 'Manual PY is ON for this branch — turn it off to select a Previous Year Trial Balance instead.'} />
+            <ManualPYButton tbId={activeTB?.id} entityId={entity?.id} data={data} onChanged={refresh}
+              onEnabledChange={isBranchEntity ? setManualPyOn : undefined}
+              disabled={(isBranchEntity && !!prevTB?.id) || pyOff}
+              disabledTitle={pyOff ? pyOffTitle : 'A Previous Year Trial Balance is already selected for this branch — clear it to use Manual PY instead.'} />
+          </div>
           <PlClosedToCapitalButton tbId={activeTB?.id} entityId={entity?.id} onChanged={refresh} label={prevTB?.id ? 'CY' : ''} />
           {prevTB?.id && (
             <PlClosedToCapitalButton tbId={prevTB.id} onChanged={refresh} label="PY" />
           )}
-          <PYTBSelector entity={entity} currentTBId={activeTB?.id} prevTB={prevTB} onChange={onPrevTBChange}
-            disabled={(isBranchEntity && manualPyOn) || pyOff}
-            disabledTitle={pyOff ? pyOffTitle : 'Manual PY is ON for this branch — turn it off to select a Previous Year Trial Balance instead.'} />
         </div>
       </div>
 
@@ -494,16 +524,10 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                 <p className="text-xs text-gray-400 mt-0.5">(Amount in ₹)</p>
               </div>
 
+              <MissingAlieWarning report={data.missingAlie} onFix={openFix} tbId={activeTB?.id} />
               {/* Column headers */}
               <table className="w-full text-xs mb-2 table-fixed">
-                <colgroup>
-                  <col style={{ width: '5%' }} />
-                  <col style={{ width: '5%' }} />
-                  <col style={{ width: '50%' }} />
-                  <col style={{ width: '9%' }} />
-                  <col style={{ width: '15.5%' }} />
-                  <col className="py-col" style={{ width: '15.5%' }} />
-                </colgroup>
+                <BsColgroup wide={changeOn && !pyOff} />
                 <thead>
                   <tr className="border-b-2 border-blue-800">
                     <th colSpan={2} className="text-left py-1.5 font-semibold text-blue-900 text-xs">No.</th>
@@ -511,6 +535,7 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                     <th className="text-center py-1.5 font-semibold text-blue-900 text-xs">Note No.</th>
                     <th className="text-right py-1.5 font-semibold text-blue-900 pr-2 text-xs">{cyLabel}</th>
                     <th className="py-col text-right py-1.5 font-semibold text-blue-900 pr-2 text-xs">{pyLabel}</th>
+                    <ChangeHeads />
                   </tr>
                 </thead>
               </table>
@@ -538,6 +563,7 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                 />
               )}
 
+              <MissingAlieWarning report={data.missingAlie} position="bottom" />
               <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-400 flex justify-between">
                 <span>The accompanying notes form an integral part of the financial statements.</span>
                 <span>Click note numbers to navigate.</span>
@@ -547,5 +573,6 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
         </Guard>
       </div>
     </div>
+    </AnalyseChangeProvider>
   )
 }

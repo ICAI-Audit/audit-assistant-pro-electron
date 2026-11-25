@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { withCurrentTitleDeedsText } from '../utils/generalNoteText'
 import { resolveConsolidationSelection } from '../utils/consolidationSelection'
 import { fsgApi } from '../api.js'
+import { attachInvestmentDetails } from '../utils/investmentStore.js'
+import { attachMissingAlie } from '../utils/missingAlieStore.js'
 // Schedule III presentation order for company (constitution=3) note numbering,
 // so a note's number matches where its line appears on the face of the BS.
 // bsStructure.js has no imports of its own — no circular dependency.
@@ -31,6 +33,7 @@ import { withoutRatioIntro } from '../utils/ratioNoteIntro'
 import { refreshRatiosInNote } from '../utils/ratioTable'
 // Saved Fill Details are matched to notes by title, not number.
 import { indexSavedNoteRows, parsedNoteData } from '../utils/savedNoteData'
+import { isLoansAdvancesNoteTitle } from '../utils/directorLoans'
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -44,6 +47,9 @@ function parseAmt(n) {
 }
 
 /** Indian number format. Negative → parentheses. Zero → '—'. */
+// T-061: the line of "Changes in inventories" holding ledgers mapped there that are not Opening / Closing Stock.
+export const STOCK_OTHER_LEDGERS_LABEL = 'Add / (Less): Other ledgers mapped to this head'
+
 export function fmtINR(n) {
   // Number('') is 0 (not NaN), but parseFloat('') IS NaN — checking the
   // guard with Number() while formatting with parseFloat() let a blank
@@ -812,7 +818,7 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
     }
     if (!a) {
       a = row.is_deemed_positive ? 'ASSETS' : 'EQUITY AND LIABILITIES'
-      const label = a === 'ASSETS' ? 'Uncategorised Assets' : 'Uncategorised Liabilities'
+      const label = a === 'ASSETS' ? 'Uncategorised Assets' : 'Uncategorised Equity and Liabilities'
       // ALIE was never determined for this row, so any level1/mapping1_resultant
       // already sitting on it is orphaned — computed by some earlier mapping
       // stage without a confirmed ALIE behind it (e.g. a Level-1 caption
@@ -822,7 +828,7 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
       // label instead of falling back to whatever was already on the row.
       row = { ...row, alie: a, level1: label, mapping1_resultant: label }
     } else if ((a === 'ASSETS' || a === 'EQUITY AND LIABILITIES') && !row.level1) {
-      const label = a === 'ASSETS' ? 'Uncategorised Assets' : 'Uncategorised Liabilities'
+      const label = a === 'ASSETS' ? 'Uncategorised Assets' : 'Uncategorised Equity and Liabilities'
       row = { ...row, level1: label, mapping1_resultant: row.mapping1_resultant || label }
     }
     if (!byAlie[a]) byAlie[a] = []
@@ -1098,7 +1104,7 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
   // live UI, PDF, and Excel (which all read section/note totals from this
   // shared processRows() output) agree automatically. See utils/inventorySplit.js.
   {
-    const materialsSec = expenseSections.find(s => /^cost of materials consumed/i.test(s.level1 || ''))
+    let materialsSec = expenseSections.find(s => /^cost of materials consumed/i.test(s.level1 || ''))
     let changesSec = expenseSections.find(s => /changes in inventor/i.test(s.level1 || ''))
     const legacyOpenSec = expenseSections.find(s => /^opening stock/i.test(s.level1 || ''))
     const legacyCloseSec = incomeSections.find(s => /^closing stock/i.test(s.level1 || ''))
@@ -1111,10 +1117,22 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
     // gets its Changes-in-Inventories / Other-Expenses split computed instead
     // of the whole block being skipped.
     if (materialsSec || changesSec || legacyOpenSec || legacyCloseSec) {
-      // Raw Materials stock is adjusted in "Cost of materials consumed". An entity with no such line (a Service Provider; a Manufacturer
-      // with no purchase ledger mapped there) has nowhere to put it, so it is adjusted in "Changes in inventories" with the other stock -
-      // it used to be left out of the P&L altogether, and profit and the Balance Sheet were both out by the year's movement.
-      const split = computeInventorySplit({ expenseSections, incomeSections }, businessType, !!prevMap, prevMap?.rows, { rawToChange: !materialsSec })
+      // Raw Materials stock is always adjusted in "Cost of materials consumed" (T-061, owner 17 November 2026: Raw Materials are
+      // consumed, so they belong to the cost of materials, never to "Changes in inventories of finished goods, WIP and Stock-in-Trade").
+      // An entity with no such line yet (no purchase ledger mapped there) gets one, holding the Opening / Less: Closing Raw Materials
+      // lines. Before T-061 (0.1.93) the Raw Materials were moved into "Changes in inventories" instead, which put them under the
+      // wrong head and the wrong caption. A Trader is still presumed to hold no Raw Materials (inventorySplit.js classify()).
+      const split = computeInventorySplit({ expenseSections, incomeSections }, businessType, !!prevMap, prevMap?.rows, { rawToChange: false })
+      if (!materialsSec && (split.rawMaterialOpeningRows.length || split.rawMaterialClosingRows.length || split.prevRawMaterialRows.length)) {
+        const MATERIALS_TITLE = 'Cost of materials consumed'
+        materialsSec = { level1: MATERIALS_TITLE, lines: [], total: 0, prevTotal: 0, noteNum: null }
+        expenseSections.push(materialsSec)
+        const newNum = allocNoteNum()
+        const note = { num: newNum, title: MATERIALS_TITLE, level1: MATERIALS_TITLE, alie: 'Expenses', isPL: true, lines: [], rows: [], total: 0, prevTotal: 0 }
+        notes[newNum] = note
+        noteByTitle.set(MATERIALS_TITLE.toLowerCase(), note)
+        materialsSec.noteNum = newNum
+      }
 
       // Legacy "Opening Stock (PL)" / "Closing Stock (PL)" buckets (older
       // rule sets only): their full value is now folded into materialsSec/
@@ -1148,12 +1166,12 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
         const openLine = {
           level2: 'Opening Stock of Raw Materials',
           total: split.rawMaterialOpening.cy, prevTotal: split.rawMaterialOpening.py,
-          rows: split.rawMaterialOpeningRows, minSortOrder: 9990,
+          rows: split.rawMaterialOpeningRows, minSortOrder: 9990, rawWorking: 'opening',
         }
         const closeLine = {
           level2: 'Less: Closing Stock of Raw Materials',
           total: -split.rawMaterialClosing.cy, prevTotal: -split.rawMaterialClosing.py,
-          rows: split.rawMaterialClosingRows, minSortOrder: 9991,
+          rows: split.rawMaterialClosingRows, minSortOrder: 9991, rawWorking: 'closing',
         }
         // notes[materialsSec.noteNum].lines sometimes ALIASES the same array
         // as materialsSec.lines (when no Purchases-of-Stock-in-Trade merge
@@ -1163,12 +1181,16 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
         // closeLine end up in the note exactly once either way.
         const noteLinesSnapshot = materialsSec.noteNum && notes[materialsSec.noteNum]
           ? [...notes[materialsSec.noteNum].lines] : null
-        materialsSec.lines.push(openLine, closeLine)
+        // Printed as the working (owner, 23 November 2026): Opening Stock of Raw Materials, Add: Purchases (and any other line
+        // of the head), Less: Closing Stock of Raw Materials, then the total captioned "Cost of materials consumed"
+        // (annexureGrouping.js plNoteLineDisplay / plNoteTotalLabel). Only the order changes; the figures do not.
+        const asWorking = (lines) => [openLine, ...lines.filter(l => l !== openLine && l !== closeLine), closeLine]
+        materialsSec.lines.splice(0, materialsSec.lines.length, ...asWorking(materialsSec.lines))
         if (noteLinesSnapshot) {
           const n = notes[materialsSec.noteNum]
           n.total += split.rawMaterialDelta.cy
           n.prevTotal += split.rawMaterialDelta.py
-          n.lines = [...noteLinesSnapshot, openLine, closeLine]
+          n.lines = asWorking(noteLinesSnapshot)
           n.rows = [...n.rows, ...split.rawMaterialOpeningRows, ...split.rawMaterialClosingRows]
         }
       }
@@ -1199,9 +1221,19 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
             total: -split.otherStockClosing.cy, prevTotal: -split.otherStockClosing.py,
             rows: split.otherStockClosingRows, minSortOrder: 1 },
           // (no "Change in Inventory of ..." row: it repeated the Total, and the Total is that figure)
+          // T-061: ledgers of the Trial Balance mapped to this head that are not Opening / Closing Stock (for example a
+          // "stock adjustment" or "change in stock" ledger). They are part of the head, so they stay in the Total, but
+          // the line says what they are and is flagged for review: it used to read "Net Change in Inventory", which looks
+          // like the Opening - Closing result line, and when the Stock tab is filled such a ledger often repeats it.
           ...(split.otherStockNetRows.length ? [{
-            level2: 'Net Change in Inventory', total: split.otherStockNet.cy, prevTotal: split.otherStockNet.py,
+            level2: STOCK_OTHER_LEDGERS_LABEL, total: split.otherStockNet.cy, prevTotal: split.otherStockNet.py,
             rows: split.otherStockNetRows, minSortOrder: 9989,
+            // T-083: flagged until the CA confirms these ledgers on Rectification / Recategorisation (saved or
+            // approved there); after that the line is an ordinary line and no screen asks again.
+            needsReview: split.otherStockNetRows.some(r => !['user_override', 'user_approved'].includes(String(r?.status || ''))),
+            reviewNote: split.otherStockOpeningRows.some(r => r.upload_nature === 'Stock Entry') || split.otherStockClosingRows.some(r => r.upload_nature === 'Stock Entry')
+              ? 'Added to Opening less Closing. The Stock tab already gives the Opening and Closing values, so check that these ledgers do not repeat that movement; re-categorise them if they do.'
+              : 'Added to Opening less Closing. Check that these ledgers belong under this head.',
           }] : []),
         ]
         if (changesSec.noteNum && notes[changesSec.noteNum]) {
@@ -1516,7 +1548,7 @@ export function processRows(rows, prevMap, constitution = null, noteDetailsList 
 
   reconcilePrevTotals(incomeSections, 'Income', 'Other Income')
   reconcilePrevTotals(expenseSections, 'Expenses', 'Other Expenses')
-  reconcilePrevTotals(elSections, 'EQUITY AND LIABILITIES', 'Uncategorised Liabilities')
+  reconcilePrevTotals(elSections, 'EQUITY AND LIABILITIES', 'Uncategorised Equity and Liabilities')
   reconcilePrevTotals(assetSections, 'ASSETS', 'Uncategorised Assets')
 
   // ── Calculate Net Profit and inject into Reserves & Surplus note ──────────
@@ -2270,6 +2302,7 @@ function previousYearEntries(note, comparativeRows) {
 // without "Add:". DISPLAY only: the row keeps its own label, which Manual PY entries, saved remarks and the
 // Annexures link are keyed on.
 const SURPLUS_NO_OPENING_LABEL = 'Surplus / (Deficit) during the year'
+export const OPENING_SURPLUS_LABEL = 'Opening Surplus / (Deficit)'
 const hasOpeningBalance = (cy, py) => Math.abs(Number(cy) || 0) >= 0.005 || Math.abs(Number(py) || 0) >= 0.005
 
 export function buildNoteTemplateRows(note, lfRows, depData, msmeData = null, cashBankData = null, comparativeRows = null) {
@@ -2324,6 +2357,10 @@ export function buildNoteTemplateRows(note, lfRows, depData, msmeData = null, ca
         label: first.mapping3_resultant || first.level3 || first.name,
         // the year's surplus, with no opening balance in either year to add it to
         ...(idx === 1 && !hasOpeningBalance(openingCY, openingPY) ? { displayLabel: SURPLUS_NO_OPENING_LABEL } : {}),
+        // T-058 (owner, 17 November 2026): the opening line reads "Opening Surplus / (Deficit)" on screen, PDF, Excel and
+        // Annexures. Display only: the ledger's Mapping 3 stays "Opening Profit & Loss", which the Closing line, Manual PY,
+        // remarks and the mapping engine recognise.
+        ...(idx === 0 ? { displayLabel: OPENING_SURPLUS_LABEL } : {}),
         cy: matched.reduce((s, r) => s + rowAmt(r, 'closing_balance'), 0),
         py: pySum(pyMatched),
         isSubtotal: matched.some(r => r.isSubtotal),
@@ -2361,6 +2398,7 @@ export function buildNoteTemplateRows(note, lfRows, depData, msmeData = null, ca
     const l3CY = l3Ledgers.reduce((s, r) => s + rowAmt(r, 'closing_balance'), 0)
     const l3PY = pySum(l3PYEntries)
     rows.push({ type: 'l3', label: l3Label, cy: l3CY, py: l3PY, lf,
+      ...(isReservesSurplus && /^opening profit\s*&?\s*loss$/i.test(l3Label) ? { displayLabel: OPENING_SURPLUS_LABEL } : {}),   // T-058
       // the ledgers behind this line (Current / Previous Year) — what its "Fix" opens
       ledgerIds: ledgerIdsOf(l3Ledgers), pyLedgerIds: ledgerIdsOf(l3PYEntries.map(e => e.row)) })
 
@@ -2650,6 +2688,11 @@ export function attachNoteExtras(processed, ndList, lfRows, depData, constitutio
       // (the display then defaults everything to "Unsecured, considered good").
       if (isTradeReceivables && [1, 2].includes(parseInt(constitution))) {
         note.ncTradeReceivables = { saved: noteData?.ncAgeing || null }
+      }
+      // T-086: Company, Long-term / Short-term loans and advances - the directors / officers / firms / private
+      // companies table (utils/directorLoans.js). Always shown; nil until entered in Fill Details.
+      if (isCompany && isLoansAdvancesNoteTitle(note.title)) {
+        note.directorLoans = { saved: noteData?.directorLoans || null }
       }
       // Attach the IT Act Block-wise WDV summary to the PPE note — opt-in
       // only (checked on the Dep (IT) → Block Summary tab), so it shows in
@@ -3258,7 +3301,9 @@ export async function fetchFinancialsData(activeTB, prevTB, entity = null, activ
     applyManualPyOverrides(processed, !prevMap && manualPyEnabled, manualPyEntries)
     if (parseInt(entity?.constitution) === 3) computeEpsData(processed, ndList, epsOverrides)
     processed.generalNotes = refreshRatiosInNote(processed.generalNotes, processed)
-    return processed
+    processed.investmentPreviousRows = pyRows.length ? pyRows : (pyOff ? [] : null)
+    await attachMissingAlie(processed, activeTB, prevTB)
+    return attachInvestmentDetails(processed, activeTB)
   }
 
   const fetchCY = fsgApi?.getFinancialData(activeTB.id)
@@ -3269,7 +3314,9 @@ export async function fetchFinancialsData(activeTB, prevTB, entity = null, activ
     ? (fsgApi?.getLevelFormat(entity.constitution, activeRsId || null) || Promise.resolve([]))
     : Promise.resolve([])
   const fetchND = fsgApi?.listNoteDetails(activeTB.id).catch(() => [])
-  const fetchDep = (fsgApi?.depGet?.(activeTB.id) || Promise.resolve(null)).catch(() => null)
+  // T-036: the ledger-level "Dep (Old)" schedule was removed from the menu and no
+  // longer shapes the PPE note; its saved rows stay in dep_schedules, unread.
+  const fetchDep = Promise.resolve(null)
   const fetchDepIT = (fsgApi?.depITGet?.(activeTB.id) || Promise.resolve(null)).catch(() => null)
   const fetchDepComp = (fsgApi?.depCompGet?.(activeTB.id) || Promise.resolve(null)).catch(() => null)
   const fetchManualPyEnabled = (fsgApi?.getManualPY?.(activeTB.id) || Promise.resolve(false)).catch(() => false)
@@ -3343,7 +3390,9 @@ export async function fetchFinancialsData(activeTB, prevTB, entity = null, activ
   // The Financial Ratios table in General Notes, as of these figures — so the
   // PDF / Excel never print ratios from when the note was first created.
   processed.generalNotes = refreshRatiosInNote(processed.generalNotes, processed)
-  return processed
+  processed.investmentPreviousRows = pyRows.length ? pyRows : (pyOff ? [] : null)
+  await attachMissingAlie(processed, activeTB, prevTB)
+  return attachInvestmentDetails(processed, activeTB)
 }
 
 export function useFinancials(activeTB, prevTB, entity = null, activeRsId = null) {
@@ -3417,7 +3466,7 @@ export function useConsolidatedFinancials(entity, activeRsId, entityPeriodId = n
     const fetchCfsC = (entity.id && entityPeriodId) ? Promise.resolve(fsgApi?.getCfs?.(entity.id, entityPeriodId)).catch(() => null) : Promise.resolve(null)
 
     Promise.all([fetchCY, fetchLF, fetchND, fetchDep, fetchDepIT, fetchDepComp, fetchManualPyEnabled, fetchManualPyEntries, fetchPlClosedToCapital, fetchEps, fetchGN, fetchCfsC])
-      .then(([cyBoth, lfRows, ndList, depData, depITData, depCompData, manualPyEnabled, manualPyEntries, plClosedToCapital, epsOverrides, generalNotesRaw, cfsSavedC]) => {
+      .then(async ([cyBoth, lfRows, ndList, depData, depITData, depCompData, manualPyEnabled, manualPyEntries, plClosedToCapital, epsOverrides, generalNotesRaw, cfsSavedC]) => {
         ;({ depITData, depCompData } = consolidatedDepFromNoteDetails(ndList))   // entity-level schedules
         const cyRows = cyBoth.cur
         const cyGuard = ignoreForeignLevel2(cyRows, lfRows)
@@ -3471,6 +3520,9 @@ export function useConsolidatedFinancials(entity, activeRsId, entityPeriodId = n
         applyManualPyOverrides(processed, !prevMap && manualPyEnabled, manualPyEntries)
         if (parseInt(entity?.constitution) === 3) computeEpsData(processed, ndList, epsOverrides)
         processed.generalNotes = refreshRatiosInNote(processed.generalNotes, processed)
+        processed.investmentPreviousRows = pyRows.length ? pyRows : null
+        await attachMissingAlie(processed, { id: '__consolidated__', entity_id: entity.id, entity_period_id: entityPeriodId })
+        await attachInvestmentDetails(processed, { id: '__consolidated__', entity_period_id: entityPeriodId })
         setData(processed)
       })
       .catch(err => setError(err?.message || 'Failed to load consolidated financial data.'))

@@ -119,9 +119,9 @@ function LiveConnect() {
     setImportResult(null)
     try {
       const { tbRows, masterData } = await fsgApi?.fetchTallyTB({
-        companyName: company,
-        fromDate,
-        toDate,
+        company,
+        // T-070: the backend reads the period as { from, to } in YYYY-MM-DD
+        period: { from: toInputDate(fromDate), to: toInputDate(toDate) },
         host,
         port: parseInt(port) || 9000,
         keepPLLedger: plClosedToCapital,

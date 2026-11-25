@@ -1,5 +1,5 @@
 /**
- * Exception Report — all Check variances in one place:
+ * Check Control (formerly Exception Report, T-055) — every check in one place:
  *   • Balance Sheet difference (Equity & Liabilities vs Assets)
  *   • Share Capital: TB vs Fill Details (paid-up)
  *   • Trade Payables: TB vs Ageing Schedule
@@ -10,8 +10,8 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useFinancials, fmtINR, displayAmt } from '../../hooks/useFinancials'
 import { indexSavedNoteRows, parsedNoteData } from '../../utils/savedNoteData'
 import PYTBSelector from '../shared/PYTBSelector'
-import { TP_AGEING_BUCKETS, TP_MSME_ROWS, TP_OTHERS_ROWS } from '../Notes/TradePayablesDisclosureForm'
-import { TR_AGEING_BUCKETS, trComputedCell } from '../Notes/TradeReceivablesAgingForm'
+import { TP_AGEING_BUCKETS, TP_MSME_ROWS, TP_OTHERS_ROWS, tpPeriodView } from '../Notes/TradePayablesDisclosureForm'
+import { trScheduleTotal } from '../Notes/TradeReceivablesAgingForm'
 import { ncAgeingResolve } from '../../utils/tradeReceivablesNonCorp'
 import { computeTax } from '../../utils/taxComputation'
 import { resolveGroup, todayLocal, figuresOf, buildTaxInput, loadDepIT, loadTaxComputationSaved } from '../../utils/taxComputationIO'
@@ -235,8 +235,8 @@ export default function ExceptionReport({ entity, activeTB, prevTB, activeRsId, 
         const ageing = det?.ageing
         const allRows = [...TP_MSME_ROWS, ...TP_OTHERS_ROWS]
         if (ageing?.cy) {
-          const schedCY = sumAgeing(ageing.cy, allRows, TP_AGEING_BUCKETS)
-          const schedPY = sumAgeing(ageing.py, allRows, TP_AGEING_BUCKETS)
+          const schedCY = sumAgeing(tpPeriodView(ageing.cy), allRows, TP_AGEING_BUCKETS)
+          const schedPY = sumAgeing(tpPeriodView(ageing.py), allRows, TP_AGEING_BUCKETS)
           rows.push({
             area: `Trade Payables (Note ${note.num})`,
             check: 'TB vs Ageing Schedule',
@@ -283,7 +283,7 @@ export default function ExceptionReport({ entity, activeTB, prevTB, activeRsId, 
         }
       } else if (note) {
         const det = noteDetails(note)
-        const grand = (pd) => TR_AGEING_BUCKETS.reduce((s, b) => s + trComputedCell(pd, 'grand', b.key), 0)
+        const grand = trScheduleTotal   // T-069: Unbilled / Not Due columns, grey cells nil
         if (det?.cy) {
           const schedCY = grand(det.cy)
           const schedPY = grand(det.py)
@@ -502,7 +502,7 @@ export default function ExceptionReport({ entity, activeTB, prevTB, activeRsId, 
     for (const f of data.foreignLevel2 || []) {
       rows.push({
         area: `Categorisation — ${f.ledger}${f.branch ? ` (${f.branch})` : ''}`,
-        check: `Under ${f.statement} head "${f.level1}", but its Level 2 "${f.level2}" is a ${f.otherStatement} heading. Shown under "${f.level1}" without that heading; set the right Level 2 in Rectification / Recategorisation`,
+        check: `Under ${f.statement} head "${f.level1}", but its Mapping 2 "${f.level2}" is a ${f.otherStatement} heading. Shown under "${f.level1}" without that heading; set the right Level 2 in Rectification / Recategorisation`,
         aLabel: 'Ledger balance', bLabel: 'Correctly categorised',
         cyA: num(f.cy), cyB: 0, cyDiff: num(f.cy),
         pyA: num(f.py), pyB: 0, pyDiff: num(f.py),
@@ -520,7 +520,7 @@ export default function ExceptionReport({ entity, activeTB, prevTB, activeRsId, 
       <Guard activeTB={activeTB} loading={loading} error={error}>
         <div className="flex items-center gap-3 px-5 py-3 border-b border-blue-100 shrink-0 bg-white flex-wrap">
           <div>
-            <h2 className="font-bold text-blue-900 text-sm">Exception Report</h2>
+            <h2 className="font-bold text-blue-900 text-sm">Check Control</h2>
             {entity && <p className="text-xs text-gray-500">{entity.name}{period ? ` | ${period}` : ''}</p>}
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -535,7 +535,7 @@ export default function ExceptionReport({ entity, activeTB, prevTB, activeRsId, 
 
         <div className="flex-1 overflow-y-auto p-5">
           <p className="text-xs text-gray-500 mb-4">
-            All Check variances at one place. Green means the figures agree; red shows the difference to be resolved.
+            All checks in one place. Green means the figures agree; red shows the difference to be resolved.
             "Not filled" means the related Fill Details / Depreciation data has not been entered yet.
           </p>
 

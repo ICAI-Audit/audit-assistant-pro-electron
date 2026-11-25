@@ -65,6 +65,18 @@ function seedUpgradeDatabase() {
     const db = new Database(process.argv[2]);
     db.pragma('foreign_keys = ON');
     for (const f of fs.readdirSync(process.argv[3]).sort()) db.exec(fs.readFileSync(path.join(process.argv[3], f), 'utf8'));
+    // The legacy tables no longer exist in HEAD's schema, so recreate empty stand-ins of an older install.
+    db.exec(\`
+      CREATE TABLE schedule_iii_config (id TEXT PRIMARY KEY, engagement_id TEXT);
+      CREATE TABLE tb_new_entity_info (id TEXT PRIMARY KEY, engagement_id TEXT);
+      CREATE TABLE tb_new_ledgers (id TEXT PRIMARY KEY, entity_info_id TEXT REFERENCES tb_new_entity_info(id));
+      CREATE TABLE tb_new_stock_items (id TEXT PRIMARY KEY, entity_info_id TEXT REFERENCES tb_new_entity_info(id));
+      CREATE TABLE tb_new_classification_mappings (id TEXT PRIMARY KEY, entity_info_id TEXT REFERENCES tb_new_entity_info(id));
+      CREATE TABLE tb_new_sessions (id TEXT PRIMARY KEY, engagement_id TEXT);
+    \`);
+    // HEAD's schema already includes firm_settings.place (T-023), so remove it to
+    // reproduce a pre-T-023 install; start-up must back up and re-add it (T-034).
+    db.exec('ALTER TABLE firm_settings DROP COLUMN place');
     db.prepare("INSERT INTO clients (id, name, constitution) VALUES ('existing-client', 'Existing Client Before Upgrade', 'company')").run();
     db.close();
   `, [projectRoot, databasePath, dir]);
@@ -149,6 +161,9 @@ async function launch() {
   });
   await cdp('Runtime.enable');
   await cdp('Page.enable');
+  // The page behaves as focused even when another window (VS Code, a dev copy of the app) is in front: without
+  // this, Chromium fires no blur event and a typed Reason of Variance is never saved in an unfocused test window.
+  await cdp('Emulation.setFocusEmulationEnabled', { enabled: true });
   await waitFor('Boolean(globalThis.electronAPI)', 20000, 'electronAPI');
 }
 function cdp(method, params = {}) {
@@ -190,6 +205,8 @@ async function goto(hash) {
 // opened by reloading, signing in through the real login form, then routing.
 // The saved engagement is restored by EngagementContext when the user signs in.
 async function openAsUser(email, password, engagement, hash) {
+  // Just after a relaunch the window can still be on its blank start page, where localStorage is denied.
+  await waitFor(`(() => { try { return /^(http|file|app)/.test(location.protocol) && !!localStorage } catch (_) { return false } })()`, 30000, 'app page loaded');
   await evaluate(`(localStorage.setItem('auditpro_current_engagement', ${JSON.stringify(JSON.stringify(engagement))}), location.hash = '#/auth', location.reload(), true)`);
   await sleep(2000);
   await waitFor(`Boolean(document.querySelector('#login-email'))`, 30000);
@@ -215,6 +232,27 @@ async function clickFsgButton(label) {
   return evaluate(`(() => { const b = [...document.querySelectorAll('.fsg-root button')].find((x) => x.textContent.replace(/\\s+/g, ' ').trim() === ${JSON.stringify(label)}); if (b) { b.click(); return true } return false })()`);
 }
 
+async function setInputValue(selector, value) {
+  await evaluate(`(() => {
+    const el = document.querySelector(${JSON.stringify(selector)});
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(value)});
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(250);
+}
+
+const firmPlace = () => evaluate(`globalThis.electronAPI.sqliteQuery({table:'firm_settings',action:'select',columns:'*'}).then(r => r.data?.[0]?.place)`);
+
+async function openSigningDialog() {
+  await waitFor(`(() => {
+    const b = [...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.trim() === 'Download Excel (.xlsx)');
+    return b && !b.disabled;
+  })()`);
+  await clickFsgButton('Download Excel (.xlsx)');
+  return waitFor(`Boolean(document.querySelector('#fsg-signing-place'))`);
+}
+
 // ── Test flow ───────────────────────────────────────────────────────────────
 async function main() {
   fs.mkdirSync(profilePath); fs.mkdirSync(downloadsPath); fs.mkdirSync(launchPath); fs.mkdirSync(shotsPath);
@@ -229,6 +267,7 @@ async function main() {
   check('empty legacy tables were removed after a backup', /Legacy trial balance tables removed/.test(stdout));
   const backups = fs.existsSync(path.join(profilePath, 'backups')) ? fs.readdirSync(path.join(profilePath, 'backups')) : [];
   check('database backup written before the legacy-table removal', backups.some((f) => f.startsWith('audit_assistant-before-T019-legacy-tb-cleanup-')), backups);
+  check('existing database receives a backup before the firm Place upgrade', backups.some((f) => f.startsWith('audit_assistant-before-T023-firm-place-')), backups);
 
   const password = 'Synthetic-FSG-Password-Not-For-Use';
   const signup = await evaluate(`globalThis.electronAPI.sqliteAuth(${JSON.stringify({ action: 'signup', email: 'fsg-admin@example.invalid', password, fullName: 'Synthetic FSG Admin' })})`);
@@ -239,11 +278,27 @@ async function main() {
     return r.data[0];
   };
   const client = await insert('clients', { name: 'Synthetic Manufacturing Private Limited', constitution: 'company', pan: 'AAACS1234A', cin: 'U12345KA2020PTC000001', address: '1 Example Road, Bengaluru' });
+  await insert('firm_settings', { firm_name: 'Synthetic Auditor Firm', place: 'Kolkata' });
   const engagement = await insert('engagements', { name: 'Statutory audit FY 2024-25', client_id: client.id, client_name: client.name, financial_year: '2024-25', engagement_type: 'statutory', created_by: signup.data.user_id });
 
   const signedIn = await openAsUser('fsg-admin@example.invalid', password, engagement, '#/financial-statement-review');
   check('signed in through the login screen', signedIn);
-  const opened = await waitFor(`document.querySelector('.fsg-root') && document.body.innerText.includes('Statutory audit FY 2024-25') && document.body.innerText.includes('Generate Financials')`, 30000);
+  await goto('#/settings');
+  await waitFor(`document.querySelector('#firm-place')?.value === 'Kolkata'`);
+  await setInputValue('#firm-place', 'Bengaluru');
+  await evaluate(`([...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Save Changes').click(), true)`);
+  await waitFor(`globalThis.electronAPI.sqliteQuery({table:'firm_settings',action:'select',columns:'*'}).then(r => r.data?.[0]?.place === 'Bengaluru')`);
+  check('Settings saves the firm Place', await firmPlace() === 'Bengaluru');
+  await goto('#/admin/settings');
+  await waitFor(`document.querySelector('#admin-firm-place')?.value === 'Bengaluru'`);
+  check('Admin Settings loads the same firm Place', await evaluate(`document.querySelector('#admin-firm-place')?.value === 'Bengaluru'`));
+  await setInputValue('#admin-firm-place', 'Chennai');
+  await evaluate(`([...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Save Firm Settings').click(), true)`);
+  await waitFor(`globalThis.electronAPI.sqliteQuery({table:'firm_settings',action:'select',columns:'*'}).then(r => r.data?.[0]?.place === 'Chennai')`);
+  check('Admin Settings saves the shared firm Place', await firmPlace() === 'Chennai');
+  await evaluate(`(localStorage.setItem('fsg.signPlace', 'Siliguri'), true)`);
+  await goto('#/financial-statement-review');
+  const opened = await waitFor(`document.querySelector('.fsg-root') && document.body.innerText.includes('Statutory audit FY 2024-25') && document.body.innerText.includes('Review Financials')`, 30000);
   await screenshot('01-financial-statement-review-opened');
   check('Financial Statement Review tab opens for the engagement', opened, (await bodyText()).slice(0, 800));
   if (!opened) {
@@ -261,7 +316,7 @@ async function main() {
   const entityId = ctx.result.entity.id;
   const periodId = ctx.result.entityPeriodId;
   const ledger = (name, parent, primary, closing) => ({ period: '2024-25', name, opening_balance: 0, debit: closing < 0 ? -closing : 0, credit: closing > 0 ? closing : 0, closing_balance: closing, parent, group_parent: primary, group_parent_1: primary });
-  const up = await fsg('tb:uploadRealBooks', { entityId, entityPeriodId: periodId, fileName: 'synthetic-tb.xlsx', tbRows: [
+  const up = await fsg('tb:uploadRealBooks', { entityId, entityPeriodId: periodId, period: '2024-04-01 To 2025-03-31', fileName: 'synthetic-tb.xlsx', tbRows: [
     ledger('Equity Share Capital', 'Capital Account', 'Capital Account', 500000),
     ledger('Plant and Machinery', 'Fixed Assets', 'Fixed Assets', -300000),
     ledger('Cash', 'Cash-in-Hand', 'Current Assets', -90000),
@@ -279,20 +334,192 @@ async function main() {
   check('mapping engine ran', run.ok, run);
 
   await openAsUser('fsg-admin@example.invalid', password, engagement, '#/financial-statement-review');
-  await waitFor(`document.querySelector('.fsg-root') && document.body.innerText.includes('Generate Financials')`, 30000);
+  await waitFor(`document.querySelector('.fsg-root') && document.body.innerText.includes('Review Financials')`, 30000);
   await sleep(1500);
+  // T-036: the Dep menu lists only Dep (Books) and Dep (Income Tax).
+  const openDepMenu = () => evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\u25b4\u25be\s]+/g, ' ').trim() === 'Dep')?.click(), true)`);
+  await openDepMenu();
+  const depItems = () => evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`);
+  await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+  const depMenu = await depItems();
+  check('T-036 Dep menu shows only Dep (Books) and Dep (Income Tax)', JSON.stringify(depMenu) === JSON.stringify(['Dep (Books)', 'Dep (Income Tax)']), depMenu);
+  for (const item of ['Dep (Books)', 'Dep (Income Tax)']) {
+    if (!(await depItems()).length) await openDepMenu();
+    await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+    await evaluate(`([...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].find(x => x.textContent.replace(/\\s+/g, ' ').trim() === ${JSON.stringify(item)})?.click(), true)`);
+    await sleep(800);
+    check(`T-036 ${item} screen opens without an error`, await evaluate(`!/Something went wrong|coming soon/i.test(document.querySelector('.fsg-root')?.innerText || '') && /depreciation|block|asset/i.test(document.querySelector('.fsg-root')?.innerText || '')`));
+  }
+  // T-038: General Notes is shown as Policy (Ctrl+Shift+O) and Features has no PPE.
+  const topLabels = await evaluate(`[...document.querySelectorAll('.fsg-root [role=tablist] > button, .fsg-root nav button')].map(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim())`);
+  check('T-038 the menu shows A/c Policy instead of General Notes (T-057)', topLabels.includes('A/c Policy') && !topLabels.includes('General Notes'), topLabels);
+  await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'Features')?.click(), true)`);
+  await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+  const featureItems = await evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/[\\u25b4\\u25be\\u25b8\\u203a\\s]+/g, ' ').trim())`);
+  check('T-038 the Features menu no longer lists PPE', featureItems.length > 0 && !featureItems.some(t => /^PPE\\b/.test(t)), featureItems);
+  // T-045: renamed and reordered menu bar; the reconciliation is Features > Reco.
+  const T045_ORDER = ['Master', 'TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Features', 'Check Control', 'Review Financials'];
+  const tabLabels = await evaluate(`[...document.querySelectorAll('.fsg-root [role=tablist] > button')].map(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim())`);
+  check('T-045 the menu bar reads Master > TB > Inventory > ... > Annex > Features > Check Control > Review Financials', JSON.stringify(tabLabels) === JSON.stringify(T045_ORDER), tabLabels);
+  check('T-045 every menu fits on screen at 1280 px wide or more, even with the VERA sidebar open', await evaluate(`(() => { const n = document.querySelector('.fsg-root [role=tablist]'); return window.innerWidth < 1280 || n.scrollWidth <= n.clientWidth + 1 })()`),
+    await evaluate(`(() => { const n = document.querySelector('.fsg-root [role=tablist]'); return { scroll: n.scrollWidth, client: n.clientWidth, window: window.innerWidth } })()`));
+  check('T-045 the Features menu lists Reco', featureItems.includes('Reco'), featureItems);
+  await evaluate(`([...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].find(x => x.textContent.trim() === 'Reco')?.click(), true)`);
+  check('T-045 Features > Reco opens the Trade Payables / Receivables reconciliation', await waitFor(`/Reconciliation — Trade Payables and Trade Receivables/.test(document.querySelector('.fsg-root')?.innerText || '') && !/Detailed Annexures by Note/i.test(document.querySelector('.fsg-root').innerText)`, 15000));
+  await screenshot('02a-reco');
+  await evaluate(`(document.activeElement?.blur?.(), document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), true)`);
+  await sleep(300);
+  // T-049: Features > Ratio has three screens; Form 3CD is shown as Form 26 (Old Name - 3CD).
+  const RATIO_ITEMS = ['Form 26 (Old Name - 3CD)', 'Company Additional Disclosure Ratio', 'Analytical Ratios'];
+  const RATIO_HEADS = [/Form 26 \(Old Name - 3CD\) : Details regarding turnover/, /Company Additional Disclosure Ratio/, /Analytical Ratios[\s\S]*Liquidity ratios[\s\S]*Profitability ratios/];
+  const subItems = `[...document.querySelectorAll('.fsg-root [role=menu] [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`;
+  const key = (k, mods = {}) => evaluate(`(document.activeElement?.blur?.(), document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, code: ${JSON.stringify('Key' + k.toUpperCase())}, bubbles: true, cancelable: true, ctrlKey: ${!!mods.ctrl}, shiftKey: ${!!mods.shift} })), true)`);
+  const openRatioMenu = async () => {
+    await key('U', { ctrl: true, shift: true });          // Features
+    await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+    await sleep(150);
+    await key('r');                                       // Ratio
+    return waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menu] [role=menuitem]').length > 0`, 5000);
+  };
+  await openRatioMenu();
+  const ratioItems = await evaluate(subItems);
+  check('T-054 the Ratio submenu is fully on screen', await evaluate(`(() => { const m = document.querySelector('.fsg-root [role=menu] [role=menu]'); if (!m) return false; const r = m.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth })()`),
+    await evaluate(`(() => { const m = document.querySelector('.fsg-root [role=menu] [role=menu]'); const r = m && m.getBoundingClientRect(); return r ? { left: r.left, right: r.right, window: window.innerWidth, flip: m.dataset.flip } : null })()`));
+  check('T-049 Features > Ratio lists Form 26 (Old Name - 3CD), Company Additional Disclosure Ratio and Analytical Ratios', JSON.stringify(ratioItems) === JSON.stringify(RATIO_ITEMS),
+    { ratioItems, menu: await evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent + '|' + x.getAttribute('aria-expanded'))`) });
+  for (let i = 0; i < RATIO_ITEMS.length; i++) {
+    if (i > 0) await openRatioMenu();
+    await key(['f', 'c', 'a'][i]);
+    check(`T-049 Ratio > ${RATIO_ITEMS[i]} opens`, await waitFor(`${RATIO_HEADS[i]}.test(document.querySelector('.fsg-root')?.innerText || '') && !/Something went wrong/i.test(document.querySelector('.fsg-root').innerText)`, 15000),
+      (await evaluate(`document.querySelector('.fsg-root')?.innerText || ''`)).slice(0, 600));
+    if (i === 2) await screenshot('02b-analytical-ratios');
+  }
+  check('T-049 the Form 3CD name is no longer shown', await evaluate(`!/Form 3CD/.test(document.querySelector('.fsg-root')?.innerText || '')`) && !ratioItems.some(x => /^Form 3CD/.test(x)));
+  // T-048: Variance Analysis adds Amount / % / Reason of Variance after the Previous Year column.
+  const changeHeads = `['Amount of Variance', '% of Variance', 'Reason of Variance'].every(h => [...document.querySelectorAll('.fsg-root th')].some(t => t.textContent.trim() === h))`;
+  const analyseChange = async (screen, reasonText) => {
+    await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
+    check(`T-048 ${screen}: Variance Analysis shows the three change columns`, await waitFor(changeHeads, 10000));
+    check(`T-048 ${screen}: the change columns come right after the Previous Year column`, await evaluate(`(() => { const r = [...document.querySelectorAll('.fsg-root thead tr')].find(tr => [...tr.children].some(t => t.textContent.trim() === 'Amount of Variance')); const cells = [...r.children].map(t => t.textContent.trim()); const i = cells.indexOf('Amount of Variance'); return i > 0 && /2024|Mar 24/.test(cells[i - 1]) && cells[i + 1] === '% of Variance' && cells[i + 2] === 'Reason of Variance' })()`));
+    check(`T-050 ${screen}: every column heading of that row sits on the bottom line`, await evaluate(`(() => { const r = [...document.querySelectorAll('.fsg-root thead tr')].find(tr => [...tr.children].some(t => t.textContent.trim() === 'Amount of Variance')); return [...r.children].every(t => getComputedStyle(t).verticalAlign === 'bottom') })()`));
+    check(`T-048 ${screen}: amounts and percentages are filled in`, await evaluate(`[...document.querySelectorAll('.fsg-root td.fsg-change-col')].some(td => /%$|N\\.A\\./.test(td.textContent.trim()))`));
+    const box = `document.querySelector('.fsg-root td.fsg-change-col input[type=text]')`;
+    const key = await evaluate(`${box}?.getAttribute('aria-label') || ''`);
+    await evaluate(`(() => { const i = ${box}; i.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, ${JSON.stringify(reasonText)}); i.dispatchEvent(new Event('input', { bubbles: true })); i.blur(); return true })()`);
+    // Wait until the reason is in the database (a fixed 1.2 s pause raced the save on a busy machine), then hide / show.
+    const savedKey = String(key).replace(/^Reason of variance: /, '');
+    check(`T-048 ${screen}: the typed reason reaches the database`, await waitFor(`(async () => { const r = await window.electronAPI.fsg.invoke('fsg:remarks:listByTB', 1); return !!r?.ok && (r.result || []).some(x => /_change$/.test(x.scope) && x.scope_key === ${JSON.stringify(savedKey)} && x.remark === ${JSON.stringify(reasonText)}) })()`, 15000), savedKey);
+    await sleep(300);
+    await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
+    check(`T-048 ${screen}: Variance Analysis again hides the columns`, await waitFor(`!(${changeHeads})`, 5000));
+    await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
+    await waitFor(changeHeads, 10000);
+    check(`T-048 ${screen}: the typed reason is saved and shown again`, await waitFor(`[...document.querySelectorAll('.fsg-root td.fsg-change-col input[type=text]')].some(i => i.getAttribute('aria-label') === ${JSON.stringify(key)} && i.value === ${JSON.stringify(reasonText)})`, 10000), key);
+    await screenshot(`03x-analyse-change-${screen.toLowerCase()}`);
+    await evaluate(`(document.querySelector('.fsg-root [data-testid=analyse-change]')?.click(), true)`);
+    await waitFor(`!(${changeHeads})`, 5000);
+  };
   check('BS tab can be opened', await clickFsgButton('BS'));
   const bs = await waitFor(`/Balance Sheet/i.test(document.querySelector('.fsg-root')?.innerText || '') && /Share capital|Shareholders/i.test(document.querySelector('.fsg-root').innerText)`, 30000);
+  check('T-027 Balance Sheet columns show reporting dates', await waitFor(`[...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='As at 31 Mar 25') && [...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='As at 31 Mar 24')`));
+  check('T-051 the Balance Sheet title keeps the full date while its columns use the short one', await evaluate(`/BALANCE SHEET AS AT 31 MARCH 2025/i.test(document.querySelector('.fsg-root h2')?.textContent || '') && ![...document.querySelectorAll('.fsg-root th')].some(t=>/31 March/.test(t.textContent))`));
   await screenshot('02-balance-sheet');
   check('Balance Sheet renders mapped figures', bs, (await evaluate(`document.querySelector('.fsg-root')?.innerText || ''`)).slice(0, 1200));
+  await analyseChange('BS', 'Capital infusion of Rs 5 lakh in FY 2024-25');
+  check(`T-050 ${'BS'}: the toolbar is one line with every button in view`, await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); const r = t && t.getBoundingClientRect(); return !!t && t.scrollWidth <= t.clientWidth + 1 && r.height < 48 && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.left >= r.left - 1 && x.right <= r.right + 1 }) })()`),
+    await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); return t ? { scroll: t.scrollWidth, client: t.clientWidth, height: t.getBoundingClientRect().height, window: window.innerWidth } : null })()`));
+  check('T-060 BS: the toolbar no longer repeats "Balance Sheet" (the statement heading says it)', await evaluate(`!document.querySelector('.fsg-root .fsg-stmt-title') && !/^(Balance Sheet|Profit & Loss|Cash Flow Statement)/.test((document.querySelector('.fsg-root .fsg-stmt-toolbar')?.innerText || '').trim())`));
+  check('T-056 BS: both grand totals read TOTAL', await evaluate(`(() => { const t = [...document.querySelectorAll('.fsg-root tfoot td')].map(td => td.textContent.trim()); return t.filter(x => x === 'TOTAL').length >= 2 && !t.some(x => /^TOTAL (EQUITY|ASSETS)/.test(x)) })()`));
+  check('T-050 BS: (i)-(iv) under (a) sit one step right, inside Particulars', await evaluate(`[...document.querySelectorAll('.fsg-root td')].some(td => /^i\\s*Tangible assets/.test(td.textContent.trim()) && td.querySelector('span.inline-block'))`));
   check('PL tab can be opened', await clickFsgButton('PL'));
   const pl = await waitFor(`/Profit/i.test(document.querySelector('.fsg-root')?.innerText || '') && /Revenue from operations/i.test(document.querySelector('.fsg-root').innerText)`, 30000);
+  check('T-027 P&L columns show year-ended dates', await waitFor(`[...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2025') && [...document.querySelectorAll('th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2024')`));
   await screenshot('03-profit-and-loss');
+  await analyseChange('PL', 'Sales up 12% - new dealer B2');
+  check(`T-050 ${'PL'}: the toolbar is one line with every button in view`, await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); const r = t && t.getBoundingClientRect(); return !!t && t.scrollWidth <= t.clientWidth + 1 && r.height < 48 && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.left >= r.left - 1 && x.right <= r.right + 1 }) })()`),
+    await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); return t ? { scroll: t.scrollWidth, client: t.clientWidth, height: t.getBoundingClientRect().height, window: window.innerWidth } : null })()`));
+  check('T-060 PL: the toolbar no longer repeats "Profit & Loss"', await evaluate(`!document.querySelector('.fsg-root .fsg-stmt-title') && !/^(Balance Sheet|Profit & Loss|Cash Flow Statement)/.test((document.querySelector('.fsg-root .fsg-stmt-toolbar')?.innerText || '').trim())`));
+  await clickFsgButton('Notes');
+  check('T-027 BS and PL notes show their respective dated column headings', await waitFor(`[...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='As at 31 March 2025') && [...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.trim()==='For the year ended 31 March 2025') && ![...document.querySelectorAll('.fsg-root th')].some(t=>/^(Current Year|Previous Year)$/.test(t.textContent.trim()))`),
+    await evaluate(`[...new Set([...document.querySelectorAll('.fsg-root th')].map(t=>t.textContent.trim()).filter(t=>/Year|As at|For the year/.test(t)))].slice(0, 20)`));
+  await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(b=>b.textContent.trim()==='Reviewed, Close')?.click(),true)`);
+  await screenshot('03b-notes-dated');
+  // T-060: the Notes header in the statement-toolbar style - each group on one line, buttons of one height, one Previous Year TB selector.
+  check('T-060 Notes: the toolbar groups sit on one line each, one button height, nothing cut off', await evaluate(`(() => {
+    const t = document.querySelector('.fsg-root .fsg-notes-toolbar'); if (!t) return false; const r = t.getBoundingClientRect();
+    const groups = [...t.querySelectorAll('.fsg-stmt-group')];
+    return groups.length === 3 && groups.every(g => g.getBoundingClientRect().height <= 36) && t.scrollWidth <= t.clientWidth + 1
+      && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.right <= r.right + 1 }) })()`),
+    await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-notes-toolbar'); return t ? { h: t.getBoundingClientRect().height, groups: [...t.querySelectorAll('.fsg-stmt-group')].map(g => Math.round(g.getBoundingClientRect().height)), w: window.innerWidth } : null })()`));
+  check('T-060 Notes: the Previous Year TB selector is drawn at most once (it was twice for a branch)', await evaluate(`document.querySelectorAll('.fsg-root .fsg-notes-toolbar select').length <= 2`),
+    await evaluate(`document.querySelectorAll('.fsg-root .fsg-notes-toolbar select').length`));
+  await screenshot('03d-notes-toolbar');
+  await analyseChange('Notes', 'Reclassified 3 ledgers from Other expenses');
+  await clickFsgButton('Annex');
+  await waitFor(`document.querySelector('.fsg-root')?.innerText.includes('Each note with its individual ledger')`);
+  check('T-045 Annex no longer shows the Trade Payables / Receivables reconciliation', await evaluate(`!/Books vs Balance Sheet Reconciliation/.test(document.querySelector('.fsg-root')?.innerText || '') && !document.querySelector('.fsg-root .fsg-reco')`));
+  await evaluate(`([...document.querySelectorAll('.fsg-root button')].filter(b=>/^Note [0-9]+:/.test(b.textContent.trim())).forEach(b=>b.click()),true)`);
+  check('T-027 BS and PL ledger annexures show matching dates', await waitFor(`[...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.includes('As at 31 March 2025 - Ledger')) && [...document.querySelectorAll('.fsg-root th')].some(t=>t.textContent.includes('For the year ended 31 March 2025 - Ledger'))`));
+  check('T-027 long dated annexure headings stay within their note card', await evaluate(`(document.querySelectorAll('.fsg-root table.table-fixed').length>0 && [...document.querySelectorAll('.fsg-root table.table-fixed')].every(t=>t.getBoundingClientRect().right<=t.parentElement.getBoundingClientRect().right+1 && [...t.querySelectorAll('th.fsg-dated-heading')].every(h=>getComputedStyle(h).whiteSpace==='normal' && h.scrollWidth<=h.clientWidth+1)))`));
+  await screenshot('03c-annexures-dated');
+
+  // T-039: a ledger's categorisation can be changed from the Annexure itself.
+  const editButtons = `[...document.querySelectorAll('.fsg-root button.fsg-annex-edit')]`;
+  check('T-039 every annexure ledger offers a change-categorisation button', await waitFor(`${editButtons}.length > 0`, 10000));
+  const editLabel = await evaluate(`${editButtons}[0]?.getAttribute('aria-label') || ''`);
+  await evaluate(`(${editButtons}[0]?.click(), true)`);
+  const modalOpen = `[...document.querySelectorAll('.fsg-root .modal-box h2')].some(h => h.textContent.trim() === 'Override Mapping')`;
+  check('T-039 the Mapped TB categorisation dialog opens from the Annexure', await waitFor(modalOpen, 5000));
+  check('T-039 the dialog starts from the ledger\'s current Mapping 1', await evaluate(`(() => { const s = document.querySelector('.fsg-root .modal-box select'); return !!(s && s.value) })()`));
+  await evaluate(`(() => { const t = document.querySelector('.fsg-root .modal-box textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, 'T-039 annexure recategorisation'); t.dispatchEvent(new Event('input', { bubbles: true })); return true })()`);
+  await evaluate(`([...document.querySelectorAll('.fsg-root .modal-box button')].find(b => b.textContent.trim() === 'Save Override')?.click(), true)`);
+  check('T-039 saving closes the dialog', await waitFor(`!(${modalOpen})`, 10000));
+  await sleep(1500);
+  if (!(await evaluate(`${editButtons}.length > 0`))) await evaluate(`([...document.querySelectorAll('.fsg-root button')].filter(b=>/^Note [0-9]+:/.test(b.textContent.trim())).forEach(b=>b.click()),true)`);
+  await waitFor(`${editButtons}.length > 0`, 10000);
+  await evaluate(`(${editButtons}.find(b => b.getAttribute('aria-label') === ${JSON.stringify(editLabel)})?.click(), true)`);
+  await waitFor(modalOpen, 5000);
+  check('T-039 the annexure change is saved and read back after the refresh', await evaluate(`document.querySelector('.fsg-root .modal-box textarea')?.value === 'T-039 annexure recategorisation'`));
+  await evaluate(`([...document.querySelectorAll('.fsg-root .modal-box button')].find(b => b.textContent.trim() === 'Cancel')?.click(), true)`);
+  await waitFor(`!(${modalOpen})`, 5000);
+
+  // T-038: run after the Notes checks, since opening Policy saves its default text
+  // (whose ratio and useful-life tables still use Current/Previous Year headings).
+  await evaluate(`(document.activeElement?.blur?.(), true)`);
+  // Real key presses are cancelable, which is how FSG's handler keeps VERA's Ctrl+O (VERA Tools) from also firing.
+  await evaluate(`(document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'O', code: 'KeyO', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })), true)`);
+  check('T-038 Ctrl+Shift+O stays inside Financial Statement Review', await evaluate(`location.hash.includes('financial-statement-review') && !!document.querySelector('.fsg-root')`), await evaluate('location.hash'));
+  check('T-038 Ctrl+Shift+O opens A/c Policy', await waitFor(`[...document.querySelectorAll('.fsg-root button.tab-active')].some(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'A/c Policy')`, 5000),
+    await evaluate(`[...document.querySelectorAll('.fsg-root button.tab-active')].map(b => b.textContent.trim())`));
+  check('T-043 Policy offers the blank / filled Excel format and its upload', await waitFor(`!!document.querySelector('.fsg-root .fsg-policy-blank') && !!document.querySelector('.fsg-root .fsg-policy-filled') && !!document.querySelector('.fsg-root .fsg-policy-upload')`, 10000));
+
+  // T-044: one-stop download / upload of every working of the active Trial Balance.
+  await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'TB')?.click(), true)`);
+  await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
+  await evaluate(`([...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].find(x => x.textContent.replace(/\\s+/g, ' ').trim() === 'Upload TB')?.click(), true)`);
+  check('T-044 Upload TB offers Download all workings and Upload all workings', await waitFor(`!!document.querySelector('.fsg-root .fsg-workings-download') && !!document.querySelector('.fsg-root .fsg-workings-upload')`, 10000));
+
   check('Statement of Profit and Loss renders', pl, (await evaluate(`document.querySelector('.fsg-root')?.innerText || ''`)).slice(0, 1200));
-  check('Generate Financials tab can be opened', await clickFsgButton('Generate Financials'));
+  check('T-055 the Exception report is shown as Check Control', await clickFsgButton('Check Control') && await waitFor(`/Check Control/.test(document.querySelector('.fsg-root h2')?.textContent || '') && !/variance/i.test(document.querySelector('.fsg-root')?.innerText || '')`, 15000));
+  check('T-054 CFS: the toolbar is one line with every button in view', await clickFsgButton('CFS') && await waitFor(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); if (!t) return false; const r = t.getBoundingClientRect(); return t.scrollWidth <= t.clientWidth + 1 && r.height < 48 && [...t.querySelectorAll('button, select')].every(b => { const x = b.getBoundingClientRect(); return x.height <= 32 && x.left >= r.left - 1 && x.right <= r.right + 1 }) })()`, 15000),
+    await evaluate(`(() => { const t = document.querySelector('.fsg-root .fsg-stmt-toolbar'); return t ? { scroll: t.scrollWidth, client: t.clientWidth, height: t.getBoundingClientRect().height } : null })()`));
+  check('T-060 CFS: the toolbar no longer repeats "Cash Flow Statement"', await evaluate(`!document.querySelector('.fsg-root .fsg-stmt-title') && !/^(Balance Sheet|Profit & Loss|Cash Flow Statement)/.test((document.querySelector('.fsg-root .fsg-stmt-toolbar')?.innerText || '').trim())`));
+  check('Review Financials tab can be opened', await clickFsgButton('Review Financials'));
   const gen = await waitFor(`/PDF|Excel/.test(document.querySelector('.fsg-root')?.innerText || '')`, 20000);
   await screenshot('04-generate-financials');
-  check('Generate Financials screen renders', gen);
+  check('Review Financials screen renders', gen);
+  check('Cloudtail MCA publishing card and controls are removed', await evaluate(`!document.querySelector('.fsg-root').innerText.includes('Cloudtail') && ![...document.querySelectorAll('.fsg-root button')].some(b=>b.textContent.includes('Publish to'))`));
+  await openSigningDialog();
+  check('signing Place defaults to the VERA firm profile and ignores old global preference',
+    await waitFor(`document.querySelector('#fsg-signing-place')?.value === 'Chennai'`));
+  await setInputValue('#fsg-signing-place', 'Mumbai');
+  check('signing Place is editable without changing the firm profile',
+    await evaluate(`document.querySelector('#fsg-signing-place')?.value === 'Mumbai'`) && await firmPlace() === 'Chennai');
+  await clickFsgButton('Cancel');
+  await openSigningDialog();
+  check('manual signing Place survives reopening the export dialog',
+    await evaluate(`document.querySelector('#fsg-signing-place')?.value === 'Mumbai'`));
+  await clickFsgButton('Cancel');
   const errorBoundary = await evaluate(`document.body.innerText.includes('Something went wrong')`);
   check('no error boundary inside the module', !errorBoundary);
 
@@ -332,12 +559,34 @@ async function main() {
   check('trial balance persisted across restart', tbs.ok && tbs.result.length === 1 && tbs.result[0].row_count === 9, tbs);
   const mapped = await fsg('mappedTB:rows', up.result.tb.id);
   check('mapping persisted across restart', mapped.ok && mapped.result.length === 9, mapped.ok ? mapped.result.length : mapped);
-  const reopened = await waitFor(`document.querySelector('.fsg-root') && document.body.innerText.includes('Generate Financials')`, 30000);
+  const reopened = await waitFor(`document.querySelector('.fsg-root') && document.body.innerText.includes('Review Financials')`, 30000);
   await sleep(1500);
   await clickFsgButton('BS');
   const bsAgain = await waitFor(`/Share capital|Shareholders/i.test(document.querySelector('.fsg-root')?.innerText || '')`, 30000);
   await screenshot('05-balance-sheet-after-restart');
   check('Balance Sheet renders after restart', reopened && bsAgain);
+  await clickFsgButton('Review Financials');
+  await openSigningDialog();
+  check('restart uses the saved firm Place instead of the previous export override',
+    await waitFor(`document.querySelector('#fsg-signing-place')?.value === 'Chennai'`));
+  await clickFsgButton('Cancel');
+  await fsg('entityPeriod:finalise', periodId, 'Recorded final place', '2026-11-10');
+  await openSigningDialog();
+  check('finalised year retains its recorded signing Place',
+    await waitFor(`document.querySelector('#fsg-signing-place')?.value === 'Recorded final place' && document.querySelector('#fsg-signing-place')?.disabled`));
+  await clickFsgButton('Cancel');
+  await fsg('entityPeriod:unlock', periodId);
+  await goto('#/settings');
+  await waitFor(`Boolean(document.querySelector('#firm-place'))`);
+  await setInputValue('#firm-place', '');
+  await evaluate(`([...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Save Changes').click(), true)`);
+  await waitFor(`globalThis.electronAPI.sqliteQuery({table:'firm_settings',action:'select',columns:'*'}).then(r => r.data?.[0]?.place === null)`);
+  await goto('#/financial-statement-review');
+  await clickFsgButton('Review Financials');
+  await openSigningDialog();
+  check('missing firm Place stays blank and requires manual entry before export',
+    await evaluate(`document.querySelector('#fsg-signing-place')?.value === '' && [...document.querySelectorAll('.fsg-root button')].some(b => b.textContent.trim() === 'Continue' && b.disabled)`));
+  await clickFsgButton('Cancel');
   await closeApp();
 
   // ── Database file ───────────────────────────────────────────────────────
@@ -347,6 +596,139 @@ async function main() {
   check('existing client data survived the upgrade', db.existingClient);
   check('FSG tables exist with the saved data', db.fsgTables === 6 && db.tbRows === 9 && db.mappedRows === 9, db);
   check('database integrity and foreign keys', db.integrity === 'ok' && db.fk === 0, db);
+
+  // T-024: exercise fallback categories through the real preload and screens.
+  await launch();
+  await openAsUser('fsg-admin@example.invalid', password, engagement, '#/financial-statement-review');
+  let fallbackEngagement;
+  for (const constitution of ['company','partnership']) {
+    const fc = await insert('clients', { name: `Synthetic Fallback ${constitution}`, constitution });
+    fallbackEngagement = await insert('engagements', { name:`Fallback ${constitution} FY 2024-25`,client_id:fc.id,client_name:fc.name,financial_year:'2024-25',engagement_type:'statutory',created_by:signup.data.user_id });
+    const context = await fsg('context:open',fallbackEngagement.id);
+    const fallbackLedger = (name,amount,type) => ({ ...ledger(name,'ZZ Unrecognised hierarchy','ZZ Unrecognised hierarchy',amount),trial_balance_type:type });
+    const trialRows = [fallbackLedger('ZZ asset',-130000,'assets'),fallbackLedger('ZZ liability',constitution==='company'?100000:99000,'liabilities'),fallbackLedger('ZZ income',60000,'income'),fallbackLedger('ZZ expense',-30000,'expenses')];
+    if (constitution==='partnership') trialRows.push({...ledger('Capital','Capital Account','Capital Account',1000),trial_balance_type:'liabilities'});
+    const upload = await fsg('tb:uploadRealBooks',{entityId:context.result.entity.id,entityPeriodId:context.result.entityPeriodId,fileName:'fallback.xlsx',tbRows:trialRows});
+    await fsg('mappedTB:run',upload.result.tb.id,rs.id,{});
+    const mappedFallback = await fsg('mappedTB:rows',upload.result.tb.id);
+    check(`T-024 ${constitution}: known-ALIE rows persist as terminal low-confidence fallbacks`,mappedFallback.ok
+      && mappedFallback.result.filter(r=>r.status==='auto_low' && !r.mapping2_resultant && !r.mapping3_resultant).length===4);
+    await openAsUser('fsg-admin@example.invalid',password,fallbackEngagement,'#/financial-statement-review');
+    await clickFsgButton('BS');
+    check(`T-024 ${constitution}: Balance Sheet shows fallback equity and source figures`,await waitFor(`document.querySelector('.fsg-root')?.innerText.includes('Uncategorised Equity and Liabilities') && document.querySelector('.fsg-root')?.innerText.includes('1,30,000')`));
+    await screenshot(`06-fallback-bs-${constitution}`);
+    await clickFsgButton('PL');
+    check(`T-024 ${constitution}: P&L shows unresolved income and expenses`,await waitFor(`document.querySelector('.fsg-root')?.innerText.includes('Uncategorised Income') && document.querySelector('.fsg-root')?.innerText.includes('Uncategorised Expenses')`));
+    await screenshot(`07-fallback-pl-${constitution}`);
+  }
+  await closeApp();
+  await launch();
+  await openAsUser('fsg-admin@example.invalid',password,fallbackEngagement,'#/financial-statement-review');
+  await clickFsgButton('BS');
+  check('T-024 fallback data and labels survive application restart',await waitFor(`document.querySelector('.fsg-root')?.innerText.includes('Uncategorised Equity and Liabilities') && document.querySelector('.fsg-root')?.innerText.includes('1,30,000')`));
+  // T-025: exercise investment tables with real mapped identities and controlled selections.
+  const ic = await insert('clients', { name: 'Synthetic Investments Company', constitution: 'company' });
+  const ie = await insert('engagements', { name: 'Investment disclosure FY 2024-25', client_id: ic.id, client_name: ic.name, financial_year: '2024-25', engagement_type: 'statutory', created_by: signup.data.user_id });
+  const ictx = (await fsg('context:open', ie.id)).result;
+  const iu = await fsg('tb:uploadRealBooks', { entityId: ictx.entity.id, entityPeriodId: ictx.entityPeriodId, fileName: 'investments.xlsx', tbRows: [
+    ledger('UI Equity Ledger', 'Investments', 'Investments', -100000),
+    ledger('UI Firm Ledger', 'Investments', 'Investments', -50000),
+    ledger('UI Current Ledger', 'Investments', 'Investments', -20000),
+    ledger('UI Capital', 'Capital Account', 'Capital Account', 170000),
+  ] });
+  await fsg('mappedTB:run', iu.result.tb.id, rs.id, {});
+  const im = (await fsg('mappedTB:rows', iu.result.tb.id)).result;
+  for (const [name, l1, l2, l3] of [
+    ['UI Equity Ledger', 'Non-current assets', 'Non-current investments', 'Investments in Equity Instruments'],
+    ['UI Firm Ledger', 'Non-current assets', 'Non-current investments', 'Investments in partnership firms'],
+    ['UI Current Ledger', 'Current assets', 'Current investments', 'Investments in Mutual Funds'],
+  ]) await fsg('mappedTB:override', im.find(r => r.ledger_name === name || r.name === name).id, { mapping1_resultant: l1, mapping2_resultant: l2, mapping3_resultant: l3, override_note: 'Synthetic T-025 UI fixture' });
+  await openAsUser('fsg-admin@example.invalid', password, ie, '#/financial-statement-review');
+  await clickFsgButton('Notes');
+  const openInvestment = async noncurrent => {
+    await waitFor(`Boolean([...document.querySelectorAll('[id^="note-"]')].find(n => /Note \\d+: ${noncurrent ? 'Non-current' : 'Current'} investments/i.test(n.querySelector('button')?.textContent || '')))`);
+    await evaluate(`(() => {const n=[...document.querySelectorAll('[id^="note-"]')].find(n=>/Note \\d+: ${noncurrent ? 'Non-current' : 'Current'} investments/i.test(n.querySelector('button')?.textContent||'')); [...n.querySelectorAll('button')].find(b=>b.textContent.includes('Fill Details')).click(); return true})()`);
+    return waitFor(`Boolean(document.querySelector('[role="dialog"] [data-testid="investment-entry"]'))`);
+  };
+  check('T-025 Investments Fill Details opens from the mapped note', await openInvestment(true));
+  check('T-025 ledger dropdowns contain only the respective investment subclass', await evaluate(`(() => {const s=[...document.querySelectorAll('[role="dialog"] select[aria-label="Name of Ledger"]')];return s.length===2 && s.every(e=>e.options.length===1) && s.some(e=>e.options[0].text.includes('UI Equity Ledger')) && s.some(e=>e.options[0].text.includes('UI Firm Ledger'))})()`));
+  await setInputValue('[aria-label="Printed investee name"]', 'Printed UI Company');
+  await setInputValue('[aria-label="No of Shares CY"]', '1000');
+  await setInputValue('[aria-label="New investment category"]', 'UI Custom Category');
+  await evaluate(`([...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent.includes('Add category')).click(),true)`);
+  check('T-025 Add category updates category choices and partnership has Add partner', await evaluate(`document.querySelector('select[aria-label="Category"]').innerText.includes('UI Custom Category') && [...document.querySelectorAll('[role="dialog"] button')].some(b=>b.textContent.includes('Add partner'))`));
+  await screenshot('09-investment-fill-details');
+  await evaluate(`([...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Save draft details').click(),true)`);
+  await waitFor(`!document.querySelector('[role="dialog"]')`);
+  await openInvestment(true);
+  check('T-025 saved investment details reopen with printed name and number of shares', await evaluate(`document.querySelector('[aria-label="Printed investee name"]').value==='Printed UI Company' && document.querySelector('[aria-label="No of Shares CY"]').value==='1000'`));
+  await evaluate(`(document.querySelector('[aria-label="Close investments"]').click(),true)`);
+  await openInvestment(false);
+  check('T-025 current investment form has no trade/other field and no non-current ledgers', await evaluate(`!document.querySelector('[aria-label="Trade / other"]') && document.querySelector('select[aria-label="Name of Ledger"]').options.length===1 && document.querySelector('select[aria-label="Name of Ledger"]').innerText.includes('UI Current Ledger')`));
+  await screenshot('10-current-investment-fill-details');
+  await evaluate(`(document.querySelector('[aria-label="Close investments"]').click(),true)`);
+  await fsg('entityPeriod:lock', ictx.entityPeriodId);
+  await openInvestment(true);
+  check('T-025 locked financial year opens investment details read-only', await evaluate(`document.querySelector('[role="dialog"] fieldset').disabled`));
+  await closeApp();
+  await launch();
+  await openAsUser('fsg-admin@example.invalid', password, ie, '#/financial-statement-review');
+  const persistedInvestments = await fsg('investments:list', { entityPeriodId: ictx.entityPeriodId, tbId: iu.result.tb.id });
+  check('T-025 investment details persist after full application restart', persistedInvestments.ok && persistedInvestments.result.noncurrent.entries.some(e => e.companyName === 'Printed UI Company' && Number(e.quantityCY) === 1000));
+  // T-026: missing ALIE stays prominently visible but never disables statement generation.
+  const ac = await insert('clients', { name: 'Synthetic Missing ALIE Company', constitution: 'company' });
+  const ae = await insert('engagements', { name: 'Missing ALIE FY 2024-25', client_id: ac.id, client_name: ac.name, financial_year: '2024-25', engagement_type: 'statutory', created_by: signup.data.user_id });
+  const actx = (await fsg('context:open', ae.id)).result;
+  const au = await fsg('tb:uploadRealBooks', { entityId: actx.entity.id, entityPeriodId: actx.entityPeriodId, fileName: 'missing-alie.xlsx', tbRows: [
+    { ...ledger('ZZ ALIE debit', 'ZZ Unknown hierarchy', 'ZZ Unknown hierarchy', -100), trial_balance_type: 'unknown' },
+    { ...ledger('ZZ ALIE credit', 'ZZ Unknown hierarchy', 'ZZ Unknown hierarchy', 250), trial_balance_type: 'unknown' },
+    { ...ledger('ZZ ALIE zero', 'ZZ Unknown hierarchy', 'ZZ Unknown hierarchy', 0), trial_balance_type: 'unknown' },
+    ledger('Cash', 'Cash-in-Hand', 'Current Assets', -1000),
+    ledger('Equity Share Capital', 'Capital Account', 'Capital Account', 850),
+  ] });
+  await fsg('mappedTB:run', au.result.tb.id, rs.id, {});
+  const stockSave = await fsg('tb:saveStock', { tbId: au.result.tb.id, stockData: { pyOpening: { 'Stock-in-Trade': 123456789.12 }, pyClosing: { 'Stock-in-Trade': 98765432.10 } } });
+  check('T-026 separately entered PY stock is saved but not returned as missing ALIE', stockSave.ok && (await fsg('financials:getMissingAlie', au.result.tb.id)).result.length === 3);
+  await openAsUser('fsg-admin@example.invalid', password, ae, '#/financial-statement-review');
+  await clickFsgButton('BS');
+  check('T-026 BS shows mandatory ALIE warning at top and bottom with gross debit/credit while excluding fully nil items', await waitFor(`document.querySelector('[data-testid="missing-alie-top"]')?.innerText.includes('ALIE classification missing for 2 ledgers.') && document.querySelector('[data-testid="missing-alie-top"]').innerText.includes('Debit 100.00') && document.querySelector('[data-testid="missing-alie-bottom"]')?.innerText.includes('Credit 250.00')`));
+  { const st = await evaluate(`(() => {const box=document.querySelector('[data-testid="missing-alie-top"]');if(!box)return {none:true};const s=getComputedStyle(box);const t=box.querySelector('[data-testid="missing-alie-title"]');return {color:s.color,border:s.borderTopWidth,weight:t?Number(getComputedStyle(t).fontWeight):0,title:t?t.innerText:''}})()`);
+    check('T-026 / T-085 missing-ALIE notice is red, in the house warning style, with a bold title', !!st && st.color === 'rgb(185, 28, 28)' && parseFloat(st.border) > 0 && parseFloat(st.border) < 1.5 && st.weight >= 700 && /ALIE not found/.test(st.title), st) }
+  check('T-026 missing ALIE remains a warning without a provisional liability head', await evaluate(`![...document.querySelectorAll('td')].some(c=>c.textContent.trim()==='ALIE MISSING') && document.querySelector('[data-testid="missing-alie-top"]').innerText.includes('excluded from the Balance Sheet and Profit and Loss')`));
+  check('T-026 ledger names and closing balances are visible without expanding details', await evaluate(`(() => {const list=document.querySelector('[data-testid="missing-alie-ledgers"]');return !!list && list.getBoundingClientRect().height>0 && list.innerText.includes('ZZ ALIE debit') && list.innerText.includes('ZZ ALIE credit') && !list.innerText.includes('ZZ ALIE zero') && !list.innerText.includes('PY Opening Stock') && !list.innerText.includes('PY Closing Stock') && !document.querySelector('[data-testid="missing-alie-top"]').innerText.includes('P&L classification pending')})()`));
+  await screenshot('11-missing-alie-bs');
+  await clickFsgButton('PL');
+  check('T-026 P&L also shows the ALIE warning at both ends', await waitFor(`!!document.querySelector('[data-testid="missing-alie-top"]') && !!document.querySelector('[data-testid="missing-alie-bottom"]')`));
+  await screenshot('12-missing-alie-pl');
+  await evaluate(`([...document.querySelectorAll('[data-testid="missing-alie-top"] button')].find(b=>b.textContent.includes('Resolve ALIE')).click(),true)`);
+  check('T-026 Resolve ALIE opens the existing rectification workflow', await waitFor(`document.querySelector('.fsg-root')?.innerText.includes('ALIE missing') && document.querySelector('.fsg-root')?.innerText.includes('ZZ ALIE debit')`));
+  await clickFsgButton('Annex');
+  check('T-026 Annexures remain available and retain the ALIE exception warning', await waitFor(`!!document.querySelector('[data-testid="missing-alie-top"]')`));
+  await clickFsgButton('Review Financials');
+  await openSigningDialog();
+  check('T-026 missing ALIE does not block opening the Excel export flow', await waitFor(`Boolean(document.querySelector('#fsg-signing-place'))`));
+  await clickFsgButton('Cancel');
+  await clickFsgButton('Download PDF');
+  check('T-026 missing ALIE does not block opening the PDF export flow', await waitFor(`Boolean(document.querySelector('#fsg-signing-place'))`));
+  await clickFsgButton('Cancel');
+  await closeApp();
+  await launch();
+  await openAsUser('fsg-admin@example.invalid', password, ae, '#/financial-statement-review');
+  await clickFsgButton('BS');
+  check('T-026 mandatory ALIE warning survives restart without a dismiss/acknowledge bypass', await waitFor(`document.querySelector('[data-testid="missing-alie-top"]')?.innerText.includes('ALIE classification missing for 2 ledgers.')`));
+  const alieMapped = (await fsg('mappedTB:rows', au.result.tb.id)).result;
+  for (const row of alieMapped.filter(r => (r.ledger_name || r.name || '').startsWith('ZZ ALIE') && !(r.ledger_name || r.name).includes('zero'))) {
+    const credit = (row.ledger_name || row.name).includes('credit');
+    await fsg('mappedTB:override', row.id, { mapping1_resultant: credit ? "Shareholders' funds" : 'Current assets', mapping2_resultant: credit ? 'Share capital' : 'Cash and bank balances', mapping3_resultant: '', override_note: 'Synthetic T-026 ALIE resolution' });
+  }
+  await clickFsgButton('PL');
+  check('T-026 warning clears after all ALIE classifications are actually resolved', await waitFor(`!document.querySelector('[data-testid="missing-alie-top"]') && /Statement of Profit|Profit and Loss/i.test(document.querySelector('.fsg-root')?.innerText || '')`));
+  await clickFsgButton('BS');
+  check('T-026 resolving active balances removes the provisional BS head while nil ALIE remains in Mapping', await waitFor(`![...document.querySelectorAll('td')].some(c=>c.textContent.trim()==='ALIE MISSING')`) && (await fsg('financials:getMissingAlie', au.result.tb.id)).result.length === 1);
+  await openAsUser('fsg-admin@example.invalid', password, ie, '#/financial-statement-review');
+  await clickFsgButton('BS');
+  check('T-026 switching to a classified client does not retain another client warning', await waitFor(`!document.querySelector('[data-testid="missing-alie-top"]') && document.querySelector('.fsg-root')?.innerText.includes('Synthetic Investments Company')`));
+  await closeApp();
 
   const failed = results.filter((r) => !r.pass);
   if (rendererErrors.length) {

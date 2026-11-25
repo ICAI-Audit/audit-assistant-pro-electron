@@ -1,8 +1,12 @@
 # Declared schema field catalogue
 
+T-025 addition, 11 November 2026: no new columns or tables. Investment JSON in existing `note_details.data` / `entity_note_details.data` records version, custom categories and investment rows (ledger identity/sub-classification, printed name, category, relationship, paid/quoted status, quantities/per-unit values, CY/PY amounts/market/diminution/valuation, partnership capital/partners and redemption facts). Reserved per-year titles/negative keys and protected write paths are defined in [T025](T025_INVESTMENT_DISCLOSURES.md). Historical schema counts below are unchanged by this task.
+
 Source baseline `cc5c04729604fba7d05240a07f24682e0644665c`, reviewed 30 October 2026. All nine sqlite/schema files were parsed by SQLite in memory, without importing the application or opening a client database. The catalogue contains 78 declared tables and 1055 columns. It records declarations, not effective installed-database state or verified UI bindings. Runtime migrations in main.cjs may add or alter fields. Nullability here describes explicit NOT NULL and PK metadata; SQLite primary-key semantics must be read with the actual DDL.
 
 The known missing engagement_tb_classification and ifc_clause_library declarations remain T-017. Other UI/type-to-schema differences are evidence to reconcile, not licence to add tables during documentation.
+
+Later addition, 10 November 2026: T-023 adds nullable TEXT `firm_settings.place` (default NULL) in `01_core_tables.sql` and a backup-before-ALTER startup upgrade. It supplies Financial Statement Review's editable signing default from VERA Firm settings. The historical table/column totals above are not recounted by this addition; see the [current field contract](T023_FIRM_SIGNING_PLACE.md).
 
 ## Table index
 
