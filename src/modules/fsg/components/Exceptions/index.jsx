@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { fmtINR, parseSlashOptions } from '../../hooks/useFinancials'
+import { fmtINR, parseSlashOptions, fetchFinancialsData } from '../../hooks/useFinancials'
+import { notesFixTargets } from '../../utils/notesFixQueue'
 import { pushAction, snapshotMapping } from '../../utils/undoManager'
 import { resolveFixScope, fixOpensPreviousYear, natureLevelsFor, ledgerNeeds, isComplete, bulkNaturePlan } from '../../utils/fixTargets'
 import HierarchyPopup from '../shared/HierarchyPopup'
@@ -173,6 +174,40 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   const activeFilter = scopeFilter
     ? (fixScope.idScoped ? { mappedIds: fixScope.ids } : fixScope.filter)
     : (showAll ? {} : { uncategorised: true })
+  const queueView = !scopeFilter && !showAll
+
+  // T-083: everything Notes, the Balance Sheet and the P&L show Fix / Bifurcate / Review for is on this list too
+  // (utils/notesFixQueue.js - the very tests those screens draw the buttons by). Without it this screen could say
+  // "no exceptions" while Notes still showed Fix. Worked out from the same statements Notes builds; kept apart from
+  // the list's own load so a save is not slowed down by it.
+  const [notesFix, setNotesFix] = useState(null)   // { cy: Map(id -> reason), py: Map, orphan: [] } | null while loading
+  useEffect(() => {
+    if (!queueView || !activeTB?.id || activeTB.id === '__consolidated__') { setNotesFix(null); return }
+    let live = true
+    Promise.resolve(fetchFinancialsData(activeTB, prevTB, entity, activeRsId))
+      .then(data => {
+        if (!live) return
+        const t = notesFixTargets(data)
+        const toMap = (key) => {
+          const m = new Map()
+          for (const it of t.items) for (const id of it[key]) if (!m.has(id)) m.set(id, { what: it.what, where: it.where })
+          return m
+        }
+        setNotesFix({ cy: toMap('ids'), py: toMap('pyIds'), orphan: t.items.filter(i => !i.ids.length && !i.pyIds.length) })
+      })
+      .catch(() => { if (live) setNotesFix({ cy: new Map(), py: new Map(), orphan: [], failed: true }) })
+    return () => { live = false }
+  }, [queueView, activeTB?.id, prevTB?.id, refreshTick, entity?.id, activeRsId])
+  const notesWhyMap = notesFix ? (categorisePY ? notesFix.py : notesFix.cy) : null
+  const notesWhy = (id) => (queueView && notesWhyMap ? notesWhyMap.get(id) || null : null)
+  // What a ledger still needs: its own Level Format test, plus the Notes / BS / P&L flag when that is all there is.
+  const rowNeeds = (r) => {
+    const needs = ledgerNeeds(levelFormat, r)
+    const why = notesWhy(r.id)
+    if (why && !needs.length) needs.push({ what: why.what === 'Review' ? 'Review' : why.what === 'Bifurcate' ? 'Mapping 3' : 'Recategorise',
+      hint: why.what === 'Review' ? `${why.where}: check it belongs under this head, then Save to confirm` : `flagged on ${why.where}` })
+    return needs
+  }
 
   useEffect(() => {
     if (!tbId) return
@@ -215,6 +250,23 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
 
   const refresh = () => setRefreshTick(t => t + 1)
 
+  // T-083: add the flagged ledgers the database query did not list.
+  useEffect(() => {
+    if (!queueView || loading || !tbId || !notesWhyMap?.size) return
+    const have = new Set(ledgers.map(r => r.id))
+    const missing = [...notesWhyMap.keys()].filter(id => !have.has(id))
+    if (!missing.length) return
+    let live = true
+    Promise.resolve(fsgApi?.findMappedByFilter(tbId, { mappedIds: missing }))
+      .then(rows => {
+        if (!live || !rows?.length) return
+        setLedgers(prev => { const ids = new Set(prev.map(r => r.id)); return [...prev, ...rows.filter(r => !ids.has(r.id))] })
+        setOriginalById(prev => { const next = { ...prev }; for (const r of rows) if (!next[r.id]) next[r.id] = snapshotMapping(r); return next })
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [queueView, loading, tbId, notesWhyMap, ledgers.length])
+
   // T-040: Notes also shows Fix for Previous Year ledgers, so "every ledger is
   // fully categorised" may only be said when the Previous Year Trial Balance
   // has nothing left either.
@@ -228,9 +280,11 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
       .catch(() => { if (live) setPyQueue([]) })
     return () => { live = false }
   }, [pyCheckApplies, prevTB?.id, refreshTick])
-  const pyPendingCount = useMemo(
-    () => (levelFormat.length ? pyQueue.filter(r => !isComplete(levelFormat, r)).length : pyQueue.length),
-    [pyQueue, levelFormat])
+  const pyPendingCount = useMemo(() => {
+    const pending = new Set((levelFormat.length ? pyQueue.filter(r => !isComplete(levelFormat, r)) : pyQueue).map(r => r.id))
+    for (const id of (notesFix?.py?.keys() || [])) pending.add(id)
+    return pending.size
+  }, [pyQueue, levelFormat, notesFix])
 
   // Bulk auto-map a TB — for Previous Year this is what actually carries
   // Current Year's classification across: runMapping's engine (see
@@ -386,7 +440,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
   const visibleLedgers = useMemo(() => {
     const q = search.trim().toLowerCase()
     return ledgers.filter(r => {
-      if (!showHidden && hiddenComplete.has(r.id)) return false
+      if (!showHidden && hiddenComplete.has(r.id) && !notesWhy(r.id)) return false
       if (!showZero) {
         const cb = Math.abs(parseFloat(r.closing_balance) || 0)
         const ob = Math.abs(parseFloat(r.opening_balance) || 0)
@@ -411,19 +465,19 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
       if (columnFilters.drcr && drCrOf(r) !== columnFilters.drcr) return false
       const nf = columnFilters.needs
       if (nf) {
-        const needs = ledgerNeeds(levelFormat, r)
+        const needs = rowNeeds(r)
         if (nf === NEEDS_ANY ? !needs.length : nf === NEEDS_NONE ? needs.length > 0 : !needs.some(n => n.what === nf)) return false
       }
       return true
     })
-  }, [ledgers, search, columnFilters, showZero, hiddenComplete, showHidden, levelFormat])
+  }, [ledgers, search, columnFilters, showZero, hiddenComplete, showHidden, levelFormat, notesWhyMap])
 
   // The kinds of fix the ledgers on screen still need, for the "To fix" filter.
   const needKinds = useMemo(() => {
     const kinds = new Set()
-    for (const r of ledgers) for (const n of ledgerNeeds(levelFormat, r)) kinds.add(n.what)
+    for (const r of ledgers) for (const n of rowNeeds(r)) kinds.add(n.what)
     return [...kinds].sort()
-  }, [ledgers, levelFormat])
+  }, [ledgers, levelFormat, notesWhyMap])
 
   // Which of Level 4-7 the ledgers on screen call for (Level 5 always; the level a Fix was about too).
   const natureLevels = useMemo(() => {
@@ -434,7 +488,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
     return [4, 5, 6, 7].filter(l => used.has(l))
   }, [ledgers, levelFormat, scopeFilter?.focusLevel])
   const columns = useMemo(() => columnsWith(natureLevels), [natureLevels])
-  const needFixCount = useMemo(() => visibleLedgers.filter(r => ledgerNeeds(levelFormat, r).length > 0).length, [visibleLedgers, levelFormat])
+  const needFixCount = useMemo(() => visibleLedgers.filter(r => rowNeeds(r).length > 0).length, [visibleLedgers, levelFormat, notesWhyMap])
 
   // The page being drawn. Back to the first page whenever the list itself changes (another search, filter, tick box or
   // Trial Balance) - never on an edit, so saving a row on page 3 leaves you on page 3.
@@ -1011,9 +1065,23 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
               Open the Previous Year ledgers
             </button>
           </div>
+        ) : queueView && !notesFix ? (
+          <div className="text-gray-600 bg-gray-50 border border-gray-200 rounded px-4 py-5 text-sm" data-testid="recat-notes-checking">
+            Checking Notes, the Balance Sheet and the P&amp;L for anything still flagged…
+          </div>
+        ) : queueView && (notesFix.failed || notesFix.orphan.length > 0) ? (
+          <div className="text-amber-800 bg-amber-50 border border-amber-200 rounded px-4 py-5 text-sm" data-testid="recat-notes-orphan">
+            {notesFix.failed ? (
+              <p className="font-semibold">No ledger is left to categorise here, but Notes could not be checked just now. Open Notes to confirm, or refresh this screen.</p>
+            ) : (<>
+              <p className="font-semibold mb-1">No ledger is left to categorise here, but these lines are still flagged and have no Trial Balance ledger behind them:</p>
+              <ul className="list-disc pl-5 text-xs">{notesFix.orphan.map((o, i) => <li key={i}>{o.where} ({o.what})</li>)}</ul>
+              <p className="text-xs mt-2">They come from a schedule or a manual entry (for example the Dep tab or the Stock tab); fix them there.</p>
+            </>)}
+          </div>
         ) : (
-          <div className="text-center text-green-700 bg-green-50 border border-green-200 rounded px-4 py-6 text-sm">
-            No exceptions - every ledger is fully categorised{prevTB?.id ? ', in this year’s and the Previous Year Trial Balance' : ''}.
+          <div className="text-center text-green-700 bg-green-50 border border-green-200 rounded px-4 py-6 text-sm" data-testid="recat-all-done">
+            No exceptions - every ledger is fully categorised{prevTB?.id ? ', in this year’s and the Previous Year Trial Balance' : ''}. Notes, the Balance Sheet and the P&amp;L will not ask for re-categorisation.
           </div>
         ))}
 
@@ -1269,7 +1337,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
                     // What this ledger still lacks, from its own Level Format row(s) — found by captions, or,
                     // when those lead nowhere (old wording, blank Level 3), by its own level_format_id:
                     // Mapping 2 / 3 and every Level 4-7 classification it must be given (utils/fixTargets.js).
-                    const needs = ledgerNeeds(levelFormat, row)
+                    const needs = rowNeeds(row)
                     const natureOf = Object.fromEntries(natureLevelsFor(levelFormat, row).map(n => [n.level, n]))
                     const isChecked = selected.has(row.id)
                     const isFocused = focusedRow?.id === row.id

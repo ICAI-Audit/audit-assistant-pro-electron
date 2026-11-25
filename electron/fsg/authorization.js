@@ -93,6 +93,10 @@ export const CHANNEL_POLICY = {
   'entity:getAll': { access: 'auth', filterResult: 'entities' },
   'entity:save': { access: 'auth', write: true, scopes: [R('entity', 0, { prop: 'id' })], requireScope: true },
   'tb:getBranches': { access: 'auth', scopes: [R('entity')] },
+  'tb:listBranchMaster': { access: 'auth', scopes: [R('entity')] },
+  'tb:addBranch': { access: 'auth', write: true, scopes: [R('entity', 0, { prop: 'entityId' })] },
+  'tb:renameBranch': { access: 'auth', write: true, scopes: [R('entity', 0, { prop: 'entityId' })] },
+  'tb:deleteBranch': { access: 'auth', write: true, scopes: [R('entity', 0, { prop: 'entityId' })] },
 
   // Entity periods (financial years)
   'entityPeriod:list': { access: 'auth', scopes: [R('entity')] },
@@ -128,7 +132,6 @@ export const CHANNEL_POLICY = {
   'tb:insertManualRow': { access: 'auth', write: true, scopes: [R('tb', 0, { prop: 'tbId' })] },
   'tb:deleteRow': { access: 'auth', write: true, scopes: [R('tb', 0, { prop: 'tbId' }), R('tbRow', 0, { prop: 'rowId' })] },
   'tb:getLedgersForTB': { access: 'auth', scopes: [R('tb')] },
-  'tb:saveJournalEntry': { access: 'auth', write: true, scopes: [R('tb', 0, { prop: 'tbId' })] },
 
   // Mapping rules
   'mapping:ruleSets': { access: 'auth', scopes: [R('entity')] },

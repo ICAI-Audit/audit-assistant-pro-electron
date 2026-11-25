@@ -31,12 +31,21 @@ export async function checkWorkings({ db, check, staff, partner, entityId, perio
     ['eps:set', oldTb, 'basicCY', 2.5],
     ['mappedTB:setAdjustment', mappedId(oldTb, 'Zw Bank'), { debit: 1000 }],
     ['mappedTB:setAdjustment', mappedId(oldTb, 'Zw Debtor'), { credit: 1000 }],
-    ['tb:saveJournalEntry', { tbId: oldTb, date: '2025-03-31', entries: [
-      { type: 'Dr', amount: 400, ledgerName: 'Zw Audit Fee', isNew: true, mapping1: 'Other expenses', mapping2: 'Audit Fees' },
-      { type: 'Cr', amount: 400, ledgerName: 'Zw Audit Fee Payable', isNew: true, mapping1: 'Other current liabilities', mapping2: 'Others' }] }],
   ]
   const failed = []
   for (const [ch, ...args] of work) { const r = await staff(ch, ...args); if (!r.ok) failed.push({ ch, r }) }
+  // T-082: the Journal Entry screen is removed; ledgers an earlier version posted that way ('Journal Passed Manually') are
+  // still in old Trial Balances, so they are put in directly and must still be carried.
+  const jeRs = db.prepare('SELECT id FROM mapping_rule_sets WHERE is_default = 1 LIMIT 1').get()?.id ?? defaultRs
+  for (const [name, closing, m1, m2, alie] of [['Zw Audit Fee', -400, 'Other expenses', 'Audit Fees', 'Expenses'], ['Zw Audit Fee Payable', 400, 'Other current liabilities', 'Others', 'EQUITY AND LIABILITIES']]) {
+    const rowId = db.prepare(`INSERT INTO tb_rows (tb_id, period, name, opening_balance, closing_balance, is_deemed_positive, upload_nature)
+      VALUES (?, '2025-03-31', ?, 0, ?, ?, 'Journal Passed Manually') RETURNING id`).get(oldTb, name, closing, closing < 0 ? 1 : 0).id
+    db.prepare(`INSERT INTO mapped_tb (tb_id, tb_row_id, rule_set_id, alie, mapping1_resultant, mapping2_resultant, status, confidence, override_note)
+      VALUES (?, ?, ?, ?, ?, ?, 'user_approved', 'high', 'Journal Entry dated 2025-03-31')`).run(oldTb, rowId, jeRs, alie, m1, m2)
+  }
+  // the harness throws for a channel that is not registered at all
+  const gone = await staff('tb:saveJournalEntry', { tbId: oldTb, date: '2025-03-31', entries: [] }).catch(e => ({ ok: false, error: e.message }))
+  check('T-082 the Journal Entry route is removed', !gone.ok, gone)
   check('T-044 synthetic workings saved on the old Trial Balance', failed.length === 0, failed)
 
   let r = await staff('workings:summary', oldTb)

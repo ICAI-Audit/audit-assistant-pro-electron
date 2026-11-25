@@ -30,13 +30,15 @@ import { investmentScope } from '../../utils/investmentStore'
 import TradeReceivablesAgingForm, { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trComputedCell, trPeriodView } from './TradeReceivablesAgingForm'
 import TradeReceivablesAgeingNonCorpForm, { NcAgeingDisplayTable } from './TradeReceivablesAgeingNonCorpForm'
 import { isNonCorpTradeReceivables } from '../../utils/tradeReceivablesNonCorp'
+import DirectorLoansForm, { DirectorLoansDisplayTable } from './DirectorLoansForm'
+import { hasDirectorLoans } from '../../utils/directorLoans'
 import { fixFilterWith, fixFilterWithIds } from '../../utils/fixTargets'
 import OwnersCapitalAccountForm from './OwnersCapitalAccountForm'
 import { NoteFormatRefButton } from '../shared/FormatReference'
 import { depStoreFor, isConsolidatedTB } from '../../utils/depStore'
 import { withNet } from '../../utils/depCompNet'
-import { plNoteShowsLines, plNoteLineLabel, isPrintedPlNoteLine, bsNoteFallbackLines } from '../../utils/annexureGrouping'
-import { unsplitSaleLine } from '../../utils/revenueLines'
+import { plNoteShowsLines, plNoteLineLabel, plNoteLineDisplay, plNoteTotalLabel, isPrintedPlNoteLine, bsNoteFallbackLines } from '../../utils/annexureGrouping'
+import { plLineFix, bsRowFix } from '../../utils/notesFixQueue'
 import { fsgApi } from '../../api.js'
 
 function Guard({ activeTB, loading, hasData, error, children }) {
@@ -580,8 +582,10 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
               // Revenue's sales ledgers not yet split into Sale of Goods / Sale
               // of Services (utils/revenueLines.js) are flagged like an
               // uncategorised line, and Fix asks for the split (their Level 3).
-              const toSplit = unsplitSaleLine(note) === line
-              const l2Uncat = (line.level2 || '').toLowerCase().includes('uncategorised') || toSplit || !!line.needsReview
+              // T-083: the same test Recategorisation lists its ledgers by (utils/notesFixQueue.js).
+              const lineFix = plLineFix(note, line)
+              const toSplit = lineFix === 'Bifurcate'
+              const l2Uncat = !!lineFix
               // A ledger mapped straight to this note's Level 1 with no Level
               // 2 at all (e.g. Purchase Accounts under "Cost of materials
               // consumed" — see mapping-engine.js's applyPurchaseAccountsOverride)
@@ -620,22 +624,22 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
                         className="text-blue-500 hover:text-blue-700 mr-1 text-[10px] align-middle"
                       >{lineExpanded ? '▾' : '▸'}</button>
                     )}
-                    {l2Label}
+                    {plNoteLineDisplay(note, line)}
                     {toSplit && (
                       <span className="ml-1 text-[10px] font-normal text-red-600">— bifurcate into Sale of Goods / Sale of Services (Mapping 3)</span>
                     )}
                     {l2Uncat && onFix && (
                       <button
                         onClick={() => onFix(
-                          line.needsReview
+                          lineFix === 'Review'
                             ? fixFilterWith({ alie: note.alie, mapping1_resultant: note.title }, line.rows)
                             : fixFilterWith({ alie: note.alie, mapping1_resultant: note.title, mapping2_resultant: toSplit ? 'Sale' : line.level2 }, line.rows),
-                          toSplit ? 'Bifurcate: Sale of Goods / Sale of Services' : line.needsReview ? `Review: ledgers mapped to ${note.title}` : `Fix: ${line.level2}`
+                          toSplit ? 'Bifurcate: Sale of Goods / Sale of Services' : lineFix === 'Review' ? `Review: ledgers mapped to ${note.title}` : `Fix: ${line.level2}`
                         )}
                         className="ml-2 px-1.5 py-0.5 text-[10px] rounded border border-red-400 text-red-700 bg-white hover:bg-red-100 transition font-normal"
-                      >{toSplit ? 'Bifurcate' : line.needsReview ? 'Review' : 'Fix'}</button>
+                      >{lineFix}</button>
                     )}
-                    {line.needsReview && line.reviewNote && (
+                    {lineFix === 'Review' && line.reviewNote && (
                       <div className="text-[10px] font-normal text-red-600 mt-0.5" data-testid="stock-other-ledgers-note">{line.reviewNote}</div>
                     )}
                     {tbId && (
@@ -681,7 +685,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
             {/* BS note: LevelFormat template rows (L3 → options from L5/L6 "/" ) */}
             {!note.isPL && noteRows.map((r, ri) => {
               if (r.type === 'l3') {
-                const l3Uncat = (r.label || '').toLowerCase().includes('uncategorised')
+                const l3Uncat = bsRowFix(note, r) === 'Fix'
                 const isHighlight = r.isHighlight
                 return (
                   <tr key={ri} className={`border-b border-gray-200 ${
@@ -828,7 +832,7 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
           </tbody>
           <tfoot>
             <tr className="bg-blue-50 border-t-2 border-blue-300">
-              <td className="py-1.5 px-4 font-bold text-blue-800 text-xs">Total</td>
+              <td className="py-1.5 px-4 font-bold text-blue-800 text-xs">{note.isPL ? plNoteTotalLabel(note) : 'Total'}</td>
               <td className="py-1.5 text-right font-mono font-bold text-blue-800 pr-3">{fmtINR(note.total)}</td>
               <td className="py-1.5 pr-3">
                 {manualPyEnabled && 'manualPyFlatEntry' in note ? (
@@ -938,6 +942,12 @@ function NoteBlock({ note, entity, activeTB, prevTB, isHighlighted, tbId, getRem
         {note.ncTradeReceivables && (
           <div className="mt-6 pt-6 border-t-2 border-indigo-300 px-4 pb-4">
             <NcAgeingDisplayTable saved={note.ncTradeReceivables.saved} noteTotal={note.total} fmtAmount={fmtINR} />
+          </div>
+        )}
+        {/* T-086 Company: loans and advances due from directors, officers and entities in which directors are interested */}
+        {note.directorLoans && (
+          <div className="mt-6 pt-6 border-t-2 border-indigo-300 px-4 pb-4">
+            <DirectorLoansDisplayTable saved={note.directorLoans.saved} periodLabels={periodLabels} fmtAmount={fmtINR} />
           </div>
         )}
 
@@ -2072,7 +2082,8 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
                             (t.includes('cash') && t.includes('bank')) ||
                             (t.includes('trade receivable') && (isCompanyEntity || isNonCorpEntity)) ||
                             t.includes("owners' capital") || t.includes('owners capital') ||
-                            t.includes("partners' capital") || t.includes('partners capital')
+                            t.includes("partners' capital") || t.includes('partners capital') ||
+                            hasDirectorLoans(entity?.constitution, note.title)
             const isLTB = t.includes('long-term borrow') || t.includes('long term borrow')
             const ltbV = note.ltbValidation
             return (
@@ -2183,6 +2194,9 @@ export default function Notes({ entity, activeTB, prevTB, activeRsId, onPrevTBCh
             plNetProfit={data?.netProfit}
             plPrevNetProfit={data?.prevNetProfit}
           />
+        }
+        if (hasDirectorLoans(entity?.constitution, noteDetailsModal.noteTitle)) {
+          return <DirectorLoansForm {...commonProps} periodLabels={statementColumnLabels(activeTB, prevTB, 'bs')} />
         }
         return null  // no form registered for this note yet
       })()}

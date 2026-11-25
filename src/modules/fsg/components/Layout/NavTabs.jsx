@@ -40,8 +40,8 @@ export const TOP_SHORTCUTS = {
 
 // Item -> its key, per dropdown (unique within the dropdown it is in)
 const ITEM_SHORTCUTS = {
-  'Master': { 'Auditee Details': 'A', 'Financial Period': 'F', 'Auditor': 'U', 'Signatory': 'S', 'Mapping Rules': 'M' },
-  'TB': { 'Upload TB': 'U', 'Actual TB': 'A', 'Mapped TB': 'M', 'Mapped TB (Remarks)': 'R', 'Journal Entry': 'J' },
+  'Master': { 'Auditee Details': 'A', 'Financial Period': 'F', 'Auditor': 'U', 'Signatory': 'S', 'Branch Master': 'B', 'Mapping Rules': 'M' },
+  'TB': { 'Upload TB': 'U', 'Actual TB': 'A', 'Mapped TB': 'M', 'Mapped TB (Remarks)': 'R' },
   'Mapping': { 'Rectification / Recategorisation': 'R', 'Mapped TB': 'M', 'Mapping Rules': 'U' },
   'Dep': { 'Dep (Books)': 'B', 'Dep (Income Tax)': 'I' },
   'Features': { 'ITR': 'I', 'Tax Computation': 'T', 'Deferred Tax': 'D', 'Ratio': 'R', 'Reco': 'C', 'Format': 'F' },

@@ -24,6 +24,7 @@ import { withNet, isDerivedField } from '../../utils/depCompNet'
 import { buildDepCompBlankTemplate, buildDepCompFilledWorkbook, parseDepCompWorkbook, depCompExcelSpec } from './depCompWorkbook'
 import { finishWorkbook } from '../../utils/veraExcel'
 import { fsgApi } from '../../api.js'
+import { latestPerBranch } from '../../utils/tbVersions'
 
 const INP  = 'w-full border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white'
 const NINP = INP + ' text-right font-mono'
@@ -215,7 +216,8 @@ export default function DepreciationComp({ entity, activeTB }) {
     if (!window.confirm('This refreshes any category below that matches a branch\'s own category with its current branch total. A category that only exists here (not in any branch) is left as it is. Continue?')) return
     setPulling(true)
     try {
-      const branches = await fsgApi?.getBranches(entity.id) || []
+      // T-087: the latest version of each branch only (A_v1 and A_v2 are the same branch)
+      const branches = latestPerBranch(await fsgApi?.getBranches(entity.id) || [])
       const branchSchedules = await Promise.all(branches.map(b => fsgApi?.depCompGet(b.id).catch(() => null)))
       const { byCategory, pyAgg } = joinDepCompSchedules(branchSchedules, CATEGORY_ROW_FIELDS, CATEGORY_ROW_FIELDS)
       const pulledRows = [...byCategory.values()].map(r => ({

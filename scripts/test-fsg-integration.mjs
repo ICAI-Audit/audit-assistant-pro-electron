@@ -27,6 +27,8 @@ import { checkAnalyseChange } from './fsg-analyse-change-checks.mjs'
 import { checkInventoryNote, checkShareholding, checkOpeningSurplusLabel, checkConflictFallback } from './fsg-inventory-note-checks.mjs'
 import { checkTbVersions } from './fsg-tb-version-checks.mjs'
 import { checkOwnerPoints } from './fsg-owner-points-checks.mjs'
+import { checkDirectorLoans } from './fsg-director-loans-checks.mjs'
+import { checkBranchMaster } from './fsg-branch-master-checks.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
@@ -290,7 +292,6 @@ async function main() {
     ['savePPELedgers', entityId, periodId, []],
     ['tb:saveStock', { tbId, stockData: [] }],
     ['tb:insertManualRow', { tbId, rowData: { name: 'Locked ledger', closing_balance: 1 } }],
-    ['tb:saveJournalEntry', { tbId, date: '2025-03-31', entries: [] }],
     ['tb:delete', tbId],
     ['manualPY:set', tbId, true],
     ['manualPyEntries:upsert', { tbId, noteNum: 1, particularLabel: 'x', pyAmount: 1 }],
@@ -436,6 +437,8 @@ async function main() {
   await checkAnalyseChange({ root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
   await checkInventoryNote({ db, root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
   await checkShareholding({ root, userData, check })
+  await checkDirectorLoans({ root, userData, check })
+  await checkBranchMaster({ db, root, check, staff: staffWithRoom, entityId, periodId })
   await checkOpeningSurplusLabel({ db, root, userData, check, staff: staffWithRoom, entityId, periodId, defaultRs })
   await checkConflictFallback({ db, check, staff: staffWithRoom, entityId, periodId, defaultRs })
   await checkTbVersions({ db, root, check, staff, partner, entityId, defaultRs })

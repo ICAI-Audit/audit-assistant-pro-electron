@@ -10,9 +10,11 @@ const require = createRequire(import.meta.url)
 export async function checkInventoryNote({ db, root, userData, check, staff, entityId, periodId, defaultRs }) {
   const bundle = require('esbuild').buildSync({ stdin: { contents: `
     export { processRows, STOCK_OTHER_LEDGERS_LABEL } from './src/modules/fsg/hooks/useFinancials.js';
+    export { plNoteLines, plNoteTotalLabel } from './src/modules/fsg/utils/annexureGrouping.js';
+    export { notesFixTargets, plLineFix } from './src/modules/fsg/utils/notesFixQueue.js';
 `, resolveDir: root }, bundle: true, platform: 'node', format: 'cjs', write: false, logLevel: 'silent' })
   const path = join(userData, 'inventory-note.cjs'); writeFileSync(path, bundle.outputFiles[0].contents)
-  const { processRows, STOCK_OTHER_LEDGERS_LABEL } = require(path)
+  const { processRows, STOCK_OTHER_LEDGERS_LABEL, plNoteLines, plNoteTotalLabel, notesFixTargets, plLineFix } = require(path)
 
   // A manufacturer with no purchase ledger: nothing maps to "Cost of materials consumed".
   const ledger = (name, closing, parent) => ({ period: '2024-25', branch: '', ledger_code: '', name, opening_balance: 0,
@@ -49,13 +51,51 @@ export async function checkInventoryNote({ db, root, userData, check, staff, ent
   const changesTitle = changes ? changes.level1 : 'Changes in inventories of finished goods, WIP and Stock-in-Trade'
   const stray = { ...source.find(r => r.alie === 'Expenses') || {}, id: 999901, tb_row_id: 999901, name: 'Stock adjustment', alie: 'Expenses',
     level1: changesTitle, mapping1_resultant: changesTitle, level2: 'Stock adjustment', mapping2_resultant: 'Stock adjustment', level3: '', mapping3_resultant: '',
-    level5_value: '', upload_nature: null, closing_balance: -1500, opening_balance: 0, is_deemed_positive: true }
+    level5_value: '', upload_nature: null, closing_balance: -1500, opening_balance: 0, is_deemed_positive: true, status: 'auto_high' }
   p = processRows([...source, stray], null, 3, [], 'Manufacturer', false, false, null, lf)
   const ch2 = p.expenseSections.find(s => /changes in inventor/i.test(s.level1 || ''))
   const other = ch2 && ch2.lines.find(l => l.level2 === STOCK_OTHER_LEDGERS_LABEL)
   check('T-061 such a ledger is shown as "Add / (Less): Other ledgers mapped to this head", flagged for review, not as "Net Change in Inventory"',
     !!other && other.needsReview === true && /Stock tab/.test(other.reviewNote || '') && !ch2.lines.some(l => /^net change in inventory$/i.test(l.level2 || '')), ch2 && ch2.lines.map(l => [l.level2, l.total, l.needsReview]))
   check('T-061 it is still counted in the head (no ledger is dropped): -10,000 + 1,500 = -8,500', !!ch2 && Math.abs(ch2.total + 8500) < 0.01, ch2 && ch2.total)
+
+  // T-081 (owner, 23 November 2026): Cost of materials consumed prints as the working - Opening Stock of Raw Materials,
+  // Add: Purchases, Less: Closing Stock of Raw Materials, and the total captioned "Cost of materials consumed".
+  const purchase = { ...stray, id: 999902, tb_row_id: 999902, name: 'Purchase of raw material', level1: 'Cost of materials consumed',
+    mapping1_resultant: 'Cost of materials consumed', level2: 'Purchases', mapping2_resultant: 'Purchases', closing_balance: -100000 }
+  p = processRows([...source, purchase], null, 3, [], 'Manufacturer', false, false, null, lf)
+  const cmc = Object.values(p.notes).find(n => /^cost of materials consumed/i.test(n.title || ''))
+  const printed = cmc ? plNoteLines(cmc) : []
+  check('T-081 Cost of materials consumed reads Opening Stock, Add: Purchases, Less: Closing Stock, in that order',
+    printed.map(x => x.display).join(' | ') === 'Opening Stock of Raw Materials | Add: Purchases | Less: Closing Stock of Raw Materials', printed.map(x => x.display))
+  check('T-081 the line keeps its own label underneath (remarks, Manual PY and Annexure still find "Purchases")', printed[1]?.label === 'Purchases', printed.map(x => x.label))
+  check('T-081 the total is captioned "Cost of materials consumed" and is unchanged (40,000 + 1,00,000 - 30,000 = 1,10,000)',
+    !!cmc && plNoteTotalLabel(cmc) === 'Cost of materials consumed' && Math.abs(cmc.total - 110000) < 0.01, cmc && { total: cmc.total, label: plNoteTotalLabel(cmc) })
+  const other2 = Object.values(p.notes).find(n => n.isPL && !/^cost of materials consumed/i.test(n.title || ''))
+  check('T-081 other P&L notes keep "Total" and their own labels', !other2 || (plNoteTotalLabel(other2) === 'Total' && plNoteLines(other2).every(x => x.display === x.label)))
+
+  // T-083 (owner, 24 November 2026): Recategorisation lists every ledger Notes shows Fix / Review for, from the same test,
+  // and a ledger confirmed there (saved or approved) is not asked about again.
+  const strayM = { ...stray, mapped_id: 999901, status: 'auto_high' }
+  p = processRows([...source, strayM], null, 3, [], 'Manufacturer', false, false, null, lf)
+  const chNote = Object.values(p.notes).find(n => /changes in inventor/i.test(n.title || ''))
+  const reviewLine = chNote && chNote.lines.find(l => l.level2 === STOCK_OTHER_LEDGERS_LABEL)
+  let targets = notesFixTargets(p)
+  check('T-083 the Review line on Notes and the Recategorisation list come from one test (the ledger is on the list)',
+    !!reviewLine && plLineFix(chNote, reviewLine) === 'Review' && targets.cy.includes(999901), { fix: reviewLine && plLineFix(chNote, reviewLine), cy: targets.cy })
+  p = processRows([...source, { ...strayM, status: 'user_override' }], null, 3, [], 'Manufacturer', false, false, null, lf)
+  const chNote2 = Object.values(p.notes).find(n => /changes in inventor/i.test(n.title || ''))
+  const confirmed = chNote2 && chNote2.lines.find(l => l.level2 === STOCK_OTHER_LEDGERS_LABEL)
+  targets = notesFixTargets(p)
+  check('T-083 once saved on Recategorisation the line is not flagged and nothing is left on the list for it',
+    !!confirmed && !confirmed.needsReview && plLineFix(chNote2, confirmed) === null && !targets.cy.includes(999901), { needsReview: confirmed && confirmed.needsReview, cy: targets.cy })
+  check('T-083 the ledger is still counted in the head after it is confirmed (-10,000 + 1,500 = -8,500)', !!chNote2 && Math.abs(chNote2.total + 8500) < 0.01, chNote2 && chNote2.total)
+  const uncatSale = { ...strayM, id: 999903, tb_row_id: 999903, mapped_id: 999903, name: 'Sales misc', alie: 'Income', level1: 'Revenue from operations',
+    mapping1_resultant: 'Revenue from operations', level2: 'Sale', mapping2_resultant: 'Sale', level3: 'Uncategorised Sale', mapping3_resultant: 'Uncategorised Sale',
+    closing_balance: 5000, is_deemed_positive: false, status: 'user_override' }
+  p = processRows([...source, uncatSale], null, 3, [], 'Manufacturer', false, false, null, lf)
+  targets = notesFixTargets(p)
+  check('T-083 a sale not split into Goods / Services is on the list even when its status says it was saved', targets.cy.includes(999903) && targets.items.some(i => i.what === 'Bifurcate'), targets.items)
 }
 
 // T-053: shareholding % in Share Capital Fill Details.

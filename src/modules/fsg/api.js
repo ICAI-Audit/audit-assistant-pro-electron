@@ -57,6 +57,10 @@ export const fsgApi = {
   saveEntity:        (e)      => call('entity:save', e),
   deleteEntity:      (id)     => call('entity:delete', id),
   getBranches:       (eid)    => call('tb:getBranches', eid),
+  listBranchMaster:  (eid)    => call('tb:listBranchMaster', eid),
+  addBranch:         (data)   => call('tb:addBranch', data),
+  renameBranch:      (data)   => call('tb:renameBranch', data),
+  deleteBranch:      (data)   => call('tb:deleteBranch', data),
 
   // Financial Periods (global master) + Entity Periods (per-Auditee attachment, with locking)
   listFinancialPeriods:  ()                    => call('financialPeriod:list'),
@@ -105,7 +109,6 @@ export const fsgApi = {
   insertManualRow:   (data)   => call('tb:insertManualRow', data),
   deleteTBRow:       (data)   => call('tb:deleteRow', data),
   getLedgersForTB:   (tbId)   => call('tb:getLedgersForTB', tbId),
-  saveJournalEntry:  (data)   => call('tb:saveJournalEntry', data),
 
   // Mapping Rules
   getDefaultMapping: (const_) => call('mapping:getDefault', const_),

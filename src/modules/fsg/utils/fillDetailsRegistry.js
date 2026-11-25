@@ -13,6 +13,7 @@ import { TP_AGEING_ROWS, TP_AGEING_BUCKETS, tpPeriodView } from '../components/N
 import { TR_AGEING_ROWS, TR_AGEING_BUCKETS, trPeriodView } from '../components/Notes/TradeReceivablesAgingForm'
 import { NC_AGEING_TITLE, NC_AGEING_BLOCKS, NC_AGEING_CATEGORIES, ncAgeingResolve } from './tradeReceivablesNonCorp'
 import { INVESTMENT_REGISTRY } from './investmentWorkbook'
+import { DIRECTOR_LOANS_ROWS, directorLoansResolve, hasDirectorLoans } from './directorLoans'
 
 const num = (v) => parseFloat(v) || 0
 // An entry's match(title, constitution) may also depend on the Auditee's constitution
@@ -319,6 +320,34 @@ export const FILL_DETAILS_REGISTRY = [
       return any ? { ncAgeing } : {}
     },
   },
+
+  // ── T-086 Long-term / Short-term loans and advances (Company): due from directors, officers, firms and
+  // private companies. One sheet per note (the sheet name carries Long / Short), rows matched back by label.
+  ...['Long', 'Short'].map(lt => ({
+    key: `director-loans-${lt.toLowerCase()}`,
+    match: (t, c) => hasDirectorLoans(c, t) && String(t).trim().toLowerCase().startsWith(lt.toLowerCase()),
+    sheetName: `${lt}-term Loans Directors`,
+    headerRow: ['Particulars', 'Current Year', 'Previous Year'],
+    toRows(details) {
+      const v = details?.directorLoans ? directorLoansResolve(details.directorLoans) : null
+      return DIRECTOR_LOANS_ROWS.map(r => [r.label, v ? (v.cy[r.key] || '') : '', v ? (v.py[r.key] || '') : ''])
+    },
+    fromRows(rows) {
+      const byLabel = new Map(DIRECTOR_LOANS_ROWS.map(r => [r.label.trim().toLowerCase(), r.key]))
+      const out = { cy: {}, py: {} }
+      let any = false
+      for (const r of rows) {
+        const key = byLabel.get((r[0] || '').toString().trim().toLowerCase())
+        if (!key) continue
+        out.cy[key] = num((r[1] ?? '').toString().replace(/,/g, ''))
+        out.py[key] = num((r[2] ?? '').toString().replace(/,/g, ''))
+        any = true
+      }
+      if (!any) return {}
+      const v = directorLoansResolve(out)
+      return { directorLoans: { cy: v.cy, py: v.py } }
+    },
+  })),
 
   // ── Trade Payables — Ageing Schedule + MSME Disclosure combined ─────────
   // Mirrors the live form's combined { ageing, msme } shape (both saved via

@@ -2,6 +2,7 @@
 // (utils/simpleTbFormat.js): one workbook, "Trial Balance" and "Groups" sheets.
 // The rows go through the same builder and save as the Tally Excel route
 // (buildTBRowsFromTally, tb:uploadTally).
+import BranchSelect, { BRANCH_REQUIRED_MESSAGE } from '../shared/BranchSelect'
 import React, { useState } from 'react'
 import { useModalKeys } from '../../hooks/useModalKeys'
 import { buildTBRowsFromTally } from '../../utils/tallyParsers'
@@ -49,6 +50,7 @@ export default function SimpleTbUploadModal({ entity, entityId, hasBranches, con
 
   const handleUpload = async () => {
     if (!ready || busy) return
+    if (hasBranches && !branchName) { window.alert(BRANCH_REQUIRED_MESSAGE); return }
     const proceed = await confirmVersion(periodPick.entityPeriodId, branchName || '')
     if (!proceed) return
     setBusy(true); setError('')
@@ -78,13 +80,7 @@ export default function SimpleTbUploadModal({ entity, entityId, hasBranches, con
         </div>
         <div className="space-y-3">
           <FinancialPeriodPicker entity={entity} value={periodPick} onChange={setPeriodPick} allowCustom={false} required label="Financial Year" />
-          {hasBranches && (
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Branch Name <span className="text-gray-400">(e.g. Head Office, Delhi Branch)</span></label>
-              <input type="text" value={branchName} onChange={e => setBranchName(e.target.value)} placeholder="e.g. Head Office"
-                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-            </div>
-          )}
+          {hasBranches && <BranchSelect entityId={entityId} value={branchName} onChange={setBranchName} />}
           <div className="border border-gray-200 rounded p-3 bg-gray-50">
             <label className="block text-xs font-semibold text-blue-900 mb-1">Workbook with the "Trial Balance" and "Groups" sheets</label>
             <input type="file" accept=".xlsx,.xls" onChange={handleFile} className="text-xs" />

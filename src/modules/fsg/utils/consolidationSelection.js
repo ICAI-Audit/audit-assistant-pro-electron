@@ -8,6 +8,7 @@
 // The CA's choice is remembered per Auditee and Financial Year in this browser profile; every screen and export reads it from here.
 import React from 'react'
 import { fsgApi } from '../api.js'
+import { latestPerBranch } from './tbVersions.js'
 
 // (guarded: the test harnesses bundle this file with a React stand-in that has no createContext)
 export const ConsolidationContext = typeof React.createContext === 'function' ? React.createContext(null) : null
@@ -36,9 +37,10 @@ export function chooseConsolidation({ tbs, periods, entityPeriodId, override }) 
   const epId = entityPeriodId != null ? entityPeriodId : (pers[0] ? pers[0].id : null)
   const idx = pers.findIndex(p => p.id === epId)
   const prior = idx >= 0 ? pers[idx + 1] : null
-  const ofPeriod = (id) => list.filter(t => id != null && t.entity_period_id === id).map(t => t.id)
+  // T-087: the latest version of each branch only - adding A_v1 and A_v2 together counted branch A twice.
+  const ofPeriod = (id) => latestPerBranch(list.filter(t => id != null && t.entity_period_id === id)).map(t => t.id)
   let cyDefault = ofPeriod(epId)
-  if (!cyDefault.length) cyDefault = list.filter(t => t.entity_period_id == null).map(t => t.id)   // old Trial Balances not tied to a year
+  if (!cyDefault.length) cyDefault = latestPerBranch(list.filter(t => t.entity_period_id == null)).map(t => t.id)   // old Trial Balances not tied to a year
   const pyDefault = prior ? ofPeriod(prior.id) : []
   const known = new Set(list.map(t => t.id))
   const clean = (a) => (Array.isArray(a) ? a.filter(id => known.has(id)) : null)

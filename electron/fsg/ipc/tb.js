@@ -32,6 +32,57 @@ async function assertEntityPeriodUnlocked(entityPeriodId) {
 // three is deleted; the freed number is then reused (lowest first).
 export const TB_VERSION_LIMIT = 3
 
+// T-087 Branch Master. A branch is one name per Auditee, whatever its case or spacing ("Delhi", " delhi ").
+export const cleanBranchName = (name) => String(name ?? '').replace(/\s+/g, ' ').trim()
+// Each branch with the Trial Balances that use it (tb_count) and how many of them sit in a locked or
+// finalised year (locked_count) - the Branch Master screen allows rename / delete from these.
+const SAME_BRANCH = `LOWER(TRIM(COALESCE(t.branch_name, ''))) = LOWER(b.name)`
+export async function listBranchMaster(entityId) {
+  const { rows } = await query(`SELECT b.id, b.name,
+      (SELECT COUNT(*) FROM trial_balances t WHERE t.entity_id = b.entity_id AND ${SAME_BRANCH}) AS tb_count,
+      (SELECT COUNT(*) FROM trial_balances t JOIN entity_periods ep ON ep.id = t.entity_period_id
+         WHERE t.entity_id = b.entity_id AND ${SAME_BRANCH} AND (COALESCE(ep.locked, 0) <> 0 OR COALESCE(ep.is_final, 0) <> 0)) AS locked_count
+    FROM fsg_branches b WHERE b.entity_id = $1 ORDER BY b.name COLLATE NOCASE`, [entityId])
+  return rows.map(r => ({ ...r, tb_count: Number(r.tb_count) || 0, locked_count: Number(r.locked_count) || 0 }))
+}
+async function branchOf(entityId, id) {
+  const hit = (await listBranchMaster(entityId)).find(b => Number(b.id) === Number(id))
+  if (!hit) throw new Error('That branch is not on this Auditee\'s Branch Master.')
+  return hit
+}
+// T-087: rename a branch - its Trial Balances take the new name, so their versions stay together.
+export async function renameBranch(entityId, id, newName) {
+  const name = cleanBranchName(newName)
+  if (!name) throw new Error('Enter the new branch name.')
+  const branch = await branchOf(entityId, id)
+  if (branch.name === name) return { name }
+  const clash = (await listBranchMaster(entityId)).find(b => Number(b.id) !== Number(id) && b.name.toLowerCase() === name.toLowerCase())
+  if (clash) throw new Error(`A branch named "${clash.name}" already exists. Choose another name.`)
+  if (branch.locked_count) throw new Error(`"${branch.name}" has ${branch.locked_count} Trial Balance${branch.locked_count > 1 ? 's' : ''} in a locked or finalised year, so it cannot be renamed. Unlock the year on the Master tab first.`)
+  return runInTransaction(async () => {
+    await query(`UPDATE trial_balances SET branch_name = $1 WHERE entity_id = $2 AND LOWER(TRIM(COALESCE(branch_name, ''))) = LOWER($3)`, [name, entityId, branch.name])
+    await query(`UPDATE fsg_branches SET name = $1 WHERE id = $2 AND entity_id = $3`, [name, id, entityId])
+    return { name }
+  })
+}
+// Only a branch no Trial Balance uses can be deleted (its Trial Balances are deleted on TB > Upload TB first).
+export async function deleteBranch(entityId, id) {
+  const branch = await branchOf(entityId, id)
+  if (branch.tb_count) throw new Error(`"${branch.name}" is used by ${branch.tb_count} Trial Balance${branch.tb_count > 1 ? 's' : ''}, so it cannot be deleted. Delete those Trial Balances on TB > Upload TB first, or rename the branch instead.`)
+  await query(`DELETE FROM fsg_branches WHERE id = $1 AND entity_id = $2`, [id, entityId])
+  return { ok: true }
+}
+// The master's spelling of this branch, adding it when new - used by every upload, so the version count
+// (same year and branch) finds the earlier Trial Balances of the branch.
+export async function canonicalBranch(entityId, name) {
+  const clean = cleanBranchName(name)
+  if (!clean || entityId == null) return clean
+  const { rows: [hit] } = await query(`SELECT name FROM fsg_branches WHERE entity_id = $1 AND name = $2 COLLATE NOCASE`, [entityId, clean])
+  if (hit) return hit.name
+  await query(`INSERT OR IGNORE INTO fsg_branches (entity_id, name) VALUES ($1, $2)`, [entityId, clean])
+  return clean
+}
+
 export async function tbVersionStatus(entityPeriodId, branchName = '') {
   if (!entityPeriodId) return { versions: [], next: 1, full: false, limit: TB_VERSION_LIMIT, yearLabel: '', locked: false }
   const branch = branchName || ''
@@ -107,13 +158,24 @@ export function registerTBHandlers() {
   })
 
   // ── List distinct branches for an entity ──────────────────────────────────
+  // (each Trial Balance of a branch entity; tb_version lets the screens show the branch once with its versions)
   ipcMain.handle('tb:getBranches', async (_, entityId) => {
     const { rows } = await query(
-      `SELECT id, branch_name, period, filename, row_count, entity_period_id FROM trial_balances
+      `SELECT id, branch_name, period, filename, row_count, entity_period_id, tb_version FROM trial_balances
        WHERE entity_id=$1 ORDER BY branch_name, id`,
       [entityId]
     )
     return rows
+  })
+
+  // ── T-087 Branch Master ─────────────────────────────────────────────────────
+  ipcMain.handle('tb:listBranchMaster', async (_, entityId) => listBranchMaster(entityId))
+  ipcMain.handle('tb:renameBranch', async (_, { entityId, id, name } = {}) => ({ ...(await renameBranch(entityId, id, name)), branches: await listBranchMaster(entityId) }))
+  ipcMain.handle('tb:deleteBranch', async (_, { entityId, id } = {}) => { await deleteBranch(entityId, id); return { branches: await listBranchMaster(entityId) } })
+  ipcMain.handle('tb:addBranch', async (_, { entityId, name } = {}) => {
+    const clean = cleanBranchName(name)
+    if (!clean) throw new Error('Enter the branch name.')
+    return { name: await canonicalBranch(entityId, clean), branches: await listBranchMaster(entityId) }
   })
 
   // ── Trial Balance upload ───────────────────────────────────────────────────
@@ -127,6 +189,7 @@ export function registerTBHandlers() {
     // SQLite port: the header + row inserts run as one transaction (file was
     // read and parsed above; only query() is awaited inside).
     return runInTransaction(async () => {
+    branchName = await canonicalBranch(entityId, branchName)
     const tbVersion = await claimTbVersion(entityPeriodId, branchName)
     const { rows: [tb] } = await query(
       `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id, tb_version)
@@ -208,6 +271,7 @@ export function registerTBHandlers() {
     // SQLite port: all inserts below run as one transaction (only query() is
     // awaited inside).
     return runInTransaction(async () => {
+    branchName = await canonicalBranch(entityId, branchName)
     const tbVersion = await claimTbVersion(entityPeriodId, branchName)
     const { rows: [tb] } = await query(
       `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id, tally_closing_stock_total, tally_opening_stock_total, tally_company, pl_closed_to_capital, tb_version)
@@ -590,6 +654,7 @@ export function registerTBHandlers() {
     // SQLite port: all inserts below run as one transaction (only query() is
     // awaited inside).
     return runInTransaction(async () => {
+    branchName = await canonicalBranch(entityId, branchName)
     const tbVersion = await claimTbVersion(entityPeriodId, branchName)
     const { rows: [tb] } = await query(
       `INSERT INTO trial_balances (entity_id, period, filename, row_count, branch_name, entity_period_id, tb_version)
@@ -824,116 +889,9 @@ export function registerTBHandlers() {
     return rows
   })
 
-  // ── Save Journal Entry (multiple Dr/Cr rows, must balance) ────────────────
-  ipcMain.handle('tb:saveJournalEntry', async (_, { tbId, date, entries }) => {
-    // Validate balance
-    const totalDr = entries.filter(e => e.type === 'Dr').reduce((s, e) => s + parseFloat(e.amount), 0)
-    const totalCr = entries.filter(e => e.type === 'Cr').reduce((s, e) => s + parseFloat(e.amount), 0)
-    if (Math.abs(totalDr - totalCr) > 0.01) {
-      throw new Error(`Journal entry not balanced: Dr ${totalDr} vs Cr ${totalCr}`)
-    }
-
-    // Get TB / entity / rule_set info for mapping inserts
-    const { rows: [tbInfo] } = await query(
-      `SELECT tb.id, e.constitution,
-              (SELECT id FROM mapping_rule_sets WHERE is_default=TRUE LIMIT 1) AS rule_set_id
-       FROM trial_balances tb JOIN entities e ON e.id = tb.entity_id WHERE tb.id = $1`,
-      [tbId]
-    )
-    const rsId = tbInfo?.rule_set_id
-    const constitution = tbInfo?.constitution
-
-    for (const e of entries) {
-      const amt = parseFloat(e.amount)
-      // Dr → negative closing_balance, is_deemed_positive=true
-      // Cr → positive closing_balance, is_deemed_positive=false
-      const closingBalance = e.type === 'Dr' ? amt * -1 : amt
-      const isDeemedPositive = e.type === 'Dr'
-
-      // Insert tb_rows entry
-      const { rows: [tbRow] } = await query(
-        `INSERT INTO tb_rows (tb_id, period, name, opening_balance, closing_balance,
-                              is_deemed_positive, upload_nature)
-         VALUES ($1, $2, $3, 0, $4, $5, 'Journal Passed Manually')
-         RETURNING id`,
-        [tbId, date || '', e.ledgerName, closingBalance, isDeemedPositive]
-      )
-
-      // Determine mapping: existing ledger or provided new mapping
-      let m1 = e.mapping1
-      let m2 = e.mapping2
-      let m3 = e.mapping3
-      let alie = null
-
-      if (!e.isNew) {
-        // Try to find existing mapping for a ledger with same name in this TB
-        const { rows: [existing] } = await query(
-          `SELECT mt.mapping1_resultant, mt.mapping2_resultant, mt.mapping3_resultant,
-                  mt.alie, mt.level_format_id
-           FROM mapped_tb mt
-           JOIN tb_rows tr ON tr.id = mt.tb_row_id
-           WHERE tr.tb_id = $1 AND tr.name = $2 AND mt.mapping1_resultant IS NOT NULL
-           ORDER BY mt.id DESC LIMIT 1`,
-          [tbId, e.ledgerName]
-        )
-        if (existing) {
-          m1 = m1 || existing.mapping1_resultant
-          m2 = m2 || existing.mapping2_resultant
-          m3 = m3 || existing.mapping3_resultant
-          alie = existing.alie
-        }
-      }
-
-      // Derive ALIE from LevelFormat if not set
-      if (!alie && m1 && rsId) {
-        const { rows: [lfRow] } = await query(
-          `SELECT alie FROM level_format
-           WHERE rule_set_id = $1 AND level1 = $2 AND alie IS NOT NULL LIMIT 1`,
-          [rsId, m1]
-        )
-        if (lfRow) alie = lfRow.alie
-      }
-
-      // Find level_format_id
-      let lfId = null
-      if (rsId && m1 && m2) {
-        const { rows: [lfRow] } = await query(
-          `SELECT id FROM level_format
-           WHERE rule_set_id = $1 AND level1 = $2 AND level2 = $3
-             ${m3 ? `AND (level3 = $4 OR $4 IN (
-               WITH RECURSIVE split(part, rest) AS (
-                 SELECT NULL, NULLIF(level3, '') || '/'
-                 UNION ALL
-                 SELECT substr(rest, 1, instr(rest, '/') - 1), substr(rest, instr(rest, '/') + 1)
-                 FROM split WHERE rest <> ''
-               )
-               SELECT btrim(part) FROM split WHERE part IS NOT NULL))` : ''}
-           LIMIT 1`,
-          m3 ? [rsId, m1, m2, m3] : [rsId, m1, m2]
-        )
-        if (lfRow) lfId = lfRow.id
-      }
-
-      // Insert mapped_tb entry
-      if (rsId && m1) {
-        await query(
-          `INSERT INTO mapped_tb
-             (tb_id, tb_row_id, rule_set_id, alie,
-              mapping1_resultant, mapping2_resultant, mapping3_resultant,
-              level_format_id, status, confidence, mapped_at, override_note)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'user_approved', 'high', NOW(), $9)
-           ON CONFLICT (tb_id, tb_row_id) DO NOTHING`,
-          [tbId, tbRow.id, rsId, alie, m1, m2, m3, lfId, `Journal Entry dated ${date || 'N/A'}`]
-        )
-      }
-    }
-
-    // Update row_count
-    const { rows: [countRow] } = await query(`SELECT COUNT(*) as cnt FROM tb_rows WHERE tb_id = $1`, [tbId])
-    await query(`UPDATE trial_balances SET row_count = $1 WHERE id = $2`, [parseInt(countRow.cnt), tbId])
-
-    return { inserted: entries.length }
-  })
+  // T-082: the Journal Entry screen and its tb:saveJournalEntry route are removed (owner, 24 November 2026) - adjustments
+  // are made on the Mapped TB. Ledgers an earlier version posted this way ('Journal Passed Manually') stay in their Trial
+  // Balance and keep working (Mapped TB, statements, workings carry-over).
 
   // ── Tally Auto-Import (HTTP XML) ───────────────────────────────────────────
   function loadTallyConfig() {

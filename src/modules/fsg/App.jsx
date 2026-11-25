@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import TopBar from './components/Layout/TopBar'
 import NavTabs, { TOP_SHORTCUTS } from './components/Layout/NavTabs'
 import Master from './components/Master'
+import BranchMaster from './components/BranchMaster'
 import UploadTB from './components/TrialBalance/UploadTB'
 import ActualTBTable from './components/TrialBalance/ActualTBTable'
-import JournalEntryPage from './components/TrialBalance/JournalEntryPage'
 import StockPage from './components/Stock/StockPage'
 import TallyTBUpload from './components/TallyTBUpload'
 import MappingRules from './components/MappingRules'
@@ -45,7 +45,7 @@ const THEME_KEY = 'vera-theme'
 // sections — Auditee Details, Financial Period, Auditor, Signatory, Mapping
 // Rules — each jumping straight to that section (see Master/index.jsx's
 // LEAF_MODAL_TYPE). Trial Balance embeds Upload TB / Actual TB / Mapped TB /
-// Mapped TB (Remarks) / Journal Entry. Mapping groups the mapping workflow —
+// Mapped TB (Remarks). (Journal Entry was removed in T-082: adjustments are made on the Mapped TB.) Mapping groups the mapping workflow —
 // Rectification / Recategorisation (renamed from the old standalone
 // "Categorisation" tab) / Mapped TB / Mapping Rules. "Mapped TB" and
 // "Mapping Rules" are deliberately reachable from two groups (Trial
@@ -60,7 +60,7 @@ const ADJUSTMENT_NOTICE_TABS = new Set([
 // T-035: screens that hold the year's data show the lock banner when that year
 // is locked or final (Mapped TB and Rectification render their own).
 const LOCK_BANNER_TABS = new Set([
-  'Upload TB', 'Actual TB', 'Mapped TB (Remarks)', 'Journal Entry', 'Inventory',
+  'Upload TB', 'Actual TB', 'Mapped TB (Remarks)', 'Inventory',
   'Dep (Books)', 'Dep (Income Tax)', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Reco',
   'Tax Computation', 'Deferred Tax', 'Ratio: Form 26 (Old Name - 3CD)', 'Ratio: Company Additional Disclosure Ratio', 'Ratio: Analytical Ratios', 'ITR: BS', 'ITR: PL', 'ITR: BS Details', 'ITR: PL Details',
   'Check Control', 'Review Financials',
@@ -71,8 +71,8 @@ const TABS = ['Master', 'TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 
 // ICAI VERA: the Auditee is the engagement's client and the Financial Year comes
 // from the engagement, so Master has no Financial Period leaf (T-019).
 const TAB_GROUPS = {
-  'Master': ['Auditee Details', 'Auditor', 'Signatory', 'Mapping Rules'],
-  'TB': ['Upload TB', 'Actual TB', 'Mapped TB', 'Mapped TB (Remarks)', 'Journal Entry'],
+  'Master': ['Auditee Details', 'Auditor', 'Signatory', 'Branch Master', 'Mapping Rules'],
+  'TB': ['Upload TB', 'Actual TB', 'Mapped TB', 'Mapped TB (Remarks)'],
   'Mapping': ['Rectification / Recategorisation', 'Mapped TB', 'Mapping Rules'],
   // T-036: Dep (Comp) shown as Dep (Books), Dep (IT) as Dep (Income Tax); Dep (Old) removed.
   'Dep': ['Dep (Books)', 'Dep (Income Tax)'],
@@ -474,6 +474,9 @@ export default function App({ context }) {
             activeLeaf={activeTab}
           />
         )
+      // T-087: the branches of an Auditee with branches (rename / delete); the upload screens' Branch list
+      case 'Branch Master':
+        return <BranchMaster entity={entity} onChanged={refreshBranchTBList} />
       case 'Upload TB':
         return (
           <UploadTB
@@ -489,14 +492,6 @@ export default function App({ context }) {
           <ActualTBTable
             entity={entity}
             activeTB={activeTB}
-          />
-        )
-      case 'Journal Entry':
-        return (
-          <JournalEntryPage
-            entity={entity}
-            activeTB={activeTB}
-            activeRsId={activeRsId}
           />
         )
       case 'Inventory':
@@ -863,7 +858,7 @@ export default function App({ context }) {
 
       {dbOk && <NavTabs tabs={TABS} groups={TAB_GROUPS} active={activeTab} onChange={setActiveTab} openRequest={menuRequest} />}
 
-      {dbOk && !entity?.has_branches && noTBForPeriod && !['Upload TB', 'Auditee Details', 'Auditor', 'Signatory', 'Mapping Rules'].includes(activeTab) && (
+      {dbOk && !entity?.has_branches && noTBForPeriod && !['Upload TB', 'Auditee Details', 'Auditor', 'Signatory', 'Branch Master', 'Mapping Rules'].includes(activeTab) && (
         <div className="flex items-center gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-sm shrink-0">
           <span>No Trial Balance uploaded yet for {entityPeriods.find(p => p.id === currentEntityPeriodId)?.year_label || 'this Financial Year'}.</span>
           <button

@@ -12,6 +12,23 @@ export function tbVersionSuffix(tb) {
   return Number.isInteger(v) && v > 0 ? `_v${v}` : ''
 }
 
+// T-087: an Auditee with branches holds up to three versions of each branch's Trial Balance per year. These
+// group them so a branch is shown (and consolidated) once, with its versions under it.
+const branchKey = (t) => `${t?.entity_period_id ?? ''}|${String(t?.branch_name || '').trim().toLowerCase()}`
+const newer = (a, b) => (Number(a.tb_version) || 0) - (Number(b.tb_version) || 0) || a.id - b.id
+/** [{ key, branch, tbs (oldest version first), latest }] in the order the branches first appear. */
+export function groupBranchVersions(tbs) {
+  const groups = new Map()
+  for (const t of tbs || []) {
+    const k = branchKey(t)
+    if (!groups.has(k)) groups.set(k, { key: k, branch: t.branch_name || '', tbs: [] })
+    groups.get(k).tbs.push(t)
+  }
+  return [...groups.values()].map(g => { const sorted = [...g.tbs].sort(newer); return { ...g, tbs: sorted, latest: sorted[sorted.length - 1] } })
+}
+/** The latest version of each branch (and year): what the Consolidated view adds together by default. */
+export const latestPerBranch = (tbs) => groupBranchVersions(tbs).map(g => g.latest)
+
 /** The name a Trial Balance is shown by: "2024-25_v2 [Head Office]". */
 export function tbDisplayName(tb) {
   if (!tb) return ''
