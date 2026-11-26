@@ -1,7 +1,7 @@
 import { ipcMain, getRegisteredHandlers } from '../ipc-registry.js'
 import { query } from '../db/client.js'
 import { noteStore } from '../db/noteStore.js'
-import { investmentKind, investmentLedgerKey, investmentSubclass, validateInvestmentInput } from '../../../src/modules/fsg/utils/investments.js'
+import { investmentKind, investmentLedgerKey, investmentSubclass, validateInvestmentInput } from '../shared/investments.js'
 
 async function context({ entityPeriodId, tbId }) {
   const { rows: [ep] } = await query('SELECT * FROM entity_periods WHERE id=$1', [entityPeriodId])

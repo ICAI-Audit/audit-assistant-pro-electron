@@ -14,6 +14,7 @@ build
 electron-dist
 *.local
 electron-dist
+dist-electron
 
 # Editor directories and files
 .vscode/*
