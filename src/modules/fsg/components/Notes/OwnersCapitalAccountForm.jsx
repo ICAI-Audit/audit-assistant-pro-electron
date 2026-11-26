@@ -541,7 +541,7 @@ export default function OwnersCapitalAccountForm({
 
   return (
     <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 9999 }}>
-      <div className="modal-box overflow-hidden flex flex-col" style={{ maxWidth: '1400px', width: '97vw', maxHeight: '94vh' }} onClick={e => e.stopPropagation()}>
+      <div className="modal-box overflow-hidden flex flex-col" style={{ maxWidth: 'calc(87.5rem * var(--fsr-scale))', width: '97%', maxHeight: '94%' }} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-gray-200 pb-3 mb-3 shrink-0">
           <div>
             <h2 className="text-base font-bold" style={{ color: 'var(--color-primary)' }}>

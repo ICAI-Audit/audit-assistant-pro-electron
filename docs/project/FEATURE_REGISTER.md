@@ -49,7 +49,7 @@ The originally uncommitted Permanent File work described in the earlier handoff 
 
 ## F-001 startup build label update (14 November 2026)
 
-After fast-forwarding local `main` to `origin/main` at `6e5da5e`, the shared login/header label identifies the 14 November snapshot and PR #111 PDF Tools / PR #112 GSTIN lookup and bulk validation. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests and build validation are recorded in [T-032 status](CURRENT_STATUS.md#t-032-sync-latest-main-and-refresh-startup-label-14-november-2026).
+After fast-forwarding local `main` to `origin/main` at `6e5da5e`, the shared login/header label identifies the 14 November snapshot and PR #111 PDF Tools plus consented PR #112 GSTIN lookup and bulk validation. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests and build validation are recorded in [T-032 status](CURRENT_STATUS.md#t-032-sync-latest-main-and-refresh-startup-label-14-november-2026).
 
 ## F-030 PDF Tools update (14 November 2026)
 
@@ -58,6 +58,8 @@ PDF Tools phase 1 (F-030, task T-031) was committed on `feat/pdf-tools` (base `8
 ## F-001 startup build label update (13 November 2026)
 
 After fast-forwarding local `main` to `origin/main` at `99324ea`, the shared login/header label identifies the pulled snapshot date and PR #109 CAAT Tools / PR #110 FSG and RSF updates. Published on `origin/main` in `bf0b5bf`. The tooltip retains the build-time branch, commit and tracked-local-change flag. This is static snapshot metadata only: it does not poll GitHub or prove that another installed build is current. Focused label regression tests pass; desktop visual fit and owner UAT are not established. See [T-030 status](CURRENT_STATUS.md#t-030-main-pull-status-on-login-13-november-2026).
+
+F-007/F-009 and shared shell, 27 November 2026 (T-088, branch `ui-redesign`, D-016): no Master tab; the top-bar Auditee button opens one Auditee page (details with PAN/CIN/address, financial periods with Lock/Unlock, auditors, signing authorities, mapping rules, Branch Master) that fills the screen. Edit Auditee saves name, constitution, address, PAN and CIN/LLPIN to the VERA client record. Tabs show full names, falling back to Cash Flow / Checks only where the bar would scroll. Upload Trial Balance shows the existing Trial Balance with a regrouped toolbar. Rectification header in two rows. Display density in FSR Tools. Sidebar fills the window height without scrolling. Compliance Applicability and Materiality > Risk Assessment fit one screen (UI only). Owner UAT pending.
 
 F-009 updates, 23 November 2026, second list (on `FSG-AM`, pull request to main pending): T-075 Dr / Cr beside the amount in Rectification / Recategorisation. T-076 shareholding % on Excel upload over every Equity class, with promoters' % change. T-077 partners' share of profit divided by the share %. T-078 the P&L Deferred tax line points to the Balance Sheet Deferred tax note when it has a figure. T-079 Dep (Books) compares depreciation for the year with the P&L. Implemented; owner UAT pending.
 
@@ -120,6 +122,22 @@ All rows below have runtime verification pending unless stated otherwise. Eviden
 
 PR #108 is merged: shared GSTIN normalization/validation is used by GST master/bulk entry and tax-audit registration rows; appointment-letter GSTIN entry and draft restore normalize uppercase. Related features: F-005, F-019 and F-023. Helper tests pass; this is not end-to-end persistence or statutory acceptance evidence. The F-001 login page and common header share the updated build label (`src/config/buildMessage.ts`, `src/components/layout/BuildInfoLabel.tsx`): `Code baseline: 11 November 2026`, `Update: GSTIN normalization and validation (PR #108)`, with source branch and build-time commit in the tooltip. Five label tests pass, including the exact displayed update and both mounting points. Desktop visual fit and owner UAT remain open. See [current validation](CURRENT_STATUS.md#t-023-gstin-merge-and-startup-label-11-november-2026).
 
+## T-024 merged update (14 November 2026)
+
+PR #112 merged the consented GSTIN lookup and bulk-validation work to `main` at `6e5da5e`. The shared login/header label shows `Repository sync: origin/main (14 November 2026)` and `Update: Consented GSTIN lookup and bulk validation (PR #112)`. The label remains a build-time identifier, not a live GitHub check. Provider confirmation, runtime flow and owner UAT remain pending; see [current status](CURRENT_STATUS.md#t-024-consented-gstin-lookup-and-bulk-validation-11-november-2026).
+
+## T-088 scoped FSR UI refresh (26 November 2026)
+
+For F-007/F-009, the upload format chooser has a two-column card presentation,
+and approved Actual TB, A/c Policy and Review Financials copy/duplicate
+changes are in progress, along with Master cards/dialogs, FSR header/tab,
+Actual TB, Mapped TB with Remarks and Inventory presentation.
+Existing operations are intended to remain unchanged. The inventory and duplicate audit are incomplete;
+the user chose a rolling approach that inventories each area before changing it.
+See [parity evidence](../ui-refresh/feature-parity.md) and
+[handoff](SESSION_HANDOFF.md#t-088-financial-statement-review-ui-refresh-26-november-2026).
+This is not owner UAT or proof of complete feature parity.
+
 | ID | Capability and user purpose | Implementation evidence | Status and next verification |
 | --- | --- | --- | --- |
 | F-001 | Local account creation and sign-in | src/pages/Auth.tsx; src/contexts/AuthContext.tsx; electron/main.cjs | Code present; verify first admin, staff, inactive account, incorrect password and restart. Remembered email is not a remembered authenticated session |
@@ -146,7 +164,7 @@ PR #108 is merged: shared GSTIN normalization/validation is used by GST master/b
 | F-022 | GSTZen login/session and GSTR-1 retrieval | src/services/gstzen-api.ts; src/pages/GstzenIntegration.tsx; src/pages/Gstr1Dashboard.tsx; electron/main.cjs | Separate from GST Number Master lookup. Code present; external connectivity, credentials, pagination and error handling need integration tests |
 | F-023 | Audit calculators and GSTIN tools | src/pages/AuditTools.tsx; src/components/audit; src/lib/gstinSpreadsheet.ts; electron/gstin-lookup.cjs; electron/main.cjs | GST Number Master no longer requires GSTZen creation. Single/bulk lookups require explicit consent and validate locally before the fixed e-waybill.in request; template and provider-confirmed result downloads use CSV extensions. Taxpayer type derives from character 14 per the supplied chart. Synthetic tests cover parsing, formula-safe CSV export, special layouts and IPC gates; successful provider confirmation and owner UAT remain unverified. Calculator checks remain outstanding |
 | F-024 | Feedback and administrative views | src/pages/Feedback.tsx; src/pages/AdminDashboard.tsx; src/pages/AdminSettings.tsx | UI route guards remain secondary; active backend IPC now enforces authenticated and role/engagement-constrained operations for tested paths. Final role matrix decisions (`viewer`/`user`) remain open; see SECURITY_AND_AUDIT.md |
-| F-025 | Desktop launch, installation and update | electron/run-electron.cjs; electron/main.cjs; electron/auto-updater.cjs; .github/workflows/release.yml | Two clean Windows installs with native rebuild and synthetic SQLite/bcrypt Electron smoke passed on Node.js 24.12.0/npm 11.6.2; Electron launch, installer, other platforms and feed owner remain unverified |
+| F-025 | Desktop launch, installation and update | electron/run-electron.cjs; electron/main.cjs; electron/auto-updater.cjs; .github/workflows/release.yml | Development main-process startup with a dedicated synthetic userData path verified on Windows; native SQLite/bcrypt and 114-table schema initialization passed. The Electron process exited after startup and `npm run electron:dev` returned 1; a usable running window is not verified. Two clean Windows installs with native rebuild and synthetic native smoke passed on Node.js 24.12.0/npm 11.6.2. Production launch, installer, other platforms and feed owner remain unverified |
 | F-026 | Backup and restore of the complete audit file | Database/file/localStorage stores identified in architecture | Not established; define consistent backup, restoration and failure recovery before claiming recoverability |
 | F-027 | AI grounded guidance and anomaly detection | Supplied AI blueprint; no verified provider and RAG execution path in reviewed runtime | Not established; scope decision and evaluation needed before implementation |
 | F-028 | Shared session knowledge and repeatable workflows | AGENTS.md; CLAUDE.md; .github/copilot-instructions.md; docs/project | Documentation implemented in this change; structural checks recorded in CURRENT_STATUS.md; actual IDE loading requires per-client smoke test |

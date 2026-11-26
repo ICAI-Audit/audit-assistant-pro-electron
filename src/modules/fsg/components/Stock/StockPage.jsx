@@ -198,24 +198,25 @@ export function StockTable({ opening, closing, pyOpening, pyClosing, heads, pyHe
       step="0.01"
       value={value[type] || ''}
       onChange={e => onValue(section, type, e.target.value)}
-      className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-right font-mono focus:ring-2 focus:ring-blue-400 focus:outline-none"
+      aria-label={`${type} ${{ opening: 'current year opening', closing: 'current year closing', pyOpening: 'previous year opening', pyClosing: 'previous year closing' }[section]}`}
+      className="w-full border border-slate-300 rounded-md px-2 py-1 text-sm text-right tabular-nums focus:ring-2 focus:ring-rose-800 focus:outline-none"
       placeholder="0.00"
     />
   )
   return (
-    <table className="w-full text-sm border border-gray-200 rounded mb-3">
+    <table className="w-full text-sm border border-slate-200 rounded mb-3">
       <thead>
-        <tr className="bg-blue-50">
-          <th rowSpan={2} className="text-left py-1.5 px-3 font-semibold text-blue-900 align-bottom border-b border-gray-200">Types of Inventory</th>
-          <th colSpan={2} className="text-center py-1 px-2 font-semibold text-blue-900 border-b border-l border-gray-200">Current Year</th>
-          <th colSpan={2} className="text-center py-1 px-2 font-semibold text-blue-900 border-b border-l border-gray-200">Previous Year</th>
-          <th rowSpan={2} className="text-left py-1.5 px-3 font-semibold text-blue-900 align-bottom border-b border-l border-gray-200 w-[30%]">Adjusted in (P&amp;L)</th>
+        <tr className="bg-slate-50">
+          <th rowSpan={2} className="text-left py-1.5 px-3 font-semibold text-slate-700 align-bottom border-b border-slate-200">Types of Inventory</th>
+          <th colSpan={2} className="text-center py-1 px-2 font-semibold text-slate-700 border-b border-l border-slate-200">Current Year</th>
+          <th colSpan={2} className="text-center py-1 px-2 font-semibold text-slate-700 border-b border-l border-slate-200">Previous Year</th>
+          <th rowSpan={2} className="text-left py-1.5 px-3 font-semibold text-slate-700 align-bottom border-b border-l border-slate-200 w-[30%]">Adjusted in (P&amp;L)</th>
         </tr>
-        <tr className="bg-blue-50">
-          <th className="text-right py-1 px-2 font-semibold text-blue-900 border-l border-gray-200 w-[11%]">Opening Balance</th>
-          <th className="text-right py-1 px-2 font-semibold text-blue-900 w-[11%]">Closing Balance</th>
-          <th className="text-right py-1 px-2 font-semibold text-blue-900 border-l border-gray-200 w-[11%]">Opening Balance</th>
-          <th className="text-right py-1 px-2 font-semibold text-blue-900 w-[11%]">Closing Balance</th>
+        <tr className="bg-slate-50">
+          <th className="text-right py-1 px-2 font-semibold text-slate-700 border-l border-slate-200 w-[11%]">Opening Balance</th>
+          <th className="text-right py-1 px-2 font-semibold text-slate-700 w-[11%]">Closing Balance</th>
+          <th className="text-right py-1 px-2 font-semibold text-slate-700 border-l border-slate-200 w-[11%]">Opening Balance</th>
+          <th className="text-right py-1 px-2 font-semibold text-slate-700 w-[11%]">Closing Balance</th>
         </tr>
       </thead>
       <tbody>
@@ -558,19 +559,19 @@ export default function StockPage({ entity, activeTB, prevTB, onPrevTBChange }) 
   return (
     <div className="flex flex-col h-full p-4 overflow-y-auto">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2" style={{ maxWidth: '1320px' }}>
-        <h2 className="text-base font-bold text-blue-900">Opening & Closing Stock</h2>
+        <h2 className="text-base font-semibold text-slate-900">Opening & Closing Stock</h2>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={downloadBlankTemplate}
-            className="px-3 py-1.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-100 transition">
+            className="px-3 py-1.5 text-xs border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition">
             ↓ Blank Template
           </button>
           <button onClick={downloadFilled}
-            className="px-3 py-1.5 text-xs border border-green-300 rounded text-green-700 hover:bg-green-50 transition"
+            className="px-3 py-1.5 text-xs border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition"
             title="Download the current entries — keep this before re-uploading a fresh Trial Balance">
             ↓ Download Filled
           </button>
           <button onClick={uploadFilled}
-            className="px-3 py-1.5 text-xs border border-blue-300 rounded text-blue-700 hover:bg-blue-50 transition"
+            className="px-3 py-1.5 text-xs border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition"
             title="Fill in the on-screen figures from an Excel file, then Save Stock Entries to persist">
             ↑ Upload from Excel
           </button>

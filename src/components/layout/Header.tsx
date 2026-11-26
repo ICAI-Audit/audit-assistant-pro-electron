@@ -23,6 +23,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
 import { useAutoUpdater } from '@/hooks/useAutoUpdater';
 import { VersionBadge } from '@/components/UpdateNotifications';
+import { fsrShellBridge, useFsrShell } from '@/lib/fsrShellBridge';
 
 export function Header() {
   const { profile, role, signOut } = useAuth();
@@ -30,6 +31,8 @@ export function Header() {
   const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotifications();
   const { currentVersion, isBeta, checkForUpdates, isCheckingForUpdates } = useAutoUpdater();
+  // Context and period list published by Financial Statement Review (it has no page-header band of its own).
+  const fsr = useFsrShell();
 
   const handleSignOut = async () => {
     if (!(await clearEngagement('sign-out'))) return;
@@ -75,28 +78,56 @@ export function Header() {
   const otherEngagements = engagements.filter(e => e.id !== currentEngagement?.id);
 
   return (
-    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between gap-4 px-6">
+    <header data-shell="topbar" className="h-[52px] border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between gap-2 px-3">
       {/* Left: Current Engagement */}
-      <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <BuildInfoLabel compact className="hidden md:block shrink-0 px-2 py-1 text-[11px] leading-tight" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 text-foreground hover:bg-muted max-w-xs">
+            <Button variant="ghost" className="h-auto min-w-0 gap-1 py-1 text-foreground hover:bg-muted max-w-xs px-2">
               <Briefcase className="h-4 w-4 text-primary shrink-0" />
-              <div className="text-left truncate">
-                {currentEngagement ? (
-                  <>
-                    <span className="font-medium truncate">{currentEngagement.client_name}</span>
-                    <span className="text-muted-foreground ml-1">- {currentEngagement.financial_year}</span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">No engagement selected</span>
+              <div className="min-w-0 text-left leading-tight">
+                <div className="truncate">
+                  {currentEngagement ? (
+                    <>
+                      <span className="font-medium truncate">{currentEngagement.client_name}</span>
+                      <span className="text-muted-foreground ml-1">- {currentEngagement.financial_year}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">No engagement selected</span>
+                  )}
+                </div>
+                {fsr.active && fsr.context && (
+                  <div className="truncate text-[11px] text-muted-foreground" data-testid="fsr-context">{fsr.context}</div>
                 )}
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-80">
+            {fsr.active && fsr.periods.length > 0 && (
+              <>
+                <DropdownMenuLabel>Financial period</DropdownMenuLabel>
+                {fsr.periods.map((period) => (
+                  <DropdownMenuItem
+                    key={String(period.id)}
+                    onClick={() => fsrShellBridge.selectPeriod(period.id)}
+                    className="cursor-pointer"
+                    data-testid="fsr-period-option"
+                  >
+                    <div className="flex w-full items-center justify-between gap-3">
+                      <span>
+                        <span className="font-medium">{period.label}</span>{' '}
+                        <span className="text-xs text-muted-foreground">{period.range}</span>
+                        {period.locked && <span className="ml-1 text-xs text-muted-foreground">(locked)</span>}
+                      </span>
+                      {period.id === fsr.selectedPeriodId && <Check className="h-4 w-4 shrink-0" aria-label="Selected" />}
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuLabel>Switch Engagement</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <ScrollArea className="max-h-64">
@@ -131,35 +162,21 @@ export function Header() {
       </div>
 
       {/* Center: Search */}
-      <div className="flex-1 max-w-xl mx-8">
+      <div className="min-w-[140px] flex-1 max-w-xl mx-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search evidence, notes..."
+            aria-label="Search evidence and notes"
             className="pl-10 bg-muted/50 border-border focus:bg-background"
           />
         </div>
       </div>
 
       {/* Right: Version, Updates & Actions */}
-      <div className="flex items-center gap-3">
-        {/* Version badge */}
-        <VersionBadge version={currentVersion || 'â€”'} isBeta={isBeta} />
-
-        {/* Manual update check button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={checkForUpdates}
-          disabled={isCheckingForUpdates}
-          title="Check for updates"
-        >
-          <Download className="h-4 w-4" />
-          <span className="hidden sm:inline">
-            {isCheckingForUpdates ? 'Checkingâ€¦' : 'Check for updates'}
-          </span>
-        </Button>
+      <div className="flex shrink-0 items-center gap-1">
+        {/* Slot for the controls a module wants in the top bar (Financial Statement Review renders its Auditee and icon buttons here) */}
+        <div id="vera-header-actions" className="flex items-center gap-1" />
 
         {/* Other header actions */}
         {/* Keyboard Shortcuts Button */}
@@ -172,13 +189,14 @@ export function Header() {
             window.dispatchEvent(new KeyboardEvent('keydown', { key: '/', ctrlKey: true }));
           }}
           title="Keyboard Shortcuts (Ctrl+/)"
+          aria-label="Keyboard shortcuts"
         >
           <Keyboard className="h-5 w-5" />
         </Button>
 
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button variant="ghost" size="icon" className="relative" aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
               <Bell className="h-5 w-5 text-muted-foreground" />
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 h-4 w-4 bg-destructive rounded-full text-[10px] text-destructive-foreground flex items-center justify-center font-medium">
@@ -297,6 +315,14 @@ export function Header() {
               <Settings className="mr-2 h-4 w-4" />
               Settings
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={checkForUpdates} disabled={isCheckingForUpdates}>
+              <Download className="mr-2 h-4 w-4" />
+              {isCheckingForUpdates ? 'Checking for updates...' : 'Check for updates'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <div className="px-2 py-1.5" data-testid="app-version">
+              <VersionBadge version={currentVersion || '-'} isBeta={isBeta} />
+            </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />

@@ -104,7 +104,7 @@ export default function TradeReceivablesAgeingNonCorpForm({ tbId, entityId, useE
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl max-h-[92%] overflow-y-auto">
         <div className="sticky top-0 z-10 bg-blue-600 text-white px-6 py-3">
           <h2 className="text-base font-bold">Note {noteNum}: {noteTitle}</h2>
           <p className="text-xs text-blue-100 mt-0.5">{NC_AGEING_TITLE}</p>

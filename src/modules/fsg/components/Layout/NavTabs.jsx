@@ -50,7 +50,21 @@ const ITEM_SHORTCUTS = {
   'Format': { 'Format: Proprietorship': 'R', 'Format: Partnership': 'A', 'Format: LLP': 'L', 'Format: Company': 'C' },
 }
 
-const shown = (label) => label.replace(/^[^:]+:\s*/, '')
+// Display names (T-088, owner request 27 Nov 2026). Internal keys ('TB', 'BS', ...) are unchanged: App.jsx, shortcuts and
+// tests use the key (data-key). Full names are shown whenever the bar has room; when it would have to scroll, a few long
+// names fall back to COMPACT_LABEL (the full name stays in the tooltip and the accessible name).
+export const TAB_LABEL = {
+  'TB': 'Trial Balance', 'Dep': 'Depreciation', 'BS': 'Balance Sheet', 'PL': 'Profit & Loss',
+  'CFS': 'Cash Flow Statement', 'Annex': 'Annexures',
+}
+const COMPACT_LABEL = { ...TAB_LABEL, 'CFS': 'Cash Flow', 'Check Control': 'Checks' }
+export const ITEM_LABEL = {
+  'Upload TB': 'Upload Trial Balance', 'Actual TB': 'Actual Trial Balance', 'Mapped TB': 'Mapped Trial Balance',
+  'Mapped TB (Remarks)': 'Mapped Trial Balance (Remarks)', 'Dep (Books)': 'Depreciation (Books)',
+  'Dep (Income Tax)': 'Depreciation (Income Tax)',
+}
+export const labelOf = (key) => TAB_LABEL[key] || ITEM_LABEL[key] || key
+const shown = (label) => labelOf(label).replace(/^[^:]+:\s*/, '')
 
 // The label with its key underlined — a single inline span so it behaves as one flex item.
 function KeyLabel({ text, k }) {
@@ -66,6 +80,15 @@ function KeyLabel({ text, k }) {
   )
 }
 
+// Small chevron for tabs that open a menu (decorative; the button carries aria-haspopup / aria-expanded).
+function Chevron({ open }) {
+  return (
+    <svg aria-hidden="true" className={`w-3 h-3 opacity-60 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4.5 6 7.5 9 4.5" />
+    </svg>
+  )
+}
+
 const typing = () => {
   const el = document.activeElement
   const tag = (el?.tagName || '').toLowerCase()
@@ -78,6 +101,37 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
   const dropdownRef = useRef(null)
   const closeTimerRef = useRef(null)
   const [openGroup, setOpenGroup] = useState(null)
+  const [compact, setCompact] = useState(false)
+  const fullWidthRef = useRef(0)
+
+  // Full names when they fit; compact names only when the full bar would scroll (measured, so it follows the window,
+  // the VERA sidebar and the FSR scale).
+  useEffect(() => {
+    const nav = navRef.current
+    if (!nav || typeof ResizeObserver === 'undefined') return undefined
+    const check = () => setCompact((was) => {
+      if (!was) { fullWidthRef.current = nav.scrollWidth; return nav.scrollWidth > nav.clientWidth + 1 }
+      return fullWidthRef.current > nav.clientWidth + 1
+    })
+    const ro = new ResizeObserver(check)
+    ro.observe(nav)
+    check()
+    return () => ro.disconnect()
+  }, [])
+
+  // Access-key underlines (the <u> in the labels) show only while Alt is held: the module root and its portal root get .fsr-alt.
+  useEffect(() => {
+    const set = (on) => {
+      navRef.current?.closest('.fsg-root')?.classList.toggle('fsr-alt', on)
+      getPortalRoot()?.classList.toggle('fsr-alt', on)
+    }
+    const onKey = (e) => { if (e.key === 'Alt') set(e.type === 'keydown') }
+    const onBlur = () => set(false)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKey)
+    window.addEventListener('blur', onBlur)
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey); window.removeEventListener('blur', onBlur); set(false) }
+  }, [])
   const [openSub, setOpenSub] = useState(null)   // a dropdown item that is itself a group (Features > Format)
   const [hi, setHi] = useState(0)                // the highlighted item of the list the keyboard is in
   const [dropdownPos, setDropdownPos] = useState(null) // { left, top }
@@ -206,7 +260,7 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
   const subOpensLeft = !!dropdownPos && typeof window !== 'undefined' && dropdownPos.left + 240 + 288 > window.innerWidth - 8
   const itemCls = (isActive, isHi) =>
     `w-full text-left px-4 py-2 text-sm transition flex items-center justify-between ${
-      isHi ? 'bg-blue-100 text-blue-900' : isActive ? 'bg-blue-50 text-blue-800 font-semibold' : 'hover:bg-blue-50 text-gray-800'
+      isHi ? 'bg-slate-100 text-slate-900' : isActive ? 'bg-slate-50 text-slate-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
     }`
 
   return (
@@ -214,7 +268,7 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
       ref={navRef}
       role="tablist"
       aria-label="Main navigation"
-      className="relative flex items-end gap-0 bg-white border-b border-blue-100 px-4 shrink-0 overflow-x-auto"
+      className="relative flex items-stretch gap-0.5 bg-white border-b border-slate-200 px-3 h-10 shrink-0 overflow-x-auto"
     >
       {tabs.map((tab, idx) => {
         const children = groups?.[tab]
@@ -229,17 +283,18 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
             aria-haspopup={!!children}
             aria-expanded={children ? openGroup === tab : undefined}
             tabIndex={topActive ? 0 : -1}
-            title={`${tab} (Ctrl+Shift+${key || '?'})`}
+            data-key={tab}
+            aria-label={labelOf(tab)}
+            title={`${labelOf(tab)} (Ctrl+Shift+${key || '?'})`}
             onClick={() => handleTopClick(tab, idx)}
             onMouseEnter={() => children && openGroupAt(tab, idx)}
             onMouseLeave={() => children && scheduleClose()}
             onKeyDown={(e) => handleKeyDown(e, idx)}
-            className={`px-2 py-2.5 text-[13px] whitespace-nowrap transition-all duration-150 flex items-center gap-1
-              focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset
+            className={`fsr-tab ${compact ? 'px-1.5' : 'px-2.5'} text-[13px] whitespace-nowrap transition-colors duration-150 flex items-center gap-1
               ${topActive ? 'tab-active' : 'tab-inactive'}`}
           >
-            <KeyLabel text={tab} k={key} />
-            {children && <span className="text-[9px] opacity-70">{openGroup === tab ? '▴' : '▾'}</span>}
+            <KeyLabel text={(compact ? COMPACT_LABEL[tab] : TAB_LABEL[tab]) || tab} k={key} />
+            {children && <Chevron open={openGroup === tab} />}
           </button>
         )
       })}
@@ -264,12 +319,13 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
                   onMouseEnter={() => setOpenSub(child)} onMouseLeave={() => setOpenSub(null)}>
                   <button
                     role="menuitem"
+                    data-key={child}
                     aria-haspopup="true"
                     aria-expanded={openSub === child}
                     onClick={() => setOpenSub(prev => (prev === child ? null : child))}
                     className={itemCls(holdsActive(child), hiHere || openSub === child)}
                   >
-                    <KeyLabel text={child} k={ck} /><span className="text-[9px] opacity-70">▸</span>
+                    <KeyLabel text={labelOf(child)} k={ck} /><span className="text-[9px] opacity-70">▸</span>
                   </button>
                   {openSub === child && (
                     // T-054: a second-level list opens to the LEFT of the dropdown when the right side has no room
@@ -280,6 +336,7 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
                         <button
                           key={leaf}
                           role="menuitem"
+                          data-key={leaf}
                           onClick={() => handleChildClick(leaf)}
                           className={itemCls(active === leaf, hi === li)}
                         >
@@ -295,10 +352,11 @@ export default function NavTabs({ tabs, groups, active, onChange, openRequest })
               <button
                 key={child}
                 role="menuitem"
+                data-key={child}
                 onClick={() => handleChildClick(child)}
                 className={itemCls(active === child, hiHere)}
               >
-                <KeyLabel text={child} k={ck} />
+                <KeyLabel text={labelOf(child)} k={ck} />
               </button>
             )
           })}

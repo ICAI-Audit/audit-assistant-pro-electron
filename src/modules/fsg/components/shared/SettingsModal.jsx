@@ -1,6 +1,14 @@
 import React, { useState } from 'react'
 import { useModalKeys } from '../../hooks/useModalKeys'
 import { fsgApi } from '../../api.js'
+import { fsrPrefs, useFsrDensity } from '../../../../lib/fsrPrefs'
+
+const DENSITY_OPTIONS = [
+  { key: 'auto', label: 'Automatic' },
+  { key: 'compact', label: 'Compact' },
+  { key: 'regular', label: 'Regular' },
+  { key: 'comfortable', label: 'Comfortable' },
+]
 
 // ICAI VERA: the data lives in VERA's local SQLite database, so FSG_Bharat's
 // PostgreSQL connection form is not shown. The two tools remain.
@@ -11,6 +19,7 @@ export default function SettingsModal({ onClose }) {
   const [refExportMsg, setRefExportMsg] = useState('')
 
   const containerRef = useModalKeys({ onClose })
+  const density = useFsrDensity()
 
   // Every Financial Statement Review table's raw data (all clients), one sheet
   // per table — for backup/audit/debugging; partners and admins only. The main process asks for the file,
@@ -73,6 +82,29 @@ export default function SettingsModal({ onClose }) {
         <p className="text-xs text-gray-500">
           Financial Statement Review data is kept in ICAI VERA's local database with the rest of the audit file.
         </p>
+
+        {/* T-088 presentation preference only: row and control height in this module. Remembered on this computer. */}
+        <fieldset className="mt-5 pt-4 border-t border-gray-200" data-testid="fsr-density">
+          <legend className="text-xs font-semibold text-gray-600 uppercase mb-1">Display density</legend>
+          <p className="text-xs text-gray-400 mb-2">
+            How tightly rows and controls are packed on these screens. Automatic uses compact on small screens and
+            comfortable on large ones. Data and exports are not affected.
+          </p>
+          <div role="radiogroup" aria-label="Display density" className="grid grid-cols-4 gap-1">
+            {DENSITY_OPTIONS.map(o => (
+              <button
+                key={o.key}
+                type="button"
+                role="radio"
+                aria-checked={density === o.key}
+                onClick={() => fsrPrefs.setDensity(o.key)}
+                className={`py-1.5 border rounded text-xs font-medium transition ${density === o.key ? 'fsr-keep border-blue-600 bg-blue-50 text-blue-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
         <div className="mt-5 pt-4 border-t border-gray-200">
           <div className="text-xs font-semibold text-gray-600 uppercase mb-1">Financial Statement Data Export</div>

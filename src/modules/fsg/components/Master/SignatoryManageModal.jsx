@@ -52,7 +52,7 @@ function SignatoryForm({ entityId, constitutionDisplay, editing, onSaved, onCanc
   }
 
   return (
-    <div className="border border-blue-200 rounded-lg p-3 mb-3 bg-blue-50/40">
+    <div className="border border-slate-200 rounded-xl p-4 mb-3 bg-slate-50 overflow-y-auto min-h-0">
       <div className="text-xs font-semibold text-blue-900 mb-2">{editing ? 'Edit Signatory' : 'New Signing Authority'}</div>
       <div className="grid grid-cols-2 gap-2 mb-2">
         <div className="col-span-2">
@@ -127,13 +127,16 @@ export default function SignatoryManageModal({ entity, startInCreate = false, on
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="bg-white rounded-xl shadow-2xl p-6 flex flex-col"
-        style={{ width: '560px', maxWidth: '92vw', maxHeight: '82vh' }}
+        style={{ width: 'calc(35rem * var(--fsr-scale))', maxWidth: 'calc(100% - 2rem)', maxHeight: '82%' }}
         ref={containerRef}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fsg-signatories-title"
       >
         <div className="flex items-center justify-between mb-4 shrink-0">
-          <h2 className="text-base font-bold text-blue-900">Signing Authorities{entity ? ` — ${entity.name}` : ''}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+          <h2 id="fsg-signatories-title" className="text-lg font-semibold text-slate-900">Signing Authorities{entity ? ` — ${entity.name}` : ''}</h2>
+          <button onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-900 text-xl leading-none rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800">&times;</button>
         </div>
 
         {!entity && <p className="text-gray-400 text-sm py-6 text-center">Select an Auditee first.</p>}
@@ -163,9 +166,9 @@ export default function SignatoryManageModal({ entity, startInCreate = false, on
           <div className="flex-1 overflow-y-auto -mx-2 px-2">
             {loading ? (
               <p className="text-gray-400 text-sm py-6 text-center">Loading...</p>
-            ) : signatories.length === 0 ? (
+            ) : signatories.length === 0 && !editing ? (
               <p className="text-gray-400 text-sm py-6 text-center">No signing authorities added yet.</p>
-            ) : (
+            ) : signatories.length === 0 ? null : (
               <ul className="divide-y divide-gray-100">
                 {signatories.map(s => (
                   <li key={s.id} className="flex items-center justify-between py-2.5 px-1 hover:bg-gray-50 rounded">

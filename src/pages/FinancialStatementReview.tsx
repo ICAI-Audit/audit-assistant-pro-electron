@@ -5,7 +5,10 @@ import { useEngagement } from '@/contexts/EngagementContext';
 import FsgApp from '@/modules/fsg/App';
 import FsgErrorBoundary from '@/modules/fsg/ErrorBoundary';
 import { getModuleStatus, openEngagementContext } from '@/modules/fsg/api';
+import '@/modules/fsg/fsr-tokens.css';
 import '@/modules/fsg/fsg.css';
+import '@/modules/fsg/fsr-theme.css';
+import '@/modules/fsg/fsr-scale.css';
 
 type LoadState =
   | { status: 'loading' }

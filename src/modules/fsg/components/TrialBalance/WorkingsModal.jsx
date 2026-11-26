@@ -29,7 +29,7 @@ export default function WorkingsModal({ title, intro, warning = '', areas, confi
         </div>
         {intro && <p className="text-xs text-gray-600 mb-3">{intro}</p>}
         {warning && <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">{warning}</p>}
-        <div className="border border-gray-200 rounded divide-y divide-gray-100 max-h-[50vh] overflow-y-auto">
+        <div className="border border-gray-200 rounded divide-y divide-gray-100 max-h-72 overflow-y-auto">
           {available.map(a => (
             <label key={a.key} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
               <input type="checkbox" checked={chosen.has(a.key)} onChange={() => toggle(a.key)} className="rounded border-gray-300" data-area={a.key} />

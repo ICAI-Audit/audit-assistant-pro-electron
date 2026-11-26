@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import FsrMore from '../shared/FsrMore'
 import { useFinancials } from '../../hooks/useFinancials'
 import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
@@ -167,14 +168,16 @@ export default function CFS({ entity, activeTB, prevTB, activeRsId, onPrevTBChan
               disabled={(isBranchEntity && !!prevTB?.id) || pyOff}
               disabledTitle="Previous Year balances for the Balance Sheet movements" />
           </div>
+          <FsrMore />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 bg-white">
+      <div className="fsr-stmt flex-1 overflow-y-auto px-5 pb-5 bg-white">
         <Guard activeTB={activeTB} loading={loading} error={error}>
           {data && cf && (
             <>
-              <div className="text-center mb-4 pb-3 border-b-2 border-blue-800">
+              <p className="fsr-report-line">Cash Flow Statement{period ? ` · for the year ended ${period}` : ''} · Amount in ₹</p>
+              <div className="fsr-report-heading text-center mb-4 pb-3 border-b-2 border-blue-800">
                 <h1 className="text-lg font-bold text-blue-900 uppercase tracking-wide">{entity?.name || 'Entity Name'}</h1>
                 {entity?.constitution_display && <p className="text-xs text-gray-500 mt-0.5">({entity.constitution_display})</p>}
                 <h2 className="text-sm font-bold text-gray-800 mt-2 uppercase tracking-wide">Cash Flow Statement</h2>
@@ -182,9 +185,9 @@ export default function CFS({ entity, activeTB, prevTB, activeRsId, onPrevTBChan
                 <p className="text-xs text-gray-400 mt-0.5">(Amount in ₹)</p>
               </div>
 
-              <div className="max-w-5xl mx-auto mb-3 space-y-1.5">
+              <div className="max-w-5xl mx-auto mb-3 grid grid-cols-1 xl:grid-cols-2 gap-1.5">
                 {askRecompute && (
-                  <div className="text-xs bg-amber-50 border border-amber-300 text-amber-900 rounded px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <div className="xl:col-span-2 text-xs bg-amber-50 border border-amber-300 text-amber-900 rounded px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                     <span>
                       Draw the Current Year again from the Balance Sheet and Profit &amp; Loss{overrideCount ? `, discarding the ${overrideCount} figure${overrideCount !== 1 ? 's' : ''} you typed over` : ''}? Previous Year figures are kept.
                     </span>
@@ -200,7 +203,7 @@ export default function CFS({ entity, activeTB, prevTB, activeRsId, onPrevTBChan
                   </div>
                 )}
                 {cf.hiddenRows && cf.hiddenRows.length > 0 && (
-                  <div className="text-xs bg-gray-50 border border-gray-200 text-gray-700 rounded px-3 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <div className="xl:col-span-2 text-xs bg-gray-50 border border-gray-200 text-gray-700 rounded px-3 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="font-semibold">Deleted rows:</span>
                     {cf.hiddenRows.map(h => (
                       <span key={h.id} className="inline-flex items-center gap-1">
@@ -340,11 +343,14 @@ export default function CFS({ entity, activeTB, prevTB, activeRsId, onPrevTBChan
                 </table>
               </div>
 
-              <div className="max-w-5xl mx-auto mt-4 text-[11px] text-gray-500 leading-relaxed space-y-1">
+              <details className="fsr-howto max-w-5xl mx-auto mt-4">
+              <summary>How this works</summary>
+              <div className="text-[11px] text-gray-500 leading-relaxed space-y-1">
                 <p>Cash and cash equivalents comprise the "Cash and cash equivalents" line of the Balance Sheet. Bank deposits shown separately on the Balance Sheet are treated as investing.</p>
                 <p>Current Year: working-capital, borrowing and fund movements are the difference between the Balance Sheet's Current Year and Previous Year balances; depreciation, finance costs, interest and dividend income and profit / loss on sale are taken from the Profit & Loss ledgers by name. Taxes paid is the tax expense for the year, the movement in tax balances sits in the working-capital lines. Type over any figure that is not right for this entity.</p>
                 <p>Previous Year: not drawn, because the Trial Balance of the year before it is not in the tool. Type the figures from last year's Cash Flow Statement; outflows in brackets or with a minus.</p>
               </div>
+              </details>
             </>
           )}
         </Guard>

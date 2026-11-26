@@ -633,7 +633,7 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
             {saveStatus && (saveStatus.includes('Error')
               ? <span className="text-xs font-medium text-red-600">{saveStatus}</span>
               : <span className="text-[11px] text-gray-400 w-14 text-right" title="Changes are saved automatically">✓ {saveStatus}</span>)}
-            <button onClick={addPoint} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium">+ Add Point</button>
+            <button onClick={addPoint} className="fsr-primary px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium">+ Add Point</button>
           </div>
         </div>
         {/* Toolbar: grouped and wrapping, so every action stays visible at any window width (was one long unwrapped row). */}
@@ -692,6 +692,7 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
           <span className="text-xs text-gray-500">
             This whole section is a single note, with every point below lettered (a), (b), (c)... within it.
           </span>
+          <span className="text-xs font-medium text-gray-600">Place as</span>
           <div className="flex items-center gap-1 rounded border border-gray-300 overflow-hidden shrink-0">
             <button
               onClick={() => persist({ ...note, position: 'first' })}
@@ -706,7 +707,7 @@ export default function GeneralNotes({ entity, activeTB, prevTB, activeRsId }) {
           </div>
         </div>
         <div className="mt-1 text-[11px] text-gray-400">
-          {entity?.name} {primaryAuditor ? `· Auditor: ${primaryAuditor.firm_name || primaryAuditor.name}` : ''} {primarySignatory ? `· Signatory: ${primarySignatory.name}` : ''}
+          {primaryAuditor ? `Auditor: ${primaryAuditor.firm_name || primaryAuditor.name}` : ''} {primarySignatory ? `${primaryAuditor ? '· ' : ''}Signatory: ${primarySignatory.name}` : ''}
         </div>
       </div>
 

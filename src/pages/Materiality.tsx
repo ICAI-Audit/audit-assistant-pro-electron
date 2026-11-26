@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calculator, AlertCircle, Trash2, Plus, FileDown, AlertTriangle, Save } from 'lucide-react';
+import { Calculator, AlertCircle, Trash2, Plus, FileDown, AlertTriangle, Save, RotateCcw, ShieldCheck, Check, PenLine } from 'lucide-react';
 import { format } from 'date-fns';
 import ExcelJS from 'exceljs';
 import { useEngagement } from '@/contexts/EngagementContext';
@@ -765,48 +765,48 @@ export default function Materiality() {
     return `\u20B9${amount.toLocaleString('en-IN')}`;
   };
 
+  // T-088 presentation refresh (owner request, 27 Nov 2026): the Risk Assessment view fits one screen at 1100px and wider;
+  // only the questionnaire list scrolls. Handlers, values, labels and placeholders are unchanged.
+  const viewBtn = (active: boolean) =>
+    `inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition ${active ? 'bg-white text-[#9f1239] shadow-sm' : 'text-slate-600 hover:text-slate-900'}`;
+  const riskPill = (risk: string) =>
+    risk === 'High Risk' ? 'bg-red-50 text-red-700 border-red-200'
+      : risk === 'Medium Risk' ? 'bg-orange-50 text-orange-700 border-orange-200'
+        : risk === 'Low Risk' ? 'bg-green-50 text-green-700 border-green-200'
+          : 'bg-slate-50 text-slate-600 border-slate-200';
+  const currentRisk = finalRisk || systemRisk;
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className={`flex flex-col gap-4 animate-fade-in ${currentView === 'risk' ? 'min-[1100px]:h-full min-[1100px]:min-h-0' : ''}`}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-2xl font-bold leading-tight text-foreground">
             Materiality & Risk Assessment Tool
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Calculate materiality and assess risk of material misstatement
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant={currentView === 'risk' ? 'default' : 'outline'} 
-            onClick={switchToRisk}
-            className="gap-2"
-          >
-            Risk Assessment
-          </Button>
-          <Button 
-            variant={currentView === 'materiality' ? 'default' : 'outline'} 
-            onClick={switchToMateriality}
-            className="gap-2"
-          >
-            Materiality
-          </Button>
-          <Button
-            variant={currentView === 'register' ? 'default' : 'outline'}
-            className="gap-2"
-            onClick={switchToRegister}
-          >
-            <AlertTriangle className="h-4 w-4" />
-            Risk Register
-          </Button>
-          <Button variant="outline" className="gap-2" onClick={exportToExcel}>
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="tablist" aria-label="View" className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+            <button type="button" role="tab" aria-selected={currentView === 'risk'} onClick={switchToRisk} className={viewBtn(currentView === 'risk')}>
+              Risk Assessment
+            </button>
+            <button type="button" role="tab" aria-selected={currentView === 'materiality'} onClick={switchToMateriality} className={viewBtn(currentView === 'materiality')}>
+              Materiality
+            </button>
+            <button type="button" role="tab" aria-selected={currentView === 'register'} onClick={switchToRegister} className={viewBtn(currentView === 'register')}>
+              <AlertTriangle className="h-4 w-4" />
+              Risk Register
+            </button>
+          </div>
+          <Button variant="outline" className="h-9 gap-2" onClick={exportToExcel}>
             <FileDown className="h-4 w-4" />
             Export to Excel
           </Button>
-          <Button 
-            variant="default" 
-            className="gap-2" 
+          <Button
+            className="h-9 gap-2 bg-[#9f1239] text-white hover:bg-[#881337]"
             onClick={handleSaveDraft}
             disabled={saving}
           >
@@ -818,154 +818,141 @@ export default function Materiality() {
 
       {currentView === 'risk' ? (
         // RISK ASSESSMENT VIEW
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Risk Assessment Matrix */}
-            <div className="audit-card">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-semibold text-foreground">Risk Assessment Questionnaire</h2>
-                <div className="flex gap-2">
-                  {isRiskFinalized && (
-                    <Button 
-                      variant="default" 
-                      size="sm" 
-                      onClick={recalculateRisk}
-                      className="gap-2"
-                    >
-                      <Calculator className="h-4 w-4" />
-                      Recalculate Risk
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={resetAllQuestions}>
-                    Reset All Questions
-                  </Button>
-                </div>
+        <div className="grid grid-cols-1 gap-4 min-[1100px]:min-h-0 min-[1100px]:flex-1 min-[1100px]:grid-cols-[minmax(0,1fr)_340px] min-[1100px]:grid-rows-[minmax(0,1fr)_150px]">
+          {/* Risk Assessment Questionnaire */}
+          <section aria-label="Risk Assessment Questionnaire" className="flex min-w-0 flex-col rounded-[10px] border border-slate-200 bg-white shadow-sm min-[1100px]:min-h-0">
+            <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700" aria-hidden="true">
+                  <AlertTriangle className="h-4 w-4" />
+                </span>
+                <h2 className="text-[15px] font-semibold text-foreground">Risk Assessment Questionnaire</h2>
               </div>
+              <div className="flex gap-2">
+                {isRiskFinalized && (
+                  <Button variant="default" size="sm" onClick={recalculateRisk} className="h-8 gap-2">
+                    <Calculator className="h-4 w-4" />
+                    Recalculate Risk
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-slate-700" onClick={resetAllQuestions}>
+                  <RotateCcw className="h-4 w-4" />
+                  Reset All Questions
+                </Button>
+              </div>
+            </header>
 
-              <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                {riskFactors.map((factor, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 hover:bg-muted/50 rounded-lg">
-                    <div className="col-span-5">
-                      <Label className="text-sm">{factor}</Label>
-                    </div>
-                    <div className="col-span-3">
-                      <Select
-                        value={riskItems[index]?.level || 'NA'}
-                        onValueChange={(value) => handleRiskLevelChange(index, value)}
+            <div className="grid grid-cols-[minmax(0,1fr)_11rem_7rem_2.25rem] items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <span>Risk factor</span>
+              <span>Risk Level</span>
+              <span>Score</span>
+              <span className="sr-only">Actions</span>
+            </div>
+
+            <div className="overflow-y-auto min-[1100px]:min-h-0 min-[1100px]:flex-1">
+              {riskFactors.map((factor, index) => (
+                <div key={index} className="grid h-9 grid-cols-[minmax(0,1fr)_11rem_7rem_2.25rem] items-center gap-3 border-b border-slate-100 px-4 odd:bg-white even:bg-slate-50/70 hover:bg-slate-100/70">
+                  <Label className="truncate text-sm font-normal" title={factor}>{factor}</Label>
+                  <Select
+                    value={riskItems[index]?.level || 'NA'}
+                    onValueChange={(value) => handleRiskLevelChange(index, value)}
+                  >
+                    <SelectTrigger className="h-7 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="High_Risk">High Risk</SelectItem>
+                      <SelectItem value="Medium_Risk">Medium Risk</SelectItem>
+                      <SelectItem value="Low_Risk">Low Risk</SelectItem>
+                      <SelectItem value="NA">N/A</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={riskItems[index]?.score?.toString() || '0'}
+                    onValueChange={(value) => handleRiskScoreChange(index, parseInt(value))}
+                    disabled={!riskItems[index] || riskItems[index].level === 'NA'}
+                  >
+                    <SelectTrigger className="h-7 text-sm tabular-nums">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getScoreOptions(riskItems[index]?.level || 'NA').map(score => (
+                        <SelectItem key={score} value={score.toString()}>{score}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex justify-end">
+                    {index >= DEFAULT_RISK_FACTORS.length && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        aria-label={`Delete ${factor}`}
+                        onClick={() => deleteQuestion(index)}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="High_Risk">High Risk</SelectItem>
-                          <SelectItem value="Medium_Risk">Medium Risk</SelectItem>
-                          <SelectItem value="Low_Risk">Low Risk</SelectItem>
-                          <SelectItem value="NA">N/A</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-2">
-                      <Select
-                        value={riskItems[index]?.score?.toString() || '0'}
-                        onValueChange={(value) => handleRiskScoreChange(index, parseInt(value))}
-                        disabled={!riskItems[index] || riskItems[index].level === 'NA'}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getScoreOptions(riskItems[index]?.level || 'NA').map(score => (
-                            <SelectItem key={score} value={score.toString()}>{score}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-2 flex justify-end">
-                      {index >= DEFAULT_RISK_FACTORS.length && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteQuestion(index)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
-                ))}
-              </div>
-
-              {/* Add New Question */}
-              <div className="mt-6 pt-6 border-t">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add custom risk factor..."
-                    value={newQuestion}
-                    onChange={(e) => setNewQuestion(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addQuestion()}
-                  />
-                  <Button onClick={addQuestion} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add
-                  </Button>
                 </div>
-              </div>
+              ))}
             </div>
 
-            {/* Remarks/Rationale */}
-            <div className="audit-card">
-              <h2 className="font-semibold text-foreground mb-4">Remarks/Rationale</h2>
-              <Textarea
-                rows={6}
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Document the rationale for risk assessment..."
-                className="resize-none"
+            {/* Add New Question (pinned) */}
+            <div className="flex shrink-0 gap-2 border-t border-slate-100 px-4 py-3">
+              <Input
+                placeholder="Add custom risk factor..."
+                value={newQuestion}
+                onChange={(e) => setNewQuestion(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addQuestion()}
+                className="h-9"
               />
+              <Button variant="outline" onClick={addQuestion} className="h-9 gap-2">
+                <Plus className="h-4 w-4" />
+                Add
+              </Button>
             </div>
-          </div>
+          </section>
 
           {/* Risk Summary Sidebar */}
-          <div className="space-y-4">
-            <div className="audit-card">
-              <h3 className="font-medium text-foreground mb-4">Risk Conclusion</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Total Risk Score</Label>
-                  <Input
-                    value={totalRiskScore}
-                    readOnly
-                    className="mt-1 bg-muted"
-                  />
+          <div className="flex min-w-0 flex-col gap-4 min-[1100px]:min-h-0 min-[1100px]:overflow-y-auto">
+            <section aria-label="Risk Conclusion" className="rounded-[10px] border border-slate-200 bg-white shadow-sm">
+              <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-[#9f1239]" aria-hidden="true">
+                  <ShieldCheck className="h-4 w-4" />
+                </span>
+                <h3 className="text-[15px] font-semibold text-foreground">Risk Conclusion</h3>
+              </header>
+
+              <div className="space-y-3.5 p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-[10px] border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+                    <Label className="text-xs font-semibold text-muted-foreground">Total Risk Score</Label>
+                    <output className="mt-0.5 block text-2xl font-bold tabular-nums text-foreground" aria-label="Total Risk Score">{totalRiskScore}</output>
+                  </div>
+                  <div className="rounded-[10px] border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+                    <Label className="text-xs font-semibold text-muted-foreground">Risk Percentage</Label>
+                    <output className="mt-0.5 block text-2xl font-bold tabular-nums text-foreground" aria-label="Risk Percentage">{`${riskPercentage}%`}</output>
+                  </div>
                 </div>
 
-                <div>
-                  <Label className="text-xs text-muted-foreground">Risk Percentage</Label>
-                  <Input
-                    value={`${riskPercentage}%`}
-                    readOnly
-                    className="mt-1 bg-muted"
-                  />
-                </div>
-
-                <div>
-                  <Label className="text-xs text-muted-foreground">System Risk</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">System Risk</Label>
                   <Input
                     value={systemRisk}
                     readOnly
-                    className={`mt-1 bg-muted font-semibold ${getRiskColor(systemRisk)}`}
+                    className={`h-9 bg-muted font-semibold ${getRiskColor(systemRisk)}`}
                   />
                 </div>
 
-                <div>
-                  <Label className="text-xs text-muted-foreground">Auditor Override</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">Auditor Override</Label>
                   <Select
                     value={finalRisk}
                     onValueChange={setFinalRisk}
                     disabled={isRiskFinalized}
                   >
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -976,25 +963,49 @@ export default function Materiality() {
                   </Select>
                 </div>
 
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="h-10 w-full gap-2 bg-[#9f1239] text-white hover:bg-[#881337]"
                   onClick={finalizeRisk}
                   disabled={isRiskFinalized}
                 >
+                  <Check className="h-4 w-4" />
                   {isRiskFinalized ? 'Risk Finalized' : 'Finalize Risk Conclusion'}
                 </Button>
               </div>
-            </div>
+            </section>
 
-            <div className="audit-card text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                Current Risk Level
-              </p>
-              <p className={`text-3xl font-bold ${getRiskColor(finalRisk || systemRisk)}`}>
-                {finalRisk || systemRisk}
-              </p>
-            </div>
+            <section aria-label="Current Risk Level" className="flex items-center justify-between gap-3 rounded-[10px] border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Current Risk Level
+                </p>
+                {!currentRisk && <p className="mt-0.5 text-xs text-muted-foreground">Appears after assessment</p>}
+              </div>
+              <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm font-semibold ${riskPill(currentRisk)}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+                {currentRisk || 'Not assessed'}
+              </span>
+            </section>
           </div>
+
+          {/* Remarks/Rationale */}
+          <section aria-label="Remarks/Rationale" className="flex min-w-0 flex-col rounded-[10px] border border-slate-200 bg-white shadow-sm min-[1100px]:col-span-2 min-[1100px]:min-h-0">
+            <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-2">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700" aria-hidden="true">
+                <PenLine className="h-4 w-4" />
+              </span>
+              <h2 className="text-[15px] font-semibold text-foreground">Remarks/Rationale</h2>
+            </header>
+            <div className="flex min-h-0 flex-1 p-3">
+              <Textarea
+                rows={3}
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Document the rationale for risk assessment..."
+                className="min-h-0 flex-1 resize-none"
+              />
+            </div>
+          </section>
         </div>
       ) : currentView === 'materiality' ? (
         // MATERIALITY VIEW

@@ -206,8 +206,29 @@ async function main() {
   check('entity:delete is disabled (clients are deleted in VERA)', r.ok === false && r.denied, r)
   r = await staff('entity:save', { name: 'New', constitution: 3, constitution_display: 'Company' })
   check('entity:save cannot create entities', r.ok === false && r.denied, r)
+  // T-088 (owner decision, 27 Nov 2026): name, constitution, address, PAN and CIN edited in FSR are saved to the VERA client
+  // record through the Permanent File client-master rules (manager or above, assigned to the client or admin).
   r = await staff('entity:save', { ...ctx.entity, name: 'Renamed in FSG', has_branches: false, business_type: 'Manufacturer' })
+  check('entity:save refuses a staff change to the client identity and leaves the VERA client as it was',
+    r.ok === false && /Manager or above/.test(r.error)
+      && db.prepare('SELECT name FROM clients WHERE id = ?').get('c1').name === 'Synthetic Industries Private Limited', r)
+  r = await staff('entity:save', { ...ctx.entity, has_branches: false, business_type: 'Manufacturer' })
   check('entity:save keeps VERA client identity and saves FSG fields', r.ok && r.result.name === 'Synthetic Industries Private Limited' && r.result.business_type === 'Manufacturer', r)
+  r = await partner('entity:save', { ...r.result, name: 'Synthetic Industries Renamed Limited' })
+  check('entity:save refuses a partner who is not assigned to the client, with a readable reason',
+    r.ok === false && /assigned to one of its engagements/.test(r.error), r)
+  db.prepare("INSERT INTO engagement_assignments (engagement_id, user_id, role) VALUES ('e1', 'u-partner', 'partner')").run()
+  const fsgFields = (await staff('entity:getAll')).result[0]
+  r = await partner('entity:save', { ...fsgFields, name: 'Synthetic Industries Renamed Limited', address: '9 Synthetic Road' })
+  check('entity:save by an assigned partner updates the VERA client, its engagements and the entity',
+    r.ok && r.result.name === 'Synthetic Industries Renamed Limited' && r.result.address === '9 Synthetic Road'
+      && db.prepare('SELECT name, address FROM clients WHERE id = ?').get('c1').name === 'Synthetic Industries Renamed Limited'
+      && db.prepare("SELECT client_name FROM engagements WHERE id = 'e1'").get().client_name === 'Synthetic Industries Renamed Limited'
+      && r.result.business_type === 'Manufacturer', r)
+  r = await partner('entity:save', { ...r.result, name: 'Synthetic Industries Private Limited', address: '' })
+  db.prepare("DELETE FROM engagement_assignments WHERE engagement_id = 'e1' AND user_id = 'u-partner'").run()
+  check('the client identity is restored for the rest of the run',
+    r.ok && db.prepare('SELECT name, address FROM clients WHERE id = ?').get('c1').name === 'Synthetic Industries Private Limited', r)
   r = await staff('file:read', join(root, 'package.json'))
   check('file:read refuses a path not chosen in a dialog', r.ok === false && r.denied, r)
   r = await staff('file:write', join(userData, 'x.txt'), [1, 2, 3])

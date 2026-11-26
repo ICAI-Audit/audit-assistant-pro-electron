@@ -131,7 +131,7 @@ export default function OverrideModal({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box max-w-2xl overflow-y-auto max-h-[90vh]" ref={containerRef} onClick={e => e.stopPropagation()}>
+      <div className="modal-box max-w-2xl overflow-y-auto max-h-[90%]" ref={containerRef} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-blue-900">{askLedger ? 'Add Ledger' : 'Override Mapping'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>

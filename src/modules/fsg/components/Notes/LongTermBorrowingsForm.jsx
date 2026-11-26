@@ -567,7 +567,7 @@ export default function LongTermBorrowingsForm({ tbId, entityId, useEntityLevel,
   return (
     <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 9999 }}>
       <div className="modal-box overflow-hidden flex flex-col"
-        style={{ maxWidth: '1200px', width: '97vw', maxHeight: '95vh' }}
+        style={{ maxWidth: 'calc(75rem * var(--fsr-scale))', width: '97%', maxHeight: '95%' }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}

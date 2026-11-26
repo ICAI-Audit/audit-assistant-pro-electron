@@ -86,7 +86,7 @@ export function PDFViewerModal({ url, label, onClose }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div
         className="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
-        style={{ width: '85vw', height: '90vh' }}
+        style={{ width: '85%', height: '90%', maxWidth: 'var(--fsr-dialog-max)' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-2.5 bg-blue-800 text-white shrink-0">

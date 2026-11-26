@@ -106,7 +106,7 @@ export default function DirectorLoansForm({ tbId, entityId, useEntityLevel, note
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-label="Loans and advances Fill Details">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl max-h-[92%] overflow-y-auto">
         <div className="sticky top-0 z-10 bg-blue-600 text-white px-6 py-3 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-base font-bold">Note {noteNum}: {noteTitle}</h2>

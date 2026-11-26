@@ -5,6 +5,7 @@ import { useEps } from '../../hooks/useEps'
 import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
+import FsrMore from '../shared/FsrMore'
 import RemarkCell, { useRemarks } from '../shared/RemarkCell'
 import { AnalyseChangeButton, AnalyseChangeProvider, useAnalyseChangeToggle, ChangeCells, ChangeHeads, useChangeSpan } from '../shared/AnalyseChange'
 import { FormatRefButton, SCHEDULE3_SECTIONS } from '../shared/FormatReference'
@@ -410,14 +411,16 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
               disabled={(isBranchEntity && !!prevTB?.id) || pyOff}
               disabledTitle={pyOff ? pyOffTitle : 'A Previous Year Trial Balance is already selected for this branch — clear it to use Manual PY instead.'} />
           </div>
+          <FsrMore />
         </div>
       </div>
 
-      <div className={`flex-1 overflow-y-auto p-5 bg-white ${data?.pyMode === 'none_hide' ? 'hide-py' : ''}`}>
+      <div className={`fsr-stmt flex-1 overflow-y-auto px-5 pb-5 bg-white ${data?.pyMode === 'none_hide' ? 'hide-py' : ''}`}>
         <Guard activeTB={activeTB} loading={loading} error={error}>
           {data && (
             <>
-              <div className="text-center mb-5 pb-3 border-b-2 border-blue-800">
+              <p className="fsr-report-line">{plTitle}{subtitle ? ` · ${subtitle}` : ''} · Amount in ₹</p>
+              <div className="fsr-report-heading text-center mb-5 pb-3 border-b-2 border-blue-800">
                 <h1 className="text-lg font-bold text-blue-900 uppercase tracking-wide">{entity?.name || 'Entity Name'}</h1>
                 {entity?.constitution_display && <p className="text-xs text-gray-500 mt-0.5">({entity.constitution_display})</p>}
                 <h2 className="text-sm font-bold text-gray-800 mt-2 uppercase tracking-wide">{plTitle}</h2>
@@ -667,7 +670,8 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                 const kmExpense = isNonCorp1 && nonCorpLayout ? nonCorpLayout.totalExpenses : mainExpCY
                 const kmProfit = isNonCorp1 && nonCorpLayout ? nonCorpLayout.netProfit : netCY
                 return (
-              <div className="mt-4 grid grid-cols-3 gap-3">
+              <div className="fsr-statusbar mt-4 rounded-md border">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
                 {[
                   { label: 'Total Revenue',   value: kmIncome,  cls: 'text-green-700' },
                   { label: 'Total Expenses',  value: kmExpense, cls: 'text-orange-700' },
@@ -675,18 +679,17 @@ export default function PL({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
                     value: Math.abs(kmProfit),
                     cls: kmProfit >= 0 ? 'text-blue-800' : 'text-red-700' },
                 ].map(({ label, value, cls }) => (
-                  <div key={label} className="summary-card text-center">
-                    <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-                    <div className={`font-bold text-sm font-mono ${cls}`}>{fmtINR(value)}</div>
-                  </div>
+                  <span key={label} className="inline-flex items-baseline gap-2">
+                    <span className="text-xs text-gray-500">{label}</span>
+                    <span className={`font-bold text-sm font-mono ${cls}`}>{fmtINR(value)}</span>
+                  </span>
                 ))}
+                </div>
+                <span className="text-gray-500">The accompanying notes form an integral part of the financial statements.</span>
               </div>
                 )
               })()}
 
-              <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-400">
-                The accompanying notes form an integral part of the financial statements.
-              </div>
             </>
           )}
         </Guard>

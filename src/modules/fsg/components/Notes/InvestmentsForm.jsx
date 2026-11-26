@@ -72,7 +72,7 @@ export default function InvestmentsForm({ activeTB, prevTB, note, onClose, onSav
     catch (e) { setError(e.message) } finally { setSaving(false) }
   }
   const unknown = details?.entries.filter(e => !rows.some(r => investmentLedgerKey(r) === e.ledgerKey && (r.level3 || r.mapping3_resultant || 'Unclassified investments').trim() === e.subclass)) || []
-  return <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div role="dialog" aria-label={`${note.title} Fill Details`} className="bg-white rounded-lg shadow-lg w-full max-w-7xl max-h-[90vh] overflow-y-auto">
+  return <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div role="dialog" aria-label={`${note.title} Fill Details`} className="bg-white rounded-lg shadow-lg w-full max-w-7xl max-h-[90%] overflow-y-auto">
     <div className="sticky top-0 z-10 bg-blue-600 text-white px-6 py-3 border-b border-blue-700 flex items-start justify-between gap-4">
       <div><h2 className="text-base font-bold">Note {note.num}: {note.displayTitle || note.title}</h2><p className="text-xs text-blue-100 mt-1">Schedule III Division I investment disclosures · Amounts in rupees</p></div>
       <button onClick={onClose} aria-label="Close investments" className="text-blue-100 hover:text-white text-sm">✕</button>

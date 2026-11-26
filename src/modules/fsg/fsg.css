@@ -109,9 +109,9 @@
 }
 
 /* ── Scrollbars ─────────────────────────────────────────────────────────── */
-.fsg-root ::-webkit-scrollbar { width: 8px; height: 8px; }
+.fsg-root ::-webkit-scrollbar { width: calc(0.5rem * var(--fsr-scale)); height: calc(0.5rem * var(--fsr-scale)); }
 .fsg-root ::-webkit-scrollbar-track { background: var(--color-scrollbar-track); }
-.fsg-root ::-webkit-scrollbar-thumb { background: var(--color-scrollbar-thumb); border-radius: 4px; }
+.fsg-root ::-webkit-scrollbar-thumb { background: var(--color-scrollbar-thumb); border-radius: calc(0.25rem * var(--fsr-scale)); }
 .fsg-root ::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-thumb-hov); }
 
 /* ── AG Grid customisation (theme-driven) ──────────────────────────────── */
@@ -123,6 +123,16 @@
 .fsg-root .ag-theme-alpine .ag-row-hover { background: var(--color-row-hover) !important; }
 .fsg-root .ag-theme-alpine .ag-cell-focus { border: 1px solid var(--color-primary-mid) !important; }
 .fsg-root .ag-theme-alpine .ag-paging-panel { background: var(--color-row-even); border-top: 1px solid var(--color-border-soft); }
+
+/* Trial-balance grids retain their column, filtering and pagination behaviour. */
+.fsg-root .ag-theme-alpine.fsg-neutral-tb-grid .ag-header { background: #f8fafc !important; color: #334155 !important; }
+.fsg-root .ag-theme-alpine.fsg-neutral-tb-grid .ag-header-cell-label { color: #334155 !important; }
+.fsg-root .ag-theme-alpine.fsg-neutral-tb-grid .ag-header-icon { color: #475569 !important; }
+.fsg-root .ag-theme-alpine.fsg-neutral-tb-grid .ag-row-even,
+.fsg-root .ag-theme-alpine.fsg-neutral-tb-grid .ag-row-odd { background: #fff; }
+.fsg-root .ag-theme-alpine.fsg-neutral-tb-grid .ag-row-hover { background: #f1f5f9 !important; }
+.fsg-root .ag-theme-alpine.fsg-neutral-tb-grid .ag-paging-panel { background: #f8fafc; border-color: #e2e8f0; }
+.fsg-root .ag-theme-alpine.fsg-neutral-tb-grid .ag-cell { font-variant-numeric: tabular-nums; }
 
 /* ── Status badge colours ────────────────────────────────────────────────── */
 .fsg-root .badge-high     { @apply bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full font-medium; }
@@ -140,18 +150,23 @@
 .fsg-root .row-approved    { background: #eff6ff !important; }
 
 /* ── Nav tab active ──────────────────────────────────────────────────────── */
+/* T-088 (owner, 27 Nov 2026): the open screen's tab is filled and underlined so the eye goes to it. */
 .fsg-root .tab-active {
-  border-bottom: 2px solid var(--color-primary);
-  color: var(--color-primary);
-  font-weight: 600;
+  border-bottom: 3px solid #9f1239;
+  background: #fff1f2;
+  color: #881337;
+  font-weight: 700;
 }
+.fsg-root .fsr-tab { border-top: 3px solid transparent; outline: none; }
+.fsg-root nav .fsr-tab:focus-visible { outline: 2px solid var(--fsr-focus, #2563eb); outline-offset: -2px; border-radius: 0.25rem; }
 .fsg-root .tab-inactive {
-  border-bottom: 2px solid transparent;
+  border-bottom: 3px solid transparent;
   color: #4b5563;
 }
 .fsg-root .tab-inactive:hover {
-  color: var(--color-primary);
-  border-bottom: 2px solid var(--color-primary-light);
+  color: #0f172a;
+  background: #f8fafc;
+  border-bottom: 3px solid #cbd5e1;
 }
 
 /* ── Summary card ────────────────────────────────────────────────────────── */
@@ -257,13 +272,13 @@
 }
 
 /* ── TipTap rich-text editor (General Notes) ──────────────────────────────── */
-.fsg-root .tiptap-editor .ProseMirror { outline: none; min-height: 100px; font-size: 13px; line-height: 1.6; color: #1f2937; }
-.fsg-root .tiptap-editor .ProseMirror p { margin: 0 0 8px; }
-.fsg-root .tiptap-editor .ProseMirror ul { list-style: disc; padding-left: 22px; margin: 0 0 8px; }
-.fsg-root .tiptap-editor .ProseMirror ol { list-style: decimal; padding-left: 22px; margin: 0 0 8px; }
-.fsg-root .tiptap-editor .ProseMirror table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.fsg-root .tiptap-editor .ProseMirror { outline: none; min-height: calc(6.25rem * var(--fsr-scale)); font-size: var(--fsr-text-base); line-height: 1.6; color: #1f2937; }
+.fsg-root .tiptap-editor .ProseMirror p { margin: 0 0 calc(0.5rem * var(--fsr-scale)); }
+.fsg-root .tiptap-editor .ProseMirror ul { list-style: disc; padding-left: calc(1.375rem * var(--fsr-scale)); margin: 0 0 calc(0.5rem * var(--fsr-scale)); }
+.fsg-root .tiptap-editor .ProseMirror ol { list-style: decimal; padding-left: calc(1.375rem * var(--fsr-scale)); margin: 0 0 calc(0.5rem * var(--fsr-scale)); }
+.fsg-root .tiptap-editor .ProseMirror table { border-collapse: collapse; width: 100%; margin: calc(0.5rem * var(--fsr-scale)) 0; }
 .fsg-root .tiptap-editor .ProseMirror table td, .fsg-root .tiptap-editor .ProseMirror table th {
-  border: 1px solid #d1d5db; padding: 4px 8px; vertical-align: top; position: relative;
+  border: 1px solid #d1d5db; padding: calc(0.25rem * var(--fsr-scale)) calc(0.5rem * var(--fsr-scale)); vertical-align: top; position: relative;
 }
 .fsg-root .tiptap-editor .ProseMirror table th { background: #f3f4f6; font-weight: 600; text-align: left; }
 .fsg-root .tiptap-editor .ProseMirror .selectedCell { background: #dbeafe; }
@@ -294,47 +309,47 @@
   align-items: center;
   flex-wrap: wrap;            /* a narrow window wraps to a second tidy line; nothing is hidden */
   column-gap: 0.5rem;
-  row-gap: 6px;
+  row-gap: calc(0.375rem * var(--fsr-scale));
   white-space: nowrap;
 }
 .fsg-root .fsg-stmt-toolbar > .ml-auto { flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
-.fsg-root .fsg-stmt-toolbar .fsg-stmt-title { font-size: 13px; font-weight: 600; color: #1e3a8a; }
+.fsg-root .fsg-stmt-toolbar .fsg-stmt-title { font-size: var(--fsr-text-base); font-weight: 600; color: #1e3a8a; }
 .fsg-root .fsg-stmt-toolbar button {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 6px;
-  font-size: 12px;
+  height: calc(1.75rem * var(--fsr-scale));
+  padding: 0 calc(0.625rem * var(--fsr-scale));
+  border-radius: calc(0.375rem * var(--fsr-scale));
+  font-size: var(--fsr-text-sm);
   line-height: 1;
   white-space: nowrap;
 }
 .fsg-root .fsg-stmt-toolbar select {
-  height: 28px;
+  height: calc(1.75rem * var(--fsr-scale));
   max-width: 9.5rem;
   padding-top: 0;
   padding-bottom: 0;
-  font-size: 12px;
+  font-size: var(--fsr-text-sm);
   text-overflow: ellipsis;
 }
-.fsg-root .fsg-stmt-toolbar label { font-size: 12px; white-space: nowrap; }
+.fsg-root .fsg-stmt-toolbar label { font-size: var(--fsr-text-sm); white-space: nowrap; }
 .fsg-root .fsg-stmt-group {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 2px 8px;
+  padding: calc(0.125rem * var(--fsr-scale)) calc(0.5rem * var(--fsr-scale));
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: calc(0.375rem * var(--fsr-scale));
   background: #fff;
 }
 /* T-060 joined buttons (Expand / Collapse, Download / Upload): one bordered strip, square inner corners. */
-.fsg-root .fsg-seg { display: inline-flex; align-items: stretch; border: 1px solid #d1d5db; border-radius: 6px; overflow: hidden; background: #fff; }
+.fsg-root .fsg-seg { display: inline-flex; align-items: stretch; border: calc(0.0625rem * var(--fsr-scale)) solid #d1d5db; border-radius: calc(0.375rem * var(--fsr-scale)); overflow: hidden; background: #fff; }
 .fsg-root .fsg-seg > button { border-radius: 0 !important; border: 0; background: transparent; }
 .fsg-root .fsg-seg > button + button { border-left: 1px solid #d1d5db; }
-.fsg-root .fsg-stmt-toolbar .fsg-seg > button { height: 26px; }
+.fsg-root .fsg-stmt-toolbar .fsg-seg > button { height: calc(1.625rem * var(--fsr-scale)); }
 .fsg-root .fsg-stmt-group-label {
-  font-size: 10px;
+  font-size: var(--fsr-text-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -348,7 +363,7 @@
 @media (max-width: 1360px) {
   .fsg-root .fsg-stmt-group-label { display: none; }
   .fsg-root .fsg-stmt-toolbar select { max-width: 8rem; }
-  .fsg-root .fsg-stmt-toolbar button { padding: 0 8px; }
+  .fsg-root .fsg-stmt-toolbar button { padding: 0 calc(0.5rem * var(--fsr-scale)); }
 }
 
 /* Figures on screen (owner, 23 November 2026): amounts used a typewriter font (JetBrains Mono, or Consolas when that web

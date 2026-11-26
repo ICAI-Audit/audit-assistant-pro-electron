@@ -37,7 +37,8 @@ function numFmt(p) {
 
 const NUM_FIELDS = ['opening_balance','debit','credit','closing_balance','trail_balance']
 
-export default function ActualTBTable({ entity, activeTB }) {
+// `embedded` (T-088): drawn inside Upload Trial Balance, which supplies the padding.
+export default function ActualTBTable({ entity, activeTB, embedded = false }) {
   const [rows, setRows]             = useState([])
   const [loading, setLoading]       = useState(false)
   const [quickFilter, setQuickFilter] = useState('')
@@ -130,14 +131,15 @@ export default function ActualTBTable({ entity, activeTB }) {
       sortable: false, filter: false, resizable: true,
     },
     {
-      headerName: '', width: 44, pinned: 'right',
+      headerName: '', width: 64, pinned: 'right',
       cellRenderer: (p) => {
         if (!p.data) return ''
         return (
           <button
             onClick={() => setRowToDelete(p.data)}
             title="Delete this row"
-            className="text-red-400 hover:text-red-600 text-sm"
+            aria-label={`Delete ${p.data.name || 'row'}`}
+            className="text-red-600 hover:text-red-800 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-800"
           >
             🗑
           </button>
@@ -153,13 +155,13 @@ export default function ActualTBTable({ entity, activeTB }) {
   const adjustedCount = rows.filter(r => r.adj_debit != null || r.adj_credit != null).length
 
   return (
-    <div className="flex flex-col h-full p-4 gap-3">
+    <div className={`flex flex-col h-full gap-3 ${embedded ? '' : 'p-4'}`}>
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap shrink-0">
         {activeTB && (
           <button
             onClick={() => setShowAddRow(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-green-400 text-green-700 text-sm rounded hover:bg-green-50 transition font-medium"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50 transition font-medium"
             title="Manually insert a new row"
           >
             + Add Row
@@ -170,13 +172,14 @@ export default function ActualTBTable({ entity, activeTB }) {
         <div className="ml-auto flex items-center gap-2">
           <input
             type="text"
-            placeholder="Global Search…"
+            placeholder="Search trial balance..."
+            aria-label="Search trial balance"
             value={quickFilter}
             onChange={e => setQuickFilter(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm w-56 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+            className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:ring-2 focus:ring-rose-800 focus:outline-none"
           />
           {quickFilter && (
-            <button onClick={() => setQuickFilter('')} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+            <button onClick={() => setQuickFilter('')} aria-label="Clear trial balance search" className="text-slate-500 hover:text-slate-800 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-800">✕</button>
           )}
         </div>
       </div>
@@ -205,22 +208,22 @@ export default function ActualTBTable({ entity, activeTB }) {
             { label: 'Total Credit',    value: totals.credit },
             { label: 'Closing Balance', value: totals.closing_balance },
           ].map(({ label, value }) => (
-            <div key={label} className="summary-card flex-1 min-w-0">
+            <div key={label} className="summary-card flex-1 min-w-0 !border-slate-200 !rounded-xl !text-left">
               <div className="text-xs text-gray-500">{label}</div>
-              <div className={`text-sm font-bold mt-0.5 ${value < 0 ? 'text-red-600' : 'text-blue-800'}`}>
+              <div className={`text-sm font-semibold tabular-nums mt-0.5 ${value < 0 ? 'text-red-600' : 'text-slate-900'}`}>
                 {fmt(value)}
               </div>
             </div>
           ))}
-          <div className="summary-card flex-1 min-w-0">
+          <div className="summary-card flex-1 min-w-0 !border-slate-200 !rounded-xl !text-left">
             <div className="text-xs text-gray-500">Total Rows</div>
-            <div className="text-sm font-bold mt-0.5 text-blue-800">{rows.length.toLocaleString()}</div>
+            <div className="text-sm font-semibold tabular-nums mt-0.5 text-slate-900">{rows.length.toLocaleString()}</div>
           </div>
         </div>
       )}
 
       {/* Grid */}
-      <div className="flex-1 ag-theme-alpine overflow-hidden rounded border border-blue-100">
+      <div className="flex-1 min-h-0 ag-theme-alpine fsg-neutral-tb-grid overflow-hidden rounded-xl border border-slate-200">
         {loading ? (
           <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>
         ) : rows.length === 0 ? (

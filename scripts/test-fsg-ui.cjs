@@ -228,8 +228,10 @@ async function openAsUser(email, password, engagement, hash) {
   return signedIn;
 }
 
+// T-088: tabs and menu items show full names (Balance Sheet, Trial Balance, ...) and carry their key in data-key;
+// a key is matched first, then the visible text.
 async function clickFsgButton(label) {
-  return evaluate(`(() => { const b = [...document.querySelectorAll('.fsg-root button')].find((x) => x.textContent.replace(/\\s+/g, ' ').trim() === ${JSON.stringify(label)}); if (b) { b.click(); return true } return false })()`);
+  return evaluate(`(() => { const all = [...document.querySelectorAll('.fsg-root button')]; const b = all.find((x) => x.dataset.key === ${JSON.stringify(label)}) || all.find((x) => x.textContent.replace(/\\s+/g, ' ').trim() === ${JSON.stringify(label)}); if (b) { b.click(); return true } return false })()`);
 }
 
 async function setInputValue(selector, value) {
@@ -337,16 +339,16 @@ async function main() {
   await waitFor(`document.querySelector('.fsg-root') && document.body.innerText.includes('Review Financials')`, 30000);
   await sleep(1500);
   // T-036: the Dep menu lists only Dep (Books) and Dep (Income Tax).
-  const openDepMenu = () => evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\u25b4\u25be\s]+/g, ' ').trim() === 'Dep')?.click(), true)`);
+  const openDepMenu = () => evaluate(`(document.querySelector('.fsg-root [role=tablist] > button[data-key="Dep"]')?.click(), true)`);
   await openDepMenu();
-  const depItems = () => evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`);
+  const depItems = () => evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.dataset.key || x.textContent.replace(/\\s+/g, ' ').trim())`);
   await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
   const depMenu = await depItems();
   check('T-036 Dep menu shows only Dep (Books) and Dep (Income Tax)', JSON.stringify(depMenu) === JSON.stringify(['Dep (Books)', 'Dep (Income Tax)']), depMenu);
   for (const item of ['Dep (Books)', 'Dep (Income Tax)']) {
     if (!(await depItems()).length) await openDepMenu();
     await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
-    await evaluate(`([...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].find(x => x.textContent.replace(/\\s+/g, ' ').trim() === ${JSON.stringify(item)})?.click(), true)`);
+    await evaluate(`([...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].find(x => x.dataset.key === ${JSON.stringify(item)})?.click(), true)`);
     await sleep(800);
     check(`T-036 ${item} screen opens without an error`, await evaluate(`!/Something went wrong|coming soon/i.test(document.querySelector('.fsg-root')?.innerText || '') && /depreciation|block|asset/i.test(document.querySelector('.fsg-root')?.innerText || '')`));
   }
@@ -358,9 +360,11 @@ async function main() {
   const featureItems = await evaluate(`[...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].map(x => x.textContent.replace(/[\\u25b4\\u25be\\u25b8\\u203a\\s]+/g, ' ').trim())`);
   check('T-038 the Features menu no longer lists PPE', featureItems.length > 0 && !featureItems.some(t => /^PPE\\b/.test(t)), featureItems);
   // T-045: renamed and reordered menu bar; the reconciliation is Features > Reco.
-  const T045_ORDER = ['Master', 'TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Features', 'Check Control', 'Review Financials'];
-  const tabLabels = await evaluate(`[...document.querySelectorAll('.fsg-root [role=tablist] > button')].map(b => b.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim())`);
-  check('T-045 the menu bar reads Master > TB > Inventory > ... > Annex > Features > Check Control > Review Financials', JSON.stringify(tabLabels) === JSON.stringify(T045_ORDER), tabLabels);
+  // T-088 (owner, 27 Nov 2026): no Master tab (its page opens from the Auditee button in the top bar); tabs carry their key
+  // in data-key while showing full names.
+  const T045_ORDER = ['TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Features', 'Check Control', 'Review Financials'];
+  const tabLabels = await evaluate(`[...document.querySelectorAll('.fsg-root [role=tablist] > button')].map(b => b.dataset.key)`);
+  check('T-045 the menu bar reads TB > Inventory > ... > Annex > Features > Check Control > Review Financials', JSON.stringify(tabLabels) === JSON.stringify(T045_ORDER), tabLabels);
   check('T-045 every menu fits on screen at 1280 px wide or more, even with the VERA sidebar open', await evaluate(`(() => { const n = document.querySelector('.fsg-root [role=tablist]'); return window.innerWidth < 1280 || n.scrollWidth <= n.clientWidth + 1 })()`),
     await evaluate(`(() => { const n = document.querySelector('.fsg-root [role=tablist]'); return { scroll: n.scrollWidth, client: n.clientWidth, window: window.innerWidth } })()`));
   check('T-045 the Features menu lists Reco', featureItems.includes('Reco'), featureItems);
@@ -493,10 +497,119 @@ async function main() {
     await evaluate(`[...document.querySelectorAll('.fsg-root button.tab-active')].map(b => b.textContent.trim())`));
   check('T-043 Policy offers the blank / filled Excel format and its upload', await waitFor(`!!document.querySelector('.fsg-root .fsg-policy-blank') && !!document.querySelector('.fsg-root .fsg-policy-filled') && !!document.querySelector('.fsg-root .fsg-policy-upload')`, 10000));
 
+  // ── T-088 (owner request, 27 Nov 2026): the Auditee page, every action clicked through the screen ──────────────────
+  // Helpers in the page: fill a dialog field by its label, click a button by its text; confirm() answers yes (restored after).
+  await evaluate(`(window.__t = {
+    modal: () => { const b = [...document.querySelectorAll('.modal-backdrop')].pop(); return b ? b.firstElementChild : null },
+    fill(label, value) {
+      const root = window.__t.modal(); if (!root) return false;
+      const l = [...root.querySelectorAll('label')].find(x => x.textContent.trim().startsWith(label));
+      const el = l && l.parentElement.querySelector('input, textarea'); if (!el) return false;
+      const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true })); return true;
+    },
+    click(text, root) {
+      const b = [...(root || document).querySelectorAll('button')].find(x => x.textContent.replace(/\\s+/g, ' ').trim() === text);
+      if (b && !b.disabled) { b.click(); return true } return false;
+    },
+    card: (id) => document.querySelector('[data-testid="' + id + '"]'),
+  }, window.__confirm = window.confirm, window.confirm = () => true, true)`);
+  const t88Text = (id) => evaluate(`window.__t.card(${JSON.stringify(id)})?.innerText || ''`);
+  await evaluate(`(document.querySelector('[data-testid="fsr-auditee-button"]')?.click(), true)`);
+  check('T-088 the Auditee button opens the Auditee page and there is no Master tab',
+    await waitFor(`!!document.querySelector('[data-testid="master-page"]')`, 10000)
+      && await evaluate(`!document.querySelector('.fsg-root [role=tablist] > button[data-key="Master"]')`));
+  await screenshot('t088-01-auditee-page');
+
+  // Lock, then unlock (two-step confirmation) the 2024-25 period
+  await evaluate(`(document.querySelector('[aria-label="Lock 2024-25"]')?.click(), true)`);
+  const t88Locked = await waitFor(`!!document.querySelector('[aria-label="Unlock 2024-25"]')`, 8000);
+  const t88LockRow = (await fsg('entityPeriod:list', entityId)).result?.find((p) => p.id === periodId);
+  check('T-088 Lock on the Auditee page locks the period', t88Locked && !!t88LockRow?.locked, t88LockRow);
+  await evaluate(`(document.querySelector('[aria-label="Unlock 2024-25"]')?.click(), true)`);
+  await waitFor(`!!window.__t.modal()`, 5000);
+  await evaluate(`window.__t.click('Continue', window.__t.modal())`);
+  await waitFor(`!!window.__t.modal()?.querySelector('input[placeholder="UNLOCK"]')`, 5000);
+  await setInputValue('.modal-box input[placeholder="UNLOCK"]', 'UNLOCK');
+  await evaluate(`window.__t.click('Unlock Period', window.__t.modal())`);
+  const t88Unlocked = await waitFor(`!!document.querySelector('[aria-label="Lock 2024-25"]')`, 8000);
+  const t88UnlockRow = (await fsg('entityPeriod:list', entityId)).result?.find((p) => p.id === periodId);
+  check('T-088 Unlock on the Auditee page unlocks the period after the typed confirmation', t88Unlocked && !t88UnlockRow?.locked, t88UnlockRow);
+
+  // Auditors: Add, then Manage > Delete
+  await evaluate(`window.__t.click('Add auditor')`);
+  await waitFor(`!!window.__t.modal()`, 5000);
+  await evaluate(`window.__t.fill('Auditor Name', 'Synthetic Partner T088') && window.__t.fill('Membership No.', '123456')`);
+  await evaluate(`window.__t.click('Save', window.__t.modal())`);
+  await waitFor(`(window.__t.modal()?.innerText || '').includes('Synthetic Partner T088')`, 8000);
+  await evaluate(`(window.__t.modal()?.querySelector('[aria-label="Close"]')?.click(), true)`);
+  const t88AuditorShown = await waitFor(`(window.__t.card('master-auditors')?.innerText || '').includes('Synthetic Partner T088')`, 8000);
+  check('T-088 Add auditor saves and the Auditors card lists the auditor', t88AuditorShown
+    && (await fsg('auditor:list', entityId)).result?.some((a) => a.name === 'Synthetic Partner T088'), await t88Text('master-auditors'));
+  await evaluate(`window.__t.click('Manage auditors')`);
+  await waitFor(`(window.__t.modal()?.innerText || '').includes('Synthetic Partner T088')`, 5000);
+  await evaluate(`window.__t.click('Delete', window.__t.modal())`);
+  await waitFor(`!(window.__t.modal()?.innerText || '').includes('Synthetic Partner T088')`, 8000);
+  await evaluate(`(window.__t.modal()?.querySelector('[aria-label="Close"]')?.click(), true)`);
+  check('T-088 Manage auditors > Delete removes the auditor and the card shows the empty state',
+    await waitFor(`(window.__t.card('master-auditors')?.innerText || '').includes('No auditors added yet')`, 8000), await t88Text('master-auditors'));
+
+  // Signing authorities: Add, then Manage > Delete
+  await evaluate(`window.__t.click('Add signatory')`);
+  await waitFor(`!!window.__t.modal()`, 5000);
+  await evaluate(`window.__t.fill('Name', 'Synthetic Director T088')`);
+  await evaluate(`window.__t.click('Save', window.__t.modal())`);
+  await waitFor(`(window.__t.modal()?.innerText || '').includes('Synthetic Director T088')`, 8000);
+  await evaluate(`(window.__t.modal()?.querySelector('[aria-label="Close"]')?.click(), true)`);
+  check('T-088 Add signatory saves and the Signing authorities card lists the person',
+    await waitFor(`(window.__t.card('master-signatories')?.innerText || '').includes('Synthetic Director T088')`, 8000)
+      && (await fsg('signatory:list', entityId)).result?.some((s) => s.name === 'Synthetic Director T088'), await t88Text('master-signatories'));
+  await evaluate(`window.__t.click('Manage signatories')`);
+  await waitFor(`(window.__t.modal()?.innerText || '').includes('Synthetic Director T088')`, 5000);
+  await evaluate(`window.__t.click('Delete', window.__t.modal())`);
+  await waitFor(`!(window.__t.modal()?.innerText || '').includes('Synthetic Director T088')`, 8000);
+  await evaluate(`(window.__t.modal()?.querySelector('[aria-label="Close"]')?.click(), true)`);
+  check('T-088 Manage signatories > Delete removes the person',
+    await waitFor(`(window.__t.card('master-signatories')?.innerText || '').includes('No signing authorities added yet')`, 8000), await t88Text('master-signatories'));
+
+  // Branch Master on the page: add, rename, delete
+  await setInputValue('[aria-label="New branch name"]', 'Synthetic Branch T088');
+  await evaluate(`window.__t.click('＋ Add branch')`);
+  const t88BranchAdded = await waitFor(`[...document.querySelectorAll('[data-testid="branch-row"]')].some(r => r.innerText.includes('Synthetic Branch T088'))`, 8000);
+  await evaluate(`window.__t.click('Rename', [...document.querySelectorAll('[data-testid="branch-row"]')].find(r => r.innerText.includes('Synthetic Branch T088')))`);
+  await waitFor(`!!document.querySelector('[aria-label="New name for Synthetic Branch T088"]')`, 5000);
+  await setInputValue('[aria-label="New name for Synthetic Branch T088"]', 'Synthetic Branch T088 Renamed');
+  await evaluate(`window.__t.click('Save', document.querySelector('[aria-label="New name for Synthetic Branch T088"]').closest('tr'))`);
+  const t88BranchRenamed = await waitFor(`[...document.querySelectorAll('[data-testid="branch-row"]')].some(r => r.innerText.includes('Synthetic Branch T088 Renamed'))`, 8000);
+  await evaluate(`window.__t.click('Delete', [...document.querySelectorAll('[data-testid="branch-row"]')].find(r => r.innerText.includes('Synthetic Branch T088 Renamed')))`);
+  const t88BranchDeleted = await waitFor(`![...document.querySelectorAll('[data-testid="branch-row"]')].some(r => r.innerText.includes('Synthetic Branch T088'))`, 8000);
+  check('T-088 Branch Master on the Auditee page adds, renames and deletes a branch', t88BranchAdded && t88BranchRenamed && t88BranchDeleted,
+    { t88BranchAdded, t88BranchRenamed, t88BranchDeleted, list: (await fsg('tb:listBranchMaster', entityId)).result });
+
+  // Edit Auditee: an identity field saves to the VERA client record (owner decision), then is restored
+  const t88ClientAddress = () => evaluate(`globalThis.electronAPI.sqliteQuery({table:'clients',action:'select',columns:'*'}).then(r => r.data?.find(c => c.id === ${JSON.stringify(client.id)})?.address)`);
+  const t88EditAddress = async (value) => {
+    await evaluate(`window.__t.click('Edit', window.__t.card('master-auditee'))`);
+    await waitFor(`!!window.__t.modal() && !window.__t.modal().querySelector('textarea')?.disabled`, 5000);
+    await evaluate(`window.__t.fill('Address', ${JSON.stringify(value)})`);
+    await evaluate(`window.__t.click('Save Changes', window.__t.modal())`);
+    return waitFor(`!window.__t.modal()`, 8000);
+  };
+  const t88Saved = await t88EditAddress('2 Synthetic Lane, Bengaluru');
+  const t88Address = await t88ClientAddress();
+  check('T-088 Edit Auditee saves a changed address to the VERA client record and shows it on the page',
+    t88Saved && t88Address === '2 Synthetic Lane, Bengaluru'
+      && await waitFor(`(window.__t.card('master-auditee')?.innerText || '').includes('2 Synthetic Lane')`, 5000), { t88Saved, t88Address });
+  await screenshot('t088-02-auditee-page-after-actions');
+  await t88EditAddress('1 Example Road, Bengaluru');
+  check('T-088 the client address is restored for the rest of the run', await t88ClientAddress() === '1 Example Road, Bengaluru');
+  await evaluate(`(window.confirm = window.__confirm, true)`);
+
   // T-044: one-stop download / upload of every working of the active Trial Balance.
-  await evaluate(`([...document.querySelectorAll('.fsg-root button')].find(x => x.textContent.replace(/[\\u25b4\\u25be\\s]+/g, ' ').trim() === 'TB')?.click(), true)`);
+  await evaluate(`(document.querySelector('.fsg-root [role=tablist] > button[data-key="TB"]')?.click(), true)`);
   await waitFor(`document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]').length > 0`, 5000);
-  await evaluate(`([...document.querySelectorAll('.fsg-root [role=menu] [role=menuitem]')].find(x => x.textContent.replace(/\\s+/g, ' ').trim() === 'Upload TB')?.click(), true)`);
+  await evaluate(`(document.querySelector('.fsg-root [role=menu] [role=menuitem][data-key="Upload TB"]')?.click(), true)`);
   check('T-044 Upload TB offers Download all workings and Upload all workings', await waitFor(`!!document.querySelector('.fsg-root .fsg-workings-download') && !!document.querySelector('.fsg-root .fsg-workings-upload')`, 10000));
 
   check('Statement of Profit and Loss renders', pl, (await evaluate(`document.querySelector('.fsg-root')?.innerText || ''`)).slice(0, 1200));
