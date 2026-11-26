@@ -3,7 +3,7 @@
   "reviewedSourceCommit": "c0ea50820094952b3bad9c83b45cc00cbff0381c",
   "note": "Lexical source inventory only. Declarations and file existence are not runtime or UAT evidence. Refreshing this snapshot does not advance the reviewed code baseline.",
   "packageName": "icai-vera",
-  "packageVersion": "0.9.1",
+  "packageVersion": "1.0.0",
   "main": "electron/main.cjs",
   "preload": "electron/preload.cjs",
   "routes": [
@@ -1684,6 +1684,7 @@
     "electron/fsg/services/missing-alie.js",
     "electron/fsg/services/tally-odbc.js",
     "electron/fsg/services/tally-ppe.js",
+    "electron/fsg/shared/investments.js",
     "electron/fsg/shared/itrDetailsBlocks.js",
     "electron/gstin-lookup.cjs",
     "electron/ledger-analysis/tally-xml.cjs",
