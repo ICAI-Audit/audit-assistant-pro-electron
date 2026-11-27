@@ -91,8 +91,8 @@ function PeriodPickRow({ globalPeriods, alreadyAttachedIds, value, onChange, onR
 }
 
 // ICAI VERA (T-019): an Auditee is a VERA client. Name, constitution, address,
-// PAN and CIN are maintained on the client record in VERA (the main process
-// re-applies them on save); financial years come from the client's
+// PAN and CIN are kept on the client record in VERA. T-088 (owner, 27 Nov 2026): they are editable here and the
+// main process saves a change to that client record (electron/fsg/index.js, applyClientFieldsToEntitySave); financial years come from the client's
 // engagements, so no period is attached here. Nature of business, branches
 // and the auditor remain FSG settings.
 const veraManaged = true
@@ -148,7 +148,7 @@ export default function AuditeeFormModal({ mode, editing, onSaved, onClose }) {
         business_type: businessType,
         has_branches: hasBranches ? 1 : 0,
         address: address.trim(),
-        cin: constitutionDisplay === 'Company' ? cin.trim() : '',
+        cin: (constitutionDisplay === 'Company' || constitutionDisplay === 'LLP') ? cin.trim().toUpperCase() : '',
         pan: normalizePan(pan),
       })
       if (!veraManaged) {
@@ -181,7 +181,7 @@ export default function AuditeeFormModal({ mode, editing, onSaved, onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box max-w-lg max-h-[88vh] overflow-y-auto" ref={containerRef} onClick={e => e.stopPropagation()}>
+      <div className="modal-box max-w-lg max-h-[88%] overflow-y-auto" ref={containerRef} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-blue-900">{mode === 'edit' ? 'Edit Auditee' : 'Create Auditee'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
@@ -190,13 +190,15 @@ export default function AuditeeFormModal({ mode, editing, onSaved, onClose }) {
         <div className="space-y-3">
           {veraManaged && (
             <p className="text-xs text-gray-600 bg-blue-50 border border-blue-100 rounded px-3 py-2">
-              Name, constitution, address, PAN and CIN come from the client record in ICAI VERA. Change them there.
+              Name, constitution, address, PAN and CIN/LLPIN are saved to this client's record in ICAI VERA, so the change
+              shows everywhere in VERA. Changing them needs a manager, partner or admin. Changing the constitution changes
+              the format of the financial statements.
             </p>
           )}
           <div>
             <label className="block text-xs text-gray-500 mb-1">Auditee / Client Name</label>
             <input
-              type="text" value={name} onChange={e => setName(e.target.value)} disabled={veraManaged}
+              type="text" value={name} onChange={e => setName(e.target.value)}
               placeholder="e.g. ABC Pvt Ltd"
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
@@ -204,10 +206,10 @@ export default function AuditeeFormModal({ mode, editing, onSaved, onClose }) {
           <div>
             <label className="block text-xs text-gray-500 mb-1">Constitution of Entity</label>
             <select
-              value={constitutionDisplay} onChange={e => setConstitutionDisplay(e.target.value)} disabled={veraManaged}
+              value={constitutionDisplay} onChange={e => setConstitutionDisplay(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
-              {CONSTITUTION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {CONSTITUTION_OPTIONS.filter(o => !veraManaged || o.value !== 'Individual').map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           <div>
@@ -222,7 +224,7 @@ export default function AuditeeFormModal({ mode, editing, onSaved, onClose }) {
           <div>
             <label className="block text-xs text-gray-500 mb-1">Address</label>
             <textarea
-              value={address} onChange={e => setAddress(e.target.value)} disabled={veraManaged}
+              value={address} onChange={e => setAddress(e.target.value)}
               placeholder="Registered / business address"
               rows={2}
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
@@ -231,18 +233,18 @@ export default function AuditeeFormModal({ mode, editing, onSaved, onClose }) {
           <div>
             <label className="block text-xs text-gray-500 mb-1">PAN <span className="text-gray-400">(optional)</span></label>
             <input
-              type="text" value={pan} onChange={e => setPan(normalizePan(e.target.value))} maxLength={10} disabled={veraManaged}
+              type="text" value={pan} onChange={e => setPan(normalizePan(e.target.value))} maxLength={10}
               placeholder="e.g. ABCDE1234F"
               className={`w-full border rounded px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 uppercase ${isValidPan(pan) || pan.length < 10 ? 'border-gray-300 focus:ring-blue-400' : 'border-red-400 focus:ring-red-300'}`}
             />
             {pan.length === 10 && !isValidPan(pan) && <p className="text-xs text-red-600 mt-1">5 letters, then 4 digits, then 1 letter.</p>}
           </div>
-          {constitutionDisplay === 'Company' && (
+          {(constitutionDisplay === 'Company' || constitutionDisplay === 'LLP') && (
             <div>
-              <label className="block text-xs text-gray-500 mb-1">CIN</label>
+              <label className="block text-xs text-gray-500 mb-1">{constitutionDisplay === 'LLP' ? 'LLPIN' : 'CIN'}</label>
               <input
-                type="text" value={cin} onChange={e => setCin(e.target.value)} disabled={veraManaged}
-                placeholder="e.g. U12345MH2020PTC123456"
+                type="text" value={cin} onChange={e => setCin(e.target.value)}
+                placeholder={constitutionDisplay === 'LLP' ? 'e.g. AAA-0000' : 'e.g. U12345MH2020PTC123456'}
                 className="w-full border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>

@@ -7,6 +7,7 @@ import { parseBusyTB, buildTBRowsFromBusy } from '../../utils/busyParsers'
 import FinancialPeriodPicker from '../shared/FinancialPeriodPicker'
 import WorkingsModal, { workingsResultText } from './WorkingsModal'
 import VersionCarryModal from './VersionCarryModal'
+import ActualTBTable from './ActualTBTable'
 import { fsgApi } from '../../api.js'
 import { finishWorkbook } from '../../utils/veraExcel'
 import { workingsExcelSpec } from '../../utils/tbExcelSpecs'
@@ -112,19 +113,21 @@ function FormatChooserModal({ onChoose, onCancel }) {
   const containerRef = useModalKeys({ onClose: onCancel })
   return (
     <div className="modal-backdrop" onClick={onCancel}>
-      <div className="modal-box max-w-md" ref={containerRef} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-bold text-blue-900">Choose Trial Balance Format</h2>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      <div className="modal-box !max-w-4xl !p-0 max-h-[calc(100%-3rem)] mx-4 flex flex-col overflow-hidden" ref={containerRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="fsg-format-title" aria-describedby="fsg-format-description">
+        <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4 shrink-0">
+          <div>
+            <h2 id="fsg-format-title" className="text-lg font-semibold text-slate-900">Choose Trial Balance Format</h2>
+            <p id="fsg-format-description" className="text-sm text-slate-600 mt-1">Select the source format of your Trial Balance.</p>
+          </div>
+          <button onClick={onCancel} aria-label="Close" className="text-slate-500 hover:text-slate-900 text-xl leading-none rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800">&times;</button>
         </div>
-        <p className="text-xs text-gray-500 mb-4">Select the source format of your Trial Balance.</p>
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-6 pb-6 overflow-y-auto">
           <button
             onClick={() => onChoose('simple')}
-            className="fsg-format-simple w-full text-left border border-blue-300 rounded p-3 hover:border-blue-500 hover:bg-blue-50 transition"
+            className="fsg-format-simple w-full text-left border border-slate-200 rounded-xl p-4 hover:border-slate-400 hover:bg-slate-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800"
           >
-            <div className="text-sm font-semibold text-blue-900">Simple Excel Format (Trial Balance and Masters)</div>
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold text-slate-900">Simple Excel Format (Trial Balance and Masters)</span><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">1 workbook</span></div>
+            <div className="text-xs leading-relaxed text-slate-600 mt-2">
               One Excel workbook with two sheets: the Trial Balance (Ledger · Under Group · Opening · Debit ·
               Credit · Closing, in Dr and Cr columns) and the Groups master (Group · Under Group · Nature). Works
               for any accounting software. Get the blank format with &quot;Download Template&quot;.
@@ -132,10 +135,10 @@ function FormatChooserModal({ onChoose, onCancel }) {
           </button>
           <button
             onClick={() => onChoose('tally')}
-            className="w-full text-left border border-gray-300 rounded p-3 hover:border-blue-500 hover:bg-blue-50 transition"
+            className="w-full text-left border border-slate-200 rounded-xl p-4 hover:border-slate-400 hover:bg-slate-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800"
           >
-            <div className="text-sm font-semibold text-blue-900">Tally Trial Balance &amp; Chart of Accounts</div>
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold text-slate-900">Tally Trial Balance &amp; Chart of Accounts</span><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">2 files</span></div>
+            <div className="text-xs leading-relaxed text-slate-600 mt-2">
               Two files: a Tally TB Excel (Particulars · Opening · Debit · Credit · Closing with
               Dr/Cr suffixes) and a Tally Master JSON (chart of accounts → builds the Level 1–7
               hierarchy automatically).
@@ -143,20 +146,20 @@ function FormatChooserModal({ onChoose, onCancel }) {
           </button>
           <button
             onClick={() => onChoose('realbooks')}
-            className="w-full text-left border border-gray-300 rounded p-3 hover:border-blue-500 hover:bg-blue-50 transition"
+            className="w-full text-left border border-slate-200 rounded-xl p-4 hover:border-slate-400 hover:bg-slate-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800"
           >
-            <div className="text-sm font-semibold text-blue-900">Real Books Format</div>
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold text-slate-900">Real Books Format</span><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">2 files</span></div>
+            <div className="text-xs leading-relaxed text-slate-600 mt-2">
               Two files: a Real Books Trial Balance Excel (Ledger Group Details Pivot Structure) and
               a Real Books Ledger Master Excel.
             </div>
           </button>
           <button
             onClick={() => onChoose('zoho')}
-            className="w-full text-left border border-gray-300 rounded p-3 hover:border-blue-500 hover:bg-blue-50 transition"
+            className="w-full text-left border border-slate-200 rounded-xl p-4 hover:border-slate-400 hover:bg-slate-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800"
           >
-            <div className="text-sm font-semibold text-blue-900">Zoho Books Format</div>
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold text-slate-900">Zoho Books Format</span><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">1 file</span></div>
+            <div className="text-xs leading-relaxed text-slate-600 mt-2">
               One Excel file — Zoho Books&apos; Trial Balance report (Account · Account Code · Opening
               Balance · Net Debit · Net Credit · Closing Balance). Zoho shows Debit as + and Credit as −;
               it is converted automatically. Suitable for a branch&apos;s Trial Balance too.
@@ -164,10 +167,10 @@ function FormatChooserModal({ onChoose, onCancel }) {
           </button>
           <button
             onClick={() => onChoose('busy')}
-            className="w-full text-left border border-gray-300 rounded p-3 hover:border-blue-500 hover:bg-blue-50 transition"
+            className="w-full text-left border border-slate-200 rounded-xl p-4 hover:border-slate-400 hover:bg-slate-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800"
           >
-            <div className="text-sm font-semibold text-blue-900">Busy Accounting Software Format</div>
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold text-slate-900">Busy Accounting Software Format</span><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">1 file</span></div>
+            <div className="text-xs leading-relaxed text-slate-600 mt-2">
               One Excel file — Busy&apos;s Trial Balance (Account/Group Name · Opening Bal. · Debit · Credit · Closing Bal.,
               balances with Dr / Cr). The group tree is read from Busy&apos;s own indentation and checked against every
               group total. Suitable for a branch&apos;s Trial Balance too.
@@ -175,20 +178,20 @@ function FormatChooserModal({ onChoose, onCancel }) {
           </button>
           <button
             onClick={() => onChoose('tally_auto')}
-            className="w-full text-left border border-green-300 rounded p-3 hover:border-green-500 hover:bg-green-50 transition"
+            className="w-full text-left border border-emerald-300 bg-emerald-50 rounded-xl p-4 hover:border-emerald-500 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800"
           >
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-green-800">⚡ Tally Auto-Import (Live)</span>
-              <span className="text-[10px] bg-green-100 text-green-700 border border-green-400 rounded px-1 py-0.5 font-medium">NEW</span>
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-sm font-semibold text-emerald-800">⚡ Tally Auto-Import (Live) <span className="ml-1 text-[10px] font-semibold">NEW</span></span>
+              <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-600">No file</span>
             </div>
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="text-xs leading-relaxed text-slate-600 mt-2">
               Connect directly to Tally while it is open. TB and Chart of Accounts are imported
               automatically — no file export needed. Tally must be running on this computer.
             </div>
           </button>
         </div>
-        <div className="mt-4 flex">
-          <button onClick={onCancel} className="ml-auto px-3 py-1.5 border border-gray-300 text-gray-600 rounded text-xs hover:bg-gray-50 transition">
+        <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-6 py-3 shrink-0">
+          <button onClick={onCancel} className="px-3 py-2 border border-slate-300 bg-white text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-100 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-800">
             Cancel
           </button>
         </div>
@@ -1201,59 +1204,62 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
 
   return (
     <div className="flex flex-col h-full p-4 gap-3">
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap shrink-0">
-        {/* TB selector */}
+      {/* Toolbar (T-088, owner 27 Nov 2026): which Trial Balance on the left; then the file actions in groups —
+          template, workings, upload (the primary action) and delete set apart at the end. */}
+      <div className="flex items-center gap-2 flex-wrap shrink-0" role="toolbar" aria-label="Trial Balance">
         {tbList.length > 0 && (
-          <select
-            value={selectedTBId}
-            onChange={handleTBSelect}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
-          >
-            <option value="">— Select Trial Balance —</option>
-            {tbList.map(t => (
-              <option key={t.id} value={t.id}>
-                {tbDisplayName(t)} — {t.filename} ({t.row_count} rows)
-              </option>
-            ))}
-          </select>
+          <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+            Trial Balance
+            <select
+              value={selectedTBId}
+              onChange={handleTBSelect}
+              className="border border-gray-300 rounded px-3 py-1.5 text-sm font-normal text-slate-900 max-w-[28rem] focus:ring-2 focus:ring-blue-400 focus:outline-none"
+            >
+              <option value="">— Select Trial Balance —</option>
+              {tbList.map(t => (
+                <option key={t.id} value={t.id}>
+                  {tbDisplayName(t)} — {t.filename} ({t.row_count} rows)
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <span className="ml-auto" />
+
+        <button
+          onClick={handleDownloadTemplate}
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition"
+          title="The blank simple Trial Balance format"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          Download Template
+        </button>
+
+        {activeTB && Number.isInteger(Number(activeTB.id)) && (
+          <div className="flex items-center rounded border border-gray-300 overflow-hidden" role="group" aria-label="Workings">
+            <button
+              onClick={handleDownloadWorkings}
+              className="fsg-workings-download fsr-keep flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 text-sm hover:bg-gray-50 transition"
+              title="One Excel file with every working of this Trial Balance: Fill Details, depreciation, Stock, manual PY, remarks, adjustments, journal entries and the client's learned ledger rules"
+            >⬇ Download all workings</button>
+            <button
+              onClick={handleUploadWorkings}
+              className="fsg-workings-upload fsr-keep flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 text-sm border-l border-gray-300 hover:bg-gray-50 transition"
+              title="Bring workings back from a 'Download all workings' file into this Trial Balance - you choose what"
+            >⬆ Upload all workings</button>
+          </div>
         )}
 
         <button
           onClick={handleUpload}
           disabled={uploading || !entity}
-          className="flex items-center gap-2 px-3 py-1.5 text-white text-sm rounded hover:opacity-90 disabled:opacity-40 transition" style={{ background: 'var(--color-primary)' }}
+          className="flex items-center gap-2 px-3 py-1.5 text-white text-sm font-semibold rounded hover:opacity-90 disabled:opacity-40 transition" style={{ background: 'var(--color-primary)' }}
+          title={activeTB ? 'Upload a new Trial Balance (a second upload for the same year becomes its next version)' : 'Upload the Trial Balance for this year'}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           {uploading ? 'Uploading…' : 'Upload Trial Balance'}
         </button>
-
-        <button
-          onClick={handleDownloadTemplate}
-          className="flex items-center gap-2 px-3 py-1.5 border border-blue-600 text-blue-700 text-sm rounded hover:bg-blue-50 transition"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Download Template
-        </button>
-
-        {activeTB && Number.isInteger(Number(activeTB.id)) && (
-          <>
-            <button
-              onClick={handleDownloadWorkings}
-              className="fsg-workings-download flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition"
-              title="One Excel file with every working of this Trial Balance: Fill Details, depreciation, Stock, manual PY, remarks, adjustments, journal entries and the client's learned ledger rules"
-            >⬇ Download all workings</button>
-            <button
-              onClick={handleUploadWorkings}
-              className="fsg-workings-upload flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition"
-              title="Bring workings back from a 'Download all workings' file into this Trial Balance - you choose what"
-            >⬆ Upload all workings</button>
-          </>
-        )}
 
         {activeTB && (
           <button
@@ -1262,9 +1268,7 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
             className="flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-600 text-sm rounded hover:bg-red-50 disabled:opacity-40 transition"
             title="Delete this Trial Balance and all its mappings"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             Delete TB
           </button>
         )}
@@ -1278,9 +1282,20 @@ export default function UploadTB({ entity, activeTB, activeRsId, onTBLoaded, onG
 
       {error && <div className="text-red-500 text-sm bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>}
 
-      {activeTB && (
-        <div className="text-sm text-blue-800 bg-blue-50 border border-blue-100 rounded px-3 py-2">
-          Active Trial Balance: <span className="font-semibold">{tbDisplayName(activeTB)}</span> — see it in the <span className="font-semibold">Actual TB</span> tab.
+      {/* T-088 (owner, 27 Nov 2026): a Trial Balance already in the database is shown here, not only on Actual Trial Balance. */}
+      {activeTB ? (
+        <div className="flex-1 min-h-0" data-testid="upload-tb-current">
+          <ActualTBTable entity={entity} activeTB={activeTB} embedded />
+        </div>
+      ) : entity && (
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6" data-testid="upload-tb-empty">
+          <p className="text-sm font-semibold text-slate-800">No Trial Balance for this year yet</p>
+          <p className="mt-1 max-w-md text-sm text-slate-500">Upload it from Tally, Zoho, Busy, Real Books or the simple Excel format. Get the blank format with Download Template.</p>
+          <button onClick={handleUpload} disabled={uploading}
+            className="mt-4 flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded hover:opacity-90 disabled:opacity-40 transition" style={{ background: 'var(--color-primary)' }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            {uploading ? 'Uploading…' : 'Upload Trial Balance'}
+          </button>
         </div>
       )}
 

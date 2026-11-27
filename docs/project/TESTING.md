@@ -22,6 +22,8 @@ Static inspection proves only the observed code path. Unit tests verify stated b
 | Tax Audit Form No. 26 (T-067) | `npx vitest run taxAudit` and `npx vitest run src/components/tax-audit` from the upper-case path; `node scripts/tax-audit-form26/generate-definition.mjs --check` after any change to the extraction; type check (49, none in a Form 26 file); the Tax Audit application test, full run, on a scratch build (see the Form No. 26 section below), and `--short` for a change that touches only Form 3CD; the Form 3CD snapshot must stay equal; for a change of the form's content, the domain team's answer recorded as a decision first |
 | Electron or packaging | Native rebuild, dev launch, production launch and target-platform installer smoke |
 
+For a development Electron smoke test, set `ICAI_VERA_DEV_USER_DATA_DIR` to a new absolute temporary directory before `npm run electron:dev`. The override is rejected outside `NODE_ENV=development` and when it points at Electron's default `userData` directory. Confirm the startup log names the isolated path; do not test against the user's normal database.
+
 ## Application checks and current evidence
 
 Use `npx tsc -p tsconfig.app.json --noEmit` to explicitly check the application source. Root tsconfig uses references; do not assume a root noEmit command proves every referenced project was checked. Use `npx vitest run src/lib` for the existing tax-audit helpers, and select other Vitest-style files as applicable. package.json has no generic npm test command. It also runs the PDF Tools library tests; the PDF Tools screen tests are run with `npx vitest run src/components/pdf-tools`.

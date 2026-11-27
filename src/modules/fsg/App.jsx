@@ -1,33 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import TopBar from './components/Layout/TopBar'
+import { fsrPrefs } from '../../lib/fsrPrefs'
 import NavTabs, { TOP_SHORTCUTS } from './components/Layout/NavTabs'
-import Master from './components/Master'
-import BranchMaster from './components/BranchMaster'
-import UploadTB from './components/TrialBalance/UploadTB'
-import ActualTBTable from './components/TrialBalance/ActualTBTable'
-import StockPage from './components/Stock/StockPage'
-import TallyTBUpload from './components/TallyTBUpload'
-import MappingRules from './components/MappingRules'
-import MappedTB from './components/MappedTB'
-import MappedTBWithRemarks from './components/MappedTBWithRemarks'
-import Exceptions from './components/Exceptions'
-import ExceptionReport from './components/ExceptionReport'
-import DepreciationIT from './components/DepreciationIT'
-import DepreciationComp from './components/DepreciationComp'
-import BS from './components/BS'
-import PL from './components/PL'
-import CFS from './components/CFS'
-import TaxComputation from './components/TaxComputation'
-import DeferredTax from './components/DeferredTax'
-import Notes from './components/Notes'
-import Annexures from './components/Annexures'
-import ITR from './components/ITR'
 import { ConsolidationContext } from './utils/consolidationSelection'
 import { consolidatedPeriodOf } from './utils/consolidatedPeriod'
-import Ratio from './components/Ratio'
-import Format from './components/Format'
-import GeneralNotes from './components/GeneralNotes'
-import GenerateFinancials from './components/GenerateFinancials'
 import SettingsModal from './components/shared/SettingsModal'
 import BranchModeBar from './components/shared/BranchModeBar'
 import AdjustmentNotice from './components/shared/AdjustmentNotice'
@@ -36,6 +12,32 @@ import { undo as undoCategorisation, redo as redoCategorisation, canUndo as canU
 import { fsgApi } from './api.js'
 import { tbDisplayName } from './utils/tbVersions'
 import { getPortalRoot } from './portalRoot.js'
+
+// Each screen is loaded when it is first opened, so opening the module does not wait for all of them.
+const Master = lazy(() => import('./components/Master'))
+const BranchMaster = lazy(() => import('./components/BranchMaster'))
+const UploadTB = lazy(() => import('./components/TrialBalance/UploadTB'))
+const ActualTBTable = lazy(() => import('./components/TrialBalance/ActualTBTable'))
+const StockPage = lazy(() => import('./components/Stock/StockPage'))
+const MappingRules = lazy(() => import('./components/MappingRules'))
+const MappedTB = lazy(() => import('./components/MappedTB'))
+const MappedTBWithRemarks = lazy(() => import('./components/MappedTBWithRemarks'))
+const Exceptions = lazy(() => import('./components/Exceptions'))
+const ExceptionReport = lazy(() => import('./components/ExceptionReport'))
+const DepreciationIT = lazy(() => import('./components/DepreciationIT'))
+const DepreciationComp = lazy(() => import('./components/DepreciationComp'))
+const BS = lazy(() => import('./components/BS'))
+const PL = lazy(() => import('./components/PL'))
+const CFS = lazy(() => import('./components/CFS'))
+const TaxComputation = lazy(() => import('./components/TaxComputation'))
+const DeferredTax = lazy(() => import('./components/DeferredTax'))
+const Notes = lazy(() => import('./components/Notes'))
+const Annexures = lazy(() => import('./components/Annexures'))
+const ITR = lazy(() => import('./components/ITR'))
+const Ratio = lazy(() => import('./components/Ratio'))
+const Format = lazy(() => import('./components/Format'))
+const GeneralNotes = lazy(() => import('./components/GeneralNotes'))
+const GenerateFinancials = lazy(() => import('./components/GenerateFinancials'))
 
 const THEME_KEY = 'vera-theme'
 
@@ -67,7 +69,9 @@ const LOCK_BANNER_TABS = new Set([
 ])
 // T-038: "General Notes" is shown as "Policy" (Ctrl+Shift+O); PPE removed from Features.
 // T-045: Trial Balance shown as TB, Stock as Inventory, Annex & Reco as Annex (its reconciliation moved to Features > Reco), Generate Financials as Review Financials.
-const TABS = ['Master', 'TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Features', 'Check Control', 'Review Financials']
+// T-088 (owner, 27 Nov 2026): no Master tab. The Auditee button in the top bar opens the Auditee page, which holds the items of TAB_GROUPS.Master
+// (TopBar.jsx) and its page; Ctrl+Shift+M opens that page.
+const TABS = ['TB', 'Inventory', 'Mapping', 'Dep', 'BS', 'PL', 'CFS', 'Notes', 'A/c Policy', 'Annex', 'Features', 'Check Control', 'Review Financials']
 // ICAI VERA: the Auditee is the engagement's client and the Financial Year comes
 // from the engagement, so Master has no Financial Period leaf (T-019).
 const TAB_GROUPS = {
@@ -181,6 +185,22 @@ export default function App({ context }) {
     try { localStorage.setItem(THEME_KEY, theme) } catch { /* not remembered */ }
   }, [theme])
 
+  // Presentation preferences (full report heading, density) are mirrored onto the module root and its dialog/menu portal root.
+  useEffect(() => {
+    const unbindRoot = fsrPrefs.bind(rootRef.current)
+    const unbindPortal = fsrPrefs.bind(getPortalRoot())
+    return () => { unbindRoot(); unbindPortal(); fsrPrefs.setFocus(false) }
+  }, [])
+
+  // Esc leaves Focus mode first, before the "Esc goes back to the previous screen" rule below sees the key.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape' && fsrPrefs.getFocus()) { e.stopImmediatePropagation(); e.preventDefault(); fsrPrefs.setFocus(false) }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
   useEffect(() => {
     try { localStorage.setItem('vera-numFormat', numFormat) } catch { /* not remembered */ }
   }, [numFormat])
@@ -211,7 +231,8 @@ export default function App({ context }) {
       const tab = TAB_OF_KEY[(e.key || '').toUpperCase()]
       if (!tab) return
       e.preventDefault()
-      if (TAB_GROUPS[tab]) setMenuRequest({ tab, n: Date.now() })
+      if (tab === 'Master') setActiveTab('Auditee Details')   // T-088: no Master tab; the Auditee page
+      else if (TAB_GROUPS[tab]) setMenuRequest({ tab, n: Date.now() })
       else setActiveTab(tab)
     }
     window.addEventListener('keydown', handler, true)
@@ -472,6 +493,8 @@ export default function App({ context }) {
             onEntityChange={(e) => handleEntityChange(e, currentEntityPeriodId)}
             onOpenMappingRules={() => setActiveTab('Mapping Rules')}
             activeLeaf={activeTab}
+            onPeriodLockChange={(id, locked) => setEntityPeriods(prev => prev.map(p => p.id === id ? { ...p, locked } : p))}
+            onBranchesChanged={refreshBranchTBList}
           />
         )
       // T-087: the branches of an Auditee with branches (rename / delete); the upload screens' Branch list
@@ -847,7 +870,9 @@ export default function App({ context }) {
       <TopBar
         entity={entity}
         engagement={context?.engagement}
-        onOpenMaster={() => setActiveTab('Auditee Details')}
+        activeTab={activeTab}
+        onOpenMaster={(leaf) => setActiveTab(leaf || 'Auditee Details')}
+        masterItems={TAB_GROUPS.Master}
         onSettings={() => setShowSettings(true)}
         theme={theme}
         onThemeChange={setTheme}
@@ -877,12 +902,14 @@ export default function App({ context }) {
       )}
 
       <div className="flex-1 overflow-hidden" key={refreshKey}>
-        {renderTab()}
+        <Suspense fallback={<div role="status" className="flex h-full items-center justify-center text-sm text-gray-400">Loading…</div>}>
+          {renderTab()}
+        </Suspense>
       </div>
 
       {tbChoicePrompt && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-[480px] max-w-[90vw] p-5">
+          <div className="bg-white rounded-lg shadow-xl w-[30rem] max-w-[calc(100%-2rem)] p-5">
             <h3 className="font-bold text-blue-900 text-sm mb-1">More than one Trial Balance for this Financial Year</h3>
             <p className="text-xs text-gray-500 mb-3">Pick which one to work with — you can switch again later from the Financial Year badge.</p>
             <div className="max-h-72 overflow-y-auto border border-gray-200 rounded divide-y divide-gray-100">

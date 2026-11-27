@@ -320,7 +320,7 @@ export default function ShortTermBorrowingsForm({ tbId, entityId, useEntityLevel
   return (
     <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 9999 }}>
       <div className="modal-box overflow-hidden flex flex-col"
-        style={{ maxWidth: '1000px', width: '95vw', maxHeight: '92vh' }}
+        style={{ maxWidth: 'calc(62.5rem * var(--fsr-scale))', width: '95%', maxHeight: '92%' }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}

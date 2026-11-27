@@ -11,6 +11,7 @@
 //   4. adds `fsg:context:open`, which links the selected VERA engagement to
 //      its FSG entity (the client) and entity period (the financial year).
 
+import { createRequire } from 'node:module'
 import { attachDatabase, query, runInTransaction } from './db/client.js'
 import { ensureLevel1Fallbacks } from './db/level1-fallbacks.js'
 import { ensureSchema } from './db/schema.js'
@@ -37,6 +38,9 @@ import { summarizeEngagement } from './engagement-summary.js'
 import { AuthorizationError, CHANNEL_POLICY, authorizeCall, createPathGuard, filterResult } from './authorization.js'
 
 export const CHANNEL_PREFIX = 'fsg:'
+
+// The VERA client-master write shared with the Permanent File module (CommonJS).
+const { saveClientMaster } = createRequire(import.meta.url)('../permanent-file/entities.cjs')
 
 // ── VERA client / engagement → FSG entity / period ─────────────────────────
 
@@ -177,13 +181,52 @@ export async function openEngagementContext(db, engagementId) {
 }
 
 // FSG fields that VERA owns: an Auditee's identity comes from the VERA client.
-async function applyClientFieldsToEntitySave(db, args) {
+// FSG constitution label -> VERA client constitution (the reverse of CONSTITUTION_MAP).
+const CLIENT_CONSTITUTION_OF = { Company: 'company', LLP: 'llp', Partnership: 'partnership', Proprietorship: 'proprietorship' }
+const norm = (v) => String(v ?? '').trim()
+
+// T-088 (owner decision, 27 November 2026): Name, constitution, address, PAN and CIN are edited from Financial Statement
+// Review too, and an edit is saved to the VERA client record, so it shows everywhere in VERA and is not lost when the
+// module re-reads the client. The write goes through the Permanent File client-master function, so the same rules apply:
+// manager or above, client access, PAN / CIN / LLPIN formats, PAN-holder type, linked GSTINs, engagement names updated.
+// The entity then takes its identity fields from the (updated) client exactly as before.
+async function applyClientFieldsToEntitySave(db, args, context) {
   const e = args[0]
   if (!e || e.id == null) return args
   const row = db.prepare(
     'SELECT c.* FROM entities e JOIN clients c ON c.id = e.client_id WHERE e.id = ?').get(Number(e.id))
   if (!row || !mapClientConstitution(row.constitution)) return args
-  return [{ ...e, ...clientEntityFields(row) }, ...args.slice(1)]
+  const current = clientEntityFields(row)
+  const wanted = {
+    name: norm(e.name), constitution_display: norm(e.constitution_display), address: norm(e.address),
+    pan: norm(e.pan).toUpperCase(), cin: norm(e.cin).toUpperCase(),
+  }
+  const changed = wanted.name !== norm(current.name)
+    || wanted.constitution_display !== norm(current.constitution_display)
+    || wanted.address !== norm(current.address)
+    || wanted.pan !== norm(current.pan)
+    // CIN only applies to a Company / LLP; the form sends it blank otherwise.
+    || (['Company', 'LLP'].includes(wanted.constitution_display) && wanted.cin !== norm(current.cin).toUpperCase())
+  let client = row
+  if (changed) {
+    const constitution = CLIENT_CONSTITUTION_OF[wanted.constitution_display]
+    if (!constitution) throw new Error(`"${wanted.constitution_display}" is not a VERA client constitution. Choose Company, LLP, Partnership or Proprietorship.`)
+    try {
+      saveClientMaster(db, context, row.id, {
+        name: wanted.name, constitution,
+        cin: ['company', 'llp'].includes(constitution) ? wanted.cin : '',
+        pan: wanted.pan, address: wanted.address,
+        industry: norm(row.industry), state: norm(row.state), pin: norm(row.pin),
+      })
+    } catch (err) {
+      const why = /access denied/i.test(err?.message || '')
+        ? 'you can change a client\'s details only when you are assigned to one of its engagements, or as an admin'
+        : (err?.message || String(err))
+      throw new Error(`The VERA client record was not changed: ${why}`)
+    }
+    client = db.prepare('SELECT * FROM clients WHERE id = ?').get(row.id)
+  }
+  return [{ ...e, ...clientEntityFields(client) }, ...args.slice(1)]
 }
 
 // ── Registration ───────────────────────────────────────────────────────────
@@ -249,7 +292,7 @@ export async function initFsg({ db, ipcMain, getAuthorizedSession, isTrustedRend
         const context = authorize(event)
         const policy = authorizeCall({ db, context, channel, args: rawArgs })
         pathGuard.check(policy, rawArgs)
-        const args = channel === 'entity:save' ? await applyClientFieldsToEntitySave(db, rawArgs) : rawArgs
+        const args = channel === 'entity:save' ? await applyClientFieldsToEntitySave(db, rawArgs, context) : rawArgs
         const result = await handler(event, ...args)
         pathGuard.recordDialogResult(channel, result)
         return { ok: true, result: filterResult({ db, context, policy, result }) }

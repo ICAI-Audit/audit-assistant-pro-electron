@@ -969,9 +969,9 @@ export default function MappedTB({ entity, activeTB, prevTB, onPrevTBChange, act
       valueGetter: (p) => locationMap.get(p.data?.id) || '—',
       cellStyle: (p) => {
         const v = p.value || ''
-        if (v.startsWith('BS'))  return { color: '#1e40af', fontWeight: 500, fontSize: '11px' }
-        if (v.startsWith('P&L')) return { color: '#065f46', fontWeight: 500, fontSize: '11px' }
-        return { color: '#6b7280', fontSize: '11px' }
+        if (v.startsWith('BS'))  return { color: '#1e40af', fontWeight: 500, fontSize: 'var(--fsr-text-xs)' }
+        if (v.startsWith('P&L')) return { color: '#065f46', fontWeight: 500, fontSize: 'var(--fsr-text-xs)' }
+        return { color: '#6b7280', fontSize: 'var(--fsr-text-xs)' }
       },
     },
     // Status — pinned right
@@ -995,21 +995,21 @@ export default function MappedTB({ entity, activeTB, prevTB, onPrevTBChange, act
             {isConflict ? (
               <button
                 onClick={() => setConflictRow(r)}
-                className="px-2 py-0.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                className="fsr-secondary px-2 py-0.5 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
               >
                 Resolve
               </button>
             ) : isDiscrepancy ? (
               <button
                 onClick={() => setDiscrepancyRow(r)}
-                className="px-2 py-0.5 text-xs bg-amber-600 text-white rounded hover:bg-amber-700"
+                className="fsr-secondary px-2 py-0.5 text-xs bg-amber-600 text-white rounded hover:bg-amber-700"
               >
                 Review
               </button>
             ) : !isApproved ? (
               <button
                 onClick={() => handleApprove(r)}
-                className="px-2 py-0.5 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                className="fsr-secondary px-2 py-0.5 text-xs bg-green-600 text-white rounded hover:bg-green-700"
               >
                 Approve
               </button>
@@ -1132,7 +1132,7 @@ export default function MappedTB({ entity, activeTB, prevTB, onPrevTBChange, act
           onClick={handleRunMapping}
           disabled={running || !activeTB}
           title="Run Auto-Mapping (Ctrl+R)"
-          className="flex items-center gap-2 px-4 py-1.5 bg-blue-700 text-white text-sm rounded font-medium hover:bg-blue-800 disabled:opacity-40 transition"
+          className="fsr-primary flex items-center gap-2 px-4 py-1.5 bg-blue-700 text-white text-sm rounded font-medium hover:bg-blue-800 disabled:opacity-40 transition"
         >
           {running
             ? <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -1156,7 +1156,7 @@ export default function MappedTB({ entity, activeTB, prevTB, onPrevTBChange, act
             <button
               onClick={handleDownloadExcel}
               disabled={downloading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded font-medium hover:bg-green-700 disabled:opacity-40 transition"
+              className="fsr-secondary flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded font-medium hover:bg-green-700 disabled:opacity-40 transition"
               title="Download Mapped Trial Balance as Excel"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1300,7 +1300,7 @@ export default function MappedTB({ entity, activeTB, prevTB, onPrevTBChange, act
           <button
             key={key}
             onClick={() => setFilterStatus(key)}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${cls} hover:opacity-80
+            className={`fsr-keep fsr-pill px-2.5 py-1 rounded-full text-xs font-medium transition ${cls} hover:opacity-80
               ${filterStatus === key ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
           >
             {label}

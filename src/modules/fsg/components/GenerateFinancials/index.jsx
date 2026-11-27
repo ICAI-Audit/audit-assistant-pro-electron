@@ -396,11 +396,14 @@ export default function GenerateFinancials({
         </div>
       )}
 
+      {/* Two columns on wide screens: Summary + Signatures | export cards (layout wrappers only) */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-4 items-start">
+      <div className="flex flex-col gap-4 min-w-0">
+
       {/* Summary card */}
       <div className="bg-white rounded-lg border p-4" style={{ borderColor: 'var(--color-border-soft)' }}>
         <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--color-primary)' }}>Summary</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div><div className="text-xs text-gray-500">Entity</div><div className="font-semibold text-gray-800">{entity?.name || '—'}</div></div>
           <div><div className="text-xs text-gray-500">{isBranchEntity ? 'Branches' : 'Period (CY)'}</div><div className="font-semibold text-gray-800">{isBranchEntity ? (branchTBList.length || '—') : (activeTB?.period || '—')}</div></div>
           <div>
             <div className="text-xs text-gray-500">Period (PY)</div>
@@ -550,6 +553,8 @@ export default function GenerateFinancials({
 
       {summaryLoading && <div className="text-gray-500 text-sm">Loading financial data...</div>}
       {summaryError && <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded px-3 py-2">{summaryError}</div>}
+      </div>
+      <div className="flex flex-col gap-4 min-w-0">
 
       {/* ── Export buttons: branch entities get two separate sections ── */}
       {isBranchEntity ? (
@@ -645,7 +650,7 @@ export default function GenerateFinancials({
         </div>
       ) : (
         /* ── Single-entity export (original layout) ── */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="bg-white rounded-lg border p-5 flex flex-col" style={{ borderColor: 'var(--color-border-soft)' }}>
             <div className="flex items-start gap-3 mb-3">
               <div className="text-3xl">📊</div>
@@ -694,6 +699,8 @@ export default function GenerateFinancials({
           </div>
         </div>
       )}
+      </div>
+      </div>
 
       {/* Denomination + Place/Date confirmation modal — shared by every export
           kind (single/consolidated × Excel/PDF) so Place & Date are asked

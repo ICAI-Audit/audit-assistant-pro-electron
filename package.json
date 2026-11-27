@@ -31,7 +31,9 @@
     "test:t003-authorization": "npm run build && node --test scripts/test-t003-authorization.cjs",
     "docs:check": "node scripts/check-project-docs.mjs",
     "docs:inventory": "node scripts/check-project-docs.mjs --refresh-inventory",
-    "sync:ocr-assets": "node scripts/sync-ocr-assets.mjs"
+    "sync:ocr-assets": "node scripts/sync-ocr-assets.mjs",
+    "gen:fsr-scale": "node scripts/gen-fsr-scale.cjs",
+    "lint:fsr-ui": "node scripts/check-fsr-ui.cjs"
   },
   "build": {
     "appId": "com.icai-vera.app",
@@ -219,5 +221,8 @@
     "vite": "^5.4.19",
     "vitest": "^4.0.17",
     "wait-on": "^9.0.3"
+  },
+  "allowScripts": {
+    "electron@40.9.1": true
   }
 }

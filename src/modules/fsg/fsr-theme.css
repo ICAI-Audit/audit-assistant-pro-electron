@@ -1,0 +1,778 @@
+/* Financial Statement Review presentation layer (T-088).
+ *
+ * UI-ONLY. Loaded after fsg.css by src/pages/FinancialStatementReview.tsx. Every rule is scoped to .fsg-root (and its
+ * portal root), so the rest of VERA is unchanged, and none of it touches markup, handlers, state or data.
+ *
+ * Design rules (docs/ui-refresh): calm neutral slate surfaces; one crimson accent used only for the primary action, the
+ * active tab and the active nav item; statement blue kept for statement bars; semantic colours only for status.
+ *
+ * Buttons: the screens colour buttons with Tailwind hue utilities (blue, green, amber, indigo...). This layer maps those
+ * hues to roles instead of rewriting hundreds of class lists: a coloured outline becomes a neutral secondary button, a
+ * coloured solid or tinted button (also used for "selected" toggles) becomes dark ink or slate so selection stays
+ * visible, and red becomes a danger outline. A button that is the screen's real primary action carries .fsr-primary
+ * (crimson); a button that must keep its own colours (for example the status pills) carries .fsr-keep.
+ * The class lists below are generated; edit the roles, not the lists.
+ */
+
+.fsg-root {
+  --fsr-accent: #9f1239;
+  --fsr-accent-hover: #881337;
+  --fsr-accent-soft: #fff1f2;
+  --fsr-ink: #0f172a;
+  --fsr-ink-2: #334155;
+  --fsr-ink-3: #64748b;
+  --fsr-line: #e2e8f0;
+  --fsr-line-strong: #cbd5e1;
+  --fsr-surface: #ffffff;
+  --fsr-surface-2: #f8fafc;
+  --fsr-hover: #f1f5f9;
+  --fsr-statement: #1e3a8a;
+  --fsr-success: #15803d;
+  --fsr-warning: #b45309;
+  --fsr-danger: #b91c1c;
+  --fsr-info: #1d4ed8;
+  --fsr-radius-sm: calc(0.4375rem * var(--fsr-scale));
+  --fsr-radius-md: calc(0.625rem * var(--fsr-scale));
+  --fsr-radius-lg: calc(0.875rem * var(--fsr-scale));
+  --fsr-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --fsr-shadow-2: 0 calc(0.5rem * var(--fsr-scale)) calc(1.5rem * var(--fsr-scale)) rgba(15, 23, 42, 0.12);
+  --fsr-focus: #1d4ed8;
+  /* neutral scrollbars whatever the colour theme */
+  --color-scrollbar-thumb: #cbd5e1;
+  --color-scrollbar-thumb-hov: #94a3b8;
+  --color-scrollbar-track: transparent;
+}
+
+/* ── Focus: one visible ring everywhere (also dialog close buttons) ─────── */
+.fsg-root button:focus-visible,
+.fsg-root a:focus-visible,
+.fsg-root input:focus-visible,
+.fsg-root select:focus-visible,
+.fsg-root textarea:focus-visible,
+.fsg-root summary:focus-visible,
+.fsg-root [role="tab"]:focus-visible,
+.fsg-root [role="menuitem"]:focus-visible,
+.fsg-root [tabindex]:focus-visible {
+  outline: 2px solid var(--fsr-focus);
+  outline-offset: 1px;
+}
+
+/* ── Scrollbars: slim and neutral ───────────────────────────────────────── */
+.fsg-root ::-webkit-scrollbar { width: calc(0.5rem * var(--fsr-scale)); height: calc(0.5rem * var(--fsr-scale)); }
+.fsg-root ::-webkit-scrollbar-track { background: transparent; }
+.fsg-root ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: calc(0.25rem * var(--fsr-scale)); }
+.fsg-root ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.fsg-root button { transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+
+/* tinted (also "selected" toggles): light slate */
+.fsg-root button:not(.fsr-keep):is(
+  .bg-blue-50,
+  .bg-blue-100,
+  .bg-blue-200,
+  .bg-indigo-50,
+  .bg-indigo-100,
+  .bg-indigo-200,
+  .bg-sky-50,
+  .bg-sky-100,
+  .bg-sky-200,
+  .bg-cyan-50,
+  .bg-cyan-100,
+  .bg-cyan-200,
+  .bg-teal-50,
+  .bg-teal-100,
+  .bg-teal-200,
+  .bg-emerald-50,
+  .bg-emerald-100,
+  .bg-emerald-200,
+  .bg-green-50,
+  .bg-green-100,
+  .bg-green-200,
+  .bg-lime-50,
+  .bg-lime-100,
+  .bg-lime-200,
+  .bg-purple-50,
+  .bg-purple-100,
+  .bg-purple-200,
+  .bg-violet-50,
+  .bg-violet-100,
+  .bg-violet-200,
+  .bg-fuchsia-50,
+  .bg-fuchsia-100,
+  .bg-fuchsia-200,
+  .bg-pink-50,
+  .bg-pink-100,
+  .bg-pink-200,
+  .bg-rose-50,
+  .bg-rose-100,
+  .bg-rose-200,
+  .bg-amber-50,
+  .bg-amber-100,
+  .bg-amber-200,
+  .bg-yellow-50,
+  .bg-yellow-100,
+  .bg-yellow-200,
+  .bg-orange-50,
+  .bg-orange-100,
+  .bg-orange-200
+) { background-color: var(--fsr-hover); }
+
+/* coloured outline: neutral outline */
+.fsg-root button:not(.fsr-keep):is(
+  .border-blue-200,
+  .border-blue-300,
+  .border-blue-400,
+  .border-blue-500,
+  .border-blue-600,
+  .border-blue-700,
+  .border-indigo-200,
+  .border-indigo-300,
+  .border-indigo-400,
+  .border-indigo-500,
+  .border-indigo-600,
+  .border-indigo-700,
+  .border-sky-200,
+  .border-sky-300,
+  .border-sky-400,
+  .border-sky-500,
+  .border-sky-600,
+  .border-sky-700,
+  .border-cyan-200,
+  .border-cyan-300,
+  .border-cyan-400,
+  .border-cyan-500,
+  .border-cyan-600,
+  .border-cyan-700,
+  .border-teal-200,
+  .border-teal-300,
+  .border-teal-400,
+  .border-teal-500,
+  .border-teal-600,
+  .border-teal-700,
+  .border-emerald-200,
+  .border-emerald-300,
+  .border-emerald-400,
+  .border-emerald-500,
+  .border-emerald-600,
+  .border-emerald-700,
+  .border-green-200,
+  .border-green-300,
+  .border-green-400,
+  .border-green-500,
+  .border-green-600,
+  .border-green-700,
+  .border-lime-200,
+  .border-lime-300,
+  .border-lime-400,
+  .border-lime-500,
+  .border-lime-600,
+  .border-lime-700,
+  .border-purple-200,
+  .border-purple-300,
+  .border-purple-400,
+  .border-purple-500,
+  .border-purple-600,
+  .border-purple-700,
+  .border-violet-200,
+  .border-violet-300,
+  .border-violet-400,
+  .border-violet-500,
+  .border-violet-600,
+  .border-violet-700,
+  .border-fuchsia-200,
+  .border-fuchsia-300,
+  .border-fuchsia-400,
+  .border-fuchsia-500,
+  .border-fuchsia-600,
+  .border-fuchsia-700,
+  .border-pink-200,
+  .border-pink-300,
+  .border-pink-400,
+  .border-pink-500,
+  .border-pink-600,
+  .border-pink-700,
+  .border-rose-200,
+  .border-rose-300,
+  .border-rose-400,
+  .border-rose-500,
+  .border-rose-600,
+  .border-rose-700,
+  .border-amber-200,
+  .border-amber-300,
+  .border-amber-400,
+  .border-amber-500,
+  .border-amber-600,
+  .border-amber-700,
+  .border-yellow-200,
+  .border-yellow-300,
+  .border-yellow-400,
+  .border-yellow-500,
+  .border-yellow-600,
+  .border-yellow-700,
+  .border-orange-200,
+  .border-orange-300,
+  .border-orange-400,
+  .border-orange-500,
+  .border-orange-600,
+  .border-orange-700
+) { border-color: var(--fsr-line-strong); }
+
+/* coloured text: neutral ink */
+.fsg-root button:not(.fsr-keep):is(
+  .text-blue-500,
+  .text-blue-600,
+  .text-blue-700,
+  .text-blue-800,
+  .text-blue-900,
+  .text-indigo-500,
+  .text-indigo-600,
+  .text-indigo-700,
+  .text-indigo-800,
+  .text-indigo-900,
+  .text-sky-500,
+  .text-sky-600,
+  .text-sky-700,
+  .text-sky-800,
+  .text-sky-900,
+  .text-cyan-500,
+  .text-cyan-600,
+  .text-cyan-700,
+  .text-cyan-800,
+  .text-cyan-900,
+  .text-teal-500,
+  .text-teal-600,
+  .text-teal-700,
+  .text-teal-800,
+  .text-teal-900,
+  .text-emerald-500,
+  .text-emerald-600,
+  .text-emerald-700,
+  .text-emerald-800,
+  .text-emerald-900,
+  .text-green-500,
+  .text-green-600,
+  .text-green-700,
+  .text-green-800,
+  .text-green-900,
+  .text-lime-500,
+  .text-lime-600,
+  .text-lime-700,
+  .text-lime-800,
+  .text-lime-900,
+  .text-purple-500,
+  .text-purple-600,
+  .text-purple-700,
+  .text-purple-800,
+  .text-purple-900,
+  .text-violet-500,
+  .text-violet-600,
+  .text-violet-700,
+  .text-violet-800,
+  .text-violet-900,
+  .text-fuchsia-500,
+  .text-fuchsia-600,
+  .text-fuchsia-700,
+  .text-fuchsia-800,
+  .text-fuchsia-900,
+  .text-pink-500,
+  .text-pink-600,
+  .text-pink-700,
+  .text-pink-800,
+  .text-pink-900,
+  .text-rose-500,
+  .text-rose-600,
+  .text-rose-700,
+  .text-rose-800,
+  .text-rose-900,
+  .text-amber-500,
+  .text-amber-600,
+  .text-amber-700,
+  .text-amber-800,
+  .text-amber-900,
+  .text-yellow-500,
+  .text-yellow-600,
+  .text-yellow-700,
+  .text-yellow-800,
+  .text-yellow-900,
+  .text-orange-500,
+  .text-orange-600,
+  .text-orange-700,
+  .text-orange-800,
+  .text-orange-900
+) { color: var(--fsr-ink-2); }
+
+.fsg-root button:not(.fsr-keep):not(:disabled):is(
+  .border-blue-200,
+  .border-blue-300,
+  .border-blue-400,
+  .border-blue-500,
+  .border-blue-600,
+  .border-blue-700,
+  .border-indigo-200,
+  .border-indigo-300,
+  .border-indigo-400,
+  .border-indigo-500,
+  .border-indigo-600,
+  .border-indigo-700,
+  .border-sky-200,
+  .border-sky-300,
+  .border-sky-400,
+  .border-sky-500,
+  .border-sky-600,
+  .border-sky-700,
+  .border-cyan-200,
+  .border-cyan-300,
+  .border-cyan-400,
+  .border-cyan-500,
+  .border-cyan-600,
+  .border-cyan-700,
+  .border-teal-200,
+  .border-teal-300,
+  .border-teal-400,
+  .border-teal-500,
+  .border-teal-600,
+  .border-teal-700,
+  .border-emerald-200,
+  .border-emerald-300,
+  .border-emerald-400,
+  .border-emerald-500,
+  .border-emerald-600,
+  .border-emerald-700,
+  .border-green-200,
+  .border-green-300,
+  .border-green-400,
+  .border-green-500,
+  .border-green-600,
+  .border-green-700,
+  .border-lime-200,
+  .border-lime-300,
+  .border-lime-400,
+  .border-lime-500,
+  .border-lime-600,
+  .border-lime-700,
+  .border-purple-200,
+  .border-purple-300,
+  .border-purple-400,
+  .border-purple-500,
+  .border-purple-600,
+  .border-purple-700,
+  .border-violet-200,
+  .border-violet-300,
+  .border-violet-400,
+  .border-violet-500,
+  .border-violet-600,
+  .border-violet-700,
+  .border-fuchsia-200,
+  .border-fuchsia-300,
+  .border-fuchsia-400,
+  .border-fuchsia-500,
+  .border-fuchsia-600,
+  .border-fuchsia-700,
+  .border-pink-200,
+  .border-pink-300,
+  .border-pink-400,
+  .border-pink-500,
+  .border-pink-600,
+  .border-pink-700,
+  .border-rose-200,
+  .border-rose-300,
+  .border-rose-400,
+  .border-rose-500,
+  .border-rose-600,
+  .border-rose-700,
+  .border-amber-200,
+  .border-amber-300,
+  .border-amber-400,
+  .border-amber-500,
+  .border-amber-600,
+  .border-amber-700,
+  .border-yellow-200,
+  .border-yellow-300,
+  .border-yellow-400,
+  .border-yellow-500,
+  .border-yellow-600,
+  .border-yellow-700,
+  .border-orange-200,
+  .border-orange-300,
+  .border-orange-400,
+  .border-orange-500,
+  .border-orange-600,
+  .border-orange-700,
+  .bg-blue-50,
+  .bg-blue-100,
+  .bg-blue-200,
+  .bg-indigo-50,
+  .bg-indigo-100,
+  .bg-indigo-200,
+  .bg-sky-50,
+  .bg-sky-100,
+  .bg-sky-200,
+  .bg-cyan-50,
+  .bg-cyan-100,
+  .bg-cyan-200,
+  .bg-teal-50,
+  .bg-teal-100,
+  .bg-teal-200,
+  .bg-emerald-50,
+  .bg-emerald-100,
+  .bg-emerald-200,
+  .bg-green-50,
+  .bg-green-100,
+  .bg-green-200,
+  .bg-lime-50,
+  .bg-lime-100,
+  .bg-lime-200,
+  .bg-purple-50,
+  .bg-purple-100,
+  .bg-purple-200,
+  .bg-violet-50,
+  .bg-violet-100,
+  .bg-violet-200,
+  .bg-fuchsia-50,
+  .bg-fuchsia-100,
+  .bg-fuchsia-200,
+  .bg-pink-50,
+  .bg-pink-100,
+  .bg-pink-200,
+  .bg-rose-50,
+  .bg-rose-100,
+  .bg-rose-200,
+  .bg-amber-50,
+  .bg-amber-100,
+  .bg-amber-200,
+  .bg-yellow-50,
+  .bg-yellow-100,
+  .bg-yellow-200,
+  .bg-orange-50,
+  .bg-orange-100,
+  .bg-orange-200
+):hover { background-color: var(--fsr-surface-2); border-color: #94a3b8; }
+
+/* coloured solid: dark ink (selected / emphasised) */
+.fsg-root button:not(.fsr-keep):is(
+  .bg-blue-500,
+  .bg-blue-600,
+  .bg-blue-700,
+  .bg-blue-800,
+  .bg-blue-900,
+  .bg-indigo-500,
+  .bg-indigo-600,
+  .bg-indigo-700,
+  .bg-indigo-800,
+  .bg-indigo-900,
+  .bg-sky-500,
+  .bg-sky-600,
+  .bg-sky-700,
+  .bg-sky-800,
+  .bg-sky-900,
+  .bg-cyan-500,
+  .bg-cyan-600,
+  .bg-cyan-700,
+  .bg-cyan-800,
+  .bg-cyan-900,
+  .bg-teal-500,
+  .bg-teal-600,
+  .bg-teal-700,
+  .bg-teal-800,
+  .bg-teal-900,
+  .bg-emerald-500,
+  .bg-emerald-600,
+  .bg-emerald-700,
+  .bg-emerald-800,
+  .bg-emerald-900,
+  .bg-green-500,
+  .bg-green-600,
+  .bg-green-700,
+  .bg-green-800,
+  .bg-green-900,
+  .bg-lime-500,
+  .bg-lime-600,
+  .bg-lime-700,
+  .bg-lime-800,
+  .bg-lime-900,
+  .bg-purple-500,
+  .bg-purple-600,
+  .bg-purple-700,
+  .bg-purple-800,
+  .bg-purple-900,
+  .bg-violet-500,
+  .bg-violet-600,
+  .bg-violet-700,
+  .bg-violet-800,
+  .bg-violet-900,
+  .bg-fuchsia-500,
+  .bg-fuchsia-600,
+  .bg-fuchsia-700,
+  .bg-fuchsia-800,
+  .bg-fuchsia-900,
+  .bg-pink-500,
+  .bg-pink-600,
+  .bg-pink-700,
+  .bg-pink-800,
+  .bg-pink-900,
+  .bg-rose-500,
+  .bg-rose-600,
+  .bg-rose-700,
+  .bg-rose-800,
+  .bg-rose-900,
+  .bg-amber-500,
+  .bg-amber-600,
+  .bg-amber-700,
+  .bg-amber-800,
+  .bg-amber-900,
+  .bg-yellow-500,
+  .bg-yellow-600,
+  .bg-yellow-700,
+  .bg-yellow-800,
+  .bg-yellow-900,
+  .bg-orange-500,
+  .bg-orange-600,
+  .bg-orange-700,
+  .bg-orange-800,
+  .bg-orange-900
+) { background-color: #1e293b; border-color: #1e293b; color: #ffffff; }
+
+.fsg-root button:not(.fsr-keep):not(:disabled):is(
+  .bg-blue-500,
+  .bg-blue-600,
+  .bg-blue-700,
+  .bg-blue-800,
+  .bg-blue-900,
+  .bg-indigo-500,
+  .bg-indigo-600,
+  .bg-indigo-700,
+  .bg-indigo-800,
+  .bg-indigo-900,
+  .bg-sky-500,
+  .bg-sky-600,
+  .bg-sky-700,
+  .bg-sky-800,
+  .bg-sky-900,
+  .bg-cyan-500,
+  .bg-cyan-600,
+  .bg-cyan-700,
+  .bg-cyan-800,
+  .bg-cyan-900,
+  .bg-teal-500,
+  .bg-teal-600,
+  .bg-teal-700,
+  .bg-teal-800,
+  .bg-teal-900,
+  .bg-emerald-500,
+  .bg-emerald-600,
+  .bg-emerald-700,
+  .bg-emerald-800,
+  .bg-emerald-900,
+  .bg-green-500,
+  .bg-green-600,
+  .bg-green-700,
+  .bg-green-800,
+  .bg-green-900,
+  .bg-lime-500,
+  .bg-lime-600,
+  .bg-lime-700,
+  .bg-lime-800,
+  .bg-lime-900,
+  .bg-purple-500,
+  .bg-purple-600,
+  .bg-purple-700,
+  .bg-purple-800,
+  .bg-purple-900,
+  .bg-violet-500,
+  .bg-violet-600,
+  .bg-violet-700,
+  .bg-violet-800,
+  .bg-violet-900,
+  .bg-fuchsia-500,
+  .bg-fuchsia-600,
+  .bg-fuchsia-700,
+  .bg-fuchsia-800,
+  .bg-fuchsia-900,
+  .bg-pink-500,
+  .bg-pink-600,
+  .bg-pink-700,
+  .bg-pink-800,
+  .bg-pink-900,
+  .bg-rose-500,
+  .bg-rose-600,
+  .bg-rose-700,
+  .bg-rose-800,
+  .bg-rose-900,
+  .bg-amber-500,
+  .bg-amber-600,
+  .bg-amber-700,
+  .bg-amber-800,
+  .bg-amber-900,
+  .bg-yellow-500,
+  .bg-yellow-600,
+  .bg-yellow-700,
+  .bg-yellow-800,
+  .bg-yellow-900,
+  .bg-orange-500,
+  .bg-orange-600,
+  .bg-orange-700,
+  .bg-orange-800,
+  .bg-orange-900
+):hover { background-color: var(--fsr-ink); border-color: var(--fsr-ink); }
+
+/* red: danger outline */
+.fsg-root button:not(.fsr-keep):is(
+  .bg-red-500,
+  .bg-red-600,
+  .bg-red-700,
+  .bg-red-800,
+  .bg-red-50,
+  .bg-red-100
+) { background-color: #ffffff; border-color: #fca5a5; color: var(--fsr-danger); }
+.fsg-root button:not(.fsr-keep):is(
+  .border-red-200,
+  .border-red-300,
+  .border-red-400,
+  .border-red-500,
+  .border-red-600
+) { border-color: #fca5a5; }
+.fsg-root button:not(.fsr-keep):is(
+  .text-red-500,
+  .text-red-600,
+  .text-red-700,
+  .text-red-800
+) { color: var(--fsr-danger); }
+.fsg-root button:not(.fsr-keep):not(:disabled):is(
+  .bg-red-500,
+  .bg-red-600,
+  .bg-red-700,
+  .bg-red-800,
+  .bg-red-50,
+  .bg-red-100,
+  .border-red-200,
+  .border-red-300,
+  .border-red-400,
+  .border-red-500,
+  .border-red-600
+):hover { background-color: #fef2f2; border-color: #f87171; color: #991b1b; }
+
+/* the screen's primary action */
+.fsg-root button.fsr-primary.fsr-primary.fsr-primary {
+  background-color: var(--fsr-accent);
+  border-color: var(--fsr-accent);
+  color: #ffffff;
+}
+.fsg-root button.fsr-primary.fsr-primary.fsr-primary:not(:disabled):hover {
+  background-color: var(--fsr-accent-hover);
+  border-color: var(--fsr-accent-hover);
+  color: #ffffff;
+}
+.fsg-root button.fsr-primary.fsr-primary.fsr-primary:disabled { opacity: 0.5; }
+
+/* A button marked solid in the markup that is only a quiet action (row Approve, Download...) */
+.fsg-root button.fsr-secondary.fsr-secondary.fsr-secondary {
+  background-color: var(--fsr-surface);
+  border: 1px solid var(--fsr-line-strong);
+  color: var(--fsr-ink-2);
+}
+.fsg-root button.fsr-secondary.fsr-secondary.fsr-secondary:not(:disabled):hover {
+  background-color: var(--fsr-surface-2);
+  border-color: #94a3b8;
+  color: var(--fsr-ink);
+}
+
+/* Status pills keep their semantic colour and gain a dot of the same colour */
+.fsg-root .fsr-pill::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%;
+  background: currentColor; vertical-align: middle; opacity: 0.85;
+}
+
+/* The screens already mark their primary action with the module's theme colour (style background: var(--color-primary));
+   that is the same semantic, so it takes the one crimson accent whatever colour theme is selected. */
+.fsg-root button[style*="background: var(--color-primary)"],
+.fsg-root button[style*="background:var(--color-primary)"] {
+  background: var(--fsr-accent) !important;
+  border-color: var(--fsr-accent) !important;
+  color: #ffffff !important;
+}
+.fsg-root button[style*="background: var(--color-primary)"]:not(:disabled):hover,
+.fsg-root button[style*="background:var(--color-primary)"]:not(:disabled):hover {
+  background: var(--fsr-accent-hover) !important;
+}
+
+/* ── Data grids (AG Grid): light header, neutral rows ────────────────────── */
+.fsg-root .ag-theme-alpine .ag-header { background: #f8fafc !important; color: #334155 !important; border-bottom: 1px solid var(--fsr-line) !important; }
+.fsg-root .ag-theme-alpine .ag-header-cell-label { color: #334155 !important; font-weight: 600; }
+.fsg-root .ag-theme-alpine .ag-header-icon { color: #64748b !important; }
+.fsg-root .ag-theme-alpine .ag-header-cell-text { font-size: var(--fsr-text-sm); }
+.fsg-root .ag-theme-alpine .ag-row-even,
+.fsg-root .ag-theme-alpine .ag-row-odd { background: #ffffff; }
+.fsg-root .ag-theme-alpine .ag-row-hover { background: #f1f5f9 !important; }
+.fsg-root .ag-theme-alpine .ag-row-selected { background: var(--fsr-accent-soft) !important; }
+.fsg-root .ag-theme-alpine .ag-cell-focus { border: 1px solid #94a3b8 !important; }
+.fsg-root .ag-theme-alpine .ag-paging-panel { background: #f8fafc; border-top: 1px solid var(--fsr-line); color: #475569; }
+.fsg-root .ag-theme-alpine .ag-cell { font-variant-numeric: tabular-nums; }
+.fsg-root .ag-theme-alpine .ag-root-wrapper { border-color: var(--fsr-line); border-radius: var(--fsr-radius-md); }
+.fsg-root .ag-theme-alpine .ag-floating-filter-input input { background: #ffffff; }
+
+/* Mapping confidence: a thin status stripe instead of a heavy row tint (the Status column still names it) */
+.fsg-root .row-high        { background: transparent !important; box-shadow: inset 3px 0 0 #16a34a; }
+.fsg-root .row-medium      { background: transparent !important; box-shadow: inset 3px 0 0 #ca8a04; }
+.fsg-root .row-low         { background: transparent !important; box-shadow: inset 3px 0 0 #ea580c; }
+.fsg-root .row-unmapped    { background: transparent !important; box-shadow: inset 3px 0 0 #dc2626; }
+.fsg-root .row-discrepancy { background: transparent !important; box-shadow: inset 3px 0 0 #d97706; }
+.fsg-root .row-approved    { background: transparent !important; box-shadow: inset 3px 0 0 #2563eb; }
+
+/* ── Dialogs ─────────────────────────────────────────────────────────────── */
+.fsg-root .modal-backdrop { background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(calc(0.125rem * var(--fsr-scale))); }
+.fsg-root .modal-box { border-radius: var(--fsr-radius-lg); box-shadow: var(--fsr-shadow-2); }
+
+/* ── Primitives used by the redesigned screens ───────────────────────────── */
+.fsg-root .fsr-card { background: var(--fsr-surface); border: 1px solid var(--fsr-line); border-radius: var(--fsr-radius-md); box-shadow: var(--fsr-shadow-1); }
+.fsg-root .fsr-chip {
+  display: inline-flex; align-items: center; gap: calc(0.375rem * var(--fsr-scale)); padding: calc(0.125rem * var(--fsr-scale)) calc(0.5rem * var(--fsr-scale)); border-radius: calc(62.4375rem * var(--fsr-scale));
+  border: 1px solid var(--fsr-line); background: var(--fsr-surface-2); color: var(--fsr-ink-2);
+  font-size: var(--fsr-text-xs); font-weight: 500; line-height: calc(1.125rem * var(--fsr-scale)); white-space: nowrap;
+}
+.fsg-root .fsr-statusbar {
+  position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: calc(0.25rem * var(--fsr-scale)) calc(1rem * var(--fsr-scale)); padding: calc(0.375rem * var(--fsr-scale)) calc(0.75rem * var(--fsr-scale)); border-top: 1px solid var(--fsr-line); background: var(--fsr-surface-2);
+  color: var(--fsr-ink-2); font-size: var(--fsr-text-sm);
+}
+.fsg-root .fsr-statusbar--warn { background: #fffbeb; border-top-color: #fcd34d; color: #92400e; }
+.fsg-root .fsr-howto { border: calc(0.0625rem * var(--fsr-scale)) solid var(--fsr-line); border-radius: var(--fsr-radius-sm); background: var(--fsr-surface-2); font-size: var(--fsr-text-sm); color: var(--fsr-ink-2); }
+.fsg-root .fsr-howto > summary { cursor: pointer; padding: calc(0.375rem * var(--fsr-scale)) calc(0.625rem * var(--fsr-scale)); font-weight: 600; color: var(--fsr-ink-2); list-style: none; }
+.fsg-root .fsr-howto > summary::-webkit-details-marker { display: none; }
+.fsg-root .fsr-howto > summary::before { content: '\25B8'; display: inline-block; margin-right: 6px; transition: transform 120ms ease; }
+.fsg-root .fsr-howto[open] > summary::before { transform: rotate(90deg); }
+.fsg-root .fsr-howto > :not(summary) { padding: 0 calc(0.75rem * var(--fsr-scale)) calc(0.625rem * var(--fsr-scale)); }
+
+/* Statement rows: the empty remark pencil is quiet until the row is hovered or focused (always reachable by keyboard) */
+.fsg-root tr .fsr-remark-empty { opacity: 0.0; transition: opacity 120ms ease; }
+.fsg-root tr:hover .fsr-remark-empty,
+.fsg-root tr:focus-within .fsr-remark-empty,
+.fsg-root tr .fsr-remark-empty:focus-visible { opacity: 1; }
+
+/* Access-key underlines in the tab bar and its menus are a hint: shown only while Alt is held (.fsr-alt, set by NavTabs). */
+.fsg-root [role="tablist"] u,
+.fsg-root [role="menu"] u { text-decoration: none; }
+.fsg-root.fsr-alt [role="tablist"] u,
+.fsg-root.fsr-alt [role="menu"] u { text-decoration: underline; }
+
+/* Tab strip: 40px, accent underline on the active tab only */
+.fsg-root [role="tablist"] > button[role="tab"] { border-bottom-width: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fsg-root *, .fsg-root *::before, .fsg-root *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+/* ── View options from the "More" menu (src/lib/fsrPrefs.ts). Presentation only. ─────────────────────────────────────── */
+/* Report heading: off by default on screen. The heading stays in the page (visually hidden) for assistive technology and
+ * text search; PDF and Excel output build their own heading in the main process and are not affected. */
+.fsg-root[data-report-heading="off"] .fsr-report-heading {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Focus mode: hide the VERA sidebar and top bar while a Financial Statement Review screen is open. fsrPrefs sets the
+ * attribute on <html>, App.jsx clears it on Escape and when the module unmounts. */
+html[data-fsr-focus] [data-shell="sidebar"],
+html[data-fsr-focus] [data-shell="topbar"] { display: none !important; }

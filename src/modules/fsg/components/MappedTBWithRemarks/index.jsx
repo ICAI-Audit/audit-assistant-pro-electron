@@ -98,15 +98,15 @@ export default function MappedTBWithRemarks({ entity, activeTB, prevTB, onPrevTB
     { field: 'adj_credit', headerName: 'Adjustments (Credit)', width: 140, type: 'numericColumn',
       valueFormatter: (p) => p.value == null ? '' : Number(p.value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
     { field: 'tb_remark', headerName: 'TB Remark', width: 200, wrapText: true, autoHeight: true,
-      cellStyle: { whiteSpace: 'normal', fontSize: '11px' } },
+      cellStyle: { whiteSpace: 'normal', fontSize: 'var(--fsr-text-xs)' } },
     { field: 'bs_remark', headerName: 'BS Remark', width: 200, wrapText: true, autoHeight: true,
-      cellStyle: { whiteSpace: 'normal', fontSize: '11px', background: '#f0fdf4' } },
+      cellStyle: { whiteSpace: 'normal', fontSize: 'var(--fsr-text-xs)', background: '#f0fdf4' } },
     { field: 'pl_remark', headerName: 'PL Remark', width: 200, wrapText: true, autoHeight: true,
-      cellStyle: { whiteSpace: 'normal', fontSize: '11px', background: '#fff7ed' } },
+      cellStyle: { whiteSpace: 'normal', fontSize: 'var(--fsr-text-xs)', background: '#fff7ed' } },
     { field: 'notes_remark', headerName: 'Notes Remark', width: 200, wrapText: true, autoHeight: true,
-      cellStyle: { whiteSpace: 'normal', fontSize: '11px', background: '#eff6ff' } },
+      cellStyle: { whiteSpace: 'normal', fontSize: 'var(--fsr-text-xs)', background: '#eff6ff' } },
     { field: 'annexure_remark', headerName: 'Annexure Remark', width: 200, wrapText: true, autoHeight: true,
-      cellStyle: { whiteSpace: 'normal', fontSize: '11px', background: '#fdf4ff' } },
+      cellStyle: { whiteSpace: 'normal', fontSize: 'var(--fsr-text-xs)', background: '#fdf4ff' } },
   ]
 
   if (!activeTB) {
@@ -131,7 +131,7 @@ export default function MappedTBWithRemarks({ entity, activeTB, prevTB, onPrevTB
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={refresh}
-            className="px-3 py-1.5 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition"
+            className="px-3 py-1.5 text-xs border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
             title="Reload remarks"
           >
             ↻ Refresh
@@ -139,7 +139,7 @@ export default function MappedTBWithRemarks({ entity, activeTB, prevTB, onPrevTB
           <button
             onClick={handleDownloadExcel}
             disabled={downloading || rows.length === 0}
-            className="px-3 py-1.5 text-xs border border-green-500 text-green-700 rounded hover:bg-green-50 transition disabled:opacity-40"
+            className="px-3 py-1.5 text-xs border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition disabled:opacity-40"
             title="Download this table as an Excel file"
           >
             {downloading ? 'Downloading…' : '⬇ Download Excel'}
@@ -147,16 +147,17 @@ export default function MappedTBWithRemarks({ entity, activeTB, prevTB, onPrevTB
           <input
             type="text"
             placeholder="Search..."
+            aria-label="Search mapped trial balance with remarks"
             value={quickFilter}
             onChange={e => setQuickFilter(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm w-56 focus:ring-2 focus:ring-blue-400 focus:outline-none"
+            className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:ring-2 focus:ring-rose-800 focus:outline-none"
           />
-          {quickFilter && <button onClick={() => setQuickFilter('')} className="text-gray-400 text-sm">✕</button>}
+          {quickFilter && <button onClick={() => setQuickFilter('')} aria-label="Clear mapped trial balance search" className="text-slate-500 hover:text-slate-800 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-800">✕</button>}
           <span className="text-[10px] text-gray-400" title={AMOUNT_FILTER_HELP}>Amount filter: &gt;1000 · &lt;500 · 1000-5000</span>
         </div>
       </div>
 
-      <div className="flex-1 ag-theme-alpine overflow-hidden rounded border border-blue-100">
+      <div className="flex-1 min-h-0 ag-theme-alpine fsg-neutral-tb-grid overflow-hidden rounded-xl border border-slate-200">
         {loading ? (
           <div className="flex items-center justify-center h-full text-gray-400">Loading...</div>
         ) : rows.length === 0 ? (

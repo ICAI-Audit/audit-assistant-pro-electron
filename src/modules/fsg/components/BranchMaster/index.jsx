@@ -4,7 +4,8 @@ import { fsgApi } from '../../api.js'
 // T-087 (owner, 24 November 2026): Master > Branch Master - the branches of an Auditee with branches. Add, rename
 // (its Trial Balances take the new name, so their versions stay together) and delete (only a branch no Trial
 // Balance uses). The same list is the Branch dropdown on every Trial Balance upload.
-export default function BranchMaster({ entity, onChanged }) {
+// `embedded` (T-088, UI only): drawn inside the Master page's Branch Master card, which supplies the title and padding.
+export default function BranchMaster({ entity, onChanged, embedded = false }) {
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -52,33 +53,34 @@ export default function BranchMaster({ entity, onChanged }) {
   if (!entity) return <div className="p-6 text-sm text-gray-400">Select an Auditee first.</div>
 
   return (
-    <div className="p-6 max-w-4xl" data-testid="branch-master">
-      <h2 className="text-lg font-bold text-blue-900">Branch Master</h2>
-      <p className="text-xs text-gray-500 mt-1 mb-4">
+    <div className={embedded ? '' : 'p-6 max-w-4xl'} data-testid="branch-master">
+      {!embedded && <h2 className="fsr-page-title text-slate-900">Branch Master</h2>}
+      <p className={`text-sm text-slate-600 mb-4 ${embedded ? '' : 'mt-1'}`}>
         The branches of {entity.name}. Each Trial Balance upload picks its branch from this list; a second upload of the same branch and year is that branch&apos;s next version (_v2, _v3).
       </p>
 
       {!entity.has_branches && (
-        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
-          This Auditee is not set up with branches (Master &gt; Auditee Details). The branches below are used only when it is.
+        <div className="mb-4 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <span aria-hidden="true">⚠</span>
+          This Auditee is not set up with branches (Auditee &gt; Edit &gt; Has Branches). The branches below are used only when it is.
         </div>
       )}
       {error && <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-300 rounded text-xs text-red-700">{error}</div>}
       {notice && <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded text-xs text-green-700">{notice}</div>}
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <input type="text" value={newName} aria-label="New branch name" placeholder="New branch, e.g. Head Office"
           onChange={e => { setNewName(e.target.value); setError('') }} onKeyDown={e => { if (e.key === 'Enter') add() }}
-          className="w-72 border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-        <button onClick={add} disabled={busy} className="px-4 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 font-medium disabled:bg-gray-400">＋ Add branch</button>
+          className={`${embedded ? 'flex-1 min-w-[12rem]' : 'w-72'} h-9 border border-gray-300 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none`} />
+        <button onClick={add} disabled={busy} className="fsr-primary h-9 px-4 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold disabled:bg-gray-400">＋ Add branch</button>
       </div>
 
       {loading ? <p className="text-sm text-gray-400">Loading…</p> : !branches.length ? (
-        <p className="text-sm text-gray-400">No branches yet. Add one above, or on the Branch dropdown when uploading a Trial Balance.</p>
+        <p className="text-sm text-slate-500">No branches yet. Add one above, or from the Branch dropdown when uploading a Trial Balance.</p>
       ) : (
-        <table className="w-full text-xs border border-blue-100">
+        <table className="w-full text-xs border border-slate-200 rounded-lg">
           <thead>
-            <tr className="bg-blue-50 border-b border-blue-200 text-blue-900">
+            <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
               <th className="py-1.5 px-3 text-left font-semibold">Branch</th>
               <th className="py-1.5 px-3 text-right font-semibold w-36">Trial Balances</th>
               <th className="py-1.5 px-3 text-right font-semibold w-56">Actions</th>
@@ -116,7 +118,7 @@ export default function BranchMaster({ entity, onChanged }) {
           </tbody>
         </table>
       )}
-      <p className="text-[10px] text-gray-400 mt-2">A branch used by a Trial Balance cannot be deleted; rename it instead, or delete its Trial Balances on TB &gt; Upload TB first. A branch with a Trial Balance in a locked or finalised year cannot be renamed.</p>
+      <p className="text-xs text-slate-500 mt-2">A branch used by a Trial Balance cannot be deleted; rename it instead, or delete its Trial Balances on TB &gt; Upload TB first. A branch with a Trial Balance in a locked or finalised year cannot be renamed.</p>
     </div>
   )
 }

@@ -974,9 +974,11 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
           </button>
         </div>
       )}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-blue-100 shrink-0 bg-white flex-wrap">
-        <div>
-          <h2 className="font-bold text-blue-900 text-sm">
+      {/* T-088 (owner, 27 Nov 2026): header in two rows — what this screen is and which year, then the table's filters. */}
+      <div className="shrink-0 border-b border-slate-200 bg-white px-5 pt-3 pb-2.5 space-y-2.5" data-testid="recat-header">
+      <div className="flex items-start gap-4 flex-wrap">
+        <div className="min-w-0 flex-1">
+          <h2 className="fsr-card-title text-slate-900">
             Rectification / Recategorisation - Fix Unmapped Ledgers
             {categorisePY && <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold align-middle">PREVIOUS YEAR</span>}
           </h2>
@@ -986,7 +988,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
               : 'Filter by books hierarchy, select similar ledgers, and apply Schedule III mappings in bulk.'}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap justify-end" role="group" aria-label="Year to categorise">
           <div className="flex rounded border border-gray-300 overflow-hidden text-xs">
             <button
               onClick={() => setCategorisePY(false)}
@@ -1011,7 +1013,11 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
             </button>
           )}
         </div>
-        <div className="ml-auto flex items-center gap-3 flex-wrap">
+      </div>
+        <div className="flex items-center gap-3 flex-wrap" role="toolbar" aria-label="Filter the ledgers">
+          <input type="text" placeholder="Search all visible fields..." aria-label="Search all visible fields"
+            value={search} onChange={e => setSearch(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1.5 text-xs flex-1 min-w-[14rem] max-w-[28rem] focus:ring-2 focus:ring-blue-400 focus:outline-none" />
           <label className="flex items-center gap-1.5 text-xs text-gray-600">
             <input type="checkbox" checked={showAll} onChange={e => { setShowAll(e.target.checked); if (e.target.checked) setScopeFilter(null) }} className="rounded border-gray-300" />
             Show all mapped rows
@@ -1020,13 +1026,11 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
             <input type="checkbox" checked={showZero} onChange={e => setShowZero(e.target.checked)} className="rounded border-gray-300" />
             Include zero-balance ledgers
           </label>
+          <span className="ml-auto" />
           <button onClick={refresh}
             className="px-3 py-1.5 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition">
             Refresh
           </button>
-          <input type="text" placeholder="Search all visible fields..."
-            value={search} onChange={e => setSearch(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-xs w-56 focus:ring-2 focus:ring-blue-400 focus:outline-none" />
           <button onClick={clearFilters} className="px-2 py-1.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50">
             Clear filters
           </button>
@@ -1300,7 +1304,7 @@ export default function Exceptions({ entity, activeTB, activeRsId, prevTB, onPre
               </div>
             )}
 
-            <div className="border border-gray-200 rounded overflow-auto max-h-[calc(100vh-360px)] bg-white">
+            <div className="border border-gray-200 rounded overflow-auto max-h-[calc(var(--fsr-viewport-h)-22.5rem)] bg-white">
               <table className="text-xs table-fixed" style={{ width: totalWidth, minWidth: totalWidth }}>
                 <colgroup>
                   {columns.map(col => <col key={col.key} style={{ width: col.width }} />)}

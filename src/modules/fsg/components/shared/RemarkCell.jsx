@@ -44,7 +44,7 @@ export default function RemarkCell({
           if (!tbId) return
           setOpen(true)
         }}
-        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition
+        className={`${hasValue ? '' : 'fsr-remark-empty'} inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition
           ${hasValue
             ? 'bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200'
             : 'text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100'}`}

@@ -12,7 +12,7 @@ The [schema field catalogue](SCHEMA_FIELD_CATALOG.md) records 78 declared tables
 
 ## Ownership
 
-One local SQLite database sits in Electron userData. It contains firm settings, users and roles, clients, engagements, audit work, templates and tax-audit content. Local evidence bytes and renderer localStorage are additional stores. Multi-firm tenancy and shared-network database access have not been established. Do not place the database on a mapped drive or invent a sync architecture as part of a documentation task.
+One local SQLite database sits in Electron userData. It contains firm settings, users and roles, clients, engagements, audit work, templates and tax-audit content. Local evidence bytes and renderer localStorage are additional stores. In development only, `ICAI_VERA_DEV_USER_DATA_DIR` can point Electron userData at a distinct absolute path; SQLite, evidence bytes and renderer storage then use that isolated profile. Production continues to use Electron's default userData path. Multi-firm tenancy and shared-network database access have not been established. Do not place the database on a mapped drive or invent a sync architecture as part of a documentation task.
 
 ## Schema families
 

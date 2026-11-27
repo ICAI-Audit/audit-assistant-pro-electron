@@ -410,7 +410,7 @@ export default function ShareCapitalForm({ tbId, entityId, useEntityLevel, noteN
 
   return (
     <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 9999 }}>
-      <div className="modal-box overflow-hidden flex flex-col" style={{ maxWidth: '1100px', width: '96vw', maxHeight: '94vh' }} onClick={e => e.stopPropagation()}>
+      <div className="modal-box overflow-hidden flex flex-col" style={{ maxWidth: 'calc(68.75rem * var(--fsr-scale))', width: '96%', maxHeight: '94%' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 pb-3 mb-3 shrink-0">
           <div>

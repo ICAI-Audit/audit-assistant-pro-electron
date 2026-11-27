@@ -7,6 +7,7 @@ import PYTBSelector from '../shared/PYTBSelector'
 import ManualPYButton from '../shared/ManualPYButton'
 import PYModeSelect from '../shared/PYModeSelect'
 import PlClosedToCapitalButton from '../shared/PlClosedToCapitalButton'
+import FsrMore from '../shared/FsrMore'
 import RemarkCell, { useRemarks } from '../shared/RemarkCell'
 import { AnalyseChangeButton, AnalyseChangeProvider, useAnalyseChangeToggle, ChangeCells, ChangeCols, ChangeHeads, useChangeSpan } from '../shared/AnalyseChange'
 import { FormatRefButton, SCHEDULE3_SECTIONS } from '../shared/FormatReference'
@@ -451,7 +452,7 @@ function CompanyBS({ data, onNoteClick, activeTB, prevTB, getRemark, onRemarkSav
 
       {/* Balance difference */}
       {Math.abs(totalEL - totalAsset) > 1 && (
-        <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+        <div className="fsr-diffbar sticky z-10 mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 shadow-sm">
           Balance Sheet difference: {fmtINR(Math.abs(totalEL - totalAsset))}. Check unmapped or uncategorised ledgers.
         </div>
       )}
@@ -509,15 +510,17 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
           {prevTB?.id && (
             <PlClosedToCapitalButton tbId={prevTB.id} onChanged={refresh} label="PY" />
           )}
+          <FsrMore />
         </div>
       </div>
 
-      <div className={`flex-1 overflow-y-auto p-5 bg-white ${data?.pyMode === 'none_hide' ? 'hide-py' : ''}`}>
+      <div className={`fsr-stmt flex-1 overflow-y-auto px-5 pb-5 bg-white ${data?.pyMode === 'none_hide' ? 'hide-py' : ''}`}>
         <Guard activeTB={activeTB} loading={loading} error={error}>
           {data && (
             <>
               {/* Header */}
-              <div className="text-center mb-5 pb-3 border-b-2 border-blue-800">
+              <p className="fsr-report-line">{subtitle} · Amount in ₹</p>
+              <div className="fsr-report-heading text-center mb-5 pb-3 border-b-2 border-blue-800">
                 <h1 className="text-lg font-bold text-blue-900 uppercase tracking-wide">{entity?.name || 'Entity Name'}</h1>
                 {entity?.constitution_display && <p className="text-xs text-gray-500 mt-0.5">({entity.constitution_display})</p>}
                 <h2 className="text-sm font-bold text-gray-800 mt-2 uppercase tracking-wide">{subtitle}</h2>
@@ -526,7 +529,7 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
 
               <MissingAlieWarning report={data.missingAlie} onFix={openFix} tbId={activeTB?.id} />
               {/* Column headers */}
-              <table className="w-full text-xs mb-2 table-fixed">
+              <table className="fsr-sticky-head w-full text-xs table-fixed">
                 <BsColgroup wide={changeOn && !pyOff} />
                 <thead>
                   <tr className="border-b-2 border-blue-800">
@@ -564,7 +567,7 @@ export default function BS({ entity, activeTB, prevTB, activeRsId, onPrevTBChang
               )}
 
               <MissingAlieWarning report={data.missingAlie} position="bottom" />
-              <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-400 flex justify-between">
+              <div className="fsr-statusbar mt-4 rounded-md border">
                 <span>The accompanying notes form an integral part of the financial statements.</span>
                 <span>Click note numbers to navigate.</span>
               </div>

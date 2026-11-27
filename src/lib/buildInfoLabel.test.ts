@@ -28,9 +28,18 @@ describe('build information label', () => {
     expect(html).not.toMatch(/latest|up to date|new commits/i);
   });
 
+  it('uses a compact neutral badge in the header', () => {
+    const compact = renderToStaticMarkup(createElement(BuildInfoLabel, { compact: true }));
+    expect(compact).toContain('v0.9.1');
+    expect(compact).toContain('Updated 22 Nov 2026');
+    expect(compact).toContain('border-slate-200');
+    expect(compact).not.toContain('border-red-600');
+  });
+
   it('identifies the latest pulled main updates on the startup label', () => {
     expect(html).toContain('Repository sync: origin/main (22 November 2026)');
     expect(html).toContain('Update: Tax Audit: Form No. 26');
+    expect(html).not.toContain('Initial developer handover');
     expect(buildDetailLines()).toContain('Source branch: main');
   });
 

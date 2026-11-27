@@ -67,8 +67,20 @@ const secondaryNavItems = [
   { name: 'Admin Settings', href: '/admin/settings', icon: Settings, adminOnly: true },
 ];
 
+// T-088 (owner, 27 Nov 2026): the menu fills the sidebar from the brand to the Collapse button, without scrolling and
+// without an empty band below it. Each row's vertical padding is shared out from the window height: the fixed parts
+// (brand 52px, Collapse bar, section labels and gaps: about 13.5rem) and 1.5rem per row (20px icon + 4px gap) are taken
+// off, and the rest is split between the rows (--nav-rows, set on <aside>), between 2px and 8px. Very short windows scroll.
+const SHORT_ROW = '';
+const ROW_PAD_VALUE = 'clamp(2px, calc((100vh - 13.5rem - var(--nav-rows, 19) * 1.5rem) / (var(--nav-rows, 19) * 2)), 8px)';
+const ROW_PAD = { paddingTop: ROW_PAD_VALUE, paddingBottom: ROW_PAD_VALUE };
+
 export function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapsed to the icon rail by the user's choice, or automatically below 1440px wide. The Collapse button always wins.
+  const [manualCollapsed, setManualCollapsed] = useState<boolean | null>(null);
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1439px)').matches);
+  const collapsed = manualCollapsed ?? narrow;
+  const [altHeld, setAltHeld] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { role, user } = useAuth();
@@ -77,8 +89,32 @@ export function AppSidebar() {
   const hasEngagement = !!currentEngagement;
 
   useEffect(() => {
-    setCollapsed(false);
+    setManualCollapsed(null);
   }, [user?.id]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1439px)');
+    const onChange = () => setNarrow(query.matches);
+    onChange();
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  // Access-key underlines are shown only while Alt is held.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Alt') setAltHeld(event.type === 'keydown');
+    };
+    const onBlur = () => setAltHeld(false);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
 
   const handleLogoClick = () => {
     navigate('/');
@@ -93,8 +129,8 @@ export function AppSidebar() {
       <>
         <span
           className={cn(
-            'underline underline-offset-2',
-            useDoubleUnderline && 'decoration-double'
+            altHeld && 'underline underline-offset-2',
+            altHeld && useDoubleUnderline && 'decoration-double'
           )}
         >
           {firstLetter}
@@ -111,14 +147,17 @@ export function AppSidebar() {
       const content = (
         <div
           className={cn(
-            'nav-link group relative cursor-not-allowed opacity-50',
+            'nav-link group relative cursor-not-allowed gap-2.5 px-2.5 py-1.5 text-[13px] opacity-50'+SHORT_ROW,
           )}
+          style={ROW_PAD}
         >
           <item.icon className="h-5 w-5 shrink-0 text-muted-foreground" />
-          {!collapsed && (
+          {!collapsed ? (
             <span className="truncate text-muted-foreground">
               {renderName(item.name)}
             </span>
+          ) : (
+            <span className="sr-only" aria-hidden="true">{item.name}</span>
           )}
         </div>
       );
@@ -142,25 +181,31 @@ export function AppSidebar() {
     return (
       <NavLink
         to={item.href}
+        title={item.name}
+        aria-label={item.name}
+        style={ROW_PAD}
         className={cn(
-          'nav-link group relative',
-          isActive && 'active'
+          'nav-link group relative gap-2.5 px-2.5 py-1.5 text-[13px]'+SHORT_ROW,
+          collapsed && 'justify-center',
+          isActive && 'active bg-white/10'
         )}
       >
         <item.icon className={cn(
           'h-5 w-5 shrink-0 transition-colors',
-          isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+          isActive ? 'text-white' : 'text-muted-foreground group-hover:text-foreground'
         )} />
-        {!collapsed && (
+        {!collapsed ? (
           <span className={cn(
             'truncate transition-colors',
-            isActive ? 'text-primary font-medium' : ''
+            isActive ? 'font-semibold text-white' : ''
           )}>
             {renderName(item.name)}
           </span>
+        ) : (
+          <span className="sr-only" aria-hidden="true">{item.name}</span>
         )}
         {isActive && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-primary rounded-r" />
+          <div className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r bg-[#9f1239]" />
         )}
       </NavLink>
     );
@@ -211,15 +256,20 @@ export function AppSidebar() {
 
   return (
     <aside
+      data-shell="sidebar"
       className={cn(
         'flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out',
         collapsed ? 'w-16' : 'w-64'
       )}
-      style={{ background: 'var(--gradient-sidebar)' }}
+      style={{
+        background: 'var(--gradient-sidebar)',
+        // rows shown, for the fluid row padding (ROW_PAD); the Administration list depends on the role
+        ['--nav-rows' as string]: navItems.length + secondaryNavItems.filter(item => (item.adminOnly ? isAdmin : ('staffOnly' in item && item.staffOnly) ? !isAdmin : true)).length,
+      }}
     >
       {/* Header */}
       <div className={cn(
-        'flex items-center border-b border-sidebar-border h-16 px-4',
+        'flex items-center border-b border-sidebar-border h-[52px] px-4',
         collapsed ? 'justify-center' : 'justify-between'
       )}>
         {!collapsed && (
@@ -231,14 +281,15 @@ export function AppSidebar() {
               <Building2 className="h-5 w-5 text-primary-foreground" />
             </div>
             <div className="text-left">
-              <h1 className="font-semibold text-foreground text-sm">AuditPro</h1>
-              <p className="text-xs text-muted-foreground">Audit Management</p>
+              <h1 className="text-sm font-semibold leading-tight text-white">AuditPro</h1>
+              <p className="text-xs leading-tight text-slate-300">Audit Management</p>
             </div>
           </button>
         )}
         {collapsed && (
           <button
             onClick={handleLogoClick}
+            aria-label="Go to dashboard"
             className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center hover:opacity-80 transition-opacity cursor-pointer"
           >
             <Building2 className="h-5 w-5 text-primary-foreground" />
@@ -247,7 +298,7 @@ export function AppSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto scrollbar-thin p-2 space-y-1">
         <div className="space-y-1">
           {!collapsed && (
             <p className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -289,7 +340,9 @@ export function AppSidebar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => setManualCollapsed(!collapsed)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className={cn(
             'w-full justify-center text-muted-foreground hover:text-foreground hover:bg-sidebar-accent',
             !collapsed && 'justify-start'

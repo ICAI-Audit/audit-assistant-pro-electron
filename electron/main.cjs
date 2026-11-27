@@ -1,5 +1,18 @@
 const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const { getDevelopmentUserDataPath } = require('./dev-user-data.cjs');
+
+const developmentUserDataPath = getDevelopmentUserDataPath(
+  process.env,
+  app.getPath('userData'),
+);
+if (developmentUserDataPath) {
+  fs.mkdirSync(developmentUserDataPath, { recursive: true });
+  app.setPath('userData', developmentUserDataPath);
+  console.log('Using isolated VERA development userData:', developmentUserDataPath);
+}
+
 const { initializeAutoUpdater } = require('./auto-updater.cjs');
 const {
   buildEngagementScope,
@@ -12,7 +25,6 @@ const {
   rowIsAuthorized,
 } = require('./sqlite-authorization.cjs');
 const crypto = require('crypto');
-const fs = require('fs');
 const { ensureFirmPlace } = require('./firm-place-migration.cjs');
 let Database;
 let bcrypt;

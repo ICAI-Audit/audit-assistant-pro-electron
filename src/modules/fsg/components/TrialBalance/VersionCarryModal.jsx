@@ -82,7 +82,7 @@ export default function VersionCarryModal({ newTb, priorVersions, loadAreas, onC
             <>
               <YesNo name="copy-details" value={copyDetails} onChange={setCopyDetails} />
               {copyDetails && (
-                <div className="mt-2 border border-gray-100 rounded divide-y divide-gray-100 max-h-[32vh] overflow-y-auto">
+                <div className="mt-2 border border-gray-100 rounded divide-y divide-gray-100 max-h-48 overflow-y-auto">
                   {areas.map(a => (
                     <label key={a.key} className="flex items-center gap-3 px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-50">
                       <input type="checkbox" checked={chosen.has(a.key)} onChange={() => toggle(a.key)} data-area={a.key} />

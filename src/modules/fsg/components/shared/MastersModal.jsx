@@ -250,7 +250,7 @@ export default function MastersModal({ entity, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       {/* text-gray-900: opened from the blue top bar, whose white text every unstyled cell here inherited (names, designations, membership numbers read blank) */}
-      <div className="modal-box overflow-y-auto max-h-[92vh] text-gray-900" style={{ maxWidth: '960px', width: '95vw' }} onClick={e => e.stopPropagation()}>
+      <div className="modal-box overflow-y-auto max-h-[92%] text-gray-900" style={{ maxWidth: 'calc(60rem * var(--fsr-scale))', width: '95%' }} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold" style={{ color: 'var(--color-primary)' }}>Masters — Auditor &amp; Signatories</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>

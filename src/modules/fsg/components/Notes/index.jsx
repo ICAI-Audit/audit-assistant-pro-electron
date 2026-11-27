@@ -1357,10 +1357,10 @@ const ASSUMPTION_ROWS_SHOWN = 300
 export function AssumptionDisclosureModal({ items, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box max-w-2xl" onClick={e => e.stopPropagation()}>
+      <div className="modal-box max-w-2xl" style={{ maxWidth: '56rem' }} role="dialog" aria-modal="true" aria-label="Assumption Followed in Categorisation" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-blue-900">Assumption Followed in Categorisation</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
         </div>
         <p className="text-xs text-gray-600 mb-4 leading-relaxed">
           The following ledgers could not be conclusively classified from their name or books hierarchy, so a

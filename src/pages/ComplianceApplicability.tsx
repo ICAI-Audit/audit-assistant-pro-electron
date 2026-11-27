@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Minus, XCircle, Save } from "lucide-react";
+import { CheckCircle2, Minus, XCircle, Save, Zap, FileText, Calculator, Landmark, Info, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,71 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getSQLiteClient } from "@/integrations/sqlite/client";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/utils/errorMessages";
+
+// ── Presentation helpers (T-088 UI refresh; no data or logic) ──────────────────────────────────────────────────────────
+const CTRL = "h-9";
+const TONES = {
+  blue: "bg-blue-50 text-blue-700",
+  rose: "bg-rose-50 text-[#9f1239]",
+  emerald: "bg-emerald-50 text-emerald-700",
+  amber: "bg-amber-50 text-amber-700",
+} as const;
+
+function PanelCard({ icon: Icon, tone, title, action, grow = false, children }: {
+  icon: React.ComponentType<{ className?: string }>;
+  tone: keyof typeof TONES;
+  title: string;
+  action?: React.ReactNode;
+  grow?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      aria-label={title}
+      className={`flex min-w-0 flex-col rounded-[10px] border border-slate-200 bg-white shadow-sm ${grow ? "min-[1100px]:min-h-0 min-[1100px]:flex-1" : "shrink-0"}`}
+    >
+      <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ${TONES[tone]}`} aria-hidden="true">
+            <Icon className="h-4 w-4" />
+          </span>
+          <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
+        </div>
+        {action}
+      </header>
+      <div className={`p-4 ${grow ? "flex flex-col min-[1100px]:min-h-0 min-[1100px]:flex-1 overflow-y-auto" : ""}`}>{children}</div>
+    </section>
+  );
+}
+
+function Field({ label, tag, children }: { label: string; tag?: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <Label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+        <span className="truncate">{label}</span>
+        {tag && <span className="shrink-0 rounded-full bg-violet-50 px-1.5 py-px text-[10px] font-semibold text-violet-700">{tag}</span>}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+function EmptyPanel({ icon: Icon, title, children }: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-[6rem] flex-1 flex-col items-center justify-center rounded-[10px] border border-dashed border-slate-300 bg-slate-50/60 px-4 py-4 text-center">
+      <span className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#9f1239]" aria-hidden="true">
+        <Icon className="h-4 w-4" />
+      </span>
+      <p className="text-sm font-semibold text-slate-800">{title}</p>
+      <p className="mt-1 max-w-xs text-sm text-slate-500">{children}</p>
+    </div>
+  );
+}
+
 
 const db = getSQLiteClient();
 
@@ -460,328 +525,213 @@ const ComplianceApplicability: React.FC = () => {
     }
   }
 
-  // UI
+  // UI (T-088 presentation refresh, owner request 27 Nov 2026: fits one screen; panels scroll inside, the page does not)
+  const yesNoSelect = (value: string, onChange: (v: string) => void) => (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={CTRL}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {yesNoOptions.map(opt => (
+          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+  const amountInput = (value: string, set: (v: string) => void) => (
+    <Input
+      value={value}
+      onChange={e => set(formatIndianNumber(e.target.value))}
+      onBlur={e => set(formatIndianNumber(e.target.value))}
+      inputMode="decimal"
+      placeholder="0"
+      className={`${CTRL} text-right tabular-nums`}
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50">
-      <div className="mx-auto max-w-6xl px-6 pb-8 pt-4">
-        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-900">
-              Compliance Applicability Engine
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Statutory applicability checks and audit planning signals in one view.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleSaveDraft} disabled={saving}>
-              {saving ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Draft
-                </>
-              )}
-            </Button>
-            <Button className="px-6" onClick={evaluateCompliance}>
-              Evaluate Compliance
-            </Button>
-          </div>
+    <div className="flex flex-col gap-4 min-[1100px]:h-full min-[1100px]:min-h-0">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold leading-tight text-slate-900">
+            Compliance Applicability Engine
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            Statutory applicability checks and audit planning signals in one view.
+          </p>
         </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="h-9" onClick={handleSaveDraft} disabled={saving}>
+            {saving ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Draft
+              </>
+            )}
+          </Button>
+          <Button className="h-9 px-5 bg-[#9f1239] text-white hover:bg-[#881337]" onClick={evaluateCompliance}>
+            <Zap className="h-4 w-4 mr-2" />
+            Evaluate Compliance
+          </Button>
+        </div>
+      </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch">
-              <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm lg:h-full">
-                <h2 className="text-sm font-semibold text-slate-700">Financial Parameters</h2>
-                <div className="mt-4 space-y-3">
-                  <div className="space-y-2">
-                    <Label>Current Year Turnover</Label>
-                    <Input
-                      value={cyTurnover}
-                      onChange={e => setCyTurnover(formatIndianNumber(e.target.value))}
-                      onBlur={e => setCyTurnover(formatIndianNumber(e.target.value))}
-                      inputMode="decimal"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Paid-up Capital</Label>
-                    <Input
-                      value={cyCapital}
-                      onChange={e => setCyCapital(formatIndianNumber(e.target.value))}
-                      onBlur={e => setCyCapital(formatIndianNumber(e.target.value))}
-                      inputMode="decimal"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Previous Year Turnover</Label>
-                    <Input
-                      value={pyTurnover}
-                      onChange={e => setPyTurnover(formatIndianNumber(e.target.value))}
-                      onBlur={e => setPyTurnover(formatIndianNumber(e.target.value))}
-                      inputMode="decimal"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Previous Year Net Worth</Label>
-                    <Input
-                      value={pyNetworth}
-                      onChange={e => setPyNetworth(formatIndianNumber(e.target.value))}
-                      onBlur={e => setPyNetworth(formatIndianNumber(e.target.value))}
-                      inputMode="decimal"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Previous Year Borrowings</Label>
-                    <Input
-                      value={pyBorrowings}
-                      onChange={e => setPyBorrowings(formatIndianNumber(e.target.value))}
-                      onBlur={e => setPyBorrowings(formatIndianNumber(e.target.value))}
-                      inputMode="decimal"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Previous Year Net Profit</Label>
-                    <Input
-                      value={pyNetprofit}
-                      onChange={e => setPyNetprofit(formatIndianNumber(e.target.value))}
-                      onBlur={e => setPyNetprofit(formatIndianNumber(e.target.value))}
-                      inputMode="decimal"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex h-full flex-col gap-6">
-                <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm flex-1">
-                  <h2 className="text-sm font-semibold text-slate-700">Income-tax Parameters</h2>
-                  <div className="mt-4 space-y-3">
-                    <div className="space-y-2">
-                      <Label>Assessee Type</Label>
-                      <Select value={assesseeType} onValueChange={setAssesseeType}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Business">Business</SelectItem>
-                          <SelectItem value="Profession">Profession</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Cash Receipts &gt; 5%</Label>
-                      <Select value={cashReceipt} onValueChange={setCashReceipt}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {yesNoOptions.map(opt => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Cash Payments &gt; 5%</Label>
-                      <Select value={cashPayment} onValueChange={setCashPayment}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {yesNoOptions.map(opt => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Presumptive Scheme</Label>
-                      <Select value={presumptive} onValueChange={setPresumptive}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {yesNoOptions.map(opt => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Lower than Presumptive</Label>
-                      <Select value={lowerPresumptive} onValueChange={setLowerPresumptive}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {yesNoOptions.map(opt => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm flex-1">
-                  <h2 className="text-sm font-semibold text-slate-700">Company Law Parameters</h2>
-                  <div className="mt-4 space-y-3">
-                    <div className="space-y-2">
-                      <Label>Significant RPT Exists</Label>
-                      <Select value={rpt} onValueChange={setRpt}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {yesNoOptions.map(opt => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm lg:col-span-2">
-                <h2 className="text-sm font-semibold text-slate-700">Entity Classification</h2>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Amount Denomination</Label>
-                    <Select value={denomination} onValueChange={setDenomination}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(UNIT_MAP).map(unit => (
-                          <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Entity Type</Label>
-                    <Select value={entityClass} onValueChange={setEntityClass}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Company">Company</SelectItem>
-                        <SelectItem value="Non-Company">Non-Company</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Constitution</Label>
-                    <Select value={constitution} onValueChange={setConstitution}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {ENTITY_CLASSIFICATION_MAP[entityClass].map(opt => (
-                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Sub-Constitution</Label>
-                    <Select value={subConstitution} onValueChange={setSubConstitution}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Neither">Neither</SelectItem>
-                        <SelectItem value="Holding Company">Holding Company</SelectItem>
-                        <SelectItem value="Subsidiary Company">Subsidiary Company</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Dormant Company</Label>
-                    <Select value={dormant} onValueChange={setDormant}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {yesNoOptions.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 gap-4 min-[1100px]:min-h-0 min-[1100px]:flex-1 min-[1100px]:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="flex min-w-0 flex-col gap-4 min-[1100px]:min-h-0">
+          <PanelCard icon={FileText} tone="blue" title="Entity Classification">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,0.8fr)]">
+              <Field label="Amount Denomination">
+                <Select value={denomination} onValueChange={setDenomination}>
+                  <SelectTrigger className={CTRL}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(UNIT_MAP).map(unit => (
+                      <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Entity Type">
+                <Select value={entityClass} onValueChange={setEntityClass}>
+                  <SelectTrigger className={CTRL}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Company">Company</SelectItem>
+                    <SelectItem value="Non-Company">Non-Company</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Constitution">
+                <Select value={constitution} onValueChange={setConstitution}>
+                  <SelectTrigger className={CTRL}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ENTITY_CLASSIFICATION_MAP[entityClass].map(opt => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Sub-Constitution">
+                <Select value={subConstitution} onValueChange={setSubConstitution}>
+                  <SelectTrigger className={CTRL}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Neither">Neither</SelectItem>
+                    <SelectItem value="Holding Company">Holding Company</SelectItem>
+                    <SelectItem value="Subsidiary Company">Subsidiary Company</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Dormant Company">{yesNoSelect(dormant, setDormant)}</Field>
             </div>
+          </PanelCard>
 
+          <div className="grid shrink-0 grid-cols-1 gap-4 min-[1100px]:grid-cols-2">
+            <PanelCard icon={Calculator} tone="rose" title="Financial Parameters">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
+                <Field label="Current Year Turnover">{amountInput(cyTurnover, setCyTurnover)}</Field>
+                <Field label="Previous Year Turnover">{amountInput(pyTurnover, setPyTurnover)}</Field>
+                <Field label="Paid-up Capital">{amountInput(cyCapital, setCyCapital)}</Field>
+                <Field label="Previous Year Net Worth">{amountInput(pyNetworth, setPyNetworth)}</Field>
+                <Field label="Previous Year Borrowings">{amountInput(pyBorrowings, setPyBorrowings)}</Field>
+                <Field label="Previous Year Net Profit">{amountInput(pyNetprofit, setPyNetprofit)}</Field>
+              </div>
+            </PanelCard>
+
+            <PanelCard icon={Landmark} tone="emerald" title="Income-tax & Company Law">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
+                <Field label="Assessee Type">
+                  <Select value={assesseeType} onValueChange={setAssesseeType}>
+                    <SelectTrigger className={CTRL}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Business">Business</SelectItem>
+                      <SelectItem value="Profession">Profession</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Presumptive Scheme">{yesNoSelect(presumptive, setPresumptive)}</Field>
+                <Field label="Cash Receipts > 5%">{yesNoSelect(cashReceipt, setCashReceipt)}</Field>
+                <Field label="Cash Payments > 5%">{yesNoSelect(cashPayment, setCashPayment)}</Field>
+                <Field label="Lower than Presumptive">{yesNoSelect(lowerPresumptive, setLowerPresumptive)}</Field>
+                <Field label="Significant RPT Exists" tag="Co. Law">{yesNoSelect(rpt, setRpt)}</Field>
+              </div>
+            </PanelCard>
           </div>
 
-          <div className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
-            <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">Evaluation Output</h2>
-                  <p className="text-xs text-slate-500">Right-side results update on every run.</p>
-                </div>
-                <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
-                  {results.length} checks
-                </span>
-              </div>
+          <PanelCard icon={Info} tone="amber" title="Evaluation Basis" grow>
+            {resultReasons.length === 0 ? (
+              <EmptyPanel icon={FileText} title="Reasons appear here">
+                Run evaluation to see the exact reason for each decision.
+              </EmptyPanel>
+            ) : (
+              <ul className="space-y-2 text-sm text-slate-600">
+                {resultReasons.map(([label, reason]) => (
+                  <li key={label}>
+                    <span className="font-semibold text-slate-700">{label}:</span> {reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </PanelCard>
+        </div>
 
-              <div className="mt-5 space-y-3">
-                {results.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-                    No evaluation yet. Click "Evaluate Compliance" to view outcomes.
-                  </div>
-                )}
+        <PanelCard
+          icon={ShieldCheck}
+          tone="rose"
+          title="Evaluation Output"
+          grow
+          action={
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-700">
+              {results.length} checks
+            </span>
+          }
+        >
+          <div className="flex flex-1 flex-col gap-3">
+            {results.length === 0 && (
+              <EmptyPanel icon={ShieldCheck} title="No evaluation yet">
+                No evaluation yet. Click "Evaluate Compliance" to view outcomes.
+              </EmptyPanel>
+            )}
 
-                {results.map(([area, applicable, statute]) => {
-                  const isYes = applicable === "Yes";
-                  const isNo = applicable === "No";
-                  const badgeClass = isYes
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : isNo
-                      ? "bg-rose-50 text-rose-700 border-rose-200"
-                      : "bg-slate-50 text-slate-600 border-slate-200";
+            {results.map(([area, applicable, statute]) => {
+              const isYes = applicable === "Yes";
+              const isNo = applicable === "No";
+              const badgeClass = isYes
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : isNo
+                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                  : "bg-slate-50 text-slate-600 border-slate-200";
 
-                  return (
-                    <div key={area} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{area}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {STATUTE_LINKS[statute] ? (
-                              <a
-                                href={STATUTE_LINKS[statute]}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-slate-600 underline decoration-dotted underline-offset-4 hover:text-slate-900"
-                              >
-                                {statute}
-                              </a>
-                            ) : (
-                              statute
-                            )}
-                          </p>
-                        </div>
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>
-                          {isYes ? <CheckCircle2 className="h-4 w-4" /> : isNo ? <XCircle className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
-                          {isYes ? "Yes" : isNo ? "No" : "N/A"}
-                        </span>
-                      </div>
+              return (
+                <div key={area} className="rounded-[10px] border border-slate-200 bg-white px-3.5 py-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{area}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {STATUTE_LINKS[statute] ? (
+                          <a
+                            href={STATUTE_LINKS[statute]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-600 underline decoration-dotted underline-offset-4 hover:text-slate-900"
+                          >
+                            {statute}
+                          </a>
+                        ) : (
+                          statute
+                        )}
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
+                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>
+                      {isYes ? <CheckCircle2 className="h-4 w-4" /> : isNo ? <XCircle className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+                      {isYes ? "Yes" : isNo ? "No" : "N/A"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
-
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white/90 px-6 py-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-800">Evaluation Basis</h3>
-          {resultReasons.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-600">
-              Run evaluation to see the exact reason for each decision.
-            </p>
-          ) : (
-            <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              {resultReasons.map(([label, reason]) => (
-                <li key={label}>
-                  <span className="font-semibold text-slate-700">{label}:</span> {reason}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        </PanelCard>
       </div>
     </div>
   );

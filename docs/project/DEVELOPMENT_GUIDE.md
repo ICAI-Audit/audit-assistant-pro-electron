@@ -55,7 +55,14 @@ npm run test:native
 
 1. Inspect Git status and shared instructions. Select one scoped task.
 2. Install with the supported toolchain. Confirm postinstall rebuild succeeds for Electron. ODBC may need its native runtime/driver for Tally tests.
-3. Use an isolated synthetic user-data profile before launching any code that can create or migrate a database. The current application has no documented dedicated test-profile environment variable; do not invent one. Establish the isolation mechanism in a separate scoped change if required.
+3. Use an isolated synthetic user-data profile before launching any code that can create or migrate a database. `ICAI_VERA_DEV_USER_DATA_DIR` is supported only when `NODE_ENV=development`; it must be an absolute path different from Electron's default `userData` path. The main process creates that directory before opening SQLite. Never use this override for production launches. For example:
+
+   ```powershell
+   $env:ICAI_VERA_DEV_USER_DATA_DIR = Join-Path $env:TEMP ('icai-vera-dev-' + [guid]::NewGuid().ToString('N'))
+   npm run electron:dev
+   ```
+
+   Run `node --test electron/dev-user-data.test.cjs` to verify the override guards. Use a new directory for a fresh synthetic profile. Remove the environment variable after stopping the app if continuing in the same PowerShell session.
 4. Start npm run electron:dev. Vite serves port 8080. A Vite browser tab alone lacks the native bridge required by the active SQLite client.
 5. Run focused tests, explicit app typecheck, lint as relevant, and renderer build for a code change. Record limitations from legacy failures.
 6. Test persistence across restart and engagement switching. Desktop or installer changes need a packaged smoke test on the target OS.

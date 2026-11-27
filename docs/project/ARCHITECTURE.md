@@ -14,6 +14,8 @@ The active handler is inline in main.cjs. sqlite/database-manager.ts and sqlite/
 
 The database opens under app.getPath('userData') as audit_assistant.db, with foreign keys enabled and WAL journalling. Startup reads sqlite/schema SQL and runs additional report, template, and tax-audit backfills in main.cjs. Migration scripts in scripts and Supabase artefacts must be classified before reuse; they are not interchangeable with desktop startup migrations.
 
+Development smoke tests may set `ICAI_VERA_DEV_USER_DATA_DIR` to a new absolute directory. This is allowed only with `NODE_ENV=development`, must differ from the default userData path, and isolates the database, evidence files and renderer storage; production behaviour is unchanged.
+
 ## File path
 
 Evidence metadata uses evidence_files and linking tables. src/hooks/useEvidenceFiles.ts calls the storage wrapper in the active SQLite client; preload forwards file-save, file-download, file-delete, and file-get-path. Main stores bytes below userData/files/bucket and normalises file paths. App exports use the separate app:exportFile handler (app:openPath and app:getDownloadsPath were removed with the Financial Review export dialog in T-019). Check path validation, engagement authorization, cleanup on failed metadata writes, and backup completeness before relying on the evidence vault.
